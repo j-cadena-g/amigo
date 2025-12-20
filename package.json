@@ -1,0 +1,23 @@
+{
+  "name": "amigo",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
+    "test:coverage": "turbo test:coverage",
+    "db:generate": "turbo db:generate",
+    "db:migrate": "turbo db:migrate",
+    "audit": "bun audit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "turbo": "^2",
+    "typescript": "^5.7"
+  },
+  "packageManager": "bun@1.1.38"
+}

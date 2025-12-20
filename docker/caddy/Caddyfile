@@ -1,0 +1,19 @@
+{
+	email james@cadenalabs.ca
+}
+
+amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	@dev host dev-amigo.cadenalabs.net
+	handle @dev {
+		reverse_proxy web-dev:3000
+	}
+
+	@prod host amigo.cadenalabs.net
+	handle @prod {
+		reverse_proxy web-prod:3000
+	}
+}

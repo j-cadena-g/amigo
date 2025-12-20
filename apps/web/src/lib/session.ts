@@ -64,11 +64,6 @@ export async function deleteSession(): Promise<void> {
   }
 }
 
-export function setSessionCookie(sessionId: string): void {
-  // This is used in route handlers where we can set cookies directly
-  // The actual cookie setting happens in the route handler
-}
-
 export function getSessionCookieOptions() {
   const isProduction = process.env["NODE_ENV"] === "production";
   return {

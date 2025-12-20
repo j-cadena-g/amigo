@@ -1,6 +1,9 @@
 import { db } from "@amigo/db";
 import { households } from "@amigo/db/schema";
 
+// Force dynamic rendering - page queries database
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   // Direct DB access pattern - Server Components query directly
   const allHouseholds = await db.select().from(households).limit(10);

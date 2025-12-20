@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL 17 Database
+  # PostgreSQL 17 Database (shared between dev and prod)
   postgres:
     image: postgres:17-alpine
     container_name: amigo-postgres
@@ -10,6 +10,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-dev-db.sh:/docker-entrypoint-initdb.d/init-dev-db.sh:ro
+    ports:
+      - "5432:5432"
     networks:
       - amigo-network
     healthcheck:
@@ -18,13 +21,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # Valkey 8 (Redis fork) for Sessions and Pub/Sub
+  # Valkey 8 (Redis fork) for Sessions and Pub/Sub (shared)
   valkey:
     image: valkey/valkey:8-alpine
     container_name: amigo-valkey
     restart: unless-stopped
     volumes:
       - valkey_data:/data
+    ports:
+      - "6379:6379"
     networks:
       - amigo-network
     healthcheck:
@@ -35,7 +40,6 @@ services:
 
   # Caddy Reverse Proxy with DNS-01 SSL
   caddy:
-    image: ghcr.io/amigo/caddy-cloudflare:latest
     build:
       context: ./docker/caddy
       dockerfile: Dockerfile
@@ -54,34 +58,35 @@ services:
       - amigo-network
     depends_on:
       - web-prod
+      - web-dev
 
-  # Next.js Web App (Production)
+  # ============================================
+  # PRODUCTION STACK (amigo.cadenalabs.net)
+  # ============================================
+
   web-prod:
-    image: ghcr.io/amigo/web:latest
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile
       target: runner
     container_name: amigo-web-prod
     restart: unless-stopped
+    network_mode: host
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      VALKEY_URL: redis://valkey:6379
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}
+      VALKEY_URL: redis://localhost:6379
       AUTHELIA_ISSUER: ${AUTHELIA_ISSUER}
       AUTHELIA_CLIENT_ID: ${AUTHELIA_CLIENT_ID}
       AUTHELIA_CLIENT_SECRET: ${AUTHELIA_CLIENT_SECRET}
-    networks:
-      - amigo-network
+      APP_URL: https://amigo.cadenalabs.net
     depends_on:
       postgres:
         condition: service_healthy
       valkey:
         condition: service_healthy
 
-  # Hono API Server (Production)
   api-prod:
-    image: ghcr.io/amigo/api:latest
     build:
       context: .
       dockerfile: ./apps/api/Dockerfile
@@ -90,6 +95,51 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      VALKEY_URL: redis://valkey:6379
+    networks:
+      - amigo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  # ============================================
+  # DEVELOPMENT STACK (dev-amigo.cadenalabs.net)
+  # ============================================
+
+  web-dev:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      target: runner
+    container_name: amigo-web-dev
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}_dev
+      VALKEY_URL: redis://localhost:6379
+      AUTHELIA_ISSUER: ${AUTHELIA_ISSUER}
+      AUTHELIA_CLIENT_ID: ${AUTHELIA_CLIENT_ID}
+      AUTHELIA_CLIENT_SECRET: ${AUTHELIA_CLIENT_SECRET}
+      APP_URL: https://dev-amigo.cadenalabs.net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  api-dev:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    container_name: amigo-api-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}_dev
       VALKEY_URL: redis://valkey:6379
     networks:
       - amigo-network

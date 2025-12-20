@@ -1,0 +1,30 @@
+{
+  "name": "@amigo/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amigo/db": "workspace:*",
+    "@amigo/types": "workspace:*",
+    "@hono/zod-validator": "^0.4",
+    "hono": "^4.6",
+    "ioredis": "^5.4",
+    "zod": "^3.24"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7"
+  }
+}

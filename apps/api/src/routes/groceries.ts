@@ -12,7 +12,7 @@ export const groceriesRouter = new Hono().get(
   "/",
   zValidator("query", querySchema),
   async (c) => {
-    const { lastSync } = c.req.valid("query");
+    const { lastSync: _lastSync } = c.req.valid("query");
 
     // Delta sync: fetch items updated after lastSync timestamp
     const query = db

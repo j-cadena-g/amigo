@@ -7,13 +7,31 @@ amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
 		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 	}
 
+	# Development environment (web-dev on host port 3001)
 	@dev host dev-amigo.cadenalabs.net
 	handle @dev {
-		reverse_proxy web-dev:3000
+		# WebSocket and API routes go to Hono
+		@api_dev path /ws /api/sync/* /api/health
+		handle @api_dev {
+			reverse_proxy api-dev:3001
+		}
+		# Everything else goes to Next.js (host network)
+		handle {
+			reverse_proxy 192.168.15.32:3001
+		}
 	}
 
+	# Production environment (web-prod on host port 3000)
 	@prod host amigo.cadenalabs.net
 	handle @prod {
-		reverse_proxy web-prod:3000
+		# WebSocket and API routes go to Hono
+		@api_prod path /ws /api/sync/* /api/health
+		handle @api_prod {
+			reverse_proxy api-prod:3001
+		}
+		# Everything else goes to Next.js (host network)
+		handle {
+			reverse_proxy 192.168.15.32:3000
+		}
 	}
 }

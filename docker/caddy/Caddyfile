@@ -2,6 +2,18 @@
 	email james@cadenalabs.ca
 }
 
+# Authentik Identity Provider
+auth.cadenalabs.net {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	reverse_proxy authentik-server:9000 {
+		trusted_proxies private_ranges
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
+
 amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
 	tls {
 		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
@@ -11,27 +23,25 @@ amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
 	@dev host dev-amigo.cadenalabs.net
 	handle @dev {
 		# WebSocket and API routes go to Hono
-		@api_dev path /ws /api/sync/* /api/health
-		handle @api_dev {
-			reverse_proxy api-dev:3001
-		}
+		reverse_proxy /ws api-dev:3001
+		reverse_proxy /api/sync/* api-dev:3001
+		reverse_proxy /api/health api-dev:3001
+		reverse_proxy /api/transactions* api-dev:3001
+		reverse_proxy /api/groceries* api-dev:3001
 		# Everything else goes to Next.js (host network)
-		handle {
-			reverse_proxy 192.168.15.32:3001
-		}
+		reverse_proxy 192.168.15.32:3001
 	}
 
 	# Production environment (web-prod on host port 3000)
 	@prod host amigo.cadenalabs.net
 	handle @prod {
 		# WebSocket and API routes go to Hono
-		@api_prod path /ws /api/sync/* /api/health
-		handle @api_prod {
-			reverse_proxy api-prod:3001
-		}
+		reverse_proxy /ws api-prod:3001
+		reverse_proxy /api/sync/* api-prod:3001
+		reverse_proxy /api/health api-prod:3001
+		reverse_proxy /api/transactions* api-prod:3001
+		reverse_proxy /api/groceries* api-prod:3001
 		# Everything else goes to Next.js (host network)
-		handle {
-			reverse_proxy 192.168.15.32:3000
-		}
+		reverse_proxy 192.168.15.32:3000
 	}
 }

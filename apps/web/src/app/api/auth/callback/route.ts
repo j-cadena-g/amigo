@@ -4,25 +4,25 @@ import { getOIDCConfig, getPostLoginRedirect, getAppUrl } from "@/lib/auth";
 import { createSession, getSessionCookieOptions } from "@/lib/session";
 import { db, eq } from "@amigo/db";
 import { users, households } from "@amigo/db/schema";
-import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
-  const cookieStore = await cookies();
-  const codeVerifier = cookieStore.get("oidc_code_verifier")?.value;
-  const expectedState = cookieStore.get("oidc_state")?.value;
+  const codeVerifier = request.cookies.get("oidc_code_verifier")?.value;
+  const expectedState = request.cookies.get("oidc_state")?.value;
+
+  console.log("Callback received. codeVerifier:", !!codeVerifier, "expectedState:", !!expectedState);
+  console.log("Query params:", request.nextUrl.search);
 
   if (!codeVerifier || !expectedState) {
+    console.log("Missing OIDC cookies, redirecting to login");
     return NextResponse.redirect(
       new URL("/api/auth/login", getAppUrl())
     );
   }
 
-  // Clear OIDC cookies
-  cookieStore.delete("oidc_code_verifier");
-  cookieStore.delete("oidc_state");
-
   try {
     const config = await getOIDCConfig();
+    const isProduction = process.env["NODE_ENV"] === "production";
+    const cookieDomain = isProduction ? ".cadenalabs.net" : undefined;
 
     // Build the callback URL with query params from the request
     // Use APP_URL as base since request.url may have internal container hostname
@@ -118,6 +118,11 @@ export async function GET(request: NextRequest) {
       maxAge: cookieOptions.maxAge,
     });
 
+    // Clear OIDC cookies on the response
+    response.cookies.delete({ name: "oidc_code_verifier", path: "/", domain: cookieDomain });
+    response.cookies.delete({ name: "oidc_state", path: "/", domain: cookieDomain });
+
+    console.log("Login successful, redirecting to", getPostLoginRedirect());
     return response;
   } catch (error) {
     console.error("OIDC callback error:", error);

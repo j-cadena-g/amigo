@@ -8,9 +8,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      AUTHENTIK_DB_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init-dev-db.sh:/docker-entrypoint-initdb.d/init-dev-db.sh:ro
+      - ./docker/postgres/init-dev-db.sh:/docker-entrypoint-initdb.d/01-init-dev-db.sh:ro
+      - ./docker/postgres/init-authentik.sh:/docker-entrypoint-initdb.d/02-init-authentik.sh:ro
     ports:
       - "5432:5432"
     networks:
@@ -38,6 +40,61 @@ services:
       timeout: 5s
       retries: 5
 
+  # ============================================
+  # AUTHENTIK (Identity Provider)
+  # ============================================
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.10
+    container_name: amigo-authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: valkey
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@cadenalabs.net}
+    volumes:
+      - ./authentik/media:/media
+      - ./authentik/custom-templates:/templates
+    networks:
+      - amigo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.10
+    container_name: amigo-authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: valkey
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik}
+      # Bootstrap vars must be on worker - it runs the blueprints that create akadmin
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@cadenalabs.net}
+    volumes:
+      - ./authentik/media:/media
+      - ./authentik/custom-templates:/templates
+    networks:
+      - amigo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
   # Caddy Reverse Proxy with DNS-01 SSL
   caddy:
     build:
@@ -59,6 +116,7 @@ services:
     depends_on:
       - web-prod
       - web-dev
+      - authentik-server
 
   # ============================================
   # PRODUCTION STACK (amigo.cadenalabs.net)
@@ -76,9 +134,9 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}
       VALKEY_URL: redis://localhost:6379
-      AUTHELIA_ISSUER: ${AUTHELIA_ISSUER}
-      AUTHELIA_CLIENT_ID: ${AUTHELIA_CLIENT_ID}
-      AUTHELIA_CLIENT_SECRET: ${AUTHELIA_CLIENT_SECRET}
+      AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
       APP_URL: https://amigo.cadenalabs.net
     depends_on:
       postgres:
@@ -121,9 +179,9 @@ services:
       PORT: 3001
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}_dev
       VALKEY_URL: redis://localhost:6379
-      AUTHELIA_ISSUER: ${AUTHELIA_ISSUER}
-      AUTHELIA_CLIENT_ID: ${AUTHELIA_CLIENT_ID}
-      AUTHELIA_CLIENT_SECRET: ${AUTHELIA_CLIENT_SECRET}
+      AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
       APP_URL: https://dev-amigo.cadenalabs.net
     depends_on:
       postgres:

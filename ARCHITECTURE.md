@@ -10,15 +10,22 @@
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Tech Stack and Standards](#tech-stack-and-standards)
+2. [Tech Stack & Standards](#tech-stack--standards)
 3. [Project Structure](#project-structure)
 4. [Data Architecture](#data-architecture)
-5. [Core Features and UX Patterns](#core-features-and-ux-patterns)
+5. [Core Features & UX Patterns](#core-features--ux-patterns)
 6. [Hybrid Data Access Strategy](#hybrid-data-access-strategy)
 7. [Real-time Architecture](#real-time-architecture)
-8. [Authentication and Security](#authentication-and-security)
-9. [Infrastructure and Networking](#infrastructure-and-networking)
-10. [Implementation Phases](#implementation-phases)
+8. [Authentication (Authentik)](#authentication-authentik)
+9. [Infrastructure & Networking](#infrastructure--networking)
+10. [Security & RLS](#security--rls)
+11. [Error Handling](#error-handling)
+12. [Testing Strategy](#testing-strategy)
+13. [Logging & Observability](#logging--observability)
+14. [Audit Logging](#audit-logging)
+15. [Backup & Data Recovery](#backup--data-recovery)
+16. [CI/CD Pipeline](#cicd-pipeline)
+17. [Implementation Phases](#implementation-phases)
 
 ---
 
@@ -29,14 +36,14 @@ A high-performance, self-hosted household management platform for `cadenalabs.ne
 ### Key Differentiators
 
 * **Monorepo Efficiency:** Server Components read directly from the database; Client Components fetch via typed RPC.
-* **Optimistic Groceries:** Zero-latency UI updates using React 19's `useOptimistic`, with background synchronization.
+* **Optimistic Groceries:** Zero-latency UI updates using React 19’s `useOptimistic`, with background synchronization.
 * **Private SSL:** Uses Cloudflare DNS-01 challenges to provision valid HTTPS certificates for internal Tailscale IPs.
 
 ---
 
-## Tech Stack and Standards
+## Tech Stack & Standards
 
-### Runtime and Language
+### Runtime & Language
 
 * **Bun:** (Latest) Primary runtime for local dev, scripting, and CI.
 * **TypeScript 5.7+:** Strict mode enabled. **Rule:** No `any` types permitted.
@@ -65,7 +72,8 @@ A high-performance, self-hosted household management platform for `cadenalabs.ne
 ### Infrastructure
 
 * **Docker Compose:** Container orchestration.
-* **Caddy:** Reverse proxy with automatic DNS-01 SSL via Cloudflare.
+* **Caddy:** Reverse proxy (Replaces Nginx for automatic DNS-01 SSL).
+* **Authentik:** OIDC Identity Provider (Docker, shares Postgres/Valkey).
 * **Tailscale:** Zero Trust Network Access (ZTNA).
 
 ---
@@ -84,7 +92,7 @@ amigo/
 │   │
 │   └── api/                      # Hono Server (WebSockets/Sync)
 │       ├── src/
-│       │   ├── routes/          # RPC Route Definitions (Sync/Health)
+│       │   ├── routes/          # RPC Route Definitions
 │       │   ├── ws/              # WebSocket Handlers
 │       │   └── index.ts         # Exports AppType for RPC
 │
@@ -92,15 +100,16 @@ amigo/
 │   ├── db/                       # Drizzle ORM Source of Truth
 │   │   ├── src/
 │   │   │   ├── schema/          # Table Definitions
-│   │   │   └── index.ts         # DB Connection and Typed Exports
+│   │   │   └── index.ts         # DB Connection
 │   │
-│   ├── types/                    # Shared Types and Zod Schemas
+│   ├── types/                    # Shared Types & Zod Schemas
 │   │
 │   └── ui/                       # Shared Shadcn Components
 │
 ├── docker/
 ├── docker-compose.prod.yaml      # Production orchestration
-└── turbo.json                    # Monorepo Config
+└── turbo.json                   # Monorepo Config
+
 ```
 
 ---
@@ -120,54 +129,23 @@ We utilize **Drizzle-Zod** to prevent schema drift.
 All tables include `created_at`, `updated_at`. Sync-enabled tables include `deleted_at`.
 
 * **`households`**: `id`, `name`.
-* **`users`**: `id`, `auth_id` (Unique), `household_id` (FK).
-* **`transactions`**: `id`, `amount`, `category`, `date`, `type` (income/expense), `deleted_at`.
+* **`users`**: `id`, `auth_id` (String, Unique, stores OIDC `sub`), `household_id` (FK).
+* **`transactions`**: `id`, `amount`, `category`, `date`, `type`, `deleted_at`.
 * **`grocery_items`**: `id`, `item_name`, `is_purchased` (bool), `category`, `deleted_at`.
-
-### Database Connection (Pooling)
-
-Configured in `packages/db`.
-
-* **Dev:** Max 5 connections.
-* **Prod:** Max 20 connections.
-* **Driver:** `postgres` (porsager/postgres) for built-in pooling.
 
 ---
 
 ## Hybrid Data Access Strategy
 
-To maximize performance in a monorepo, we use different access patterns for Server vs. Client.
-
 ### 1. Read: Server Components (RSC) -> Direct DB
 
 **Pattern:** Next.js Server Components import `db` from `packages/db` and query directly.
-**Why:** Lowest latency, no serialization overhead, no HTTP round-trip.
-
-```typescript
-// apps/web/src/app/dashboard/page.tsx
-import { db } from '@amigo/db';
-import { transactions } from '@amigo/db/schema';
-
-export default async function Dashboard() {
-  const data = await db.select().from(transactions).limit(10);
-  return <TransactionList initialData={data} />;
-}
-```
+**Why:** Lowest latency, no serialization overhead.
 
 ### 2. Read: Client Components -> Hono RPC
 
-**Pattern:** Client-side interactions (Infinite Scroll, Polling) use Hono RPC.
-**Why:** Type-safe fetching without exposing direct DB logic to the browser.
-
-```typescript
-// apps/web/src/components/TransactionList.tsx
-import { client } from '@/lib/api';
-
-const fetchMore = async () => {
-  const res = await client.api.transactions.$get({ query: { page: 2 } });
-  const data = await res.json();
-};
-```
+**Pattern:** Client-side interactions (Infinite Scroll) use Hono RPC.
+**Why:** Type-safe fetching without exposing direct DB logic to browser.
 
 ### 3. Write: Server Actions -> Direct DB + Valkey
 
@@ -178,36 +156,11 @@ const fetchMore = async () => {
 3. Publish "Update" event to Valkey (for Hono to broadcast).
 4. Revalidate Next.js Cache (`revalidatePath`).
 
-```typescript
-// apps/web/src/actions/groceries.ts
-'use server'
-import { db } from '@amigo/db';
-import { redis } from '@/lib/redis';
-
-export async function toggleItem(id: string) {
-  await db.update(groceryItems)...;
-  await redis.publish('household:updates', JSON.stringify({ type: 'GROCERY_UPDATE' }));
-  revalidatePath('/groceries');
-}
-```
-
----
-
-## Core Features and UX Patterns
-
-### 1. The Grocery Module (Optimistic UI)
-
-* **Requirement:** 0ms latency.
-* **Implementation:**
-  * **UI:** React `useOptimistic` toggles the checkbox instantly.
-  * **Network:** Triggers Server Action in background.
-  * **Sync:** If successful, Server Action publishes to Valkey. Hono (WebSocket server) receives message and broadcasts to *other* clients.
-
 ---
 
 ## Real-time Architecture
 
-We separate **State** (DB) from **Signal** (WebSockets) using Valkey and WebSockets.
+We separate **State** (DB) from **Signal** (WebSockets).
 
 1. **Event:** User A mutates data via Server Action.
 2. **Pub:** Server Action publishes to Valkey channel `household:{id}`.
@@ -216,80 +169,151 @@ We separate **State** (DB) from **Signal** (WebSockets) using Valkey and WebSock
 
 ---
 
-## Authentication and Security
+## Authentication (Authentik)
 
-### OIDC Flow (Authelia)
+### OIDC Flow
 
-* **Provider:** Self-hosted Authelia (running in a separate LXC container on Proxmox).
+* **Provider:** Authentik (Docker containers: `authentik-server` + `authentik-worker`).
+* **Issuer URL:** `https://auth.cadenalabs.net/application/o/amigo/`
 * **Mechanism:** Authorization Code Flow with PKCE.
-* **Session:** Stored in Valkey.
-* **Cookie:** `amigo_session` (HttpOnly, Secure, SameSite=Lax).
-* **Scope:** `.cadenalabs.net` (Covers both `amigo.` and `dev-amigo.`).
+* **Scope:** `.cadenalabs.net` (Allows SSO across `amigo` and `dev-amigo`).
 
-### OIDC Configuration
+### Session Management
 
-Environment variables for Authelia integration:
+* **Cookie:** `amigo_session` (HttpOnly, Secure, SameSite=Lax, Domain=`.cadenalabs.net`).
+* **Storage:** OIDC Profile stored in Valkey with session ID as key.
 
-* `AUTHELIA_ISSUER` - The Authelia OIDC issuer URL (e.g., `https://auth.cadenalabs.net`).
-* `AUTHELIA_CLIENT_ID` - The OIDC client ID registered in Authelia.
-* `AUTHELIA_CLIENT_SECRET` - The OIDC client secret.
+### Authorization
 
-### User Identity
+* **Middleware:** Validates session cookie against Valkey-stored profile.
+* **User Mapping:** OIDC `sub` claim stored in `users.auth_id`.
 
-The `auth_id` field in the `users` table stores the OIDC provider's `sub` claim, providing a generic identifier that works with any OIDC-compliant provider.
+### Bootstrap (First Deploy)
 
-### Row-Level Security (RLS)
-
-Security is enforced at the Database level using Postgres RLS.
-
-* **Middleware:** Sets `app.current_household_id` config var on every DB transaction.
-* **Policy:** `CREATE POLICY tenant_isolation ON tables USING (household_id = current_setting('app.current_household_id')::uuid);`
+* Set `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_EMAIL` on the **worker** container.
+* Access `https://auth.cadenalabs.net` and login as `akadmin` with bootstrap password.
+* Create OIDC application with redirect URIs for both prod and dev.
 
 ---
 
-## Infrastructure and Networking
+## Infrastructure & Networking
 
 ### Environment Isolation
 
-Single VM (Proxmox) hosting both Dev and Prod stacks, separated by Docker Networks.
+Single VM (Proxmox) hosting both Dev and Prod stacks.
 
-* **Prod Domain:** `amigo.cadenalabs.net`
-* **Dev Domain:** `dev-amigo.cadenalabs.net`
+* **Prod:** `amigo.cadenalabs.net` (Port 3100)
+* **Dev:** `dev-amigo.cadenalabs.net` (Port 3000)
 
-### SSL Strategy (Cloudflare DNS-01)
-
-Since the server is behind Tailscale (no public IP), we use **Caddy** with the Cloudflare module to provision valid certificates.
-
-**Caddyfile:**
+### SSL Strategy (Caddy + Cloudflare)
 
 ```text
 {
   email your-email@cadenalabs.net
 }
-
 amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
   tls {
     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
   }
-
   @dev host dev-amigo.cadenalabs.net
-  handle @dev {
-    reverse_proxy web-dev:3000
-  }
-
+  handle @dev { reverse_proxy web-dev:3000 }
   @prod host amigo.cadenalabs.net
-  handle @prod {
-    reverse_proxy web-prod:3000
-  }
+  handle @prod { reverse_proxy web-prod:3000 }
 }
+
 ```
 
-### Docker Build Optimization
+---
 
-Next.js builds can be memory intensive.
+## Security & RLS
 
-* **Dockerfile:** Use `output: "standalone"` in `next.config.js`.
-* **Runner:** Use a swap file on the VM if RAM is < 4GB.
+### Row-Level Security (RLS)
+
+Security enforced at Database level.
+
+* **Policy:** `CREATE POLICY tenant_isolation ON tables USING (household_id = current_setting('app.current_household_id')::uuid);`
+
+### Content Security Policy (CSP)
+
+* **Nonce-based:** Generated in Middleware, injected into Next.js and Tailwind.
+* **Strict:** `script-src 'self' 'nonce-xyz'`.
+
+---
+
+## Testing Strategy
+
+### Test Pyramid
+
+* **Unit (Bun Test):** Pure functions, Zod schemas, Utilities.
+* **Integration (Bun Test):** API Routes with Test DB Container.
+* **E2E (Playwright):** Critical flows (Auth, Grocery Add).
+
+### Targets
+
+* `packages/db`: Schema validation tests.
+* `apps/api`: Route handler tests.
+
+---
+
+## Logging & Observability
+
+### Structured Logging
+
+* **Library:** Pino (JSON).
+* **Fields:** `timestamp`, `level`, `household_id`, `request_id`.
+
+### Monitoring (Self-Hosted)
+
+* **Health Check:** `/health` endpoint checks DB/Valkey connectivity.
+* **Alerting:** Simple Bash script curling `/health` and emailing on failure.
+
+---
+
+## Audit Logging
+
+### Strategy
+
+* **Triggers:** Postgres Triggers capture `OLD` and `NEW` values on `UPDATE/DELETE`.
+* **Storage:** `audit_logs` table (partitioned by month).
+* **Retention:** 90 days hot storage.
+
+---
+
+## Backup & Data Recovery
+
+### Database
+
+* **Tool:** `pg_dump` container sidecar.
+* **Schedule:** Daily @ 02:00 UTC.
+* **Destination:** Local Volume + Rclone to Cloud Storage (encrypted).
+
+### Disaster Recovery
+
+1. Re-deploy Docker Compose.
+2. `cat backup.sql | docker exec -i db psql -U postgres`.
+
+---
+
+## CI/CD Pipeline
+
+### Runner
+
+* **Type:** Self-Hosted GitHub Actions Runner (on the Proxmox VM).
+
+### Workflows
+
+1. **CI (Push):** Lint, Typecheck, Test.
+2. **Deploy Dev (Push to `dev`):**
+* Build `web-dev` container.
+* `docker compose -f docker-compose.dev.yaml up -d`.
+
+
+3. **Deploy Prod (Push to `main`):**
+* Backup DB.
+* Build `web-prod` container (Optimized).
+* `docker compose -f docker-compose.prod.yaml up -d`.
+
+
 
 ---
 
@@ -298,45 +322,30 @@ Next.js builds can be memory intensive.
 ### Phase 1: Monorepo Skeleton
 
 1. Init Turborepo.
-2. Setup `packages/db` with Drizzle and `packages/types`.
-3. Verify local `bun db:migrate`.
+2. Setup `packages/db` with Drizzle.
+3. **Checkpoint:** `bun db:migrate` works.
 
 ### Phase 2: Hybrid Core
 
-1. Create `apps/web` (Next.js) and `apps/api` (Hono).
-2. Implement **Direct DB Access** in a Next.js Page.
-3. Implement **Hono RPC** in a Client Component.
+1. Create `apps/web` & `apps/api`.
+2. Implement Direct DB Access (RSC).
+3. Implement Hono RPC Client.
 
-### Phase 3: Auth and Identity
+### Phase 3: Auth (Authentik)
 
-1. Setup Authelia OIDC for `cadenalabs.net`.
-2. Create Auth Middleware (validating Valkey sessions).
-3. Ensure Cookie sharing between `dev-amigo` and `amigo`.
+1. Deploy Authentik (server + worker) sharing Postgres/Valkey.
+2. Configure OIDC Application with redirect URIs.
+3. Implement OIDC Callback in Next.js with PKCE.
+4. Map `sub` to `users.auth_id`.
 
 ### Phase 4: Real-time Groceries
 
-1. Build `grocery_items` schema.
-2. Implement **Server Action** for `addItem` (Write).
-3. Implement **WebSocket** in Hono (Broadcast).
-4. Wire up `useOptimistic` in Frontend.
+1. `grocery_items` schema + RLS.
+2. Server Action (Write) + Valkey Pub.
+3. Hono WebSocket (Sub) + Broadcast.
 
 ### Phase 5: Budgeting
 
-1. Create `transactions` schema.
-2. Build Dashboard with Recharts.
-3. Implement Infinite Scroll using Hono RPC.
-
----
-
-## Notes for Claude Code
-
-### Critical Directives
-
-1. **Monorepo Patterns:**
-   * Next.js Server Components -> Import `@amigo/db` directly.
-   * Next.js Client Components -> Use `@amigo/api` RPC client.
-   * Next.js Server Actions -> Import `@amigo/db` directly + Publish to Valkey.
-
-2. **No "Any" Types:** Ask for clarification if types are difficult.
-3. **Schema First:** Changes start in `packages/db/schema`, then generate migrations, then update code.
-4. **Domain Awareness:** All links, auth callbacks, and cookies must respect `*.cadenalabs.net`.
+1. `transactions` schema.
+2. Dashboard Charts.
+3. Infinite Scroll RPC.

@@ -1,16 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { deleteSession, getSessionCookieOptions } from "@/lib/session";
-import { getPostLogoutRedirect } from "@/lib/auth";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   // Delete session from Valkey
   await deleteSession();
 
   // Clear session cookie
   const cookieOptions = getSessionCookieOptions();
-  const response = NextResponse.redirect(
-    new URL(getPostLogoutRedirect(), request.url)
-  );
+
+  // Redirect to Authentik's logout endpoint
+  // Authentik uses /application/o/<slug>/end-session/ or we can use the base logout
+  const authentikIssuer = process.env["AUTHENTIK_ISSUER"] ?? "https://auth.cadenalabs.net/application/o/amigo/";
+  const appUrl = process.env["APP_URL"] ?? "https://dev-amigo.cadenalabs.net";
+  // Use OIDC end_session_endpoint with post_logout_redirect_uri
+  const logoutUrl = `${authentikIssuer}end-session/?post_logout_redirect_uri=${encodeURIComponent(appUrl)}`;
+
+  const response = NextResponse.redirect(logoutUrl);
 
   response.cookies.delete({
     name: cookieOptions.name,
@@ -21,6 +26,6 @@ export async function GET(request: NextRequest) {
   return response;
 }
 
-export async function POST(request: NextRequest) {
-  return GET(request);
+export async function POST() {
+  return GET();
 }

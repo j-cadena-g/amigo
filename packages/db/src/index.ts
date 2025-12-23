@@ -34,6 +34,7 @@ export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 export * from "./schema";
 export * from "./queries/analytics";
+export * from "./triggers";
 
 // Re-export commonly used drizzle-orm operators
 export { desc, asc, eq, ne, gt, gte, lt, lte, isNull, isNotNull, and, or, sql } from "drizzle-orm";

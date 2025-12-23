@@ -1,65 +1,81 @@
-.PHONY: dev-up dev-down dev-logs dev-shell dev-restart \
-        prod-up prod-down prod-logs prod-pull prod-shell \
+.PHONY: dev-up dev-down dev-logs dev-shell dev-restart dev-build \
+        prod-up prod-down prod-logs prod-shell prod-build \
+        up down logs build \
         db-migrate-dev db-migrate-prod db-seed-dev \
         deploy
 
 # =============================================================================
-# Development (Base + Dev Override)
-# Chaining: -f docker-compose.yaml -f docker-compose.dev.yaml
-# Ports: 3000/3001
+# Full Stack (All Services)
+# =============================================================================
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f
+
+build:
+	docker compose build
+
+# =============================================================================
+# Development Stack (web-dev, api-dev)
 # =============================================================================
 
 dev-up:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d
+	docker compose up -d web-dev api-dev
 
 dev-down:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml down
+	docker compose stop web-dev api-dev
 
 dev-logs:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml logs -f
+	docker compose logs -f web-dev api-dev
 
 dev-shell:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml exec web-dev /bin/sh
+	docker compose exec web-dev /bin/sh
 
 dev-restart:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml restart
+	docker compose restart web-dev api-dev
+
+dev-build:
+	docker compose build web-dev api-dev
 
 # =============================================================================
-# Production (Base + Prod Override)
-# Chaining: -f docker-compose.yaml -f docker-compose.prod.yaml
-# Ports: 3100/3101
+# Production Stack (web-prod, api-prod)
 # =============================================================================
 
 prod-up:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
+	docker compose up -d web-prod api-prod
 
 prod-down:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml down
+	docker compose stop web-prod api-prod
 
 prod-logs:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml logs -f
-
-prod-pull:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml pull
+	docker compose logs -f web-prod api-prod
 
 prod-shell:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml exec web-prod /bin/sh
+	docker compose exec web-prod /bin/sh
+
+prod-build:
+	docker compose build web-prod api-prod
 
 # =============================================================================
 # Database Utilities
 # =============================================================================
 
 db-migrate-dev:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml exec api-dev bun db:migrate
+	docker compose exec api-dev bun db:migrate
 
 db-migrate-prod:
-	docker compose -f docker-compose.yaml -f docker-compose.prod.yaml exec api-prod bun db:migrate
+	docker compose exec api-prod bun db:migrate
 
 db-seed-dev:
-	docker compose -f docker-compose.yaml -f docker-compose.dev.yaml exec api-dev bun db:seed
+	docker compose exec api-dev bun db:seed
 
 # =============================================================================
 # Deployment
 # =============================================================================
 
-deploy: prod-pull prod-up db-migrate-prod
+deploy: build up db-migrate-prod

@@ -64,6 +64,31 @@ export async function deleteSession(): Promise<void> {
   }
 }
 
+export async function updateSessionHousehold(newHouseholdId: string): Promise<boolean> {
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
+
+  if (!sessionId) {
+    return false;
+  }
+
+  const data = await redis.get(getSessionKey(sessionId));
+  if (!data) {
+    return false;
+  }
+
+  const session = JSON.parse(data) as Session;
+  session.householdId = newHouseholdId;
+
+  await redis.setex(
+    getSessionKey(sessionId),
+    SESSION_TTL,
+    JSON.stringify(session)
+  );
+
+  return true;
+}
+
 export function getSessionCookieOptions() {
   const isProduction = process.env["NODE_ENV"] === "production";
   return {

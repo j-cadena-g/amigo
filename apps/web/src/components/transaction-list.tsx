@@ -1,17 +1,29 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import type { Transaction } from "@amigo/db";
+import { useEffect, useState } from "react";
+import { useInView } from "react-intersection-observer";
 import { Loader2, Plus, Trash2, ArrowDown, ArrowUp } from "lucide-react";
 import { addTransaction, deleteTransaction } from "@/actions/transactions";
+import { client } from "@/lib/api";
 
-interface TransactionListProps {
-  apiUrl: string;
+// Transaction type for RPC responses (dates are serialized as strings)
+interface TransactionDTO {
+  id: string;
+  householdId: string;
+  userId: string;
+  amount: string;
+  category: string;
+  description: string | null;
+  type: "income" | "expense";
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
 }
 
 interface TransactionsResponse {
-  data: Transaction[];
+  data: TransactionDTO[];
   pagination: {
     page: number;
     limit: number;
@@ -20,21 +32,18 @@ interface TransactionsResponse {
 }
 
 async function fetchTransactions(
-  apiUrl: string,
   page: number,
   category?: string
 ): Promise<TransactionsResponse> {
-  const params = new URLSearchParams({
+  const query: { page: string; limit: string; category?: string } = {
     page: String(page),
     limit: "10",
-  });
+  };
   if (category) {
-    params.set("category", category);
+    query.category = category;
   }
 
-  const response = await fetch(`${apiUrl}/api/transactions?${params}`, {
-    credentials: "include",
-  });
+  const response = await client.api.transactions.$get({ query });
 
   if (!response.ok) {
     throw new Error("Failed to fetch transactions");
@@ -60,7 +69,7 @@ function formatDate(date: Date | string): string {
   });
 }
 
-export function TransactionList({ apiUrl }: TransactionListProps) {
+export function TransactionList() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
     amount: "",
@@ -69,6 +78,11 @@ export function TransactionList({ apiUrl }: TransactionListProps) {
     type: "expense" as "income" | "expense",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Intersection observer for infinite scroll
+  const { ref: loadMoreRef, inView } = useInView({
+    threshold: 0,
+  });
 
   const {
     data,
@@ -80,11 +94,18 @@ export function TransactionList({ apiUrl }: TransactionListProps) {
     refetch,
   } = useInfiniteQuery({
     queryKey: ["transactions"],
-    queryFn: ({ pageParam }) => fetchTransactions(apiUrl, pageParam),
+    queryFn: ({ pageParam }) => fetchTransactions(pageParam),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined,
   });
+
+  // Auto-fetch when scroll sentinel comes into view
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const transactions = data?.pages.flatMap((page) => page.data) ?? [];
 
@@ -302,23 +323,15 @@ export function TransactionList({ apiUrl }: TransactionListProps) {
         </div>
       )}
 
-      {/* Load More Button */}
-      {hasNextPage && (
-        <button
-          onClick={() => fetchNextPage()}
-          disabled={isFetchingNextPage}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border bg-card py-3 text-muted-foreground hover:bg-accent disabled:opacity-50"
-        >
-          {isFetchingNextPage ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            "Load More"
-          )}
-        </button>
-      )}
+      {/* Infinite scroll sentinel */}
+      <div ref={loadMoreRef} className="flex justify-center py-4">
+        {isFetchingNextPage && (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        )}
+        {!hasNextPage && transactions.length > 0 && (
+          <p className="text-sm text-muted-foreground">No more transactions</p>
+        )}
+      </div>
     </div>
   );
 }

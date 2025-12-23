@@ -8,10 +8,6 @@ import { TransactionList } from "@/components/transaction-list";
 // Force dynamic rendering - page queries database
 export const dynamic = "force-dynamic";
 
-function getApiUrl(): string {
-  // Return empty string for relative URLs - client will use current origin
-  return "";
-}
 
 export default async function BudgetPage() {
   const session = await getSession();
@@ -63,8 +59,6 @@ export default async function BudgetPage() {
     amount: parseFloat(row.total ?? "0"),
   }));
 
-  const apiUrl = getApiUrl();
-
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -85,7 +79,7 @@ export default async function BudgetPage() {
         {/* Transaction List Section */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Recent Transactions</h2>
-          <TransactionList apiUrl={apiUrl} />
+          <TransactionList />
         </div>
       </div>
     </main>

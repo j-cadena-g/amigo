@@ -24,6 +24,7 @@
     "openid-client": "^6.1",
     "react": "^19",
     "react-dom": "^19",
+    "react-intersection-observer": "^10.0.0",
     "recharts": "^3.6.0",
     "zod": "^3.24"
   },

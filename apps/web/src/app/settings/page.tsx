@@ -4,6 +4,8 @@ import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { SettingsThemeToggle } from "@/components/settings-theme-toggle";
 import { RenameHouseholdDialog } from "@/components/rename-household-dialog";
+import { CopyHouseholdId } from "@/components/copy-household-id";
+import { JoinHouseholdForm } from "@/components/join-household-form";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +50,20 @@ export default async function SettingsPage() {
               <p className="text-sm font-medium text-muted-foreground">
                 Household ID
               </p>
-              <p className="mt-1 font-mono text-sm text-muted-foreground">
-                {session.householdId}
-              </p>
+              <div className="mt-1">
+                <CopyHouseholdId householdId={session.householdId} />
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Join Household Card */}
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">Join Household</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Enter another household&apos;s ID to join them. Your groceries, debts, and transactions will be migrated.
+          </p>
+          <JoinHouseholdForm />
         </div>
 
         {/* Theme Preference Card */}

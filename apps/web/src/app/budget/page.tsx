@@ -1,5 +1,4 @@
-import { db, eq, and, isNull, gte, sql } from "@amigo/db";
-import { transactions } from "@amigo/db/schema";
+import { getBudgetAnalytics } from "@amigo/db";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { BudgetCharts } from "@/components/budget-charts";
@@ -16,48 +15,10 @@ export default async function BudgetPage() {
     redirect("/api/auth/login");
   }
 
-  // Get start of current month
+  // Fetch budget analytics using the DB query function (RSC pattern)
+  const analytics = await getBudgetAnalytics(session.householdId);
+
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  // Fetch total spending this month (direct DB query - RSC pattern)
-  const totalSpendingResult = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.householdId, session.householdId),
-        eq(transactions.type, "expense"),
-        isNull(transactions.deletedAt),
-        gte(transactions.date, startOfMonth)
-      )
-    );
-
-  const totalSpending = parseFloat(totalSpendingResult[0]?.total ?? "0");
-
-  // Fetch spending by category (aggregated)
-  const spendingByCategory = await db
-    .select({
-      category: transactions.category,
-      total: sql<string>`SUM(${transactions.amount})`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.householdId, session.householdId),
-        eq(transactions.type, "expense"),
-        isNull(transactions.deletedAt),
-        gte(transactions.date, startOfMonth)
-      )
-    )
-    .groupBy(transactions.category);
-
-  const categoryData = spendingByCategory.map((row) => ({
-    category: row.category,
-    amount: parseFloat(row.total ?? "0"),
-  }));
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -72,8 +33,9 @@ export default async function BudgetPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Charts Section */}
         <BudgetCharts
-          totalSpending={totalSpending}
-          categoryData={categoryData}
+          totalSpending={analytics.totalSpending}
+          categoryData={analytics.categoryData}
+          monthlyComparison={analytics.monthlyComparison}
         />
 
         {/* Transaction List Section */}

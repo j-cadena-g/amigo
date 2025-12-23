@@ -21,9 +21,17 @@ interface CategoryData {
   [key: string]: string | number;
 }
 
+interface MonthlyComparison {
+  category: string;
+  thisMonth: number;
+  lastMonth: number;
+  [key: string]: string | number;
+}
+
 interface BudgetChartsProps {
   totalSpending: number;
   categoryData: CategoryData[];
+  monthlyComparison?: MonthlyComparison[];
 }
 
 const COLORS = [
@@ -48,8 +56,16 @@ function formatCurrency(value: number | undefined): string {
 export function BudgetCharts({
   totalSpending,
   categoryData,
+  monthlyComparison,
 }: BudgetChartsProps) {
   const hasData = categoryData.length > 0;
+  const hasComparisonData = monthlyComparison && monthlyComparison.length > 0;
+
+  // Get current and last month names for the comparison chart
+  const now = new Date();
+  const thisMonthName = now.toLocaleDateString("en-US", { month: "short" });
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+  const lastMonthName = lastMonth.toLocaleDateString("en-US", { month: "short" });
 
   return (
     <div className="space-y-6">
@@ -104,28 +120,67 @@ export function BudgetCharts({
             </div>
           </div>
 
-          {/* Bar Chart */}
-          <div className="rounded-lg border bg-card p-6">
-            <h3 className="mb-4 text-lg font-semibold">Category Breakdown</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={(v) => `$${v}`} />
-                  <YAxis
-                    type="category"
-                    dataKey="category"
-                    width={100}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value as number)}
-                  />
-                  <Bar dataKey="amount" fill="#0088FE" />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Month-over-Month Comparison Bar Chart */}
+          {hasComparisonData && (
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="mb-4 text-lg font-semibold">
+                {thisMonthName} vs {lastMonthName}
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyComparison} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => `$${v}`} />
+                    <YAxis
+                      type="category"
+                      dataKey="category"
+                      width={100}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      formatter={(value) => formatCurrency(value as number)}
+                    />
+                    <Legend />
+                    <Bar
+                      dataKey="thisMonth"
+                      name={thisMonthName}
+                      fill="#0088FE"
+                    />
+                    <Bar
+                      dataKey="lastMonth"
+                      name={lastMonthName}
+                      fill="#82CA9D"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Fallback: Category Breakdown (when no comparison data) */}
+          {!hasComparisonData && (
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="mb-4 text-lg font-semibold">Category Breakdown</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => `$${v}`} />
+                    <YAxis
+                      type="category"
+                      dataKey="category"
+                      width={100}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      formatter={(value) => formatCurrency(value as number)}
+                    />
+                    <Bar dataKey="amount" fill="#0088FE" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="rounded-lg border bg-card p-6">

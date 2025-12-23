@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Wallet,
   ShoppingCart,
   CreditCard,
   Settings,
@@ -21,7 +22,8 @@ interface NavBarProps {
 }
 
 const navLinks = [
-  { href: "/budget", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/groceries", label: "Groceries", icon: ShoppingCart },
   { href: "/debts", label: "Debts", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -39,7 +41,7 @@ export function NavBar({ userName, userEmail }: NavBarProps) {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/budget" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <span className="text-xl font-bold text-primary">amigo</span>
           </Link>
 

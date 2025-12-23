@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const session = await getSession();
 
-  // If logged in, redirect to the budget dashboard
+  // If logged in, redirect to the dashboard
   if (session) {
-    redirect("/budget");
+    redirect("/dashboard");
   }
 
   // If not logged in, show login page

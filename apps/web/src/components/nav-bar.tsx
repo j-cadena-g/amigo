@@ -8,6 +8,7 @@ import {
   Wallet,
   ShoppingCart,
   CreditCard,
+  Landmark,
   Settings,
   LogOut,
   ChevronDown,
@@ -26,6 +27,7 @@ const navLinks = [
   { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/groceries", label: "Groceries", icon: ShoppingCart },
   { href: "/debts", label: "Debts", icon: CreditCard },
+  { href: "/assets", label: "Assets", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

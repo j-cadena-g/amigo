@@ -72,7 +72,7 @@ function groceryReducer(
   }
 }
 
-// Tag color mapping
+// Tag color mapping for badges
 const tagColors = {
   blue: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300" },
   green: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300" },
@@ -82,6 +82,18 @@ const tagColors = {
   orange: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300" },
   pink: { bg: "bg-pink-100 dark:bg-pink-900/30", text: "text-pink-700 dark:text-pink-300" },
   gray: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300" },
+} as const;
+
+// Solid colors for swatch picker
+const swatchColors = {
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+  red: "bg-red-500",
+  yellow: "bg-yellow-500",
+  purple: "bg-purple-500",
+  orange: "bg-orange-500",
+  pink: "bg-pink-500",
+  gray: "bg-gray-500",
 } as const;
 
 type TagColorKey = keyof typeof tagColors;
@@ -112,8 +124,8 @@ function TagSelector({
   onCreateTag,
 }: TagSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState("blue");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newTagColor, setNewTagColor] = useState<TagColorKey>("blue");
   const [isCreating, setIsCreating] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -130,18 +142,30 @@ function TagSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Filter tags by search query
+  const filteredTags = allTags.filter((tag) =>
+    tag.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+  );
+
+  // Check if exact match exists (case-insensitive)
+  const exactMatchTag = allTags.find(
+    (tag) => tag.name.toLowerCase() === searchQuery.toLowerCase().trim()
+  );
+
+  const canCreateTag = searchQuery.trim() && !exactMatchTag;
+
   const handleCreateTag = async () => {
-    if (!newTagName.trim()) return;
+    if (!canCreateTag) return;
     setIsCreating(true);
     try {
-      await onCreateTag(newTagName.trim(), newTagColor);
-      setNewTagName("");
+      await onCreateTag(searchQuery.trim(), newTagColor);
+      setSearchQuery("");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const colorOptions = Object.keys(tagColors);
+  const colorOptions = Object.keys(swatchColors) as TagColorKey[];
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -172,15 +196,32 @@ function TagSelector({
 
       {isOpen && (
         <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
-          {/* Existing tags */}
+          {/* Search/Filter Input */}
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search or create tag..."
+            className="mb-2 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canCreateTag) {
+                e.preventDefault();
+                handleCreateTag();
+              }
+            }}
+          />
+
+          {/* Filtered tag list */}
           <div className="max-h-48 overflow-y-auto">
-            {allTags.length === 0 ? (
+            {filteredTags.length === 0 && !canCreateTag ? (
               <p className="px-2 py-1 text-sm text-muted-foreground">
-                No tags yet
+                {allTags.length === 0 ? "No tags yet" : "No matching tags"}
               </p>
             ) : (
-              allTags.map((tag) => {
+              filteredTags.map((tag) => {
                 const isSelected = selectedTagIds.includes(tag.id);
+                const isExactMatch =
+                  tag.name.toLowerCase() === searchQuery.toLowerCase().trim();
                 return (
                   <button
                     key={tag.id}
@@ -188,7 +229,7 @@ function TagSelector({
                     onClick={() => onToggleTag(tag.id)}
                     className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
                       isSelected ? "bg-accent" : ""
-                    }`}
+                    } ${isExactMatch && searchQuery ? "ring-2 ring-primary ring-offset-1" : ""}`}
                   >
                     <TagBadge tag={tag} />
                     {isSelected && (
@@ -211,43 +252,38 @@ function TagSelector({
             )}
           </div>
 
-          {/* Create new tag */}
-          <div className="mt-2 border-t pt-2">
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="New tag..."
-                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus:border-primary focus:outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleCreateTag();
-                  }
-                }}
-              />
-              <select
-                value={newTagColor}
-                onChange={(e) => setNewTagColor(e.target.value)}
-                className="rounded-md border border-input bg-background px-1 py-1 text-sm"
-              >
+          {/* Create new tag section - only visible when no exact match */}
+          {canCreateTag && (
+            <div className="mt-2 border-t pt-2">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Create &quot;{searchQuery.trim()}&quot;
+              </p>
+              {/* Color swatch picker */}
+              <div className="mb-2 flex items-center gap-1">
                 {colorOptions.map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewTagColor(color)}
+                    className={`h-6 w-6 rounded-full ${swatchColors[color]} ${
+                      newTagColor === color
+                        ? "ring-2 ring-primary ring-offset-2"
+                        : "hover:ring-2 hover:ring-muted-foreground hover:ring-offset-1"
+                    }`}
+                    aria-label={`Select ${color} color`}
+                  />
                 ))}
-              </select>
+              </div>
               <button
                 type="button"
                 onClick={handleCreateTag}
-                disabled={isCreating || !newTagName.trim()}
-                className="rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                disabled={isCreating}
+                className="w-full rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                +
+                {isCreating ? "Creating..." : "Create Tag"}
               </button>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -271,8 +307,8 @@ function ItemTagSelector({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
     item.groceryItemTags.map((it) => it.tagId)
   );
-  const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState("blue");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newTagColor, setNewTagColor] = useState<TagColorKey>("blue");
   const [isCreating, setIsCreating] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -294,6 +330,18 @@ function ItemTagSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Filter tags by search query
+  const filteredTags = allTags.filter((tag) =>
+    tag.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+  );
+
+  // Check if exact match exists (case-insensitive)
+  const exactMatchTag = allTags.find(
+    (tag) => tag.name.toLowerCase() === searchQuery.toLowerCase().trim()
+  );
+
+  const canCreateTag = searchQuery.trim() && !exactMatchTag;
+
   const handleToggleTag = (tagId: string) => {
     const newTagIds = selectedTagIds.includes(tagId)
       ? selectedTagIds.filter((id) => id !== tagId)
@@ -303,23 +351,23 @@ function ItemTagSelector({
   };
 
   const handleCreateTag = async () => {
-    if (!newTagName.trim()) return;
+    if (!canCreateTag) return;
     setIsCreating(true);
     try {
-      const newTag = await onCreateTag(newTagName.trim(), newTagColor);
+      const newTag = await onCreateTag(searchQuery.trim(), newTagColor);
       if (newTag) {
         // Auto-select the newly created tag
         const newTagIds = [...selectedTagIds, newTag.id];
         setSelectedTagIds(newTagIds);
         onUpdateTags(item.id, newTagIds);
       }
-      setNewTagName("");
+      setSearchQuery("");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const colorOptions = Object.keys(tagColors);
+  const colorOptions = Object.keys(swatchColors) as TagColorKey[];
 
   return (
     <div
@@ -352,15 +400,34 @@ function ItemTagSelector({
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
-          {/* Existing tags */}
+          {/* Search/Filter Input */}
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="Search or create tag..."
+            className="mb-2 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter" && canCreateTag) {
+                e.preventDefault();
+                handleCreateTag();
+              }
+            }}
+          />
+
+          {/* Filtered tag list */}
           <div className="max-h-48 overflow-y-auto">
-            {allTags.length === 0 ? (
+            {filteredTags.length === 0 && !canCreateTag ? (
               <p className="px-2 py-1 text-sm text-muted-foreground">
-                No tags yet
+                {allTags.length === 0 ? "No tags yet" : "No matching tags"}
               </p>
             ) : (
-              allTags.map((tag) => {
+              filteredTags.map((tag) => {
                 const isSelected = selectedTagIds.includes(tag.id);
+                const isExactMatch =
+                  tag.name.toLowerCase() === searchQuery.toLowerCase().trim();
                 return (
                   <button
                     key={tag.id}
@@ -371,7 +438,7 @@ function ItemTagSelector({
                     }}
                     className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
                       isSelected ? "bg-accent" : ""
-                    }`}
+                    } ${isExactMatch && searchQuery ? "ring-2 ring-primary ring-offset-1" : ""}`}
                   >
                     <TagBadge tag={tag} />
                     {isSelected && (
@@ -394,49 +461,44 @@ function ItemTagSelector({
             )}
           </div>
 
-          {/* Create new tag */}
-          <div className="mt-2 border-t pt-2">
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="New tag..."
-                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus:border-primary focus:outline-none"
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleCreateTag();
-                  }
-                }}
-              />
-              <select
-                value={newTagColor}
-                onChange={(e) => setNewTagColor(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-md border border-input bg-background px-1 py-1 text-sm"
-              >
+          {/* Create new tag section - only visible when no exact match */}
+          {canCreateTag && (
+            <div className="mt-2 border-t pt-2">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Create &quot;{searchQuery.trim()}&quot;
+              </p>
+              {/* Color swatch picker */}
+              <div className="mb-2 flex items-center gap-1">
                 {colorOptions.map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNewTagColor(color);
+                    }}
+                    className={`h-6 w-6 rounded-full ${swatchColors[color]} ${
+                      newTagColor === color
+                        ? "ring-2 ring-primary ring-offset-2"
+                        : "hover:ring-2 hover:ring-muted-foreground hover:ring-offset-1"
+                    }`}
+                    aria-label={`Select ${color} color`}
+                  />
                 ))}
-              </select>
+              </div>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCreateTag();
                 }}
-                disabled={isCreating || !newTagName.trim()}
-                className="rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                disabled={isCreating}
+                className="w-full rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                +
+                {isCreating ? "Creating..." : "Create Tag"}
               </button>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

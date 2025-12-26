@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db, eq, withAuditing } from "@amigo/db";
+import { db, eq, and, sql, withAuditing } from "@amigo/db";
 import { groceryTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 
@@ -25,12 +25,28 @@ export async function createTag(name: string, color?: string) {
     throw new Error("Unauthorized");
   }
 
+  const trimmedName = name.trim();
+
+  // Check for existing tag with same name (case-insensitive) in this household
+  const existingTag = await db.query.groceryTags.findFirst({
+    where: and(
+      eq(groceryTags.householdId, session.householdId),
+      sql`lower(${groceryTags.name}) = lower(${trimmedName})`
+    ),
+  });
+
+  // If tag already exists, return it without creating a duplicate
+  if (existingTag) {
+    return existingTag;
+  }
+
+  // Create new tag
   const tag = await withAuditing(session.authId, async (tx) => {
     const [inserted] = await tx
       .insert(groceryTags)
       .values({
         householdId: session.householdId,
-        name: name.trim(),
+        name: trimmedName,
         color: color?.trim() || "blue",
       })
       .returning();

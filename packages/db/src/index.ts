@@ -47,7 +47,12 @@ export async function withAuditing<T>(
   callback: (tx: Transaction) => Promise<T>
 ): Promise<T> {
   return getDb().transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL app.current_user_auth_id = ${authId}`);
+    // SET LOCAL doesn't support parameterized values, so we use sql.raw()
+    // The authId is sanitized by escaping single quotes to prevent SQL injection
+    const sanitizedAuthId = authId.replace(/'/g, "''");
+    await tx.execute(
+      sql.raw(`SET LOCAL app.current_user_auth_id = '${sanitizedAuthId}'`)
+    );
     return callback(tx);
   });
 }

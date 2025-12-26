@@ -136,3 +136,47 @@ export async function deleteItem(id: string) {
 
   return deleted;
 }
+
+export async function updateItemTags(itemId: string, tagIds: string[]) {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify ownership - item must belong to user's household
+  const existing = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, itemId),
+      eq(groceryItems.householdId, session.householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw new Error("Item not found");
+  }
+
+  await withAuditing(session.authId, async (tx) => {
+    // Delete all existing tag associations for this item
+    await tx
+      .delete(groceryItemTags)
+      .where(eq(groceryItemTags.itemId, itemId));
+
+    // Insert new tag associations if any provided
+    if (tagIds.length > 0) {
+      await tx.insert(groceryItemTags).values(
+        tagIds.map((tagId) => ({
+          itemId,
+          tagId,
+        }))
+      );
+    }
+  });
+
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+  });
+
+  revalidatePath("/groceries");
+}

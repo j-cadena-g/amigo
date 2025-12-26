@@ -8,7 +8,7 @@ import {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
-import { addItem, toggleItem, deleteItem } from "@/actions/groceries";
+import { addItem, toggleItem, deleteItem, updateItemTags } from "@/actions/groceries";
 import { createTag } from "@/actions/tags";
 import type { GroceryItem, GroceryTag, GroceryItemTag } from "@amigo/db";
 
@@ -26,7 +26,8 @@ interface GroceryListProps {
 type OptimisticAction =
   | { type: "add"; item: GroceryItemWithTags }
   | { type: "toggle"; id: string }
-  | { type: "delete"; id: string };
+  | { type: "delete"; id: string }
+  | { type: "update_tags"; id: string; tagIds: string[]; allTags: GroceryTag[] };
 
 function groceryReducer(
   state: GroceryItemWithTags[],
@@ -43,6 +44,29 @@ function groceryReducer(
       );
     case "delete":
       return state.filter((item) => item.id !== action.id);
+    case "update_tags":
+      return state.map((item) =>
+        item.id === action.id
+          ? {
+              ...item,
+              groceryItemTags: action.tagIds.map((tagId) => {
+                const tag = action.allTags.find((t) => t.id === tagId);
+                return {
+                  itemId: item.id,
+                  tagId,
+                  groceryTag: tag || {
+                    id: tagId,
+                    householdId: "",
+                    name: "...",
+                    color: "gray",
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  },
+                };
+              }),
+            }
+          : item
+      );
     default:
       return state;
   }
@@ -230,6 +254,195 @@ function TagSelector({
   );
 }
 
+interface ItemTagSelectorProps {
+  item: GroceryItemWithTags;
+  allTags: GroceryTag[];
+  onUpdateTags: (itemId: string, tagIds: string[]) => void;
+  onCreateTag: (name: string, color: string) => Promise<GroceryTag | undefined>;
+}
+
+function ItemTagSelector({
+  item,
+  allTags,
+  onUpdateTags,
+  onCreateTag,
+}: ItemTagSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
+    item.groceryItemTags.map((it) => it.tagId)
+  );
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("blue");
+  const [isCreating, setIsCreating] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Sync selected tags when item changes (e.g., from server refresh)
+  useEffect(() => {
+    setSelectedTagIds(item.groceryItemTags.map((it) => it.tagId));
+  }, [item.groceryItemTags]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggleTag = (tagId: string) => {
+    const newTagIds = selectedTagIds.includes(tagId)
+      ? selectedTagIds.filter((id) => id !== tagId)
+      : [...selectedTagIds, tagId];
+    setSelectedTagIds(newTagIds);
+    onUpdateTags(item.id, newTagIds);
+  };
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return;
+    setIsCreating(true);
+    try {
+      const newTag = await onCreateTag(newTagName.trim(), newTagColor);
+      if (newTag) {
+        // Auto-select the newly created tag
+        const newTagIds = [...selectedTagIds, newTag.id];
+        setSelectedTagIds(newTagIds);
+        onUpdateTags(item.id, newTagIds);
+      }
+      setNewTagName("");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const colorOptions = Object.keys(tagColors);
+
+  return (
+    <div
+      className="relative"
+      ref={popoverRef}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="text-muted-foreground hover:text-foreground"
+        aria-label="Edit tags"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
+          {/* Existing tags */}
+          <div className="max-h-48 overflow-y-auto">
+            {allTags.length === 0 ? (
+              <p className="px-2 py-1 text-sm text-muted-foreground">
+                No tags yet
+              </p>
+            ) : (
+              allTags.map((tag) => {
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleTag(tag.id);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
+                      isSelected ? "bg-accent" : ""
+                    }`}
+                  >
+                    <TagBadge tag={tag} />
+                    {isSelected && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 text-primary"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Create new tag */}
+          <div className="mt-2 border-t pt-2">
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="New tag..."
+                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus:border-primary focus:outline-none"
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateTag();
+                  }
+                }}
+              />
+              <select
+                value={newTagColor}
+                onChange={(e) => setNewTagColor(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-md border border-input bg-background px-1 py-1 text-sm"
+              >
+                {colorOptions.map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCreateTag();
+                }}
+                disabled={isCreating || !newTagName.trim()}
+                className="rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GroceryList({
   initialItems,
   allTags: initialTags,
@@ -364,6 +577,21 @@ export function GroceryList({
     });
   };
 
+  const handleUpdateItemTags = (itemId: string, tagIds: string[]) => {
+    startTransition(async () => {
+      addOptimistic({ type: "update_tags", id: itemId, tagIds, allTags });
+      await updateItemTags(itemId, tagIds);
+    });
+  };
+
+  const handleCreateTagForItem = async (name: string, color: string) => {
+    const newTag = await createTag(name, color);
+    if (newTag) {
+      setAllTags((prev) => [...prev, newTag]);
+    }
+    return newTag;
+  };
+
   // Group items by category
   const groupedItems = optimisticItems.reduce(
     (acc, item) => {
@@ -472,24 +700,32 @@ export function GroceryList({
                         ))}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label="Delete item"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+                    <div className="flex items-center gap-2">
+                      <ItemTagSelector
+                        item={item}
+                        allTags={allTags}
+                        onUpdateTags={handleUpdateItemTags}
+                        onCreateTag={handleCreateTagForItem}
+                      />
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Delete item"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

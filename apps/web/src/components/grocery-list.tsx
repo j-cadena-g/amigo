@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { addItem, toggleItem, deleteItem, updateItemTags } from "@/actions/groceries";
-import { createTag } from "@/actions/tags";
+import { createTag, deleteTag } from "@/actions/tags";
 import type { GroceryItem, GroceryTag, GroceryItemTag } from "@amigo/db";
 
 // Extended type for grocery items with their tags
@@ -115,6 +115,7 @@ interface TagSelectorProps {
   selectedTagIds: string[];
   onToggleTag: (tagId: string) => void;
   onCreateTag: (name: string, color: string) => Promise<void>;
+  onDeleteTag: (tagId: string) => void;
 }
 
 function TagSelector({
@@ -122,6 +123,7 @@ function TagSelector({
   selectedTagIds,
   onToggleTag,
   onCreateTag,
+  onDeleteTag,
 }: TagSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -223,30 +225,60 @@ function TagSelector({
                 const isExactMatch =
                   tag.name.toLowerCase() === searchQuery.toLowerCase().trim();
                 return (
-                  <button
+                  <div
                     key={tag.id}
-                    type="button"
-                    onClick={() => onToggleTag(tag.id)}
-                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
+                    className={`group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
                       isSelected ? "bg-accent" : ""
                     } ${isExactMatch && searchQuery ? "ring-2 ring-primary ring-offset-1" : ""}`}
                   >
-                    <TagBadge tag={tag} />
-                    {isSelected && (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 text-primary"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+                    <button
+                      type="button"
+                      onClick={() => onToggleTag(tag.id)}
+                      className="flex flex-1 items-center gap-2"
+                    >
+                      <TagBadge tag={tag} />
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {isSelected && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 text-primary"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Delete this tag globally?")) {
+                            onDeleteTag(tag.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete tag"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -295,6 +327,7 @@ interface ItemTagSelectorProps {
   allTags: GroceryTag[];
   onUpdateTags: (itemId: string, tagIds: string[]) => void;
   onCreateTag: (name: string, color: string) => Promise<GroceryTag | undefined>;
+  onDeleteTag: (tagId: string) => void;
 }
 
 function ItemTagSelector({
@@ -302,6 +335,7 @@ function ItemTagSelector({
   allTags,
   onUpdateTags,
   onCreateTag,
+  onDeleteTag,
 }: ItemTagSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
@@ -429,33 +463,63 @@ function ItemTagSelector({
                 const isExactMatch =
                   tag.name.toLowerCase() === searchQuery.toLowerCase().trim();
                 return (
-                  <button
+                  <div
                     key={tag.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleTag(tag.id);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
+                    className={`group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
                       isSelected ? "bg-accent" : ""
                     } ${isExactMatch && searchQuery ? "ring-2 ring-primary ring-offset-1" : ""}`}
                   >
-                    <TagBadge tag={tag} />
-                    {isSelected && (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 text-primary"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleTag(tag.id);
+                      }}
+                      className="flex flex-1 items-center gap-2"
+                    >
+                      <TagBadge tag={tag} />
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {isSelected && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 text-primary"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Delete this tag globally?")) {
+                            onDeleteTag(tag.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete tag"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -582,6 +646,19 @@ export function GroceryList({
     }
   };
 
+  const handleDeleteTag = (tagId: string) => {
+    // Optimistically remove from allTags
+    setAllTags((prev) => prev.filter((t) => t.id !== tagId));
+    // Remove from selected tags if selected
+    setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+    // Optimistically remove tag from all items that have it
+    // This is handled by rerender since allTags changes and groceryItemTags
+    // will be filtered on next server refresh via WebSocket
+    startTransition(async () => {
+      await deleteTag(tagId);
+    });
+  };
+
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newItemName.trim();
@@ -686,6 +763,7 @@ export function GroceryList({
           selectedTagIds={selectedTagIds}
           onToggleTag={handleToggleTag}
           onCreateTag={handleCreateTag}
+          onDeleteTag={handleDeleteTag}
         />
         <button
           type="submit"
@@ -768,6 +846,7 @@ export function GroceryList({
                         allTags={allTags}
                         onUpdateTags={handleUpdateItemTags}
                         onCreateTag={handleCreateTagForItem}
+                        onDeleteTag={handleDeleteTag}
                       />
                       <button
                         onClick={() => handleDeleteItem(item.id)}

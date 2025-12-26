@@ -25,3 +25,5 @@ export const groceryItems = pgTable("grocery_items", {
 
 export type GroceryItem = typeof groceryItems.$inferSelect;
 export type NewGroceryItem = typeof groceryItems.$inferInsert;
+
+// Note: groceryItemsRelations is defined in grocery-tags.ts to avoid circular imports

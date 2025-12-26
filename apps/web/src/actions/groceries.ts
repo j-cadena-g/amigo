@@ -2,17 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { db, eq, and, isNull, withAuditing } from "@amigo/db";
-import { groceryItems } from "@amigo/db/schema";
+import { groceryItems, groceryItemTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 import { publishHouseholdUpdate } from "@/lib/redis";
 
-export async function addItem(name: string, category?: string) {
+export async function addItem(
+  name: string,
+  category?: string,
+  tagIds?: string[]
+) {
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
   const item = await withAuditing(session.authId, async (tx) => {
+    // Insert the grocery item
     const [inserted] = await tx
       .insert(groceryItems)
       .values({
@@ -22,6 +27,21 @@ export async function addItem(name: string, category?: string) {
         category: category?.trim() || "Uncategorized",
       })
       .returning();
+
+    if (!inserted) {
+      throw new Error("Failed to insert grocery item");
+    }
+
+    // Insert tag associations if any tags provided
+    if (tagIds && tagIds.length > 0) {
+      await tx.insert(groceryItemTags).values(
+        tagIds.map((tagId) => ({
+          itemId: inserted.id,
+          tagId,
+        }))
+      );
+    }
+
     return inserted;
   });
 

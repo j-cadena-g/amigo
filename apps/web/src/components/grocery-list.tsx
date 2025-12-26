@@ -1,24 +1,37 @@
 "use client";
 
-import { useOptimistic, useState, useTransition, useEffect } from "react";
+import {
+  useOptimistic,
+  useState,
+  useTransition,
+  useEffect,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
 import { addItem, toggleItem, deleteItem } from "@/actions/groceries";
-import type { GroceryItem } from "@amigo/db";
+import { createTag } from "@/actions/tags";
+import type { GroceryItem, GroceryTag, GroceryItemTag } from "@amigo/db";
+
+// Extended type for grocery items with their tags
+type GroceryItemWithTags = GroceryItem & {
+  groceryItemTags: (GroceryItemTag & { groceryTag: GroceryTag })[];
+};
 
 interface GroceryListProps {
-  initialItems: GroceryItem[];
+  initialItems: GroceryItemWithTags[];
+  allTags: GroceryTag[];
   wsUrl: string;
 }
 
 type OptimisticAction =
-  | { type: "add"; item: GroceryItem }
+  | { type: "add"; item: GroceryItemWithTags }
   | { type: "toggle"; id: string }
   | { type: "delete"; id: string };
 
 function groceryReducer(
-  state: GroceryItem[],
+  state: GroceryItemWithTags[],
   action: OptimisticAction
-): GroceryItem[] {
+): GroceryItemWithTags[] {
   switch (action.type) {
     case "add":
       return [action.item, ...state];
@@ -35,10 +48,198 @@ function groceryReducer(
   }
 }
 
-export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
+// Tag color mapping
+const tagColors = {
+  blue: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300" },
+  green: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300" },
+  red: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-300" },
+  yellow: { bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-300" },
+  purple: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300" },
+  orange: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300" },
+  pink: { bg: "bg-pink-100 dark:bg-pink-900/30", text: "text-pink-700 dark:text-pink-300" },
+  gray: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300" },
+} as const;
+
+type TagColorKey = keyof typeof tagColors;
+
+function TagBadge({ tag }: { tag: GroceryTag }) {
+  const colorKey = (tag.color in tagColors ? tag.color : "gray") as TagColorKey;
+  const colors = tagColors[colorKey];
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+    >
+      {tag.name}
+    </span>
+  );
+}
+
+interface TagSelectorProps {
+  allTags: GroceryTag[];
+  selectedTagIds: string[];
+  onToggleTag: (tagId: string) => void;
+  onCreateTag: (name: string, color: string) => Promise<void>;
+}
+
+function TagSelector({
+  allTags,
+  selectedTagIds,
+  onToggleTag,
+  onCreateTag,
+}: TagSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("blue");
+  const [isCreating, setIsCreating] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return;
+    setIsCreating(true);
+    try {
+      await onCreateTag(newTagName.trim(), newTagColor);
+      setNewTagName("");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const colorOptions = Object.keys(tagColors);
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-4 w-4"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z"
+            clipRule="evenodd"
+          />
+        </svg>
+        Tags
+        {selectedTagIds.length > 0 && (
+          <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+            {selectedTagIds.length}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
+          {/* Existing tags */}
+          <div className="max-h-48 overflow-y-auto">
+            {allTags.length === 0 ? (
+              <p className="px-2 py-1 text-sm text-muted-foreground">
+                No tags yet
+              </p>
+            ) : (
+              allTags.map((tag) => {
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => onToggleTag(tag.id)}
+                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent ${
+                      isSelected ? "bg-accent" : ""
+                    }`}
+                  >
+                    <TagBadge tag={tag} />
+                    {isSelected && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 text-primary"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Create new tag */}
+          <div className="mt-2 border-t pt-2">
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="New tag..."
+                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus:border-primary focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateTag();
+                  }
+                }}
+              />
+              <select
+                value={newTagColor}
+                onChange={(e) => setNewTagColor(e.target.value)}
+                className="rounded-md border border-input bg-background px-1 py-1 text-sm"
+              >
+                {colorOptions.map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleCreateTag}
+                disabled={isCreating || !newTagName.trim()}
+                className="rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function GroceryList({
+  initialItems,
+  allTags: initialTags,
+  wsUrl,
+}: GroceryListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [newItemName, setNewItemName] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState(initialTags);
   const [optimisticItems, addOptimistic] = useOptimistic(
     initialItems,
     groceryReducer
@@ -84,15 +285,39 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
     };
   }, [wsUrl, router]);
 
+  // Sync allTags with server state on refresh
+  useEffect(() => {
+    setAllTags(initialTags);
+  }, [initialTags]);
+
+  const handleToggleTag = (tagId: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const handleCreateTag = async (name: string, color: string) => {
+    const newTag = await createTag(name, color);
+    if (newTag) {
+      setAllTags((prev) => [...prev, newTag]);
+      // Auto-select the newly created tag
+      setSelectedTagIds((prev) => [...prev, newTag.id]);
+    }
+  };
+
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newItemName.trim();
     if (!name) return;
 
+    const tagIdsToAdd = [...selectedTagIds];
     setNewItemName("");
+    setSelectedTagIds([]);
 
-    // Optimistic update with temp ID
-    const tempItem: GroceryItem = {
+    // Build optimistic item with tags
+    const tempItem: GroceryItemWithTags = {
       id: crypto.randomUUID(),
       householdId: "",
       createdByUserId: "",
@@ -102,11 +327,26 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
+      groceryItemTags: tagIdsToAdd.map((tagId) => {
+        const tag = allTags.find((t) => t.id === tagId);
+        return {
+          itemId: "",
+          tagId,
+          groceryTag: tag || {
+            id: tagId,
+            householdId: "",
+            name: "...",
+            color: "gray",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+      }),
     };
 
     startTransition(async () => {
       addOptimistic({ type: "add", item: tempItem });
-      await addItem(name);
+      await addItem(name, undefined, tagIdsToAdd);
     });
   };
 
@@ -134,7 +374,7 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
       acc[category].push(item);
       return acc;
     },
-    {} as Record<string, GroceryItem[]>
+    {} as Record<string, GroceryItemWithTags[]>
   );
 
   const categories = Object.keys(groupedItems).sort();
@@ -142,14 +382,20 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
   return (
     <div className="space-y-6">
       {/* Add Item Form */}
-      <form onSubmit={handleAddItem} className="flex gap-2">
+      <form onSubmit={handleAddItem} className="flex flex-wrap gap-2">
         <input
           type="text"
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
           placeholder="Add an item..."
-          className="flex-1 rounded-md border border-input bg-background px-4 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="min-w-0 flex-1 rounded-md border border-input bg-background px-4 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           disabled={isPending}
+        />
+        <TagSelector
+          allTags={allTags}
+          selectedTagIds={selectedTagIds}
+          onToggleTag={handleToggleTag}
+          onCreateTag={handleCreateTag}
         />
         <button
           type="submit"
@@ -159,6 +405,29 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
           Add
         </button>
       </form>
+
+      {/* Selected tags preview */}
+      {selectedTagIds.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedTagIds.map((tagId) => {
+            const tag = allTags.find((t) => t.id === tagId);
+            if (!tag) return null;
+            return (
+              <button
+                key={tagId}
+                type="button"
+                onClick={() => handleToggleTag(tagId)}
+                className="group inline-flex items-center gap-1"
+              >
+                <TagBadge tag={tag} />
+                <span className="text-xs text-muted-foreground group-hover:text-destructive">
+                  ×
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Item List by Category */}
       {categories.length === 0 ? (
@@ -185,15 +454,23 @@ export function GroceryList({ initialItems, wsUrl }: GroceryListProps) {
                         onChange={() => handleToggleItem(item.id)}
                         className="h-5 w-5 rounded border-input bg-background text-primary focus:ring-primary"
                       />
-                      <span
-                        className={
-                          item.isPurchased
-                            ? "text-muted-foreground line-through"
-                            : "text-foreground"
-                        }
-                      >
-                        {item.itemName}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={
+                            item.isPurchased
+                              ? "text-muted-foreground line-through"
+                              : "text-foreground"
+                          }
+                        >
+                          {item.itemName}
+                        </span>
+                        {item.groceryItemTags.map((itemTag) => (
+                          <TagBadge
+                            key={itemTag.tagId}
+                            tag={itemTag.groceryTag}
+                          />
+                        ))}
+                      </div>
                     </div>
                     <button
                       onClick={() => handleDeleteItem(item.id)}

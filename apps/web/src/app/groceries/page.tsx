@@ -1,5 +1,5 @@
 import { db, eq, isNull, and, desc } from "@amigo/db";
-import { groceryItems } from "@amigo/db/schema";
+import { groceryItems, groceryTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { GroceryList } from "@/components/grocery-list";
@@ -20,17 +20,27 @@ export default async function GroceriesPage() {
     redirect("/api/auth/login");
   }
 
-  // Fetch grocery items directly from DB (RSC pattern)
-  const items = await db
-    .select()
-    .from(groceryItems)
-    .where(
-      and(
-        eq(groceryItems.householdId, session.householdId),
-        isNull(groceryItems.deletedAt)
-      )
-    )
-    .orderBy(desc(groceryItems.createdAt));
+  // Fetch grocery items with their tags using query API
+  const items = await db.query.groceryItems.findMany({
+    where: and(
+      eq(groceryItems.householdId, session.householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+    orderBy: [desc(groceryItems.createdAt)],
+    with: {
+      groceryItemTags: {
+        with: {
+          groceryTag: true,
+        },
+      },
+    },
+  });
+
+  // Fetch all tags for the household
+  const allTags = await db.query.groceryTags.findMany({
+    where: eq(groceryTags.householdId, session.householdId),
+    orderBy: [desc(groceryTags.name)],
+  });
 
   const wsUrl = getWsUrl();
 
@@ -41,7 +51,7 @@ export default async function GroceriesPage() {
         <p className="text-muted-foreground">Manage your shopping list</p>
       </div>
 
-      <GroceryList initialItems={items} wsUrl={wsUrl} />
+      <GroceryList initialItems={items} allTags={allTags} wsUrl={wsUrl} />
     </main>
   );
 }

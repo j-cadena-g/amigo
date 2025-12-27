@@ -13,8 +13,8 @@ Self-hosted household management app for budgeting and grocery tracking.
 ## Development
 
 ```bash
-bun install
-docker compose up -d
+make up          # Start all services
+make dev-logs    # Tail dev logs
 ```
 
 Visit http://localhost:3000
@@ -22,15 +22,17 @@ Visit http://localhost:3000
 ## Production
 
 ```bash
-make deploy
+make deploy      # Build, start, and migrate
+make prod-logs   # Tail prod logs
 ```
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `bun install` | Install dependencies |
-| `bun dev` | Start dev servers |
-| `bun db:generate` | Generate migrations |
-| `bun db:migrate` | Apply migrations |
-| `make deploy` | Deploy to production |
+| `make up` | Start all services |
+| `make down` | Stop all services |
+| `make build` | Build containers |
+| `make dev-up` | Start dev stack only |
+| `make prod-up` | Start prod stack only |
+| `make deploy` | Build, start, and migrate prod |

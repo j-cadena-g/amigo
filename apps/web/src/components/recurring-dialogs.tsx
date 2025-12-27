@@ -257,8 +257,7 @@ export function AddRecurringDialog({
     onSuccess();
   };
 
-  if (!open) return null;
-
+  // Don't conditionally render - AlertDialog must stay mounted for controlled state to work
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -269,6 +268,7 @@ export function AddRecurringDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <RecurringForm
+          key={open ? "open" : "closed"}
           initialData={{
             amount: "",
             category: "",

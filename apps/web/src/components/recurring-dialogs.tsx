@@ -1,16 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  Button,
-  Input,
-} from "@amigo/ui";
+import { Button, Input } from "@amigo/ui";
 import { createRecurringRule, updateRecurringRule } from "@/actions/recurring";
 import type { RecurringTransaction } from "@amigo/db/schema";
 
@@ -218,15 +209,34 @@ function RecurringForm({
         />
       </div>
 
-      <AlertDialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="flex gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending || !formData.amount}>
+        <Button type="submit" disabled={isPending || !formData.amount} className="flex-1">
           {isPending ? "Saving..." : submitLabel}
         </Button>
-      </AlertDialogFooter>
+      </div>
     </form>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M6 18L18 6M6 6l12 12"
+      />
+    </svg>
   );
 }
 
@@ -257,16 +267,26 @@ export function AddRecurringDialog({
     onSuccess();
   };
 
-  // Don't conditionally render - AlertDialog must stay mounted for controlled state to work
+  if (!open) return null;
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Add Recurring Rule</AlertDialogTitle>
-          <AlertDialogDescription>
-            Create a recurring transaction that repeats on a schedule.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-lg border bg-card p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Add Recurring Rule</h2>
+            <p className="text-sm text-muted-foreground">
+              Create a recurring transaction that repeats on a schedule.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <CloseIcon className="h-6 w-6" />
+          </button>
+        </div>
         <RecurringForm
           key={open ? "open" : "closed"}
           initialData={{
@@ -283,8 +303,8 @@ export function AddRecurringDialog({
           onCancel={() => onOpenChange(false)}
           submitLabel="Create Rule"
         />
-      </AlertDialogContent>
-    </AlertDialog>
+      </div>
+    </div>
   );
 }
 
@@ -321,15 +341,26 @@ export function EditRecurringDialog({
     onSuccess();
   };
 
+  if (!open) return null;
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Edit Recurring Rule</AlertDialogTitle>
-          <AlertDialogDescription>
-            Modify the recurring transaction settings.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-lg border bg-card p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Edit Recurring Rule</h2>
+            <p className="text-sm text-muted-foreground">
+              Modify the recurring transaction settings.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <CloseIcon className="h-6 w-6" />
+          </button>
+        </div>
         <RecurringForm
           initialData={{
             amount: rule.amount,
@@ -345,7 +376,7 @@ export function EditRecurringDialog({
           onCancel={() => onOpenChange(false)}
           submitLabel="Save Changes"
         />
-      </AlertDialogContent>
-    </AlertDialog>
+      </div>
+    </div>
   );
 }

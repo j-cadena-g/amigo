@@ -1,5 +1,9 @@
 # amigo
 
+<p align="center">
+  <img src="apps/web/public/amigo-original.png" alt="amigo" width="200" />
+</p>
+
 Self-hosted household management app for budgeting and grocery tracking.
 
 ## Tech Stack

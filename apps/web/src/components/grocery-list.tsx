@@ -199,7 +199,7 @@ function TagSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover p-2 shadow-lg">
           {/* Search/Filter Input */}
           <input
             type="text"
@@ -268,12 +268,12 @@ function TagSelector({
                             onDeleteTag(tag.id);
                           }
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        className="md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                         aria-label="Delete tag"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
+                          className="h-5 w-5"
                           viewBox="0 0 20 20"
                           fill="currentColor"
                         >
@@ -304,7 +304,7 @@ function TagSelector({
                     key={color}
                     type="button"
                     onClick={() => setNewTagColor(color)}
-                    className={`h-6 w-6 rounded-full ${swatchColors[color]} ${
+                    className={`h-10 w-10 rounded-full ${swatchColors[color]} ${
                       newTagColor === color
                         ? "ring-2 ring-primary ring-offset-2"
                         : "hover:ring-2 hover:ring-muted-foreground hover:ring-offset-1"
@@ -441,7 +441,7 @@ function ItemTagSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover p-2 shadow-lg">
           {/* Search/Filter Input */}
           <input
             type="text"
@@ -515,12 +515,12 @@ function ItemTagSelector({
                             onDeleteTag(tag.id);
                           }
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        className="md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                         aria-label="Delete tag"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
+                          className="h-5 w-5"
                           viewBox="0 0 20 20"
                           fill="currentColor"
                         >
@@ -554,7 +554,7 @@ function ItemTagSelector({
                       e.stopPropagation();
                       setNewTagColor(color);
                     }}
-                    className={`h-6 w-6 rounded-full ${swatchColors[color]} ${
+                    className={`h-10 w-10 rounded-full ${swatchColors[color]} ${
                       newTagColor === color
                         ? "ring-2 ring-primary ring-offset-2"
                         : "hover:ring-2 hover:ring-muted-foreground hover:ring-offset-1"

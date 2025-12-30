@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Loader2,
   Plus,
   Pencil,
   Trash2,
@@ -19,6 +18,8 @@ import {
   deleteRecurringRule,
 } from "@/actions/recurring";
 import { useConfirm } from "@/components/confirm-provider";
+import { EmptyState } from "@/components/empty-state";
+import { Loading } from "@/components/loading";
 import type { RecurringTransaction } from "@amigo/db/schema";
 import {
   AddRecurringDialog,
@@ -97,11 +98,7 @@ export function RecurringList() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <Loading />;
   }
 
   if (isError) {
@@ -125,16 +122,14 @@ export function RecurringList() {
 
       {/* Rules List */}
       {!rules || rules.length === 0 ? (
-        <div className="rounded-lg border bg-card p-6 text-center text-muted-foreground">
-          No recurring rules yet. Add one to automate your transactions.
-        </div>
+        <EmptyState message="No recurring rules yet. Add one to automate your transactions." />
       ) : (
         <div className="space-y-3">
           {rules.map((rule) => (
             <div
               key={rule.id}
-              className={`rounded-lg border bg-card p-4 ${
-                !rule.active ? "opacity-60" : ""
+              className={`rounded-lg border bg-card p-4 transition-colors ${
+                !rule.active ? "border-dashed border-muted-foreground/30 bg-muted/30" : ""
               }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -185,12 +180,17 @@ export function RecurringList() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    <Switch
-                      checked={rule.active}
-                      onCheckedChange={() => handleToggle(rule.id)}
-                      disabled={isPending}
-                      aria-label={rule.active ? "Pause rule" : "Resume rule"}
-                    />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span className={`text-xs ${rule.active ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                        {rule.active ? "Active" : "Paused"}
+                      </span>
+                      <Switch
+                        checked={rule.active}
+                        onCheckedChange={() => handleToggle(rule.id)}
+                        disabled={isPending}
+                        aria-label={rule.active ? "Pause rule" : "Resume rule"}
+                      />
+                    </label>
                     <button
                       onClick={() => setEditingRule(rule)}
                       className="text-muted-foreground hover:text-foreground"

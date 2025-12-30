@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { EmptyState } from "@/components/empty-state";
 import { useRouter } from "next/navigation";
 import { addItem, toggleItem, deleteItem, updateItemTags } from "@/actions/groceries";
 import { createTag, deleteTag } from "@/actions/tags";
@@ -812,9 +813,7 @@ export function GroceryList({
 
       {/* Item List by Category */}
       {categories.length === 0 ? (
-        <p className="text-center text-muted-foreground">
-          No items yet. Add something to your grocery list!
-        </p>
+        <EmptyState message="No items yet. Add something to your grocery list!" />
       ) : (
         <div className="space-y-4">
           {categories.map((category) => (

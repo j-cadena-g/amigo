@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { deleteAsset } from "@/actions/assets";
 import { EditAssetDialog } from "@/components/edit-asset-dialog";
 import { useConfirm } from "@/components/confirm-provider";
+import { EmptyState } from "@/components/empty-state";
 import type { Asset } from "@amigo/db";
 
 interface AssetCardsProps {
@@ -152,11 +153,7 @@ export function AssetCards({ assets }: AssetCardsProps) {
 
   if (assets.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">
-          No assets yet. Add your first asset to start tracking your net worth.
-        </p>
-      </div>
+      <EmptyState message="No assets yet. Add your first asset to start tracking your net worth." />
     );
   }
 

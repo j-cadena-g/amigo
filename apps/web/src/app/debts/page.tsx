@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { DebtCards } from "@/components/debt-cards";
 import { AddDebtDialog } from "@/components/add-debt-dialog";
+import { EmptyState } from "@/components/empty-state";
 
 // Force dynamic rendering - page queries database
 export const dynamic = "force-dynamic";
@@ -93,12 +94,7 @@ export default async function DebtsPage() {
 
       {/* Debt Cards */}
       {allDebts.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <p className="text-muted-foreground">No debts tracked yet.</p>
-          <p className="mt-1 text-sm text-muted-foreground/70">
-            Add a loan or credit card to get started.
-          </p>
-        </div>
+        <EmptyState message="No debts tracked yet. Add a loan or credit card to get started." />
       ) : (
         <DebtCards debts={allDebts} />
       )}

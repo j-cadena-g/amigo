@@ -15,8 +15,8 @@ export default async function BudgetPage() {
     redirect("/api/auth/login");
   }
 
-  // Lazy trigger: Process any due recurring transactions before fetching data
-  await processDueRecurringTransactions(session.householdId);
+  // Lazy trigger: Process any due recurring transactions for this user before fetching data
+  await processDueRecurringTransactions();
 
   // Fetch budget analytics using the DB query function (RSC pattern)
   const analytics = await getBudgetAnalytics(session.householdId);

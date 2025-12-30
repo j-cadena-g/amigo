@@ -74,7 +74,10 @@ export async function getRecurringRules(): Promise<RecurringTransaction[]> {
   }
 
   return db.query.recurringTransactions.findMany({
-    where: eq(recurringTransactions.householdId, session.householdId),
+    where: and(
+      eq(recurringTransactions.householdId, session.householdId),
+      eq(recurringTransactions.userId, session.userId)
+    ),
     orderBy: (rt, { desc }) => [desc(rt.createdAt)],
   });
 }
@@ -158,7 +161,8 @@ export async function updateRecurringRule(input: UpdateRecurringRuleInput) {
       .where(
         and(
           eq(recurringTransactions.id, input.id),
-          eq(recurringTransactions.householdId, session.householdId)
+          eq(recurringTransactions.householdId, session.householdId),
+          eq(recurringTransactions.userId, session.userId)
         )
       )
       .returning();
@@ -191,7 +195,8 @@ export async function deleteRecurringRule(id: string) {
       .where(
         and(
           eq(recurringTransactions.id, id),
-          eq(recurringTransactions.householdId, session.householdId)
+          eq(recurringTransactions.householdId, session.householdId),
+          eq(recurringTransactions.userId, session.userId)
         )
       )
       .returning();
@@ -218,11 +223,12 @@ export async function toggleRecurringRule(id: string) {
     throw new Error("Unauthorized");
   }
 
-  // First get the current state
+  // First get the current state - only for rules owned by this user
   const existing = await db.query.recurringTransactions.findFirst({
     where: and(
       eq(recurringTransactions.id, id),
-      eq(recurringTransactions.householdId, session.householdId)
+      eq(recurringTransactions.householdId, session.householdId),
+      eq(recurringTransactions.userId, session.userId)
     ),
   });
 
@@ -237,7 +243,8 @@ export async function toggleRecurringRule(id: string) {
       .where(
         and(
           eq(recurringTransactions.id, id),
-          eq(recurringTransactions.householdId, session.householdId)
+          eq(recurringTransactions.householdId, session.householdId),
+          eq(recurringTransactions.userId, session.userId)
         )
       )
       .returning();
@@ -255,27 +262,23 @@ export async function toggleRecurringRule(id: string) {
 }
 
 /**
- * Process all due recurring transactions for a household.
+ * Process all due recurring transactions for the current user.
  * This is called lazily when the user visits the dashboard to ensure data is up to date.
  */
-export async function processDueRecurringTransactions(householdId: string) {
+export async function processDueRecurringTransactions() {
   const session = await getSession();
   if (!session) {
-    throw new Error("Unauthorized");
-  }
-
-  // Ensure user can only process their own household
-  if (session.householdId !== householdId) {
     throw new Error("Unauthorized");
   }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Find all active rules where next_run_date <= today
+  // Find all active rules for this user where next_run_date <= today
   const dueRules = await db.query.recurringTransactions.findMany({
     where: and(
-      eq(recurringTransactions.householdId, householdId),
+      eq(recurringTransactions.householdId, session.householdId),
+      eq(recurringTransactions.userId, session.userId),
       eq(recurringTransactions.active, true),
       lte(recurringTransactions.nextRunDate, today)
     ),
@@ -332,7 +335,7 @@ export async function processDueRecurringTransactions(householdId: string) {
 
   if (processedCount > 0) {
     await publishHouseholdUpdate({
-      householdId,
+      householdId: session.householdId,
       type: "TRANSACTION_UPDATE",
     });
 

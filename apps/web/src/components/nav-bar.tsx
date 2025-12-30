@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Wallet,
@@ -43,8 +44,15 @@ export function NavBar({ userName, userEmail }: NavBarProps) {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-primary">amigo</span>
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src="/amigo-PWA-192x192.png"
+              alt="amigo"
+              width={40}
+              height={40}
+              className="h-10 w-10"
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}

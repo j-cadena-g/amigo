@@ -4,6 +4,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import { Loader2, Plus, Trash2, ArrowDown, ArrowUp } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
+import { Loading } from "@/components/loading";
 import { addTransaction, deleteTransaction } from "@/actions/transactions";
 import { client } from "@/lib/api";
 
@@ -147,11 +149,7 @@ export function TransactionList() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <Loading />;
   }
 
   if (isError) {
@@ -266,9 +264,7 @@ export function TransactionList() {
 
       {/* Transaction List */}
       {transactions.length === 0 ? (
-        <div className="rounded-lg border bg-card p-6 text-center text-muted-foreground">
-          No transactions yet.
-        </div>
+        <EmptyState message="No transactions yet." />
       ) : (
         <div className="divide-y divide-border rounded-lg border bg-card">
           {transactions.map((transaction) => (

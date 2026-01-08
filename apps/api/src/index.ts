@@ -83,7 +83,16 @@ const server = Bun.serve<WebSocketData>({
       addClient(ws);
     },
     message(ws, message) {
-      console.log("WebSocket message:", message);
+      // Handle ping/pong for keepalive
+      try {
+        const data = JSON.parse(String(message));
+        if (data.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
+      } catch {
+        // Ignore non-JSON messages
+      }
     },
     close(ws) {
       console.log(

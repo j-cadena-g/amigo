@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { db, desc, isNull, eq, and } from "@amigo/db";
+import { db, desc, eq, and, gte, isNull } from "@amigo/db";
 import { groceryItems } from "@amigo/db/schema";
 import { getSessionFromCookie } from "../lib/session";
 
@@ -20,24 +20,39 @@ export const groceriesRouter = new Hono().get(
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const { lastSync: _lastSync } = c.req.valid("query");
+    const { lastSync } = c.req.valid("query");
 
     // Delta sync: fetch items updated after lastSync timestamp
-    // Only return items belonging to the user's household
-    const data = await db
-      .select()
-      .from(groceryItems)
-      .where(
-        and(
-          eq(groceryItems.householdId, session.householdId),
-          isNull(groceryItems.deletedAt)
-        )
-      )
-      .orderBy(desc(groceryItems.updatedAt));
+    // Include soft-deleted items so clients can remove them
+    // If no lastSync provided, return all active items (initial sync)
+    const baseCondition = eq(groceryItems.householdId, session.householdId);
+
+    const data = lastSync
+      ? await db
+          .select()
+          .from(groceryItems)
+          .where(
+            and(
+              baseCondition,
+              gte(groceryItems.updatedAt, new Date(lastSync))
+            )
+          )
+          .orderBy(desc(groceryItems.updatedAt))
+      : await db
+          .select()
+          .from(groceryItems)
+          .where(
+            and(
+              baseCondition,
+              isNull(groceryItems.deletedAt)
+            )
+          )
+          .orderBy(desc(groceryItems.updatedAt));
 
     return c.json({
       data,
       syncTimestamp: Date.now(),
+      isDelta: !!lastSync,
     });
   }
 );

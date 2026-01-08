@@ -27,9 +27,16 @@ export const CHANNELS = {
   HOUSEHOLD_UPDATES: "household:updates",
 } as const;
 
+export type UpdateAction = "create" | "update" | "delete";
+
 export interface HouseholdUpdatePayload {
   householdId: string;
   type: "GROCERY_UPDATE" | "TRANSACTION_UPDATE" | "RECURRING_UPDATE";
+  /** The action that triggered this update */
+  action?: UpdateAction;
+  /** The affected entity ID(s) */
+  entityId?: string | string[];
+  /** Optional full entity data for create/update (avoids refetch) */
   data?: unknown;
 }
 

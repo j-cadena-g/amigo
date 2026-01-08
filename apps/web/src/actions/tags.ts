@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db, eq, and, sql } from "@amigo/db";
 import { groceryTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
+import { publishHouseholdUpdate } from "@/lib/redis";
 
 export async function getTags() {
   const session = await getSession();
@@ -48,6 +49,10 @@ export async function createTag(name: string, color?: string) {
     .returning();
 
   revalidatePath("/groceries");
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+  });
 
   return tag;
 }
@@ -95,6 +100,10 @@ export async function updateTag(id: string, name: string, color: string) {
     .returning();
 
   revalidatePath("/groceries");
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+  });
 
   return updated;
 }
@@ -117,6 +126,10 @@ export async function deleteTag(id: string) {
   }
 
   revalidatePath("/groceries");
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+  });
 
   return deleted;
 }

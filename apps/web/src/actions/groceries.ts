@@ -48,6 +48,8 @@ export async function addItem(
   await publishHouseholdUpdate({
     householdId: session.householdId,
     type: "GROCERY_UPDATE",
+    action: "create",
+    entityId: item.id,
   });
 
   // Queue push notification for batching
@@ -99,6 +101,8 @@ export async function toggleItem(id: string) {
   await publishHouseholdUpdate({
     householdId: session.householdId,
     type: "GROCERY_UPDATE",
+    action: "update",
+    entityId: id,
   });
 
   // Send push notification only when marking as purchased (not when un-marking)
@@ -141,6 +145,8 @@ export async function deleteItem(id: string) {
   await publishHouseholdUpdate({
     householdId: session.householdId,
     type: "GROCERY_UPDATE",
+    action: "delete",
+    entityId: id,
   });
 
   revalidatePath("/groceries");
@@ -184,6 +190,8 @@ export async function updateItemTags(itemId: string, tagIds: string[]) {
   await publishHouseholdUpdate({
     householdId: session.householdId,
     type: "GROCERY_UPDATE",
+    action: "update",
+    entityId: itemId,
   });
 
   revalidatePath("/groceries");
@@ -222,6 +230,8 @@ export async function updateItem(id: string, name: string) {
   await publishHouseholdUpdate({
     householdId: session.householdId,
     type: "GROCERY_UPDATE",
+    action: "update",
+    entityId: id,
   });
 
   revalidatePath("/groceries");

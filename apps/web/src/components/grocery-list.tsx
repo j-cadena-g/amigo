@@ -6,6 +6,7 @@ import {
   useTransition,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { addItem, toggleItem, deleteItem, updateItemTags, updateItem } from "@/a
 import { createTag, deleteTag, updateTag } from "@/actions/tags";
 import { useConfirm } from "@/components/confirm-provider";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { useWebSocket } from "@/hooks/use-websocket";
 import type { GroceryItem, GroceryTag, GroceryItemTag } from "@amigo/db";
 
 // Extended type for grocery items with their tags
@@ -893,64 +895,23 @@ export function GroceryList({
     groceryReducer
   );
 
-  // WebSocket connection for real-time updates
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let isMounted = true;
-
-    // Construct full WebSocket URL from current page location
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const fullWsUrl = `${protocol}//${window.location.host}${wsUrl}`;
-
-    // Small delay to avoid rapid connect/disconnect in React Strict Mode
-    const connectTimeout = setTimeout(() => {
-      if (!isMounted) return;
-
-      ws = new WebSocket(fullWsUrl);
-
-      ws.onopen = () => {
-        if (isMounted) {
-          console.log("WebSocket connected");
-        }
-      };
-
-      ws.onmessage = (event) => {
-        if (!isMounted) return;
-        try {
-          const payload = JSON.parse(event.data) as {
-            type: string;
-            householdId: string;
-          };
-
-          if (payload.type === "GROCERY_UPDATE") {
-            // Refresh the page to get authoritative state
-            router.refresh();
-          }
-        } catch (error) {
-          console.error("Failed to parse WebSocket message:", error);
-        }
-      };
-
-      ws.onerror = () => {
-        // Silently handle errors - connection will be retried on next navigation
-        // This avoids noisy console errors during React Strict Mode double-mount
-      };
-
-      ws.onclose = () => {
-        if (isMounted) {
-          console.log("WebSocket disconnected");
-        }
-      };
-    }, 100);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(connectTimeout);
-      if (ws) {
-        ws.close();
+  // WebSocket message handler
+  const handleWebSocketMessage = useCallback(
+    (data: unknown) => {
+      const payload = data as { type: string; householdId: string };
+      if (payload.type === "GROCERY_UPDATE") {
+        // Refresh to get authoritative state
+        router.refresh();
       }
-    };
-  }, [wsUrl, router]);
+    },
+    [router]
+  );
+
+  // WebSocket connection with auto-reconnect
+  useWebSocket({
+    url: wsUrl,
+    onMessage: handleWebSocketMessage,
+  });
 
   // Sync allTags with server state on refresh
   useEffect(() => {

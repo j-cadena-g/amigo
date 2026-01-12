@@ -31,3 +31,6 @@ bun.lockb
 # Logs
 *.log
 npm-debug.log*
+
+# Test coverage
+coverage/

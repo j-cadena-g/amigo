@@ -3,7 +3,8 @@ import Dexie, { type Table } from "dexie";
 export interface OfflineGroceryItem {
   id: string;
   householdId: string;
-  createdByUserId: string;
+  createdByUserId: string | null;
+  createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
   isPurchased: boolean;

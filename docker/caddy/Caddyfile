@@ -29,10 +29,10 @@ amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
 		-Server
 	}
 
-	# Development environment (hot-reload)
+	# Development environment
 	@dev host dev-amigo.cadenalabs.net
 	handle @dev {
-		# CSP for development (allows unsafe-eval for hot reload)
+		# CSP for development
 		header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://dev-amigo.cadenalabs.net https://auth.cadenalabs.net; manifest-src 'self'; frame-ancestors 'none'; form-action 'self' https://auth.cadenalabs.net; base-uri 'self'"
 		# WebSocket and API routes go to Hono
 		reverse_proxy /ws api-dev:3001
@@ -40,8 +40,8 @@ amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
 		reverse_proxy /api/health api-dev:3001
 		reverse_proxy /api/transactions* api-dev:3001
 		reverse_proxy /api/groceries* api-dev:3001
-		# Everything else goes to Next.js (hot-reload)
-		reverse_proxy web-dev-hot:3001
+		# Everything else goes to Next.js
+		reverse_proxy web-dev:3001
 	}
 
 	# Production environment

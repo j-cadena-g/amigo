@@ -22,9 +22,14 @@ export const transactions = pgTable("transactions", {
   householdId: uuid("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  // Denormalized user info for display when user is deleted
+  userDisplayName: text("user_display_name"),
+  // Track original creator when data is transferred during "fresh start" restore
+  transferredFromUserId: uuid("transferred_from_user_id").references(
+    () => users.id,
+    { onDelete: "set null" }
+  ),
   budgetId: uuid("budget_id").references(() => budgets.id, {
     onDelete: "set null",
   }),

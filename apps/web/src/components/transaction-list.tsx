@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { BudgetSelect } from "@/components/budget-select";
 import { CurrencySelect } from "@/components/currency-select";
+import { TransferredFromIndicator } from "@/components/transferred-from-indicator";
 import { addTransaction, deleteTransaction, updateTransaction } from "@/actions/transactions";
 import { client } from "@/lib/api";
 import { formatCurrency } from "@/lib/currency";
@@ -17,7 +18,12 @@ import type { CurrencyCode } from "@amigo/db/schema";
 interface TransactionDTO {
   id: string;
   householdId: string;
-  userId: string;
+  userId: string | null;
+  createdByDisplayName: string;
+  isDeletedUser: boolean;
+  transferredFromUserId: string | null;
+  transferredFromDisplayName: string | null;
+  wasTransferred: boolean;
   amount: string;
   currency: CurrencyCode;
   exchangeRateToHome: string | null;
@@ -81,7 +87,11 @@ function formatDate(date: Date | string): string {
   });
 }
 
-export function TransactionList() {
+interface TransactionListProps {
+  currentUserId: string;
+}
+
+export function TransactionList({ currentUserId }: TransactionListProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
     amount: "",
@@ -264,7 +274,7 @@ export function TransactionList() {
             <button
               type="button"
               onClick={() =>
-                setNewTransaction((prev) => ({ ...prev, type: "income" }))
+                setNewTransaction((prev) => ({ ...prev, type: "income", budgetId: null }))
               }
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                 newTransaction.type === "income"
@@ -322,15 +332,17 @@ export function TransactionList() {
             className="w-full rounded-md border border-input bg-background px-3 py-2"
           />
 
-          <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Budget (optional)</label>
-            <BudgetSelect
-              value={newTransaction.budgetId}
-              onChange={(budgetId) =>
-                setNewTransaction((prev) => ({ ...prev, budgetId }))
-              }
-            />
-          </div>
+          {newTransaction.type === "expense" && (
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Budget (optional)</label>
+              <BudgetSelect
+                value={newTransaction.budgetId}
+                onChange={(budgetId) =>
+                  setNewTransaction((prev) => ({ ...prev, budgetId }))
+                }
+              />
+            </div>
+          )}
 
           <div className="flex gap-2">
             <button
@@ -385,7 +397,7 @@ export function TransactionList() {
                     <button
                       type="button"
                       onClick={() =>
-                        setEditForm((prev) => ({ ...prev, type: "income" }))
+                        setEditForm((prev) => ({ ...prev, type: "income", budgetId: null }))
                       }
                       className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                         editForm.type === "income"
@@ -453,15 +465,17 @@ export function TransactionList() {
                     required
                   />
 
-                  <div>
-                    <label className="text-sm text-muted-foreground mb-1 block">Budget (optional)</label>
-                    <BudgetSelect
-                      value={editForm.budgetId}
-                      onChange={(budgetId) =>
-                        setEditForm((prev) => ({ ...prev, budgetId }))
-                      }
-                    />
-                  </div>
+                  {editForm.type === "expense" && (
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Budget (optional)</label>
+                      <BudgetSelect
+                        value={editForm.budgetId}
+                        onChange={(budgetId) =>
+                          setEditForm((prev) => ({ ...prev, budgetId }))
+                        }
+                      />
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <button
@@ -568,6 +582,24 @@ export function TransactionList() {
                           <div>
                             <p className="text-muted-foreground text-xs">Currency</p>
                             <p className="font-medium">{transaction.currency}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-muted-foreground text-xs">Created by</p>
+                          <p className={`font-medium ${transaction.isDeletedUser ? "text-muted-foreground italic" : ""}`}>
+                            {transaction.createdByDisplayName}
+                            {transaction.isDeletedUser && " (removed)"}
+                          </p>
+                        </div>
+                        {transaction.wasTransferred && transaction.transferredFromDisplayName && (
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground text-xs mb-1">Transferred</p>
+                            <TransferredFromIndicator
+                              originalOwnerName={transaction.transferredFromDisplayName}
+                              recordId={transaction.id}
+                              tableName="transactions"
+                              show={transaction.userId === currentUserId}
+                            />
                           </div>
                         )}
                       </div>

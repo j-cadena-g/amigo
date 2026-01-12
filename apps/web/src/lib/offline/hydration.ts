@@ -10,7 +10,8 @@ import {
 export interface GroceryItemWithTags {
   id: string;
   householdId: string;
-  createdByUserId: string;
+  createdByUserId: string | null;
+  createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
   isPurchased: boolean;
@@ -56,6 +57,7 @@ async function bulkInsertItems(items: GroceryItemWithTags[]): Promise<void> {
     id: item.id,
     householdId: item.householdId,
     createdByUserId: item.createdByUserId,
+    createdByUserDisplayName: item.createdByUserDisplayName,
     itemName: item.itemName,
     category: item.category,
     isPurchased: item.isPurchased,
@@ -100,6 +102,7 @@ async function incrementalSync(
       // New item from server - add it
       await db.groceryItems.add({
         ...serverItem,
+        createdByUserDisplayName: serverItem.createdByUserDisplayName ?? null,
         _localVersion: 0,
         _serverVersion: new Date(serverItem.updatedAt).getTime(),
         _syncStatus: "synced",

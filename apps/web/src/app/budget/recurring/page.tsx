@@ -24,7 +24,7 @@ export default async function RecurringPage() {
           Set up automatic transactions that repeat on a schedule.
         </p>
       </div>
-      <RecurringList />
+      <RecurringList currentUserId={session.userId} />
     </div>
   );
 }

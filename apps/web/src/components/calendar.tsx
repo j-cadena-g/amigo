@@ -25,6 +25,18 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
 
+// Format a date as YYYY-MM-DD in the user's local timezone (for timestamps)
+function toLocalDateKey(date: Date): string {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Format a date as YYYY-MM-DD using UTC components (for date-only fields already normalized server-side)
+function toUTCDateKey(date: Date): string {
+  const d = new Date(date);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 function formatAmount(amount: string | undefined, type: "income" | "expense" | undefined): string {
   if (!amount) return "";
   const num = parseFloat(amount);
@@ -252,14 +264,48 @@ export function Calendar({ initialYear, initialMonth, initialEvents, wsUrl }: Ca
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 
   // Group events by date
+  // - grocery_purchase events have full timestamps, use local timezone for display
+  // - transaction/recurring events have date-only fields normalized to UTC by server, use UTC
   const eventsByDate = new Map<string, CalendarEvent[]>();
   for (const event of events) {
-    const dateKey = new Date(event.date).toISOString().split("T")[0] ?? "";
-    if (!dateKey) continue;
+    // Grocery purchases are timestamps - convert to user's local date
+    // Other events are date-only fields - use UTC to preserve server normalization
+    const dateKey = event.type === "grocery_purchase"
+      ? toLocalDateKey(new Date(event.date))
+      : toUTCDateKey(new Date(event.date));
     if (!eventsByDate.has(dateKey)) {
       eventsByDate.set(dateKey, []);
     }
     eventsByDate.get(dateKey)!.push(event);
+  }
+
+  // Consolidate grocery purchases into a single event per day for display
+  for (const [dateKey, dayEvents] of eventsByDate) {
+    const groceryEvents = dayEvents.filter(e => e.type === "grocery_purchase");
+    const otherEvents = dayEvents.filter(e => e.type !== "grocery_purchase");
+
+    if (groceryEvents.length > 1) {
+      // Replace multiple grocery events with a single consolidated one
+      const consolidatedGrocery: CalendarEvent = {
+        id: `grocery-consolidated-${dateKey}`,
+        type: "grocery_purchase",
+        date: groceryEvents[0]!.date,
+        title: `${groceryEvents.length} items purchased`,
+        color: "orange",
+        metadata: {
+          itemCount: groceryEvents.length,
+        },
+      };
+      eventsByDate.set(dateKey, [...otherEvents, consolidatedGrocery]);
+    } else if (groceryEvents.length === 1) {
+      // Single item - update title to show "1 item purchased"
+      const single = groceryEvents[0]!;
+      const updatedGrocery: CalendarEvent = {
+        ...single,
+        title: "1 item purchased",
+      };
+      eventsByDate.set(dateKey, [...otherEvents, updatedGrocery]);
+    }
   }
 
   // Calculate days from previous month to show
@@ -273,7 +319,7 @@ export function Calendar({ initialYear, initialMonth, initialEvents, wsUrl }: Ca
   const nextMonthDays = totalCells - daysInMonth - firstDayOfMonth;
 
   const selectedDateEvents = selectedDate
-    ? eventsByDate.get(selectedDate.toISOString().split("T")[0] ?? "") || []
+    ? eventsByDate.get(toLocalDateKey(selectedDate)) || []
     : [];
 
   return (

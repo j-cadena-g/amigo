@@ -241,7 +241,7 @@ function RecurringForm({
         </button>
         <button
           type="button"
-          onClick={() => setFormData((prev) => ({ ...prev, type: "income" }))}
+          onClick={() => setFormData((prev) => ({ ...prev, type: "income", budgetId: null }))}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             formData.type === "income"
               ? "bg-green-500/10 text-green-600 dark:text-green-400"
@@ -449,18 +449,20 @@ function RecurringForm({
         />
       </div>
 
-      {/* Budget Selection (optional) */}
-      <div>
-        <label className="text-sm font-medium text-muted-foreground">
-          Budget (optional)
-        </label>
-        <BudgetSelect
-          value={formData.budgetId}
-          onChange={(budgetId) =>
-            setFormData((prev) => ({ ...prev, budgetId }))
-          }
-        />
-      </div>
+      {/* Budget Selection (optional, expenses only) */}
+      {formData.type === "expense" && (
+        <div>
+          <label className="text-sm font-medium text-muted-foreground">
+            Budget (optional)
+          </label>
+          <BudgetSelect
+            value={formData.budgetId}
+            onChange={(budgetId) =>
+              setFormData((prev) => ({ ...prev, budgetId }))
+            }
+          />
+        </div>
+      )}
 
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">

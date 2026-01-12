@@ -25,7 +25,7 @@ export default async function GroceriesPage() {
   // Clean up items purchased more than 90 days ago
   await clearOldPurchasedItems();
 
-  // Fetch grocery items with their tags using query API
+  // Fetch grocery items with their tags and creator using query API
   const items = await db.query.groceryItems.findMany({
     where: and(
       eq(groceryItems.householdId, session.householdId),
@@ -36,6 +36,13 @@ export default async function GroceriesPage() {
       groceryItemTags: {
         with: {
           groceryTag: true,
+        },
+      },
+      createdByUser: {
+        columns: {
+          id: true,
+          name: true,
+          email: true,
         },
       },
     },

@@ -30,7 +30,7 @@ export default async function TransactionsPage() {
       {/* Transaction List Section */}
       <div className="space-y-4 min-w-0">
         <h2 className="text-xl font-semibold">Recent Transactions</h2>
-        <TransactionList />
+        <TransactionList currentUserId={session.userId} />
       </div>
     </div>
   );

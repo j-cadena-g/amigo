@@ -14,11 +14,16 @@
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun run dist/index.js",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@amigo/db": "workspace:*",
     "@amigo/types": "workspace:*",
+    "@hono/swagger-ui": "^0.5",
+    "@hono/zod-openapi": "^0.18",
     "@hono/zod-validator": "^0.4",
     "hono": "^4.6",
     "ioredis": "^5.4",

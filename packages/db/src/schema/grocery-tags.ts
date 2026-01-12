@@ -2,6 +2,7 @@ import { pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { relations } from "drizzle-orm";
 import { households } from "./households";
 import { groceryItems } from "./grocery-items";
+import { users } from "./users";
 
 export const groceryTags = pgTable("grocery_tags", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -52,10 +53,14 @@ export const groceryItemTagsRelations = relations(
   })
 );
 
-// Relations for grocery_items (one-to-many with grocery_item_tags)
+// Relations for grocery_items (one-to-many with grocery_item_tags, many-to-one with users)
 // Defined here to avoid circular imports between grocery-items.ts and grocery-tags.ts
-export const groceryItemsRelations = relations(groceryItems, ({ many }) => ({
+export const groceryItemsRelations = relations(groceryItems, ({ many, one }) => ({
   groceryItemTags: many(groceryItemTags),
+  createdByUser: one(users, {
+    fields: [groceryItems.createdByUserId],
+    references: [users.id],
+  }),
 }));
 
 export type GroceryTag = typeof groceryTags.$inferSelect;

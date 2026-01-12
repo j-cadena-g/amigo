@@ -26,6 +26,7 @@ import {
   EditRecurringDialog,
 } from "@/components/recurring-dialogs";
 import { formatCurrency } from "@/lib/currency";
+import { TransferredFromIndicator } from "@/components/transferred-from-indicator";
 
 function formatDate(date: Date | string): string {
   let d: Date;
@@ -83,7 +84,11 @@ function getFrequencyLabel(frequency: Frequency, interval: number, dayOfMonth?: 
   return `Every ${interval} ${label.plural}`;
 }
 
-export function RecurringList() {
+interface RecurringListProps {
+  currentUserId: string;
+}
+
+export function RecurringList({ currentUserId }: RecurringListProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<RecurringTransaction | null>(
     null
@@ -190,6 +195,14 @@ export function RecurringList() {
                           `Next: ${formatDate(rule.nextRunDate)}`
                         )}
                       </span>
+                      {rule.transferredFromUserId && rule.userDisplayName && (
+                        <TransferredFromIndicator
+                          originalOwnerName={rule.userDisplayName}
+                          recordId={rule.id}
+                          tableName="recurring_transactions"
+                          show={rule.userId === currentUserId}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

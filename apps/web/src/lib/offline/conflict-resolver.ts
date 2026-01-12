@@ -3,7 +3,8 @@ import type { OfflineGroceryItem } from "./db";
 export interface ServerGroceryItem {
   id: string;
   householdId: string;
-  createdByUserId: string;
+  createdByUserId: string | null;
+  createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
   isPurchased: boolean;
@@ -87,6 +88,7 @@ export function mergeItems(
   if (strategy === "server-wins") {
     return {
       ...server,
+      createdByUserDisplayName: server.createdByUserDisplayName ?? null,
       _localVersion: 0,
       _serverVersion: serverTimestamp,
       _syncStatus: "synced",
@@ -109,6 +111,8 @@ export function mergeItems(
     id: local.id,
     householdId: local.householdId,
     createdByUserId: local.createdByUserId,
+    createdByUserDisplayName:
+      server.createdByUserDisplayName ?? local.createdByUserDisplayName,
     itemName: useServer ? server.itemName : local.itemName,
     category: useServer ? server.category : local.category,
     isPurchased: useServer ? server.isPurchased : local.isPurchased,

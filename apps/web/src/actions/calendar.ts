@@ -200,33 +200,18 @@ export async function getCalendarEvents(
     events.push(...occurrences);
   }
 
-  // Group groceries by purchase date and create events
-  // Use local date (not UTC) to match user's perspective
-  const groceryByDate = new Map<string, { date: Date; items: typeof purchasedGroceries }>();
+  // Add grocery purchase events
+  // Send each purchase with its full timestamp - the client will group by local date
   for (const item of purchasedGroceries) {
     if (!item.purchasedAt) continue;
-    // Format as local date YYYY-MM-DD
-    const d = item.purchasedAt;
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    if (!groceryByDate.has(dateKey)) {
-      // Store the date at midnight local time for this day
-      groceryByDate.set(dateKey, {
-        date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
-        items: [],
-      });
-    }
-    groceryByDate.get(dateKey)!.items.push(item);
-  }
-
-  for (const [dateKey, { date, items }] of groceryByDate) {
     events.push({
-      id: `grocery-${dateKey}`,
+      id: `grocery-${item.id}`,
       type: "grocery_purchase",
-      date,
-      title: `${items.length} item${items.length !== 1 ? "s" : ""} purchased`,
+      date: item.purchasedAt, // Full timestamp, client handles timezone display
+      title: item.itemName,
       color: "orange",
       metadata: {
-        itemCount: items.length,
+        itemCount: 1,
       },
     });
   }

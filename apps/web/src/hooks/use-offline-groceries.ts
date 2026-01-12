@@ -154,6 +154,7 @@ export function useOfflineGroceries({
         id: tempId,
         householdId,
         createdByUserId: userId,
+        createdByUserDisplayName: null,
         itemName: name,
         category: null,
         isPurchased: false,

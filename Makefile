@@ -1,12 +1,14 @@
-.PHONY: dev-up dev-down dev-logs dev-shell dev-restart dev-build \
+.PHONY: dev-up dev-up-with-authentik dev-down dev-down-with-authentik dev-logs dev-shell dev-restart dev-build \
         prod-up prod-down prod-logs prod-shell prod-build \
-        up down logs build \
+        up down logs build up-with-authentik down-with-authentik \
+        authentik-up authentik-down authentik-logs \
         db-migrate db-generate db-push db-studio db-seed \
         deploy deploy-fresh rebuild
 
 # =============================================================================
-# Full Stack (All Services)
+# Full Stack (Core Services - without bundled Authentik)
 # =============================================================================
+# Use these if you have an external OIDC provider (existing Authentik, etc.)
 
 up:
 	docker compose up -d
@@ -21,14 +23,45 @@ build:
 	docker compose build
 
 # =============================================================================
+# Full Stack WITH Bundled Authentik
+# =============================================================================
+# Use these if you want to run Authentik as part of this stack
+
+up-with-authentik:
+	docker compose --profile authentik up -d
+
+down-with-authentik:
+	docker compose --profile authentik down
+
+# =============================================================================
+# Authentik Only (Identity Provider)
+# =============================================================================
+# Manage just the Authentik services
+
+authentik-up:
+	docker compose --profile authentik up -d authentik-server authentik-worker
+
+authentik-down:
+	docker compose --profile authentik stop authentik-server authentik-worker
+
+authentik-logs:
+	docker compose --profile authentik logs -f authentik-server authentik-worker
+
+# =============================================================================
 # Development Stack (web-dev, api-dev)
 # =============================================================================
 
 dev-up:
 	docker compose up -d web-dev api-dev
 
+dev-up-with-authentik:
+	docker compose --profile authentik up -d web-dev api-dev
+
 dev-down:
 	docker compose stop web-dev api-dev
+
+dev-down-with-authentik:
+	docker compose --profile authentik stop web-dev api-dev
 
 dev-logs:
 	docker compose logs -f web-dev api-dev
@@ -78,7 +111,7 @@ dev-local:
 	@bash -c 'source .env && \
 		export DATABASE_URL="postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@localhost:5432/$${POSTGRES_DB}_dev" && \
 		export VALKEY_URL="redis://localhost:6379" && \
-		export APP_URL="https://dev-amigo.cadenalabs.net" && \
+		export APP_URL="$${DEV_APP_URL:-$${APP_URL}}" && \
 		cd apps/web && bun run dev --port 3001'
 
 # Run all apps locally with turbo (web + api)
@@ -88,7 +121,7 @@ dev-local-all:
 	@bash -c 'source .env && \
 		export DATABASE_URL="postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@localhost:5432/$${POSTGRES_DB}_dev" && \
 		export VALKEY_URL="redis://localhost:6379" && \
-		export APP_URL="https://dev-amigo.cadenalabs.net" && \
+		export APP_URL="$${DEV_APP_URL:-$${APP_URL}}" && \
 		bun run dev'
 
 # =============================================================================

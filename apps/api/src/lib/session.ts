@@ -1,4 +1,5 @@
 import { redis } from "./redis";
+import type { UserRole } from "@amigo/db";
 
 const SESSION_COOKIE = "amigo_session";
 
@@ -8,6 +9,7 @@ export interface Session {
   email: string;
   name: string | null;
   authId: string;
+  role: UserRole;
 }
 
 function getSessionKey(sessionId: string): string {

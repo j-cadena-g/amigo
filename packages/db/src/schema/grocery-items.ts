@@ -7,9 +7,15 @@ export const groceryItems = pgTable("grocery_items", {
   householdId: uuid("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  createdByUserId: uuid("created_by_user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  // Denormalized user info for display when user is deleted
+  createdByUserDisplayName: text("created_by_user_display_name"),
+  // Track original creator when data is transferred during "fresh start" restore
+  transferredFromCreatedByUserId: uuid(
+    "transferred_from_created_by_user_id"
+  ).references(() => users.id, { onDelete: "set null" }),
   itemName: text("item_name").notNull(),
   category: text("category"),
   isPurchased: boolean("is_purchased").notNull().default(false),

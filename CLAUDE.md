@@ -22,24 +22,35 @@ amigo is a self-hosted household management application for 2 users (James (AKA 
 # Dependencies
 bun install
 
+# Development (local hot reload - fastest)
+make dev-local         # Run Next.js locally with Docker DB/Valkey
+make dev-local-all     # Run all apps locally (web + api)
+
+# Development (containerized)
+make dev-up            # Start web-dev, api-dev containers
+make dev-logs          # Tail dev container logs
+
 # Database
-bun db:generate    # Generate migrations from schema changes
-bun db:migrate     # Apply pending migrations
+bun db:generate        # Generate migrations from schema changes
+bun db:migrate         # Apply pending migrations
+make db-studio         # Open Drizzle Studio for DB inspection
 
 # Testing
-bun test           # Unit + Integration tests (Vitest)
-bun test:e2e       # E2E tests (Playwright)
-bun test:coverage  # Coverage report
+bun test               # Unit + Integration tests (Vitest)
+bun test:e2e           # E2E tests (Playwright)
+bun test:coverage      # Coverage report
+
+# Run single test file
+cd apps/api && bun run vitest run src/routes/__tests__/health.test.ts
+cd apps/api && bun run vitest --watch  # Watch mode
 
 # Quality
 bun run lint
 bun run typecheck
-bun audit
 
-# Production Operations (Makefile)
-make prod-up       # Start production stack
-make prod-logs     # View production logs
-make deploy        # Pull, Build, and Restart
+# Production (Makefile)
+make deploy            # Build, start, and migrate
+make prod-logs         # View production logs
 ```
 
 ## Project Structure
@@ -99,6 +110,53 @@ Row-Level Security (RLS) enforced at database level using `household_id` on all 
 * **Real-time:** Server Action → Valkey pub → Hono subscription → WebSocket broadcast
 * **Delta Sync:** Reconnection fetches only records where `updated_at > lastSyncTimestamp`
 * **Soft Deletes:** Tables use `deleted_at` column for delta sync compatibility
+* **PWA/Offline:** Dexie (IndexedDB) stores groceries offline, syncs on reconnect
+
+### Server Action Pattern
+
+Server Actions in `apps/web/src/actions/` follow this pattern for real-time sync:
+
+```typescript
+"use server"
+import { db, groceryItems } from "@amigo/db";
+import { getSession } from "@/lib/session";
+import { publishHouseholdUpdate } from "@/lib/redis";
+import { revalidatePath } from "next/cache";
+
+export async function addGroceryItem(name: string) {
+  const session = await getSession();  // Get session from Valkey
+
+  const [item] = await db.insert(groceryItems).values({
+    householdId: session.householdId,
+    createdByUserId: session.userId,
+    itemName: name,
+  }).returning();
+
+  // Broadcast to other clients via WebSocket
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+    action: "create",
+    entityId: item.id,
+  });
+
+  revalidatePath("/groceries");
+  return item;
+}
+```
+
+### RLS Context
+
+Database queries that need RLS scoping use `withRLS`:
+
+```typescript
+import { db, withRLS, transactions, eq } from "@amigo/db";
+
+// Queries automatically scoped to household
+const results = await withRLS(session.householdId, async () => {
+  return db.select().from(transactions).where(eq(transactions.userId, userId));
+});
+```
 
 ## Domain
 

@@ -17,9 +17,10 @@ import { OfflineIndicator } from "@/components/offline-indicator";
 import { useWebSocket } from "@/hooks/use-websocket";
 import type { GroceryItem, GroceryTag, GroceryItemTag } from "@amigo/db";
 
-// Extended type for grocery items with their tags
+// Extended type for grocery items with their tags and creator
 type GroceryItemWithTags = GroceryItem & {
   groceryItemTags: (GroceryItemTag & { groceryTag: GroceryTag })[];
+  createdByUser: { id: string; name: string | null; email: string } | null;
 };
 
 interface GroceryListProps {
@@ -973,7 +974,9 @@ export function GroceryList({
     const tempItem: GroceryItemWithTags = {
       id: crypto.randomUUID(),
       householdId: "",
-      createdByUserId: "",
+      createdByUserId: _userId,
+      createdByUserDisplayName: null,
+      transferredFromCreatedByUserId: null,
       itemName: name,
       category: "Uncategorized",
       isPurchased: false,
@@ -996,6 +999,7 @@ export function GroceryList({
           },
         };
       }),
+      createdByUser: null, // Will be populated on server refresh
     };
 
     startTransition(async () => {
@@ -1198,14 +1202,14 @@ export function GroceryList({
           {filteredActiveItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center justify-between px-4 py-3"
+              className="flex items-start justify-between px-4 py-3"
             >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
                 <input
                   type="checkbox"
                   checked={item.isPurchased}
                   onChange={() => handleToggleItem(item.id)}
-                  className="h-5 w-5 shrink-0 rounded border-input bg-background text-primary focus:ring-primary"
+                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-input bg-background text-primary focus:ring-primary"
                 />
                 {editingItemId === item.id ? (
                   <form
@@ -1241,10 +1245,15 @@ export function GroceryList({
                     {item.groceryItemTags.map((itemTag) => (
                       <TagBadge key={itemTag.tagId} tag={itemTag.groceryTag} />
                     ))}
+                    {item.createdByUser && item.createdByUserId !== _userId && (
+                      <span className="text-xs text-muted-foreground">
+                        by {item.createdByUser.name ?? item.createdByUser.email.split("@")[0]}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 mt-0.5">
                 <ItemTagSelector
                   item={item}
                   allTags={allTags}
@@ -1325,6 +1334,11 @@ export function GroceryList({
                                 tag={itemTag.groceryTag}
                               />
                             ))}
+                            {item.createdByUser && item.createdByUserId !== _userId && (
+                              <span className="text-xs text-muted-foreground/70">
+                                by {item.createdByUser.name ?? item.createdByUser.email.split("@")[0]}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </li>

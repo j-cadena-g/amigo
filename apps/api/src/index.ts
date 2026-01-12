@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { healthRouter } from "./routes/health";
 import { transactionsRouter } from "./routes/transactions";
 import { groceriesRouter } from "./routes/groceries";
+import { openAPISpec } from "./lib/openapi-spec";
 import {
   setupWebSocketHandlers,
   addClient,
@@ -42,6 +44,12 @@ const app = new Hono()
   .route("/api/health", healthRouter)
   .route("/api/transactions", transactionsRouter)
   .route("/api/groceries", groceriesRouter);
+
+// OpenAPI JSON specification endpoint
+app.get("/api/doc", (c) => c.json(openAPISpec));
+
+// Swagger UI documentation endpoint
+app.get("/api/docs", swaggerUI({ url: "/api/doc" }));
 
 // Export type for RPC client
 export type AppType = typeof app;

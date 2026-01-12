@@ -46,6 +46,22 @@ const COLORS = [
   "#FF6B6B",
 ];
 
+// Tooltip styles that respect the current theme
+const tooltipContentStyle = {
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "var(--radius)",
+};
+
+const tooltipLabelStyle = {
+  color: "hsl(var(--card-foreground))",
+};
+
+const tooltipCursorStyle = {
+  fill: "hsl(var(--muted))",
+  opacity: 0.3,
+};
+
 function formatCurrency(value: number | undefined): string {
   if (value === undefined) return "";
   return new Intl.NumberFormat("en-US", {
@@ -118,6 +134,8 @@ export function BudgetCharts({
                       ))}
                     </Pie>
                     <Tooltip
+                      contentStyle={tooltipContentStyle}
+                        labelStyle={tooltipLabelStyle}
                       formatter={(value, _name, props) => [
                         formatCurrency(value as number),
                         props.payload?.category
@@ -157,6 +175,9 @@ export function BudgetCharts({
                         tick={{ fontSize: 10 }}
                       />
                       <Tooltip
+                        contentStyle={tooltipContentStyle}
+                        labelStyle={tooltipLabelStyle}
+                        cursor={tooltipCursorStyle}
                         formatter={(value) => formatCurrency(value as number)}
                       />
                       <Legend wrapperStyle={{ fontSize: "12px" }} />
@@ -198,6 +219,9 @@ export function BudgetCharts({
                         tick={{ fontSize: 10 }}
                       />
                       <Tooltip
+                        contentStyle={tooltipContentStyle}
+                        labelStyle={tooltipLabelStyle}
+                        cursor={tooltipCursorStyle}
                         formatter={(value) => formatCurrency(value as number)}
                       />
                       <Bar dataKey="amount" fill="#0088FE" />

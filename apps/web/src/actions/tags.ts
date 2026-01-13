@@ -5,6 +5,22 @@ import { db, eq, and, sql } from "@amigo/db";
 import { groceryTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 import { publishHouseholdUpdate } from "@/lib/redis";
+import { z } from "zod";
+import { TAG_COLORS } from "@amigo/types";
+
+// Validation schemas
+const createTagSchema = z.object({
+  name: z.string().min(1, "Tag name is required").max(50, "Tag name too long"),
+  color: z.enum(TAG_COLORS).optional(),
+});
+
+const updateTagSchema = z.object({
+  id: z.string().uuid("Invalid tag ID"),
+  name: z.string().min(1, "Tag name is required").max(50, "Tag name too long"),
+  color: z.enum(TAG_COLORS),
+});
+
+const tagIdSchema = z.string().uuid("Invalid tag ID");
 
 export async function getTags() {
   const session = await getSession();
@@ -21,12 +37,14 @@ export async function getTags() {
 }
 
 export async function createTag(name: string, color?: string) {
+  const validated = createTagSchema.parse({ name, color });
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
-  const trimmedName = name.trim();
+  const trimmedName = validated.name.trim();
 
   const existingTag = await db.query.groceryTags.findFirst({
     where: and(
@@ -44,7 +62,7 @@ export async function createTag(name: string, color?: string) {
     .values({
       householdId: session.householdId,
       name: trimmedName,
-      color: color?.trim() || "blue",
+      color: validated.color ?? "blue",
     })
     .returning();
 
@@ -58,16 +76,18 @@ export async function createTag(name: string, color?: string) {
 }
 
 export async function updateTag(id: string, name: string, color: string) {
+  const validated = updateTagSchema.parse({ id, name, color });
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
-  const trimmedName = name.trim();
+  const trimmedName = validated.name.trim();
 
   const existing = await db.query.groceryTags.findFirst({
     where: and(
-      eq(groceryTags.id, id),
+      eq(groceryTags.id, validated.id),
       eq(groceryTags.householdId, session.householdId)
     ),
   });
@@ -80,7 +100,7 @@ export async function updateTag(id: string, name: string, color: string) {
     where: and(
       eq(groceryTags.householdId, session.householdId),
       sql`lower(${groceryTags.name}) = lower(${trimmedName})`,
-      sql`${groceryTags.id} != ${id}`
+      sql`${groceryTags.id} != ${validated.id}`
     ),
   });
 
@@ -92,10 +112,10 @@ export async function updateTag(id: string, name: string, color: string) {
     .update(groceryTags)
     .set({
       name: trimmedName,
-      color: color.trim() || "blue",
+      color: validated.color,
     })
     .where(
-      and(eq(groceryTags.id, id), eq(groceryTags.householdId, session.householdId))
+      and(eq(groceryTags.id, validated.id), eq(groceryTags.householdId, session.householdId))
     )
     .returning();
 
@@ -109,6 +129,8 @@ export async function updateTag(id: string, name: string, color: string) {
 }
 
 export async function deleteTag(id: string) {
+  const validatedId = tagIdSchema.parse(id);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -117,7 +139,7 @@ export async function deleteTag(id: string) {
   const [deleted] = await db
     .delete(groceryTags)
     .where(
-      and(eq(groceryTags.id, id), eq(groceryTags.householdId, session.householdId))
+      and(eq(groceryTags.id, validatedId), eq(groceryTags.householdId, session.householdId))
     )
     .returning();
 

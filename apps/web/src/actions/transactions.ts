@@ -7,6 +7,33 @@ import { getSession } from "@/lib/session";
 import { publishHouseholdUpdate } from "@/lib/redis";
 import { getExchangeRateForRecord } from "@/lib/exchange-rates";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { z } from "zod";
+
+// Validation schemas
+const currencyEnum = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]);
+
+const addTransactionSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  description: z.string().max(500, "Description too long").optional(),
+  category: z.string().min(1, "Category is required").max(100, "Category too long"),
+  type: z.enum(["income", "expense"]),
+  date: z.date(),
+  budgetId: z.string().uuid().nullable().optional(),
+  currency: currencyEnum.optional(),
+});
+
+const updateTransactionSchema = z.object({
+  id: z.string().uuid("Invalid transaction ID"),
+  amount: z.number().positive("Amount must be positive").optional(),
+  description: z.string().max(500, "Description too long").nullable().optional(),
+  category: z.string().min(1, "Category is required").max(100, "Category too long").optional(),
+  type: z.enum(["income", "expense"]).optional(),
+  date: z.date().optional(),
+  budgetId: z.string().uuid().nullable().optional(),
+  currency: currencyEnum.optional(),
+});
+
+const transactionIdSchema = z.string().uuid("Invalid transaction ID");
 
 interface AddTransactionInput {
   amount: number;
@@ -28,12 +55,14 @@ async function getHomeCurrency(householdId: string): Promise<CurrencyCode> {
 export async function addTransaction(input: AddTransactionInput) {
   await enforceRateLimit("action:transactions:add", RATE_LIMITS.MUTATION);
 
+  const validated = addTransactionSchema.parse(input);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
-  const currency = input.currency ?? "CAD";
+  const currency = validated.currency ?? "CAD";
   const homeCurrency = await getHomeCurrency(session.householdId);
   const exchangeRateToHome = await getExchangeRateForRecord(currency, homeCurrency);
 
@@ -43,14 +72,14 @@ export async function addTransaction(input: AddTransactionInput) {
       .values({
         householdId: session.householdId,
         userId: session.userId,
-        amount: input.amount.toFixed(2),
+        amount: validated.amount.toFixed(2),
         currency,
         exchangeRateToHome,
-        description: input.description?.trim() || null,
-        category: input.category.trim(),
-        type: input.type,
-        date: input.date,
-        budgetId: input.budgetId || null,
+        description: validated.description?.trim() || null,
+        category: validated.category.trim(),
+        type: validated.type,
+        date: validated.date,
+        budgetId: validated.budgetId || null,
       })
       .returning();
   });
@@ -79,6 +108,8 @@ interface UpdateTransactionInput {
 export async function updateTransaction(input: UpdateTransactionInput) {
   await enforceRateLimit("action:transactions:update", RATE_LIMITS.MUTATION);
 
+  const validated = updateTransactionSchema.parse(input);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -86,29 +117,29 @@ export async function updateTransaction(input: UpdateTransactionInput) {
 
   const updateData: Partial<typeof transactions.$inferInsert> = {};
 
-  if (input.amount !== undefined) {
-    updateData.amount = input.amount.toFixed(2);
+  if (validated.amount !== undefined) {
+    updateData.amount = validated.amount.toFixed(2);
   }
-  if (input.description !== undefined) {
-    updateData.description = input.description?.trim() || null;
+  if (validated.description !== undefined) {
+    updateData.description = validated.description?.trim() || null;
   }
-  if (input.category !== undefined) {
-    updateData.category = input.category.trim();
+  if (validated.category !== undefined) {
+    updateData.category = validated.category.trim();
   }
-  if (input.type !== undefined) {
-    updateData.type = input.type;
+  if (validated.type !== undefined) {
+    updateData.type = validated.type;
   }
-  if (input.date !== undefined) {
-    updateData.date = input.date;
+  if (validated.date !== undefined) {
+    updateData.date = validated.date;
   }
-  if (input.budgetId !== undefined) {
-    updateData.budgetId = input.budgetId || null;
+  if (validated.budgetId !== undefined) {
+    updateData.budgetId = validated.budgetId || null;
   }
-  if (input.currency !== undefined) {
-    updateData.currency = input.currency;
+  if (validated.currency !== undefined) {
+    updateData.currency = validated.currency;
     const homeCurrency = await getHomeCurrency(session.householdId);
     updateData.exchangeRateToHome = await getExchangeRateForRecord(
-      input.currency,
+      validated.currency,
       homeCurrency
     );
   }
@@ -128,7 +159,7 @@ export async function updateTransaction(input: UpdateTransactionInput) {
       .set(updateData)
       .where(
         and(
-          eq(transactions.id, input.id),
+          eq(transactions.id, validated.id),
           eq(transactions.householdId, session.householdId),
           isNull(transactions.deletedAt),
           visibilityCondition
@@ -154,6 +185,8 @@ export async function updateTransaction(input: UpdateTransactionInput) {
 export async function deleteTransaction(id: string) {
   await enforceRateLimit("action:transactions:delete", RATE_LIMITS.MUTATION);
 
+  const validatedId = transactionIdSchema.parse(id);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -174,7 +207,7 @@ export async function deleteTransaction(id: string) {
       .set({ deletedAt: new Date() })
       .where(
         and(
-          eq(transactions.id, id),
+          eq(transactions.id, validatedId),
           eq(transactions.householdId, session.householdId),
           isNull(transactions.deletedAt),
           visibilityCondition

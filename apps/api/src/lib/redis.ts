@@ -10,4 +10,5 @@ export const subscriber = new Redis(redisUrl);
 
 export const CHANNELS = {
   HOUSEHOLD_UPDATES: "household:updates",
+  SESSION_INVALIDATIONS: "session:invalidations",
 } as const;

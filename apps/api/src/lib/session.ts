@@ -12,13 +12,17 @@ export interface Session {
   role: UserRole;
 }
 
+export interface SessionWithId extends Session {
+  sessionId: string;
+}
+
 function getSessionKey(sessionId: string): string {
   return `session:${sessionId}`;
 }
 
 export async function getSessionFromCookie(
   cookieHeader: string | null
-): Promise<Session | null> {
+): Promise<SessionWithId | null> {
   if (!cookieHeader) {
     return null;
   }
@@ -41,5 +45,6 @@ export async function getSessionFromCookie(
     return null;
   }
 
-  return JSON.parse(data) as Session;
+  const session = JSON.parse(data) as Session;
+  return { ...session, sessionId };
 }

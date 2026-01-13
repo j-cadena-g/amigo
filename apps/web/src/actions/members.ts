@@ -19,6 +19,7 @@ import {
 } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const updateRoleSchema = z.object({
   userId: z.string().uuid(),
@@ -32,6 +33,8 @@ export async function updateMemberRole(input: {
   userId: string;
   role: "admin" | "member";
 }) {
+  await enforceRateLimit("action:members:role", RATE_LIMITS.SENSITIVE);
+
   const session = await getSession();
 
   if (!session) {
@@ -90,6 +93,8 @@ export async function updateMemberRole(input: {
  * Transfer ownership to another member (owner only)
  */
 export async function transferOwnership(newOwnerId: string) {
+  await enforceRateLimit("action:members:transfer", RATE_LIMITS.SENSITIVE);
+
   const session = await getSession();
 
   if (!session) {
@@ -158,6 +163,8 @@ export interface MemberDataSummary {
 export async function getMemberDataSummary(
   userId: string
 ): Promise<{ success: boolean; error?: string; summary?: MemberDataSummary }> {
+  await enforceRateLimit("action:members:summary", RATE_LIMITS.READ);
+
   const session = await getSession();
 
   if (!session) {
@@ -251,6 +258,8 @@ export async function getMemberDataSummary(
  * Uses soft delete and preserves data with denormalized user display name
  */
 export async function removeMember(userId: string) {
+  await enforceRateLimit("action:members:remove", RATE_LIMITS.SENSITIVE);
+
   const session = await getSession();
 
   if (!session) {
@@ -350,6 +359,8 @@ export async function removeMember(userId: string) {
  * Get all active members in the household with their roles
  */
 export async function getHouseholdMembers() {
+  await enforceRateLimit("action:members:list", RATE_LIMITS.READ);
+
   const session = await getSession();
 
   if (!session) {

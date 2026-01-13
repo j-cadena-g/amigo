@@ -46,6 +46,8 @@ vi.mock("@amigo/db/schema", () => ({
     id: "id",
     householdId: "householdId",
     userId: "userId",
+    userDisplayName: "userDisplayName",
+    transferredFromUserId: "transferredFromUserId",
     budgetId: "budgetId",
     amount: "amount",
     currency: "currency",
@@ -62,6 +64,11 @@ vi.mock("@amigo/db/schema", () => ({
     id: "id",
     name: "name",
     userId: "userId",
+  },
+  users: {
+    id: "id",
+    name: "name",
+    email: "email",
   },
 }));
 

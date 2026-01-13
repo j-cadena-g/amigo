@@ -1,24 +1,27 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db, eq, and, isNull, lt, isNotNull } from "@amigo/db";
+import { db, eq, and, isNull, lt, isNotNull, withAuditContext } from "@amigo/db";
 import { groceryItems, groceryItemTags } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 import { publishHouseholdUpdate } from "@/lib/redis";
 import { addToBatch } from "@/lib/push/batching";
 import { scheduleBatchProcessing } from "@/lib/push/sender";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function addItem(
   name: string,
   category?: string,
   tagIds?: string[]
 ) {
+  await enforceRateLimit("action:groceries:add", RATE_LIMITS.MUTATION);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
-  const item = await db.transaction(async (tx) => {
+  const item = await withAuditContext(session.authId, async (tx) => {
     const [inserted] = await tx
       .insert(groceryItems)
       .values({
@@ -67,6 +70,8 @@ export async function addItem(
 }
 
 export async function toggleItem(id: string) {
+  await enforceRateLimit("action:groceries:toggle", RATE_LIMITS.MUTATION);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -84,19 +89,21 @@ export async function toggleItem(id: string) {
     throw new Error("Item not found");
   }
 
-  const [updated] = await db
-    .update(groceryItems)
-    .set({
-      isPurchased: !existing.isPurchased,
-      purchasedAt: existing.isPurchased ? null : new Date(),
-    })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        eq(groceryItems.householdId, session.householdId)
+  const [updated] = await withAuditContext(session.authId, async (tx) => {
+    return tx
+      .update(groceryItems)
+      .set({
+        isPurchased: !existing.isPurchased,
+        purchasedAt: existing.isPurchased ? null : new Date(),
+      })
+      .where(
+        and(
+          eq(groceryItems.id, id),
+          eq(groceryItems.householdId, session.householdId)
+        )
       )
-    )
-    .returning();
+      .returning();
+  });
 
   await publishHouseholdUpdate({
     householdId: session.householdId,
@@ -122,21 +129,25 @@ export async function toggleItem(id: string) {
 }
 
 export async function deleteItem(id: string) {
+  await enforceRateLimit("action:groceries:delete", RATE_LIMITS.MUTATION);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
   }
 
-  const [deleted] = await db
-    .update(groceryItems)
-    .set({ deletedAt: new Date() })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        eq(groceryItems.householdId, session.householdId)
+  const [deleted] = await withAuditContext(session.authId, async (tx) => {
+    return tx
+      .update(groceryItems)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(groceryItems.id, id),
+          eq(groceryItems.householdId, session.householdId)
+        )
       )
-    )
-    .returning();
+      .returning();
+  });
 
   if (!deleted) {
     throw new Error("Item not found");
@@ -155,6 +166,8 @@ export async function deleteItem(id: string) {
 }
 
 export async function updateItemTags(itemId: string, tagIds: string[]) {
+  await enforceRateLimit("action:groceries:tags", RATE_LIMITS.MUTATION);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -198,6 +211,8 @@ export async function updateItemTags(itemId: string, tagIds: string[]) {
 }
 
 export async function updateItem(id: string, name: string) {
+  await enforceRateLimit("action:groceries:update", RATE_LIMITS.MUTATION);
+
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -208,20 +223,22 @@ export async function updateItem(id: string, name: string) {
     throw new Error("Item name cannot be empty");
   }
 
-  const [updated] = await db
-    .update(groceryItems)
-    .set({
-      itemName: trimmedName,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        eq(groceryItems.householdId, session.householdId),
-        isNull(groceryItems.deletedAt)
+  const [updated] = await withAuditContext(session.authId, async (tx) => {
+    return tx
+      .update(groceryItems)
+      .set({
+        itemName: trimmedName,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(groceryItems.id, id),
+          eq(groceryItems.householdId, session.householdId),
+          isNull(groceryItems.deletedAt)
+        )
       )
-    )
-    .returning();
+      .returning();
+  });
 
   if (!updated) {
     throw new Error("Item not found");
@@ -240,6 +257,8 @@ export async function updateItem(id: string, name: string) {
 }
 
 export async function clearOldPurchasedItems() {
+  await enforceRateLimit("action:groceries:clear", RATE_LIMITS.BULK);
+
   const session = await getSession();
   if (!session) {
     return { deleted: 0 };
@@ -248,17 +267,19 @@ export async function clearOldPurchasedItems() {
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const result = await db
-    .delete(groceryItems)
-    .where(
-      and(
-        eq(groceryItems.householdId, session.householdId),
-        eq(groceryItems.isPurchased, true),
-        isNotNull(groceryItems.purchasedAt),
-        lt(groceryItems.purchasedAt, ninetyDaysAgo)
+  const result = await withAuditContext(session.authId, async (tx) => {
+    return tx
+      .delete(groceryItems)
+      .where(
+        and(
+          eq(groceryItems.householdId, session.householdId),
+          eq(groceryItems.isPurchased, true),
+          isNotNull(groceryItems.purchasedAt),
+          lt(groceryItems.purchasedAt, ninetyDaysAgo)
+        )
       )
-    )
-    .returning({ id: groceryItems.id });
+      .returning({ id: groceryItems.id });
+  });
 
   return { deleted: result.length };
 }

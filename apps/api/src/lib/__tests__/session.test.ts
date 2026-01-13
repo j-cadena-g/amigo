@@ -49,7 +49,7 @@ describe("Session Utilities", () => {
 
       const result = await getSessionFromCookie("amigo_session=valid-session-id");
 
-      expect(result).toEqual(mockSession);
+      expect(result).toEqual({ ...mockSession, sessionId: "valid-session-id" });
       expect(mockRedis.get).toHaveBeenCalledWith("session:valid-session-id");
     });
 
@@ -61,7 +61,7 @@ describe("Session Utilities", () => {
         "other=value; amigo_session=my-session; another=test"
       );
 
-      expect(result).toEqual(mockSession);
+      expect(result).toEqual({ ...mockSession, sessionId: "my-session" });
       expect(mockRedis.get).toHaveBeenCalledWith("session:my-session");
     });
 
@@ -73,7 +73,7 @@ describe("Session Utilities", () => {
         "  amigo_session=trimmed-session  "
       );
 
-      expect(result).toEqual(mockSession);
+      expect(result).toEqual({ ...mockSession, sessionId: "trimmed-session" });
       expect(mockRedis.get).toHaveBeenCalledWith("session:trimmed-session");
     });
 
@@ -84,7 +84,7 @@ describe("Session Utilities", () => {
       // Some session IDs might contain = characters (base64 encoded)
       const result = await getSessionFromCookie("amigo_session=abc=def=ghi");
 
-      expect(result).toEqual(mockSession);
+      expect(result).toEqual({ ...mockSession, sessionId: "abc=def=ghi" });
       expect(mockRedis.get).toHaveBeenCalledWith("session:abc=def=ghi");
     });
 
@@ -106,6 +106,7 @@ describe("Session Utilities", () => {
         email: "test@example.com",
         name: "Test User",
         authId: "auth-789",
+        sessionId: "session-id",
       });
     });
 

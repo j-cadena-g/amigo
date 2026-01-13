@@ -76,6 +76,7 @@ const server = Bun.serve<WebSocketData>({
       const success = server.upgrade(req, {
         data: {
           householdId: session.householdId,
+          sessionId: session.sessionId,
         },
       });
 

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { redis } from "./redis";
+import { redis, publishSessionInvalidation } from "./redis";
 import type { User, UserRole } from "@amigo/db";
 
 const SESSION_COOKIE = "amigo_session";
@@ -88,6 +88,8 @@ export async function deleteSession(): Promise<void> {
 
   if (sessionId) {
     await redis.del(getSessionKey(sessionId));
+    // Notify API server to close any WebSocket connections for this session
+    await publishSessionInvalidation(sessionId);
   }
 }
 

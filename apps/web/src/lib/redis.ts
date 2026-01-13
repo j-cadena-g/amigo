@@ -25,6 +25,7 @@ export const redis = new Proxy({} as Redis, {
 
 export const CHANNELS = {
   HOUSEHOLD_UPDATES: "household:updates",
+  SESSION_INVALIDATIONS: "session:invalidations",
 } as const;
 
 export type UpdateAction = "create" | "update" | "delete";
@@ -44,4 +45,8 @@ export async function publishHouseholdUpdate(
   payload: HouseholdUpdatePayload
 ): Promise<void> {
   await redis.publish(CHANNELS.HOUSEHOLD_UPDATES, JSON.stringify(payload));
+}
+
+export async function publishSessionInvalidation(sessionId: string): Promise<void> {
+  await redis.publish(CHANNELS.SESSION_INVALIDATIONS, JSON.stringify({ sessionId }));
 }

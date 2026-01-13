@@ -49,7 +49,7 @@ jobs:
         run: ~/.bun/bin/bun install --frozen-lockfile
 
       - name: Run tests
-        run: ~/.bun/bin/bun test
+        run: ~/.bun/bin/bun run test
 
   build:
     name: Build

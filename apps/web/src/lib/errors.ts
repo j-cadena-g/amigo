@@ -136,3 +136,27 @@ export function logServerError(
     }
   }
 }
+
+/**
+ * Log a security-relevant event for auditing purposes.
+ * These events indicate account recovery, permission changes, or other sensitive operations.
+ */
+export function logSecurityEvent(
+  event: string,
+  metadata: Record<string, unknown>
+): void {
+  const logEntry = {
+    level: "security",
+    event,
+    ...metadata,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (isProduction) {
+    // Structured JSON for log aggregation systems
+    console.log(JSON.stringify(logEntry));
+  } else {
+    // Human-readable for development
+    console.log(`[SECURITY] ${event}`, metadata);
+  }
+}

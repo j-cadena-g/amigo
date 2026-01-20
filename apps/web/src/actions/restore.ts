@@ -18,6 +18,7 @@ import {
   PENDING_RESTORE_COOKIE,
   type PendingRestoreData,
 } from "@/lib/restore";
+import { logSecurityEvent, logServerError } from "@/lib/errors";
 import { redirect } from "next/navigation";
 
 /**
@@ -119,9 +120,20 @@ export async function restoreUserAccount(): Promise<{
     await deletePendingRestoreToken(token);
     cookieStore.delete(PENDING_RESTORE_COOKIE);
 
+    // Log security event for account restoration
+    logSecurityEvent("account_restored", {
+      userId: user.id,
+      householdId: user.householdId,
+      email: user.email,
+      action: "restore",
+    });
+
     return { success: true };
   } catch (error) {
-    console.error("Failed to restore user account:", error);
+    logServerError("restore-account", error, {
+      userId: restoreData.userId,
+      householdId: restoreData.householdId,
+    });
     return { success: false, error: "Failed to restore account" };
   }
 }
@@ -251,9 +263,21 @@ export async function freshStartUserAccount(): Promise<{
     await deletePendingRestoreToken(token);
     cookieStore.delete(PENDING_RESTORE_COOKIE);
 
+    // Log security event for fresh start (data transfer)
+    logSecurityEvent("account_fresh_start", {
+      userId: user.id,
+      householdId: user.householdId,
+      email: user.email,
+      transferredToUserId: owner.id,
+      action: "fresh_start",
+    });
+
     return { success: true };
   } catch (error) {
-    console.error("Failed to fresh start user account:", error);
+    logServerError("fresh-start-account", error, {
+      userId: restoreData.userId,
+      householdId: restoreData.householdId,
+    });
     return { success: false, error: "Failed to start fresh" };
   }
 }

@@ -5,6 +5,10 @@ import type { User, UserRole } from "@amigo/db";
 const SESSION_COOKIE = "amigo_session";
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
 
+// Key for tracking when push subscription cleanup was last run
+const PUSH_CLEANUP_KEY = "push_cleanup_last_run";
+const PUSH_CLEANUP_INTERVAL = 60 * 60 * 6; // Run cleanup at most every 6 hours
+
 export interface Session {
   userId: string;
   householdId: string;
@@ -38,6 +42,33 @@ export async function createSession(user: User): Promise<string> {
   return sessionId;
 }
 
+/**
+ * Trigger stale push subscription cleanup if enough time has passed.
+ * Uses Redis to coordinate cleanup across instances.
+ */
+async function maybeCleanupStalePushSubscriptions(): Promise<void> {
+  try {
+    // Use SET NX with TTL to ensure only one instance runs cleanup
+    const acquired = await redis.set(
+      PUSH_CLEANUP_KEY,
+      Date.now().toString(),
+      "EX",
+      PUSH_CLEANUP_INTERVAL,
+      "NX"
+    );
+
+    if (acquired) {
+      // We acquired the lock, run cleanup in background
+      const { cleanupStalePushSubscriptions } = await import("@/actions/push");
+      cleanupStalePushSubscriptions().catch((err) => {
+        console.error("Push subscription cleanup failed:", err);
+      });
+    }
+  } catch {
+    // Ignore cleanup errors - this is a best-effort operation
+  }
+}
+
 export async function getSession(): Promise<Session | null> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
@@ -53,6 +84,9 @@ export async function getSession(): Promise<Session | null> {
 
   // Refresh TTL on access
   await redis.expire(getSessionKey(sessionId), SESSION_TTL);
+
+  // Occasionally trigger stale push subscription cleanup
+  maybeCleanupStalePushSubscriptions();
 
   const session = JSON.parse(data) as Session;
 

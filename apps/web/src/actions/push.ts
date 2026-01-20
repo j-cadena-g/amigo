@@ -1,9 +1,12 @@
 "use server";
 
-import { db, eq } from "@amigo/db";
+import { db, eq, lt } from "@amigo/db";
 import { pushSubscriptions } from "@amigo/db/schema";
 import { getSession } from "@/lib/session";
 import { z } from "zod";
+
+// Push subscriptions older than this are considered stale (matches session TTL)
+const PUSH_SUBSCRIPTION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const subscribeSchema = z.object({
   endpoint: z.string().url(),
@@ -85,4 +88,22 @@ export async function getSubscriptionStatus(): Promise<{
   });
 
   return { hasSubscription: !!subscription };
+}
+
+/**
+ * Clean up stale push subscriptions that haven't been updated within the max age.
+ * This should be called periodically (e.g., during session refresh or via cron).
+ * Subscriptions are considered stale if updatedAt is older than PUSH_SUBSCRIPTION_MAX_AGE_MS.
+ */
+export async function cleanupStalePushSubscriptions(): Promise<{
+  deletedCount: number;
+}> {
+  const cutoffDate = new Date(Date.now() - PUSH_SUBSCRIPTION_MAX_AGE_MS);
+
+  const result = await db
+    .delete(pushSubscriptions)
+    .where(lt(pushSubscriptions.updatedAt, cutoffDate))
+    .returning({ id: pushSubscriptions.id });
+
+  return { deletedCount: result.length };
 }

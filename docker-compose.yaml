@@ -102,6 +102,9 @@ services:
         condition: service_healthy
 
   # Caddy Reverse Proxy with DNS-01 SSL
+  # Uses combined Caddyfile by default. Set CADDYFILE env var to override:
+  #   CADDYFILE=Caddyfile.prod docker compose up caddy
+  #   CADDYFILE=Caddyfile.dev docker compose up caddy
   caddy:
     build:
       context: ./docker/caddy
@@ -114,7 +117,7 @@ services:
     environment:
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
     volumes:
-      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy/${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

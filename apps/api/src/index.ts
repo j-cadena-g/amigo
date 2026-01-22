@@ -14,17 +14,19 @@ import {
 import type { WebSocketData } from "./ws/handler";
 import { getSessionFromCookie } from "./lib/session";
 import { rateLimit } from "./lib/rate-limit";
+import { connectRedis, isRedisAvailable } from "./lib/redis";
 
 // ============================================================================
 // Environment Variable Validation
 // ============================================================================
-const requiredEnvVars = ["VALKEY_URL"] as const;
-
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`FATAL: Missing required environment variable: ${envVar}`);
-    process.exit(1);
-  }
+// VALKEY_URL is now optional - server will run in degraded mode without it
+if (!process.env["VALKEY_URL"]) {
+  console.warn(
+    "WARNING: VALKEY_URL not set - server will run in DEGRADED MODE"
+  );
+  console.warn("  - WebSocket real-time updates: DISABLED");
+  console.warn("  - Session-based authentication: DISABLED");
+  console.warn("  - Rate limiting: FALLBACK to in-memory");
 }
 
 // ============================================================================
@@ -80,68 +82,103 @@ app.get("/api/docs", swaggerUI({ url: "/api/doc" }));
 // Export type for RPC client
 export type AppType = typeof app;
 
-// Bun server with WebSocket support
-const port = process.env["PORT"] ?? 3001;
+// ============================================================================
+// Server Startup
+// ============================================================================
+async function startServer() {
+  const port = process.env["PORT"] ?? 3001;
 
-setupWebSocketHandlers();
+  // Attempt to connect to Redis (non-blocking)
+  const redisConnected = await connectRedis();
 
-const server = Bun.serve<WebSocketData>({
-  port: Number(port),
-  async fetch(req, server) {
-    const url = new URL(req.url);
+  if (redisConnected) {
+    console.log("Redis connected - full functionality enabled");
+    setupWebSocketHandlers();
+  } else {
+    console.warn("Redis not available - running in degraded mode");
+  }
 
-    // Handle WebSocket upgrade requests
-    if (url.pathname === "/ws") {
-      const cookieHeader = req.headers.get("cookie");
-      const session = await getSessionFromCookie(cookieHeader);
+  const server = Bun.serve<WebSocketData>({
+    port: Number(port),
+    async fetch(req, server) {
+      const url = new URL(req.url);
 
-      if (!session) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
-      const success = server.upgrade(req, {
-        data: {
-          householdId: session.householdId,
-          sessionId: session.sessionId,
-        },
-      });
-
-      if (success) {
-        return undefined;
-      }
-
-      return new Response("WebSocket upgrade failed", { status: 500 });
-    }
-
-    // Handle regular HTTP requests via Hono
-    return app.fetch(req, { ip: server.requestIP(req) });
-  },
-  websocket: {
-    open(ws) {
-      console.log(
-        `WebSocket connected for household: ${ws.data.householdId}`
-      );
-      addClient(ws);
-    },
-    message(ws, message) {
-      // Handle ping/pong for keepalive
-      try {
-        const data = JSON.parse(String(message));
-        if (data.type === "ping") {
-          ws.send(JSON.stringify({ type: "pong" }));
-          return;
+      // Handle WebSocket upgrade requests
+      if (url.pathname === "/ws") {
+        // Reject WebSocket connections if Redis is unavailable
+        if (!isRedisAvailable()) {
+          return new Response(
+            JSON.stringify({
+              error: "Service Unavailable",
+              message: "Real-time updates temporarily unavailable",
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
         }
-      } catch {
-        // Ignore non-JSON messages
-      }
-    },
-    close(ws) {
-      console.log(
-        `WebSocket disconnected for household: ${ws.data.householdId}`
-      );
-      removeClient(ws);
-    },
-  },
-});
 
-console.log(`API server running on port ${server.port}`);
+        const cookieHeader = req.headers.get("cookie");
+        const session = await getSessionFromCookie(cookieHeader);
+
+        if (!session) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
+        const success = server.upgrade(req, {
+          data: {
+            householdId: session.householdId,
+            sessionId: session.sessionId,
+          },
+        });
+
+        if (success) {
+          return undefined;
+        }
+
+        return new Response("WebSocket upgrade failed", { status: 500 });
+      }
+
+      // Handle regular HTTP requests via Hono
+      return app.fetch(req, { ip: server.requestIP(req) });
+    },
+    websocket: {
+      open(ws) {
+        console.log(
+          `WebSocket connected for household: ${ws.data.householdId}`
+        );
+        addClient(ws);
+      },
+      message(ws, message) {
+        // Handle ping/pong for keepalive
+        try {
+          const data = JSON.parse(String(message));
+          if (data.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong" }));
+            return;
+          }
+        } catch {
+          // Ignore non-JSON messages
+        }
+      },
+      close(ws) {
+        console.log(
+          `WebSocket disconnected for household: ${ws.data.householdId}`
+        );
+        removeClient(ws);
+      },
+    },
+  });
+
+  console.log(`API server running on port ${server.port}`);
+  if (!redisConnected) {
+    console.log("  Mode: DEGRADED (no real-time updates)");
+  }
+}
+
+// Start the server
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});

@@ -34,3 +34,8 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# Database backups (contain sensitive data)
+backups/
+*.sql.gz
+*.dump

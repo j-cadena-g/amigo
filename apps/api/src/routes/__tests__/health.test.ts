@@ -7,9 +7,7 @@ const mockDb = vi.hoisted(() => ({
   execute: vi.fn(),
 }));
 
-const mockRedis = vi.hoisted(() => ({
-  ping: vi.fn(),
-}));
+const mockCheckRedisHealth = vi.hoisted(() => vi.fn());
 
 vi.mock("@amigo/db", () => ({
   db: mockDb,
@@ -17,7 +15,7 @@ vi.mock("@amigo/db", () => ({
 }));
 
 vi.mock("../../lib/redis", () => ({
-  redis: mockRedis,
+  checkRedisHealth: mockCheckRedisHealth,
 }));
 
 describe("Health Route", () => {
@@ -30,7 +28,7 @@ describe("Health Route", () => {
 
   it("returns 200 when all services are healthy", async () => {
     mockDb.execute.mockResolvedValue([{ "?column?": 1 }]);
-    mockRedis.ping.mockResolvedValue("PONG");
+    mockCheckRedisHealth.mockResolvedValue({ status: "healthy", latency: 1 });
 
     const res = await app.request("/api/health");
     const body = await res.json();
@@ -46,7 +44,7 @@ describe("Health Route", () => {
 
   it("returns 503 when Postgres is unhealthy", async () => {
     mockDb.execute.mockRejectedValue(new Error("Connection refused"));
-    mockRedis.ping.mockResolvedValue("PONG");
+    mockCheckRedisHealth.mockResolvedValue({ status: "healthy", latency: 1 });
 
     const res = await app.request("/api/health");
     const body = await res.json();
@@ -58,36 +56,48 @@ describe("Health Route", () => {
     expect(body.services.valkey.status).toBe("ok");
   });
 
-  it("returns 503 when Valkey is unhealthy", async () => {
+  it("returns 200 with degraded status when Valkey is unavailable but Postgres is ok", async () => {
     mockDb.execute.mockResolvedValue([{ "?column?": 1 }]);
-    mockRedis.ping.mockRejectedValue(new Error("Redis connection failed"));
+    mockCheckRedisHealth.mockResolvedValue({
+      status: "degraded",
+      error: "Redis not configured",
+    });
 
     const res = await app.request("/api/health");
     const body = await res.json();
 
-    expect(res.status).toBe(503);
+    // Degraded mode returns 200 (server is still functional)
+    expect(res.status).toBe(200);
+    expect(body.status).toBe("degraded");
+    expect(body.services.postgres.status).toBe("ok");
+    expect(body.services.valkey.status).toBe("degraded");
+    expect(body.services.valkey.error).toBe("Redis not configured");
+  });
+
+  it("returns 200 with error status when Valkey connection fails", async () => {
+    mockDb.execute.mockResolvedValue([{ "?column?": 1 }]);
+    mockCheckRedisHealth.mockResolvedValue({
+      status: "error",
+      error: "Redis connection failed",
+    });
+
+    const res = await app.request("/api/health");
+    const body = await res.json();
+
+    // Valkey error returns 200 (postgres is the critical service)
+    expect(res.status).toBe(200);
     expect(body.status).toBe("error");
     expect(body.services.postgres.status).toBe("ok");
     expect(body.services.valkey.status).toBe("error");
     expect(body.services.valkey.error).toBe("Redis connection failed");
   });
 
-  it("returns 503 when Valkey returns unexpected response", async () => {
-    mockDb.execute.mockResolvedValue([{ "?column?": 1 }]);
-    mockRedis.ping.mockResolvedValue("UNEXPECTED");
-
-    const res = await app.request("/api/health");
-    const body = await res.json();
-
-    expect(res.status).toBe(503);
-    expect(body.status).toBe("error");
-    expect(body.services.valkey.status).toBe("error");
-    expect(body.services.valkey.error).toContain("Unexpected response");
-  });
-
   it("returns 503 when both services are unhealthy", async () => {
     mockDb.execute.mockRejectedValue(new Error("DB down"));
-    mockRedis.ping.mockRejectedValue(new Error("Redis down"));
+    mockCheckRedisHealth.mockResolvedValue({
+      status: "error",
+      error: "Redis down",
+    });
 
     const res = await app.request("/api/health");
     const body = await res.json();

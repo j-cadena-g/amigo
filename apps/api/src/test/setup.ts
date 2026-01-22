@@ -34,7 +34,7 @@ vi.mock("@amigo/db", () => ({
   isNull: vi.fn(),
 }));
 
-// Mock Redis
+// Mock Redis module with graceful degradation functions
 vi.mock("../lib/redis", () => ({
   redis: {
     ping: vi.fn(() => Promise.resolve("PONG")),
@@ -44,4 +44,18 @@ vi.mock("../lib/redis", () => ({
     expire: vi.fn(() => Promise.resolve(1)),
     publish: vi.fn(() => Promise.resolve(1)),
   },
+  subscriber: {
+    subscribe: vi.fn(),
+    on: vi.fn(),
+  },
+  CHANNELS: {
+    HOUSEHOLD_UPDATES: "household:updates",
+    SESSION_INVALIDATIONS: "session:invalidations",
+  },
+  isRedisAvailable: vi.fn(() => true),
+  getRedisError: vi.fn(() => null),
+  connectRedis: vi.fn(() => Promise.resolve(true)),
+  checkRedisHealth: vi.fn(() =>
+    Promise.resolve({ status: "healthy", latency: 1 })
+  ),
 }));

@@ -3,6 +3,9 @@
         up down logs build up-with-authentik down-with-authentik \
         authentik-up authentik-down authentik-logs \
         db-migrate db-generate db-push db-studio db-seed \
+        db-backup db-backup-list db-restore \
+        audit-stats audit-prune \
+        caddy-prod caddy-dev caddy-reload \
         deploy deploy-fresh rebuild
 
 # =============================================================================
@@ -166,6 +169,53 @@ db-studio:
 # Seed the database (runs in dev container)
 db-seed:
 	docker compose exec api-dev bun run --cwd /app/packages/db db:seed
+
+# Backup databases (production and dev)
+db-backup:
+	./scripts/backup.sh
+
+# List available backups
+db-backup-list:
+	./scripts/backup.sh --list
+
+# Restore from backup (usage: make db-restore FILE=backup_file.sql.gz)
+db-restore:
+	@if [ -z "$(FILE)" ]; then echo "Usage: make db-restore FILE=<backup_file>"; exit 1; fi
+	./scripts/backup.sh --restore $(FILE)
+
+# =============================================================================
+# Audit Log Management
+# =============================================================================
+# 90-day retention policy (configurable via AUDIT_RETENTION_DAYS)
+
+# Show audit log statistics
+audit-stats:
+	./scripts/audit-retention.sh --count
+
+# Prune audit logs older than retention period (default: 90 days)
+audit-prune:
+	./scripts/audit-retention.sh
+
+# Dry run - show what would be pruned without deleting
+audit-prune-dry:
+	./scripts/audit-retention.sh --dry-run
+
+# =============================================================================
+# Caddy Configuration (Reverse Proxy)
+# =============================================================================
+# Use separate Caddyfiles to reduce accidental production misconfiguration
+
+# Use production-only Caddyfile (recommended for production servers)
+caddy-prod:
+	CADDYFILE=Caddyfile.prod docker compose up -d caddy
+
+# Use development-only Caddyfile
+caddy-dev:
+	CADDYFILE=Caddyfile.dev docker compose up -d caddy
+
+# Reload Caddy configuration without restart
+caddy-reload:
+	docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 # =============================================================================
 # Deployment

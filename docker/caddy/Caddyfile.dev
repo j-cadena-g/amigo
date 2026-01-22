@@ -1,0 +1,51 @@
+# =============================================================================
+# Development Caddyfile
+# =============================================================================
+# This configuration handles ONLY development traffic.
+# Use Caddyfile.prod for production environment.
+
+{
+	email james@cadenalabs.ca
+}
+
+# Authentik Identity Provider (shared)
+auth.cadenalabs.net {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	reverse_proxy authentik-server:9000 {
+		trusted_proxies private_ranges
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
+
+# Development Application
+dev-amigo.cadenalabs.net {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	# Security headers - using defer to apply after response
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# CSP for development (allows unsafe-eval for hot reload)
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://dev-amigo.cadenalabs.net https://auth.cadenalabs.net; manifest-src 'self'; frame-ancestors 'none'; form-action 'self' https://auth.cadenalabs.net; base-uri 'self'"
+
+	# WebSocket and API routes go to Hono
+	reverse_proxy /ws api-dev:3001
+	reverse_proxy /api/sync/* api-dev:3001
+	reverse_proxy /api/health api-dev:3001
+	reverse_proxy /api/transactions* api-dev:3001
+	reverse_proxy /api/groceries* api-dev:3001
+
+	# Everything else goes to Next.js
+	reverse_proxy web-dev:3001
+}

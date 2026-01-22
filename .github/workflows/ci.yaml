@@ -52,7 +52,8 @@ jobs:
         run: ~/.bun/bin/bun install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: ~/.bun/bin/bun run test:coverage
+        # Use npx to run vitest with Node.js - coverage-v8 requires node:inspector which Bun doesn't support
+        run: cd apps/api && npx vitest run --coverage
 
   build:
     name: Build

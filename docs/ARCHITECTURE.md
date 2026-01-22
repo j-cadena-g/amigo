@@ -238,6 +238,37 @@ Security enforced at Database level.
 * **Nonce-based:** Generated in Middleware, injected into Next.js and Tailwind.
 * **Strict:** `script-src 'self' 'nonce-xyz'`.
 
+### Rate Limiting
+
+* **API Server:** Redis-backed rate limiting with in-memory fallback when Redis unavailable.
+* **Server Actions:** Rate limiting middleware using shared Redis infrastructure.
+* **Pattern:** Fail-closed with graceful degradation to in-memory limits.
+
+### Input Validation
+
+* **Standard:** All server action inputs validated with Zod schemas from `@amigo/types`.
+* **Length Constraints:** String fields have `.max()` constraints matching database column sizes.
+* **Category Constants:** Shared constants in `@amigo/types` prevent hardcoded defaults.
+
+### Error Handling
+
+* **Production:** Generic error messages returned to clients; detailed errors logged server-side.
+* **Structured Logging:** JSON format with `level`, `event`, `timestamp` fields.
+* **Security Events:** Sensitive operations (account restore, fresh start) logged via `logSecurityEvent()`.
+
+### WebSocket Security
+
+* **Session Validation:** Periodic revalidation of WebSocket connections via Redis pub/sub.
+* **Heartbeat:** 30-second interval ensures stale connections are detected.
+* **Logout Propagation:** Session invalidation events broadcast to terminate WebSocket connections.
+
+### Session Cookie Security
+
+* **Attributes:** `HttpOnly`, `Secure`, `SameSite=Lax`.
+* **Domain:** `.cadenalabs.net` (shared across subdomains for SSO).
+* **TTL:** 7-day expiration with refresh on access.
+* **Note:** Parent domain scoping enables SSO but requires all subdomains to be trusted.
+
 ---
 
 ## Testing Strategy

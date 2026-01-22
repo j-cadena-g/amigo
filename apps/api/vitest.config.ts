@@ -13,5 +13,9 @@ export default defineConfig({
     },
     // Setup file for mocks
     setupFiles: ["./src/test/setup.ts"],
+    // Ensure external deps are properly handled
+    deps: {
+      interopDefault: true,
+    },
   },
 });

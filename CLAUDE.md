@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-amigo is a self-hosted household management application for 2 users (James (AKA - Jaime) and Valentina). It's a TypeScript monorepo using Turborepo, deployed on Proxmox via Docker + Tailscale.
+amigo is a self-hosted household management application for a small household. It's a TypeScript monorepo using Turborepo, deployed on Proxmox via Docker + Tailscale.
 
 ## Tech Stack
 

@@ -35,14 +35,17 @@ bun db:generate        # Generate migrations from schema changes
 bun db:migrate         # Apply pending migrations
 make db-studio         # Open Drizzle Studio for DB inspection
 
-# Testing
-bun test               # Unit + Integration tests (Vitest)
-bun test:e2e           # E2E tests (Playwright)
-bun test:coverage      # Coverage report
+# Testing (use `bun run test`, NOT `bun test`)
+bun run test           # Unit + Integration tests (Vitest via Turbo)
+bun run test:e2e       # E2E tests (Playwright)
+bun run test:coverage  # Coverage report
 
 # Run single test file
 cd apps/api && bun run vitest run src/routes/__tests__/health.test.ts
 cd apps/api && bun run vitest --watch  # Watch mode
+
+# NOTE: `bun test` (without `run`) uses Bun's native test runner which
+# doesn't support vitest features like vi.hoisted(). Always use `bun run test`.
 
 # Quality
 bun run lint

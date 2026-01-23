@@ -7,7 +7,7 @@ import { getSession } from "@/lib/session";
 import { publishHouseholdUpdate } from "@/lib/redis";
 import { addToBatch } from "@/lib/push/batching";
 import { scheduleBatchProcessing } from "@/lib/push/sender";
-import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { enforceRateLimit, checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { notFoundError, unauthorizedError, logServerError } from "@/lib/errors";
 import { z } from "zod";
 import { DEFAULT_GROCERY_CATEGORY } from "@amigo/types";
@@ -29,6 +29,14 @@ const itemIdSchema = z.string().uuid("Invalid item ID");
 const updateTagsSchema = z.object({
   itemId: z.string().uuid("Invalid item ID"),
   tagIds: z.array(z.string().uuid("Invalid tag ID")),
+});
+
+const updatePurchaseDateSchema = z.object({
+  id: z.string().uuid("Invalid item ID"),
+  purchasedAt: z.coerce.date().refine(
+    (date) => date <= new Date(),
+    "Purchase date cannot be in the future"
+  ),
 });
 
 export async function addItem(
@@ -94,7 +102,7 @@ export async function addItem(
   return item;
 }
 
-export async function toggleItem(id: string) {
+export async function toggleItem(id: string, purchasedAt?: Date) {
   await enforceRateLimit("action:groceries:toggle", RATE_LIMITS.MUTATION);
 
   const validatedId = itemIdSchema.parse(id);
@@ -116,12 +124,16 @@ export async function toggleItem(id: string) {
     throw notFoundError("Item");
   }
 
+  // When marking as purchased, use provided date or current date
+  // When unmarking, clear the purchase date
+  const newPurchasedAt = existing.isPurchased ? null : (purchasedAt ?? new Date());
+
   const [updated] = await withAuditContext(session.authId, async (tx) => {
     return tx
       .update(groceryItems)
       .set({
         isPurchased: !existing.isPurchased,
-        purchasedAt: existing.isPurchased ? null : new Date(),
+        purchasedAt: newPurchasedAt,
       })
       .where(
         and(
@@ -241,6 +253,60 @@ export async function updateItemTags(itemId: string, tagIds: string[]) {
   revalidatePath("/groceries");
 }
 
+export async function updatePurchaseDate(id: string, purchasedAt: Date) {
+  await enforceRateLimit("action:groceries:updateDate", RATE_LIMITS.MUTATION);
+
+  const validated = updatePurchaseDateSchema.parse({ id, purchasedAt });
+
+  const session = await getSession();
+  if (!session) {
+    throw unauthorizedError();
+  }
+
+  const existing = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, validated.id),
+      eq(groceryItems.householdId, session.householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw notFoundError("Item");
+  }
+
+  const [updated] = await withAuditContext(session.authId, async (tx) => {
+    return tx
+      .update(groceryItems)
+      .set({
+        purchasedAt: validated.purchasedAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(groceryItems.id, validated.id),
+          eq(groceryItems.householdId, session.householdId)
+        )
+      )
+      .returning();
+  });
+
+  if (!updated) {
+    throw notFoundError("Item");
+  }
+
+  await publishHouseholdUpdate({
+    householdId: session.householdId,
+    type: "GROCERY_UPDATE",
+    action: "update",
+    entityId: validated.id,
+  });
+
+  revalidatePath("/groceries");
+
+  return updated;
+}
+
 export async function updateItem(id: string, name: string) {
   await enforceRateLimit("action:groceries:update", RATE_LIMITS.MUTATION);
 
@@ -285,7 +351,16 @@ export async function updateItem(id: string, name: string) {
 }
 
 export async function clearOldPurchasedItems() {
-  await enforceRateLimit("action:groceries:clear", RATE_LIMITS.BULK);
+  // This runs on every page load, so we check rate limit but don't throw
+  // if exceeded - just skip the cleanup silently
+  const rateLimitResult = await checkRateLimit({
+    ...RATE_LIMITS.BULK,
+    keyPrefix: "action:groceries:clear",
+  });
+
+  if (!rateLimitResult.success) {
+    return { deleted: 0, skipped: true };
+  }
 
   const session = await getSession();
   if (!session) {

@@ -18,6 +18,7 @@ export default [
       "**/*.config.js",
       "**/*.config.ts",
       "**/next-env.d.ts",
+      "**/public/sw.js",
     ],
   },
   // Base TypeScript config for all packages

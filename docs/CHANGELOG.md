@@ -2,6 +2,114 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-01-24
+
+### Infrastructure
+
+- **Standalone Authentik Stack**
+  - Separate Authentik identity provider to `~/authentik/` with dedicated PostgreSQL and Valkey
+  - Independent scaling and management from the amigo application stack
+  - Data migration from shared amigo PostgreSQL to dedicated instance
+
+- **Service Isolation**
+  - Use explicit container names (`amigo-postgres`, `amigo-valkey`) in connection strings
+  - Prevents DNS conflicts with other services on shared `caddy-network`
+  - All three stacks (Caddy, Authentik, Amigo) now fully isolated
+
+### Changed
+
+- **Docker Compose**
+  - Remove Authentik services from amigo docker-compose.yaml
+  - Update DATABASE_URL to use `amigo-postgres` instead of `postgres`
+  - Update VALKEY_URL to use `amigo-valkey` instead of `valkey`
+
+- **Makefile**
+  - Remove Authentik-related make targets (authentik-up, authentik-down, etc.)
+  - Simplify to core amigo stack management only
+
+### Fixed
+
+- Unused `args` parameter in `apps/api/src/lib/redis.ts` (lint error)
+- ESLint now ignores bundled `sw.js` service worker file
+
+### Documentation
+
+- Update ARCHITECTURE.md with standalone service architecture
+- Add container names reference table
+- Update README.md with external service prerequisites
+- Update CLAUDE.md with standalone service commands
+- Remove redundant caddy-external-setup.md (consolidated into ARCHITECTURE.md)
+
+## [0.2.2] - 2026-01-24
+
+### Changed
+
+- **Grocery Module Refactoring**
+  - Break down monolithic 1540-line GroceryList component into focused modules
+  - New structure under `apps/web/src/components/groceries/`:
+    - `constants.ts`: Tag colors and date formatting helpers
+    - `types.ts`: Shared types (GroceryItemWithTags, OptimisticAction)
+    - `grocery-icons.tsx`: Extracted SVG icon components
+    - `tag-badge.tsx`: Reusable tag badge component
+    - `tag-selector.tsx`: Unified TagSelector (merged global + item modes)
+    - `grocery-item.tsx`: Individual item row with long-press handling
+    - `history-section.tsx`: Collapsible history with date grouping
+    - `date-picker-modal.tsx`: Purchase date picker modal
+    - `use-grocery-logic.ts`: Custom hook for state, actions, WebSocket
+    - `grocery-list.tsx`: Clean container component
+    - `index.ts`: Public exports
+
+### Added
+
+- **Purchase Date Editing**
+  - Long-press checkbox to set custom purchase date
+  - `updatePurchaseDate` server action
+
+### Fixed
+
+- Button alignment for tag and delete icons on grocery items
+
+### Documentation
+
+- Remove PII from documentation (personal names)
+- Replace hardcoded domain with `yourdomain.com` placeholder
+- Add `APP_DOMAIN` environment variable reference
+- Clarify `bun run test` vs `bun test` usage in CLAUDE.md
+
+## [0.2.1] - 2026-01-22
+
+### Added
+
+- **Branding**
+  - Add Amigo logo throughout the app (navbar, login, empty states, loading)
+  - Reusable `EmptyState` and `Loading` components with logo
+
+- **Database Backup**
+  - Automated PostgreSQL backup script with 7-day rotation
+  - Makefile targets: `db-backup`, `db-backup-list`, `db-restore`
+
+- **Audit Log Retention**
+  - Automated retention script with configurable period
+  - Batch deletion to prevent long-running transactions
+  - Makefile targets: `audit-stats`, `audit-prune`, `audit-prune-dry`
+
+### Changed
+
+- **Caddyfile Split**
+  - Separate `Caddyfile.prod` (stricter CSP) and `Caddyfile.dev` (allows HMR)
+  - `CADDYFILE` env var for docker-compose selection
+
+- **CI/CD**
+  - Test coverage enforcement with Istanbul provider (Bun-compatible)
+  - Vitest upgraded to v4.0.17
+
+### Fixed
+
+- **Privacy**: Recurring transaction rules now scoped to individual users
+- **Resilience**: API server starts in degraded mode when Valkey unavailable
+- **Mobile UX**: Delete buttons visible on touch devices, larger color swatch targets
+- **PWA**: Viewport meta tag, manifest.json, apple-touch-icon
+
 ## [0.2.0] - 2026-01-22
 
 ### Security
@@ -131,8 +239,8 @@ All notable changes to this project will be documented in this file.
 ### Infrastructure
 
 - **Dev/Prod Hybrid Environment**
-  - Production: `amigo.cadenalabs.net`
-  - Development: `dev-amigo.cadenalabs.net`
+  - Production: `amigo.yourdomain.com`
+  - Development: `dev-amigo.yourdomain.com`
   - Shared PostgreSQL with separate databases
   - Shared Valkey for sessions
   - Caddy reverse proxy with DNS-01 SSL

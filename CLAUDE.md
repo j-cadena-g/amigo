@@ -14,7 +14,8 @@ amigo is a self-hosted household management application for a small household. I
 - **Backend:** Hono for WebSockets/sync, Next.js Server Actions for mutations
 - **Database:** PostgreSQL 17 with Drizzle ORM, Valkey 8 for sessions/pub-sub
 - **Validation:** Zod (single source of truth via drizzle-zod)
-- **Infrastructure:** Docker Compose, Caddy (DNS-01 SSL via Cloudflare), Tailscale
+- **Infrastructure:** Docker Compose, Tailscale
+- **External Services:** Caddy (`~/caddy/`) and Authentik (`~/authentik/`) run as standalone stacks
 
 ## Common Commands
 
@@ -180,13 +181,25 @@ const results = await withRLS(session.householdId, async () => {
 });
 ```
 
-## Domain
+## Domain & Infrastructure
 
 * **Prod:** `amigo.yourdomain.com`
 * **Dev:** `dev-amigo.yourdomain.com`
+* **Auth:** `auth.yourdomain.com`
 * **Cookie scope:** `.yourdomain.com`
 
-Configure your domain via `APP_DOMAIN` environment variable.
+Configure your domain via `APP_URL` and `DEV_APP_URL` environment variables.
+
+### Standalone Services
+
+Caddy and Authentik run as separate Docker Compose stacks:
+
+| Service | Location | Commands |
+|---------|----------|----------|
+| Caddy | `~/caddy/` | `make up`, `make reload`, `make logs` |
+| Authentik | `~/authentik/` | `make up`, `make logs`, `make status` |
+
+All services communicate via the shared `caddy-network` Docker network.
 
 ## Server Actions
 

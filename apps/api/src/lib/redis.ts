@@ -84,7 +84,7 @@ export const subscriber = new Proxy({} as Redis, {
     if (!_subscriber) {
       // Return no-op functions for common methods
       if (["subscribe", "on", "off"].includes(prop)) {
-        return (...args: unknown[]) => {
+        return (..._args: unknown[]) => {
           console.warn(`[subscriber] Operation '${prop}' skipped - Redis unavailable`);
           // Return subscriber for chaining
           return subscriber;

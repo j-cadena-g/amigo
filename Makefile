@@ -1,17 +1,15 @@
-.PHONY: dev-up dev-up-with-authentik dev-down dev-down-with-authentik dev-logs dev-shell dev-restart dev-build \
+.PHONY: dev-up dev-down dev-logs dev-shell dev-restart dev-build \
         prod-up prod-down prod-logs prod-shell prod-build \
-        up down logs build up-with-authentik down-with-authentik \
-        authentik-up authentik-down authentik-logs \
+        up down logs build \
         db-migrate db-generate db-push db-studio db-seed \
         db-backup db-backup-list db-restore \
         audit-stats audit-prune \
-        caddy-prod caddy-dev caddy-reload \
         deploy deploy-fresh rebuild
 
 # =============================================================================
-# Full Stack (Core Services - without bundled Authentik)
+# Full Stack (Core Services)
 # =============================================================================
-# Use these if you have an external OIDC provider (existing Authentik, etc.)
+# Authentik runs as a standalone stack at ~/authentik/
 
 up:
 	docker compose up -d
@@ -26,45 +24,14 @@ build:
 	docker compose build
 
 # =============================================================================
-# Full Stack WITH Bundled Authentik
-# =============================================================================
-# Use these if you want to run Authentik as part of this stack
-
-up-with-authentik:
-	docker compose --profile authentik up -d
-
-down-with-authentik:
-	docker compose --profile authentik down
-
-# =============================================================================
-# Authentik Only (Identity Provider)
-# =============================================================================
-# Manage just the Authentik services
-
-authentik-up:
-	docker compose --profile authentik up -d authentik-server authentik-worker
-
-authentik-down:
-	docker compose --profile authentik stop authentik-server authentik-worker
-
-authentik-logs:
-	docker compose --profile authentik logs -f authentik-server authentik-worker
-
-# =============================================================================
 # Development Stack (web-dev, api-dev)
 # =============================================================================
 
 dev-up:
 	docker compose up -d web-dev api-dev
 
-dev-up-with-authentik:
-	docker compose --profile authentik up -d web-dev api-dev
-
 dev-down:
 	docker compose stop web-dev api-dev
-
-dev-down-with-authentik:
-	docker compose --profile authentik stop web-dev api-dev
 
 dev-logs:
 	docker compose logs -f web-dev api-dev
@@ -199,23 +166,6 @@ audit-prune:
 # Dry run - show what would be pruned without deleting
 audit-prune-dry:
 	./scripts/audit-retention.sh --dry-run
-
-# =============================================================================
-# Caddy Configuration (Reverse Proxy)
-# =============================================================================
-# Use separate Caddyfiles to reduce accidental production misconfiguration
-
-# Use production-only Caddyfile (recommended for production servers)
-caddy-prod:
-	CADDYFILE=Caddyfile.prod docker compose up -d caddy
-
-# Use development-only Caddyfile
-caddy-dev:
-	CADDYFILE=Caddyfile.dev docker compose up -d caddy
-
-# Reload Caddy configuration without restart
-caddy-reload:
-	docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 # =============================================================================
 # Deployment

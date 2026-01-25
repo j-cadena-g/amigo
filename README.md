@@ -12,7 +12,18 @@ Self-hosted household management app for budgeting and grocery tracking.
 - **Frontend:** Next.js 15, React 19, Tailwind v4, Shadcn/UI
 - **Backend:** Hono (WebSockets), Next.js Server Actions
 - **Database:** Postgres 17, Drizzle ORM, Valkey 8
-- **Infra:** Docker Compose, Caddy, Authentik
+- **Infra:** Docker Compose, Tailscale
+
+### External Services (Standalone Stacks)
+
+Caddy and Authentik run as separate Docker Compose stacks on the same VM:
+
+| Service | Location | Purpose |
+|---------|----------|---------|
+| Caddy | `~/caddy/` | Reverse proxy with Cloudflare DNS-01 SSL |
+| Authentik | `~/authentik/` | OIDC identity provider |
+
+All services communicate via the shared `caddy-network` Docker network.
 
 ## Development
 
@@ -45,12 +56,17 @@ make prod-logs    # Tail prod logs
 ### Prerequisites
 
 - Docker & Docker Compose
-- Cloudflare API token (for DNS-01 SSL via Caddy)
-- Domain configured (e.g., `*.yourdomain.com`)
+- Standalone Caddy stack running (see `~/caddy/`)
+- Standalone Authentik stack running (see `~/authentik/`)
+- Shared Docker network: `docker network create caddy-network`
 
 ### First-Time Setup
 
-1. **Environment Configuration**
+1. **Set up external services first:**
+   - Caddy: `cd ~/caddy && make up`
+   - Authentik: `cd ~/authentik && make up`
+
+2. **Environment Configuration**
 
    ```bash
    cp .env.example .env
@@ -61,29 +77,20 @@ make prod-logs    # Tail prod logs
    POSTGRES_USER=amigo
    POSTGRES_PASSWORD=<strong-password>
    POSTGRES_DB=amigo
-   AUTHENTIK_SECRET_KEY=$(openssl rand -base64 32)
-   AUTHENTIK_BOOTSTRAP_PASSWORD=<initial-admin-password>
-   CLOUDFLARE_API_TOKEN=<your-token>
-   APP_DOMAIN=yourdomain.com
-   ```
 
-2. **Create Directories**
-
-   ```bash
-   mkdir -p authentik/media authentik/custom-templates
+   # OIDC credentials from Authentik
+   AUTHENTIK_ISSUER=https://auth.yourdomain.com/application/o/amigo/
+   AUTHENTIK_CLIENT_ID=<from-authentik>
+   AUTHENTIK_CLIENT_SECRET=<from-authentik>
    ```
 
 3. **Start Services**
 
    ```bash
-   docker compose -f docker-compose.prod.yaml up -d
+   make up
    ```
 
-4. **Initialize Authentik**
-
-   Navigate to `https://auth.yourdomain.com/if/flow/initial-setup/` and create admin account.
-
-5. **Configure OIDC Application**
+4. **Configure OIDC Application** (if not already done)
 
    In Authentik Admin → Applications → Create:
    - **Name:** Amigo
@@ -94,13 +101,6 @@ make prod-logs    # Tail prod logs
      https://amigo.yourdomain.com/api/auth/callback
      https://dev-amigo.yourdomain.com/api/auth/callback
      ```
-
-   Update `.env`:
-   ```bash
-   AUTHENTIK_ISSUER=https://auth.yourdomain.com/application/o/amigo/
-   AUTHENTIK_CLIENT_ID=amigo
-   AUTHENTIK_CLIENT_SECRET=<generated-secret>
-   ```
 
 ### Domains
 
@@ -130,7 +130,8 @@ make prod-logs    # Tail prod logs
 ## Troubleshooting
 
 **OIDC Discovery Fails**
-- Check Authentik is running: `docker logs amigo-authentik-server`
+- Check Authentik is running: `cd ~/authentik && make status`
+- View Authentik logs: `cd ~/authentik && make logs`
 - Verify issuer URL ends with `/`
 
 **Login Redirect Loop**
@@ -139,3 +140,7 @@ make prod-logs    # Tail prod logs
 
 **Database Connection Issues**
 - Ensure postgres healthcheck passes before web starts
+
+**Service Communication Issues**
+- Verify all services are on the same network: `docker network inspect caddy-network`
+- Check Caddy can reach services: `cd ~/caddy && make logs`

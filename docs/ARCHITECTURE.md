@@ -72,9 +72,18 @@ A high-performance, self-hosted household management platform for `cadenalabs.ne
 ### Infrastructure
 
 * **Docker Compose:** Container orchestration.
-* **Caddy:** Reverse proxy (Replaces Nginx for automatic DNS-01 SSL).
-* **Authentik:** OIDC Identity Provider (Docker, shares Postgres/Valkey).
 * **Tailscale:** Zero Trust Network Access (ZTNA).
+
+### External Services (Standalone Stacks)
+
+Caddy and Authentik run as separate Docker Compose stacks on the same VM, communicating via shared `caddy-network`:
+
+| Service | Location | Purpose |
+|---------|----------|---------|
+| **Caddy** | `~/caddy/` | Reverse proxy with Cloudflare DNS-01 SSL |
+| **Authentik** | `~/authentik/` | OIDC Identity Provider with dedicated PostgreSQL and Valkey |
+
+This separation allows independent scaling, updates, and management of each service.
 
 ---
 
@@ -171,9 +180,17 @@ We separate **State** (DB) from **Signal** (WebSockets).
 
 ## Authentication (Authentik)
 
+### Standalone Authentik Stack
+
+Authentik runs as a separate Docker Compose stack at `~/authentik/` with its own:
+- PostgreSQL 17 instance (`authentik-postgres`)
+- Valkey 8 instance (`authentik-valkey`)
+- Server container (`authentik-server`)
+- Worker container (`authentik-worker`)
+
 ### OIDC Flow
 
-* **Provider:** Authentik (Docker containers: `authentik-server` + `authentik-worker`).
+* **Provider:** Authentik (standalone stack at `~/authentik/`).
 * **Issuer URL:** `https://auth.cadenalabs.net/application/o/amigo/`
 * **Mechanism:** Authorization Code Flow with PKCE.
 * **Scope:** `.cadenalabs.net` (Allows SSO across `amigo` and `dev-amigo`).
@@ -181,16 +198,27 @@ We separate **State** (DB) from **Signal** (WebSockets).
 ### Session Management
 
 * **Cookie:** `amigo_session` (HttpOnly, Secure, SameSite=Lax, Domain=`.cadenalabs.net`).
-* **Storage:** OIDC Profile stored in Valkey with session ID as key.
+* **Storage:** OIDC Profile stored in Valkey (amigo's Valkey) with session ID as key.
 
 ### Authorization
 
 * **Middleware:** Validates session cookie against Valkey-stored profile.
 * **User Mapping:** OIDC `sub` claim stored in `users.auth_id`.
 
+### Managing Authentik
+
+```bash
+cd ~/authentik
+make up        # Start Authentik
+make down      # Stop Authentik
+make logs      # View logs
+make status    # Check container status
+```
+
 ### Bootstrap (First Deploy)
 
-* Set `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_EMAIL` on the **worker** container.
+* Set `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_EMAIL` in `~/authentik/.env`.
+* Start Authentik: `cd ~/authentik && make up`
 * Access `https://auth.cadenalabs.net` and login as `akadmin` with bootstrap password.
 * Create OIDC application with redirect URIs for both prod and dev.
 
@@ -198,30 +226,54 @@ We separate **State** (DB) from **Signal** (WebSockets).
 
 ## Infrastructure & Networking
 
-### Environment Isolation
+### Service Architecture
 
-Single VM (Proxmox) hosting both Dev and Prod stacks.
-
-* **Prod:** `amigo.cadenalabs.net` (Port 3100)
-* **Dev:** `dev-amigo.cadenalabs.net` (Port 3000)
-
-### SSL Strategy (Caddy + Cloudflare)
-
-```text
-{
-  email your-email@cadenalabs.net
-}
-amigo.cadenalabs.net, dev-amigo.cadenalabs.net {
-  tls {
-    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-  }
-  @dev host dev-amigo.cadenalabs.net
-  handle @dev { reverse_proxy web-dev:3000 }
-  @prod host amigo.cadenalabs.net
-  handle @prod { reverse_proxy web-prod:3000 }
-}
+Single VM (Proxmox) hosting three separate Docker Compose stacks:
 
 ```
+~/caddy/        → Reverse proxy (ports 80/443)
+~/authentik/    → Identity provider (auth.cadenalabs.net)
+~/amigo/        → Application stack (amigo.cadenalabs.net, dev-amigo.cadenalabs.net)
+
+All connected via external Docker network: caddy-network
+```
+
+### Environment Isolation
+
+* **Prod:** `amigo.cadenalabs.net` → `amigo-web-prod:3000`
+* **Dev:** `dev-amigo.cadenalabs.net` → `amigo-web-dev:3001`
+* **Auth:** `auth.cadenalabs.net` → `authentik-server:9000`
+
+### SSL Strategy (Standalone Caddy + Cloudflare)
+
+Caddy runs as a standalone stack at `~/caddy/` with Cloudflare DNS-01 SSL:
+
+```bash
+cd ~/caddy
+make up        # Start Caddy
+make reload    # Reload config (zero downtime)
+make logs      # View logs
+```
+
+Caddyfile location: `~/caddy/Caddyfile`
+
+### Container Names
+
+All services communicate via container names on `caddy-network`:
+
+| Container | Stack | Purpose |
+|-----------|-------|---------|
+| `caddy` | ~/caddy/ | Reverse proxy |
+| `authentik-server` | ~/authentik/ | Identity provider API |
+| `authentik-worker` | ~/authentik/ | Background tasks |
+| `authentik-postgres` | ~/authentik/ | Authentik database |
+| `authentik-valkey` | ~/authentik/ | Authentik cache |
+| `amigo-web-prod` | ~/amigo/ | Production web (port 3000) |
+| `amigo-web-dev` | ~/amigo/ | Development web (port 3001) |
+| `amigo-api-prod` | ~/amigo/ | Production API (port 3001) |
+| `amigo-api-dev` | ~/amigo/ | Development API (port 3001) |
+| `amigo-postgres` | ~/amigo/ | Application database |
+| `amigo-valkey` | ~/amigo/ | Sessions and pub/sub |
 
 ---
 
@@ -364,7 +416,7 @@ Security enforced at Database level.
 
 ### Phase 3: Auth (Authentik)
 
-1. Deploy Authentik (server + worker) sharing Postgres/Valkey.
+1. Deploy Authentik as standalone stack at `~/authentik/` (dedicated Postgres/Valkey).
 2. Configure OIDC Application with redirect URIs.
 3. Implement OIDC Callback in Next.js with PKCE.
 4. Map `sub` to `users.auth_id`.

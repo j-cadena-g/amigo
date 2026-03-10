@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "amigo",
+  "account_id": "25d6de6017afd7b3592d69835ab8f7ee",
   "main": "./worker.ts",
   "compatibility_date": "2026-03-01",
   "compatibility_flags": ["nodejs_compat"],

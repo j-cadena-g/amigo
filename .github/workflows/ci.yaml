@@ -36,7 +36,7 @@ jobs:
       - name: Deploy preview
         uses: cloudflare/wrangler-action@v3
         with:
-          command: versions upload --env preview
+          command: deploy --env preview
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   deploy-production:

@@ -67,6 +67,20 @@
           "id": "placeholder-create-via-wrangler"
         }
       ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "HOUSEHOLD",
+            "class_name": "HouseholdDO"
+          }
+        ]
+      },
+      "migrations": [
+        {
+          "tag": "v1",
+          "new_sqlite_classes": ["HouseholdDO"]
+        }
+      ],
       "vars": {
         "APP_ENV": "preview"
       }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
-import { getDb, assets, scopeToHousehold, and, isNull } from "@amigo/db";
+import { getDb, assets, scopeToHousehold, eq, and, or, isNull } from "@amigo/db";
 import { AssetCards } from "@/app/components/asset-cards";
 import { AddAssetDialog } from "@/app/components/add-asset-dialog";
 
@@ -14,19 +14,21 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const items = await db.query.assets.findMany({
     where: and(
       scopeToHousehold(assets.householdId, session.householdId),
+      or(eq(assets.userId, session.userId), isNull(assets.userId)),
       isNull(assets.deletedAt)
     ),
     orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
   });
 
   return {
-    assets: items,
+    assets: items.map(a => ({ ...a, isShared: a.userId === null })),
     userId: session.userId,
+    role: session.role,
   };
 }
 
 export default function Assets() {
-  const { assets: assetData, userId } = useLoaderData<typeof loader>();
+  const { assets: assetData, userId, role } = useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -48,7 +50,7 @@ export default function Assets() {
         </button>
         <AddAssetDialog open={addOpen} onOpenChange={setAddOpen} />
       </div>
-      <AssetCards assets={assetData} session={{ userId }} />
+      <AssetCards assets={assetData} session={{ userId, role }} />
     </main>
   );
 }

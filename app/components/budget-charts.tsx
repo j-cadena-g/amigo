@@ -216,6 +216,7 @@ export function BudgetCharts({
                     tickLine={false}
                   />
                   <Tooltip
+                    cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
                     content={
                       <ComparisonTooltip
                         currency={currency}
@@ -266,6 +267,7 @@ export function BudgetCharts({
                     tickLine={false}
                   />
                   <Tooltip
+                    cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
                     content={<CustomTooltip currency={currency} />}
                   />
                   <Bar

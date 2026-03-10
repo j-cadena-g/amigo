@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRevalidator } from "react-router";
+import { Link, useRevalidator } from "react-router";
 import { Loader2, Plus, Trash2, ArrowDown, ArrowUp, Pencil, ChevronDown } from "lucide-react";
 import { EmptyState } from "@/app/components/empty-state";
 import { BudgetSelect } from "@/app/components/budget-select";
@@ -33,11 +33,13 @@ function formatDate(date: string): string {
 interface TransactionListProps {
   initialTransactions: TransactionDTO[];
   currentUserId: string;
+  typeFilter?: "income" | "expense" | null;
 }
 
 export function TransactionList({
   initialTransactions,
   currentUserId: _currentUserId,
+  typeFilter,
 }: TransactionListProps) {
   const revalidator = useRevalidator();
   const [allTransactions, setAllTransactions] =
@@ -83,7 +85,8 @@ export function TransactionList({
     setIsLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const res = await fetch(`/api/transactions?page=${nextPage}&limit=20`);
+      const filterParam = typeFilter ? `&type=${typeFilter}` : "";
+      const res = await fetch(`/api/transactions?page=${nextPage}&limit=20${filterParam}`);
       if (res.ok) {
         const data = (await res.json()) as { data: TransactionDTO[]; pagination: { hasMore: boolean } };
         setAllTransactions((prev) => [...prev, ...data.data]);
@@ -93,7 +96,7 @@ export function TransactionList({
     } finally {
       setIsLoadingMore(false);
     }
-  }, [page, hasMore, isLoadingMore]);
+  }, [page, hasMore, isLoadingMore, typeFilter]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -193,6 +196,18 @@ export function TransactionList({
 
   return (
     <div className="space-y-4">
+      {/* Filter banner */}
+      {typeFilter && (
+        <div className="flex items-center justify-between rounded-lg bg-secondary/50 px-4 py-2">
+          <span className="text-sm text-muted-foreground">
+            Showing: <span className="font-medium text-foreground capitalize">{typeFilter}</span>
+          </span>
+          <Link to="/budget/transactions" className="text-sm font-medium text-primary hover:text-primary/80">
+            Clear filter
+          </Link>
+        </div>
+      )}
+
       {/* Add Transaction */}
       {showAddForm ? (
         <form

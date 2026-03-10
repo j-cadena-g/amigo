@@ -8,7 +8,7 @@ import { toCents, toISODate } from "../lib/conversions";
 
 const budgetSchema = z.object({
   name: z.string().min(1),
-  category: z.string().optional(),
+  category: z.string().nullable().optional(),
   limitAmount: z.number().positive(),
   period: z.enum(["weekly", "monthly", "yearly"]),
   isShared: z.boolean(),

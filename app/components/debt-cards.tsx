@@ -18,54 +18,67 @@ export interface Debt {
   currency: CurrencyCode;
   exchangeRateToHome: number | null;
   userId: string | null;
+  isShared?: boolean;
   createdAt: Date | number;
 }
 
 interface DebtCardsProps {
   debts: Debt[];
-  session: { userId: string };
+  session: { userId: string; role: string };
 }
 
 export function DebtCards({ debts, session: _session }: DebtCardsProps) {
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
-  const loans = debts.filter((d) => d.type === "LOAN");
-  const creditCards = debts.filter((d) => d.type === "CREDIT_CARD");
+  const shared = debts.filter((d) => d.isShared);
+  const personal = debts.filter((d) => !d.isShared);
 
-  return (
-    <>
-      <div className="space-y-6">
+  function renderDebtGroup(items: Debt[]) {
+    const loans = items.filter((d) => d.type === "LOAN");
+    const creditCards = items.filter((d) => d.type === "CREDIT_CARD");
+    return (
+      <>
         {loans.length > 0 && (
           <div>
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
               Loans ({loans.length})
-            </h2>
+            </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {loans.map((debt) => (
-                <LoanCard
-                  key={debt.id}
-                  debt={debt}
-                  onEdit={() => setEditingDebt(debt)}
-                />
+                <LoanCard key={debt.id} debt={debt} onEdit={() => setEditingDebt(debt)} />
               ))}
             </div>
           </div>
         )}
-
         {creditCards.length > 0 && (
           <div>
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
               Credit Cards ({creditCards.length})
-            </h2>
+            </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {creditCards.map((debt) => (
-                <CreditCardCard
-                  key={debt.id}
-                  debt={debt}
-                  onEdit={() => setEditingDebt(debt)}
-                />
+                <CreditCardCard key={debt.id} debt={debt} onEdit={() => setEditingDebt(debt)} />
               ))}
             </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-6">
+        {shared.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Shared</h2>
+            {renderDebtGroup(shared)}
+          </div>
+        )}
+        {personal.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Personal</h2>
+            {renderDebtGroup(personal)}
           </div>
         )}
       </div>
@@ -100,7 +113,14 @@ function LoanCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
-          <CardTitle className="text-base">{debt.name}</CardTitle>
+          <div>
+            <CardTitle className="text-base">{debt.name}</CardTitle>
+            {debt.isShared && (
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
+                Shared
+              </span>
+            )}
+          </div>
           <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
             <Pencil className="h-4 w-4" />
             <span className="sr-only">Edit</span>
@@ -165,9 +185,16 @@ function CreditCardCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <CardTitle className="text-base">{debt.name}</CardTitle>
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-              Credit Card
-            </span>
+            <div className="flex gap-1.5">
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
+                Credit Card
+              </span>
+              {debt.isShared && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
+                  Shared
+                </span>
+              )}
+            </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
             <Pencil className="h-4 w-4" />

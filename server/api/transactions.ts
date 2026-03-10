@@ -47,16 +47,23 @@ transactionsRoute.get("/", async (c) => {
   const page = parseInt(c.req.query("page") ?? "1");
   const limit = parseInt(c.req.query("limit") ?? "20");
   const offset = (page - 1) * limit;
+  const typeFilter = c.req.query("type");
+
+  const conditions = [
+    scopeToHousehold(transactions.householdId, session.householdId),
+    isNull(transactions.deletedAt),
+    or(
+      eq(transactions.userId, session.userId),
+      sql`EXISTS (SELECT 1 FROM budgets WHERE budgets.id = ${transactions.budgetId} AND budgets.user_id IS NULL)`
+    ),
+  ];
+
+  if (typeFilter === "income" || typeFilter === "expense") {
+    conditions.push(eq(transactions.type, typeFilter));
+  }
 
   const items = await db.query.transactions.findMany({
-    where: and(
-      scopeToHousehold(transactions.householdId, session.householdId),
-      isNull(transactions.deletedAt),
-      or(
-        eq(transactions.userId, session.userId),
-        sql`EXISTS (SELECT 1 FROM budgets WHERE budgets.id = ${transactions.budgetId} AND budgets.user_id IS NULL)`
-      )
-    ),
+    where: and(...conditions),
     orderBy: (t, { desc }) => [desc(t.date), desc(t.createdAt)],
     limit: limit + 1,
     offset,

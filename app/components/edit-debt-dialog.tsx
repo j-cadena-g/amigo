@@ -27,6 +27,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
   const revalidator = useRevalidator();
   const [name, setName] = useState(debt.name);
   const [currency, setCurrency] = useState<CurrencyCode>(debt.currency);
+  const [isShared, setIsShared] = useState(debt.userId === null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               loanAmount: parseFloat(loanAmount) || 0,
               totalPaid: parseFloat(totalPaid) || 0,
               currency,
+              isShared,
             }
           : {
               type: "CREDIT_CARD" as const,
@@ -68,6 +70,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               creditLimit: parseFloat(creditLimit) || 0,
               availableCredit: parseFloat(availableCredit) || 0,
               currency,
+              isShared,
             };
 
       const res = await fetch(`/api/debts/${debt.id}`, {
@@ -228,6 +231,19 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               </div>
             </>
           )}
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="edit-debt-shared"
+              checked={isShared}
+              onChange={(e) => setIsShared(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <label htmlFor="edit-debt-shared" className="text-sm font-medium">
+              Shared (household-wide)
+            </label>
+          </div>
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
-import { getDb, debts, scopeToHousehold, and, isNull } from "@amigo/db";
+import { getDb, debts, scopeToHousehold, eq, and, or, isNull } from "@amigo/db";
 import { DebtCards } from "@/app/components/debt-cards";
 import { AddDebtDialog } from "@/app/components/add-debt-dialog";
 
@@ -14,19 +14,21 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const items = await db.query.debts.findMany({
     where: and(
       scopeToHousehold(debts.householdId, session.householdId),
+      or(eq(debts.userId, session.userId), isNull(debts.userId)),
       isNull(debts.deletedAt)
     ),
     orderBy: (d, { asc }) => [asc(d.type), asc(d.name)],
   });
 
   return {
-    debts: items,
+    debts: items.map(d => ({ ...d, isShared: d.userId === null })),
     userId: session.userId,
+    role: session.role,
   };
 }
 
 export default function Debts() {
-  const { debts: debtData, userId } = useLoaderData<typeof loader>();
+  const { debts: debtData, userId, role } = useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -48,7 +50,7 @@ export default function Debts() {
         </button>
         <AddDebtDialog open={addOpen} onOpenChange={setAddOpen} />
       </div>
-      <DebtCards debts={debtData} session={{ userId }} />
+      <DebtCards debts={debtData} session={{ userId, role }} />
     </main>
   );
 }

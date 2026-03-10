@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { HonoEnv } from "../env";
-import { getDb, assets, households, scopeToHousehold, eq, and, isNull } from "@amigo/db";
+import { getDb, assets, households, scopeToHousehold, eq, and, or, isNull } from "@amigo/db";
 import { ActionError } from "../lib/errors";
+import { assertPermission, canManageSharedItems } from "../lib/permissions";
 import { toCents } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import type { CurrencyCode } from "@amigo/db";
@@ -12,6 +13,7 @@ const assetSchema = z.object({
   type: z.enum(["BANK", "INVESTMENT", "CASH", "PROPERTY"]),
   balance: z.number(),
   currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
+  isShared: z.boolean().optional().default(false),
 });
 
 export const assetsRoute = new Hono<HonoEnv>();
@@ -31,13 +33,13 @@ assetsRoute.get("/", async (c) => {
   const userAssets = await db.query.assets.findMany({
     where: and(
       scopeToHousehold(assets.householdId, session.householdId),
-      eq(assets.userId, session.userId),
+      or(eq(assets.userId, session.userId), isNull(assets.userId)),
       isNull(assets.deletedAt)
     ),
     orderBy: (assets, { desc }) => [desc(assets.createdAt)],
   });
 
-  return c.json(userAssets);
+  return c.json(userAssets.map(a => ({ ...a, isShared: a.userId === null })));
 });
 
 // Create asset
@@ -47,6 +49,10 @@ assetsRoute.post("/", async (c) => {
   const validated = assetSchema.parse(body);
   const db = getDb(c.env.DB);
 
+  if (validated.isShared) {
+    assertPermission(canManageSharedItems(session), "Only owners and admins can create shared assets");
+  }
+
   const currency = validated.currency ?? "CAD";
   const homeCurrency = await getHomeCurrency(db, session.householdId);
   const exchangeRateToHome = await getExchangeRateForRecord(c.env, currency, homeCurrency);
@@ -55,7 +61,7 @@ assetsRoute.post("/", async (c) => {
     .insert(assets)
     .values({
       householdId: session.householdId,
-      userId: session.userId,
+      userId: validated.isShared ? null : session.userId,
       name: validated.name.trim(),
       type: validated.type,
       balance: toCents(validated.balance),
@@ -76,6 +82,25 @@ assetsRoute.patch("/:id", async (c) => {
   const validated = assetSchema.parse(body);
   const db = getDb(c.env.DB);
 
+  const existing = await db.query.assets.findFirst({
+    where: and(
+      eq(assets.id, id),
+      scopeToHousehold(assets.householdId, session.householdId),
+      isNull(assets.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Asset not found", "NOT_FOUND");
+  }
+
+  const isCurrentlyShared = existing.userId === null;
+  if (isCurrentlyShared || validated.isShared) {
+    assertPermission(canManageSharedItems(session), "Only owners and admins can modify shared assets");
+  } else if (existing.userId !== session.userId) {
+    throw new ActionError("Cannot modify another user's personal asset", "PERMISSION_DENIED");
+  }
+
   const currency = validated.currency ?? "CAD";
   const homeCurrency = await getHomeCurrency(db, session.householdId);
   const exchangeRateToHome = await getExchangeRateForRecord(c.env, currency, homeCurrency);
@@ -83,6 +108,7 @@ assetsRoute.patch("/:id", async (c) => {
   const updated = await db
     .update(assets)
     .set({
+      userId: validated.isShared ? null : session.userId,
       name: validated.name.trim(),
       type: validated.type,
       balance: toCents(validated.balance),
@@ -90,7 +116,7 @@ assetsRoute.patch("/:id", async (c) => {
       exchangeRateToHome,
       updatedAt: new Date(),
     })
-    .where(and(eq(assets.id, id), eq(assets.userId, session.userId)))
+    .where(and(eq(assets.id, id), scopeToHousehold(assets.householdId, session.householdId)))
     .returning()
     .get();
 
@@ -107,10 +133,29 @@ assetsRoute.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 
+  const existing = await db.query.assets.findFirst({
+    where: and(
+      eq(assets.id, id),
+      scopeToHousehold(assets.householdId, session.householdId),
+      isNull(assets.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Asset not found", "NOT_FOUND");
+  }
+
+  const isShared = existing.userId === null;
+  if (isShared) {
+    assertPermission(canManageSharedItems(session), "Only owners and admins can delete shared assets");
+  } else if (existing.userId !== session.userId) {
+    throw new ActionError("Cannot delete another user's personal asset", "PERMISSION_DENIED");
+  }
+
   const deleted = await db
     .update(assets)
     .set({ deletedAt: new Date() })
-    .where(and(eq(assets.id, id), eq(assets.userId, session.userId)))
+    .where(and(eq(assets.id, id), scopeToHousehold(assets.householdId, session.householdId)))
     .returning()
     .get();
 

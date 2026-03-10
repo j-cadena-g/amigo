@@ -26,6 +26,10 @@ export function canManageSharedBudgets(session: AppSession): boolean {
   return hasRole(session, "admin");
 }
 
+export function canManageSharedItems(session: AppSession): boolean {
+  return hasRole(session, "admin");
+}
+
 export function canTransferOwnership(session: AppSession): boolean {
   return session.role === "owner";
 }

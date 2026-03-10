@@ -31,6 +31,7 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
   const [type, setType] = useState<"BANK" | "INVESTMENT" | "CASH" | "PROPERTY">("BANK");
   const [balance, setBalance] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("CAD");
+  const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +49,7 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
           type,
           balance: parseFloat(balance) || 0,
           currency,
+          isShared,
         }),
       });
 
@@ -71,6 +73,7 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
     setType("BANK");
     setBalance("");
     setCurrency("CAD");
+    setIsShared(false);
     setError(null);
   }
 
@@ -154,6 +157,19 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="asset-shared"
+              checked={isShared}
+              onChange={(e) => setIsShared(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <label htmlFor="asset-shared" className="text-sm font-medium">
+              Shared (household-wide)
+            </label>
           </div>
 
           {error && (

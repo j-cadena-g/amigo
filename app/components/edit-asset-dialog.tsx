@@ -36,6 +36,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const [type, setType] = useState(asset.type);
   const [balance, setBalance] = useState((asset.balance / 100).toFixed(2));
   const [currency, setCurrency] = useState<CurrencyCode>(asset.currency);
+  const [isShared, setIsShared] = useState(asset.userId === null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
           type,
           balance: parseFloat(balance) || 0,
           currency,
+          isShared,
         }),
       });
 
@@ -174,6 +176,19 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="edit-asset-shared"
+              checked={isShared}
+              onChange={(e) => setIsShared(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <label htmlFor="edit-asset-shared" className="text-sm font-medium">
+              Shared (household-wide)
+            </label>
           </div>
 
           {error && (

@@ -35,6 +35,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
   const [creditLimit, setCreditLimit] = useState("");
   const [availableCredit, setAvailableCredit] = useState("");
 
+  const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +53,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
               loanAmount: parseFloat(loanAmount) || 0,
               totalPaid: parseFloat(totalPaid) || 0,
               currency: loanCurrency,
+              isShared,
             }
           : {
               type: "CREDIT_CARD" as const,
@@ -59,6 +61,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
               creditLimit: parseFloat(creditLimit) || 0,
               availableCredit: parseFloat(availableCredit) || 0,
               currency: ccCurrency,
+              isShared,
             };
 
       const res = await fetch("/api/debts", {
@@ -91,6 +94,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
     setCcCurrency("CAD");
     setCreditLimit("");
     setAvailableCredit("");
+    setIsShared(false);
     setError(null);
   }
 
@@ -256,6 +260,19 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
                 />
               </div>
             </TabsContent>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="debt-shared"
+                checked={isShared}
+                onChange={(e) => setIsShared(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+              <label htmlFor="debt-shared" className="text-sm font-medium">
+                Shared (household-wide)
+              </label>
+            </div>
 
             {error && (
               <p className="text-sm text-destructive">{error}</p>

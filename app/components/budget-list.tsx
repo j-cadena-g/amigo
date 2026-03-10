@@ -138,6 +138,7 @@ function BudgetFormDialog({
   setForm,
   onSubmit,
   submitting,
+  error,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -146,6 +147,7 @@ function BudgetFormDialog({
   setForm: React.Dispatch<React.SetStateAction<BudgetFormData>>;
   onSubmit: () => void;
   submitting: boolean;
+  error?: string | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,6 +225,7 @@ function BudgetFormDialog({
             </label>
           </div>
         </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <Button
             variant="outline"
@@ -247,12 +250,14 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
   const [deletingBudget, setDeletingBudget] = useState<BudgetWithSpending | null>(null);
   const [form, setForm] = useState<BudgetFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const shared = budgets.filter((b) => b.isShared);
   const personal = budgets.filter((b) => !b.isShared);
 
   function openAdd() {
     setForm(EMPTY_FORM);
+    setError(null);
     setShowAdd(true);
   }
 
@@ -265,11 +270,13 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
       period: budget.period,
       isShared: budget.isShared,
     });
+    setError(null);
     setEditingBudget(budget);
   }
 
   async function handleAdd() {
     setSubmitting(true);
+    setError(null);
     try {
       const res = await fetch("/api/budgets", {
         method: "POST",
@@ -277,7 +284,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
         body: JSON.stringify({
           name: form.name,
           category: form.category || null,
-          limitAmount: Math.round(parseFloat(form.limitAmount) * 100),
+          limitAmount: parseFloat(form.limitAmount),
           currency: form.currency,
           period: form.period,
           isShared: form.isShared,
@@ -286,6 +293,9 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
       if (res.ok) {
         setShowAdd(false);
         revalidator.revalidate();
+      } else {
+        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        setError(data?.message ?? "Failed to create budget");
       }
     } finally {
       setSubmitting(false);
@@ -295,6 +305,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
   async function handleEdit() {
     if (!editingBudget) return;
     setSubmitting(true);
+    setError(null);
     try {
       const res = await fetch(`/api/budgets/${editingBudget.id}`, {
         method: "PATCH",
@@ -302,7 +313,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
         body: JSON.stringify({
           name: form.name,
           category: form.category || null,
-          limitAmount: Math.round(parseFloat(form.limitAmount) * 100),
+          limitAmount: parseFloat(form.limitAmount),
           currency: form.currency,
           period: form.period,
           isShared: form.isShared,
@@ -311,6 +322,9 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
       if (res.ok) {
         setEditingBudget(null);
         revalidator.revalidate();
+      } else {
+        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        setError(data?.message ?? "Failed to update budget");
       }
     } finally {
       setSubmitting(false);
@@ -391,6 +405,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
         setForm={setForm}
         onSubmit={handleAdd}
         submitting={submitting}
+        error={error}
       />
 
       {/* Edit dialog */}
@@ -404,6 +419,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
         setForm={setForm}
         onSubmit={handleEdit}
         submitting={submitting}
+        error={error}
       />
 
       {/* Delete confirmation */}

@@ -50,12 +50,9 @@
   "workers_dev": false,
   "preview_urls": false,
 
-  "routes": [
-    {
-      "pattern": "mi-amigo.com",
-      "custom_domain": true
-    }
-  ],
+  // Custom domains configured via Cloudflare dashboard:
+  // - Production: mi-amigo.com
+  // - Preview: dev.mi-amigo.com
 
   "triggers": {
     "crons": ["0 3 * * 0"]
@@ -93,12 +90,6 @@
         {
           "tag": "v1",
           "new_sqlite_classes": ["HouseholdDO"]
-        }
-      ],
-      "routes": [
-        {
-          "pattern": "dev.mi-amigo.com",
-          "custom_domain": true
         }
       ],
       "triggers": {

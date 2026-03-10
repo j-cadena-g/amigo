@@ -59,7 +59,8 @@
   },
 
   "vars": {
-    "APP_ENV": "production"
+    "APP_ENV": "production",
+    "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWktYW1pZ28uY29tJA"
   },
 
   "env": {
@@ -99,7 +100,8 @@
         { "pattern": "dev.mi-amigo.com", "custom_domain": true }
       ],
       "vars": {
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "CLERK_PUBLISHABLE_KEY": "pk_test_ZW5oYW5jZWQtd2FsbGFieS00Mi5jbGVyay5hY2NvdW50cy5kZXYk"
       }
     }
   }

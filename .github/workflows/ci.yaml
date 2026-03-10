@@ -28,6 +28,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: [lint-and-typecheck, test]
     runs-on: ubuntu-latest
+    environment: dev
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -42,6 +43,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     needs: [lint-and-typecheck, test]
     runs-on: ubuntu-latest
+    environment: prod
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

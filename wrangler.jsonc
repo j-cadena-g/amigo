@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "amigo-db",
-      "database_id": "placeholder-create-via-wrangler",
+      "database_id": "c5c09768-673a-4cd8-b197-a17aa1679fa9",
       "migrations_dir": "packages/db/migrations"
     }
   ],
@@ -23,7 +23,7 @@
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "placeholder-create-via-wrangler"
+      "id": "e8a6dad5bc5b45a79916d514736171d3"
     }
   ],
 
@@ -57,14 +57,14 @@
         {
           "binding": "DB",
           "database_name": "amigo-db-preview",
-          "database_id": "placeholder-create-via-wrangler",
+          "database_id": "50434d75-216b-4463-87cd-7f0b90d5093c",
           "migrations_dir": "packages/db/migrations"
         }
       ],
       "kv_namespaces": [
         {
           "binding": "CACHE",
-          "id": "placeholder-create-via-wrangler"
+          "id": "a302b7c698b54a47bb2a1b662e2aea9c"
         }
       ],
       "durable_objects": {

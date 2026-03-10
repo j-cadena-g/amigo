@@ -1,47 +1,38 @@
-import {
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
-import { currencyEnum } from "./currencies";
+import { CURRENCY_CODES } from "./currencies";
 
-export const budgetPeriodEnum = pgEnum("budget_period", [
-  "weekly",
-  "monthly",
-  "yearly",
-]);
+export const BUDGET_PERIODS = ["weekly", "monthly", "yearly"] as const;
 
-export const budgets = pgTable("budgets", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
+export const budgets = sqliteTable("budgets", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
   // If userId is NULL, the budget is shared (household-wide)
   // If userId is set, the budget is personal (only that user's spending counts)
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   // Track original creator when data is transferred during "fresh start" restore
-  transferredFromUserId: uuid("transferred_from_user_id").references(
+  transferredFromUserId: text("transferred_from_user_id").references(
     () => users.id,
     { onDelete: "set null" }
   ),
-  name: text("name").notNull(), // Budget name (required)
-  category: text("category"), // Optional category for filtering
-  limitAmount: numeric("limit_amount", { precision: 12, scale: 2 }).notNull(),
-  currency: currencyEnum("currency").notNull().default("CAD"),
-  period: budgetPeriodEnum("period").notNull().default("monthly"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  name: text("name").notNull(),
+  category: text("category"),
+  limitAmount: integer("limit_amount").notNull(), // Stored as integer cents
+  currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
+  period: text("period", { enum: BUDGET_PERIODS }).notNull().default("monthly"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
 });
 
 export type Budget = typeof budgets.$inferSelect;

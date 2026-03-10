@@ -3,9 +3,12 @@ node_modules/
 
 # Build outputs
 dist/
-.next/
-.turbo/
+build/
 *.tsbuildinfo
+
+# Cloudflare
+.wrangler/
+.dev.vars
 
 # Environment
 .env
@@ -22,7 +25,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Drizzle
+# Drizzle (old postgres migrations)
 packages/db/drizzle/
 
 # Bun
@@ -35,7 +38,11 @@ npm-debug.log*
 # Test coverage
 coverage/
 
-# Database backups (contain sensitive data)
-backups/
-*.sql.gz
-*.dump
+# Migration checkpoints
+migration-checkpoint.json
+
+# 1Password
+.op/refs.env
+
+# clerk configuration (can include secrets)
+/.clerk/

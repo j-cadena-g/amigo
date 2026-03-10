@@ -1,16 +1,21 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { currencyEnum } from "./currencies";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { CURRENCY_CODES } from "./currencies";
 
-export const households = pgTable("households", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const households = sqliteTable("households", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  clerkOrgId: text("clerk_org_id").notNull().unique(),
   name: text("name").notNull(),
-  homeCurrency: currencyEnum("home_currency").notNull().default("CAD"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  homeCurrency: text("home_currency", { enum: CURRENCY_CODES })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .default("CAD"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
 });
 

@@ -1,67 +1,59 @@
-import {
-  boolean,
-  date,
-  integer,
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
-import { transactionTypeEnum } from "./transactions";
+import { TRANSACTION_TYPES } from "./transactions";
 import { budgets } from "./budgets";
-import { currencyEnum } from "./currencies";
+import { CURRENCY_CODES } from "./currencies";
 
-export const recurringFrequencyEnum = pgEnum("recurring_frequency", [
+export const RECURRING_FREQUENCIES = [
   "DAILY",
   "WEEKLY",
   "MONTHLY",
   "YEARLY",
-]);
+] as const;
 
-export const recurringTransactions = pgTable("recurring_transactions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
+export const recurringTransactions = sqliteTable("recurring_transactions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   // Denormalized user info for display when user is deleted
   userDisplayName: text("user_display_name"),
   // Track original creator when data is transferred during "fresh start" restore
-  transferredFromUserId: uuid("transferred_from_user_id").references(
+  transferredFromUserId: text("transferred_from_user_id").references(
     () => users.id,
     { onDelete: "set null" }
   ),
-  budgetId: uuid("budget_id").references(() => budgets.id, {
+  budgetId: text("budget_id").references(() => budgets.id, {
     onDelete: "set null",
   }),
 
   // Transaction Template Fields
-  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  currency: currencyEnum("currency").notNull().default("CAD"),
+  amount: integer("amount").notNull(), // Stored as integer cents
+  currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
   category: text("category").notNull(),
   description: text("description"),
-  type: transactionTypeEnum("type").notNull(),
+  type: text("type", { enum: TRANSACTION_TYPES }).notNull(),
 
   // Scheduling Fields
-  frequency: recurringFrequencyEnum("frequency").notNull(),
+  frequency: text("frequency", { enum: RECURRING_FREQUENCIES }).notNull(),
   interval: integer("interval").notNull().default(1),
-  dayOfMonth: integer("day_of_month"), // 1-31, used for MONTHLY frequency to specify which day
-  startDate: date("start_date", { mode: "date" }).notNull(),
-  endDate: date("end_date", { mode: "date" }),
-  lastRunDate: date("last_run_date", { mode: "date" }),
-  nextRunDate: date("next_run_date", { mode: "date" }).notNull(),
-  active: boolean("active").notNull().default(true),
+  dayOfMonth: integer("day_of_month"), // 1-31, used for MONTHLY frequency
+  startDate: text("start_date").notNull(), // ISO 8601 YYYY-MM-DD
+  endDate: text("end_date"), // ISO 8601 YYYY-MM-DD
+  lastRunDate: text("last_run_date"), // ISO 8601 YYYY-MM-DD
+  nextRunDate: text("next_run_date").notNull(), // ISO 8601 YYYY-MM-DD
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
 
-  createdAt: timestamp("created_at", { withTimezone: true })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
 });
 

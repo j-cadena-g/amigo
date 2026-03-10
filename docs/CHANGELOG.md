@@ -2,6 +2,101 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-09
+
+### Breaking Changes
+
+- **Complete platform migration** from self-hosted Docker/Next.js/PostgreSQL to Cloudflare Workers/D1/KV/Durable Objects
+- **Authentication** migrated from Authentik (self-hosted OIDC) to Clerk (SaaS)
+- **Database** migrated from PostgreSQL to Cloudflare D1 (SQLite)
+- All money values now stored as **integer cents** (not floats)
+- All timestamps now stored as **integer milliseconds**
+
+### Added
+
+- **Cloudflare Workers Runtime**
+  - Single Worker deployment with Hono server + React Router v7 SSR
+  - `hono-react-router-adapter` bridges server and client rendering
+  - Cron Trigger for weekly audit log pruning
+
+- **Cloudflare D1 Database**
+  - 13 tables converted from `pg-core` to `sqlite-core` (Drizzle ORM)
+  - Application-level RLS via `scopeToHousehold()` query filter
+  - D1 migration file: `packages/db/migrations/0000_faithful_cardiac.sql`
+
+- **Durable Objects (Real-time)**
+  - `HouseholdDO` WebSocket hub using Hibernation API
+  - Sender filtering on broadcast, session invalidation
+  - `broadcastToHousehold()` helper with optional sender skip
+
+- **KV-backed Infrastructure**
+  - Session cache (24h TTL) replacing Valkey
+  - Rate limiting (4 presets: MUTATION, BULK, SENSITIVE, READ)
+
+- **Clerk Authentication**
+  - `@hono/clerk-auth` middleware for API routes
+  - `@clerk/react-router` for client-side auth
+  - Auto-provisioning: first login creates household + user
+
+- **React Router v7 SSR**
+  - All routes with server-side loaders querying D1
+  - `requireSession()` / `getEnv()` loader helpers
+  - Soft auth middleware for SSR (doesn't reject unauthenticated)
+
+- **Full Component Suite**
+  - Grocery list with offline sync, optimistic UI, tag management
+  - Transaction list with infinite scroll and add/edit/delete
+  - Budget list with spending progress bars and CRUD
+  - Budget charts (pie chart by category, month-over-month bar chart)
+  - Recurring transaction rules with CRUD and toggle
+  - Asset and debt cards with add/edit/delete dialogs
+  - Calendar view with transaction and grocery events
+  - Settings page with household rename, member role manager
+  - Account restore with fresh-start option
+
+- **Offline/PWA**
+  - Dexie (IndexedDB) for grocery offline storage
+  - Chunked batch sync (max 10 mutations per request)
+  - Conflict resolution (server-wins with field-level merge)
+  - `vite-plugin-pwa` service worker (NetworkFirst API, CacheFirst static)
+
+- **Exchange Rates**
+  - 3-tier cache: Cache API → D1 → external API
+  - Historical rate lookup for backdated transactions
+
+- **Data Migration Script**
+  - `scripts/migrate-to-d1.ts`: PostgreSQL → D1 migration
+  - Resumable with checkpoint file, dry-run mode
+  - Transforms: timestamps → ms, amounts → cents, booleans → 0/1
+
+- **CI/CD Pipeline**
+  - GitHub Actions: lint, typecheck, test, deploy
+  - Preview deployments with isolated D1/KV (`--env preview`)
+  - Production deploy via `wrangler deploy`
+
+### Removed
+
+- Docker infrastructure (Dockerfile, docker-compose, Makefile)
+- Next.js App Router (`apps/web/`)
+- Hono API server (`apps/api/`)
+- PostgreSQL and all PG-specific code (triggers, RLS policies, `set_config`)
+- Valkey/Redis (`ioredis`) for sessions and pub/sub
+- Authentik OIDC (`openid-client`)
+- Web Push notifications (`web-push`)
+- Serwist service worker (`@serwist/next`)
+- Turborepo (`turbo.json`)
+- System cron scripts (`scripts/audit-retention.sh`, `scripts/backup.sh`)
+
+### Changed
+
+- Money: `numeric(precision, scale)` → `integer` (cents)
+- Timestamps: `timestamp with time zone` → `integer` (milliseconds)
+- Booleans: `boolean` → `integer({ mode: "boolean" })`
+- Dates: `date` → `text` (ISO 8601 YYYY-MM-DD)
+- JSON: `jsonb` → `text({ mode: "json" })`
+- Enums: `pgEnum` → `text({ enum: [...] })` with const arrays
+- IDs: `uuid().defaultRandom()` → `text().$defaultFn(() => crypto.randomUUID())`
+
 ## [0.2.3] - 2026-01-24
 
 ### Infrastructure

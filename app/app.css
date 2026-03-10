@@ -1,0 +1,298 @@
+@import "tailwindcss";
+
+/* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme */
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Consolas, monospace;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.5rem;
+
+  /* Light mode — warm cream + terracotta accent */
+  --color-background: hsl(36 30% 97%);
+  --color-foreground: hsl(20 20% 14%);
+  --color-card: hsl(40 40% 99%);
+  --color-card-foreground: hsl(20 20% 14%);
+  --color-popover: hsl(40 40% 99%);
+  --color-popover-foreground: hsl(20 20% 14%);
+  --color-primary: hsl(14 76% 52%);
+  --color-primary-foreground: hsl(40 40% 99%);
+  --color-secondary: hsl(36 20% 92%);
+  --color-secondary-foreground: hsl(20 20% 22%);
+  --color-muted: hsl(36 16% 93%);
+  --color-muted-foreground: hsl(20 10% 48%);
+  --color-accent: hsl(152 28% 92%);
+  --color-accent-foreground: hsl(152 40% 26%);
+  --color-destructive: hsl(0 72% 55%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(30 18% 88%);
+  --color-input: hsl(30 18% 86%);
+  --color-ring: hsl(14 76% 52%);
+
+  /* Semantic colors for finance UI */
+  --color-success: hsl(152 56% 38%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(36 96% 50%);
+  --color-warning-foreground: hsl(36 90% 12%);
+  --color-info: hsl(210 85% 52%);
+  --color-info-foreground: hsl(0 0% 100%);
+
+  /* Animation durations */
+  --animate-duration-fast: 150ms;
+  --animate-duration-normal: 300ms;
+  --animate-duration-slow: 500ms;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Subtle warm grain texture on the page background */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.3;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
+  /* Dark mode overrides — warm charcoal + brighter terracotta */
+  .dark {
+    --color-background: hsl(20 16% 8%);
+    --color-foreground: hsl(36 16% 92%);
+    --color-card: hsl(20 14% 11%);
+    --color-card-foreground: hsl(36 16% 92%);
+    --color-popover: hsl(20 14% 11%);
+    --color-popover-foreground: hsl(36 16% 92%);
+    --color-primary: hsl(14 80% 58%);
+    --color-primary-foreground: hsl(20 16% 8%);
+    --color-secondary: hsl(20 12% 16%);
+    --color-secondary-foreground: hsl(36 16% 88%);
+    --color-muted: hsl(20 12% 16%);
+    --color-muted-foreground: hsl(20 10% 52%);
+    --color-accent: hsl(20 12% 16%);
+    --color-accent-foreground: hsl(14 80% 64%);
+    --color-destructive: hsl(0 72% 51%);
+    --color-destructive-foreground: hsl(0 0% 100%);
+    --color-border: hsl(20 12% 18%);
+    --color-input: hsl(20 12% 18%);
+    --color-ring: hsl(14 80% 58%);
+
+    --color-success: hsl(152 56% 46%);
+    --color-success-foreground: hsl(20 16% 8%);
+    --color-warning: hsl(36 96% 58%);
+    --color-warning-foreground: hsl(36 90% 10%);
+    --color-info: hsl(210 85% 60%);
+    --color-info-foreground: hsl(0 0% 100%);
+  }
+}
+
+/* ---- Animations ---- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Staggered card entrance */
+.animate-stagger-in > * {
+  animation: fade-in 0.4s ease-out both;
+}
+.animate-stagger-in > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.animate-stagger-in > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.animate-stagger-in > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.animate-stagger-in > *:nth-child(4) {
+  animation-delay: 180ms;
+}
+.animate-stagger-in > *:nth-child(5) {
+  animation-delay: 240ms;
+}
+.animate-stagger-in > *:nth-child(6) {
+  animation-delay: 300ms;
+}
+.animate-stagger-in > *:nth-child(n + 7) {
+  animation-delay: 360ms;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.3s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slide-in-from-bottom 0.5s ease-out both;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-muted) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ---- Page transition ---- */
+
+.page-enter {
+  animation: fade-in 0.3s ease-out both;
+}
+
+/* ---- Selection color ---- */
+
+::selection {
+  background-color: hsl(14 76% 52% / 0.2);
+  color: inherit;
+}
+
+.dark ::selection {
+  background-color: hsl(14 80% 58% / 0.3);
+}
+
+/* ---- Scrollbar styling ---- */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* ---- Focus ring ---- */
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Enhanced card hover ---- */
+
+.card-interactive {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px hsl(20 20% 14% / 0.08),
+    0 2px 8px -2px hsl(20 20% 14% / 0.04);
+}
+
+.dark .card-interactive:hover {
+  box-shadow: 0 8px 24px -4px hsl(0 0% 0% / 0.4),
+    0 2px 8px -2px hsl(0 0% 0% / 0.2);
+}

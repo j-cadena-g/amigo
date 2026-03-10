@@ -1,32 +1,39 @@
-import { pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 import { households } from "./households";
 import { groceryItems } from "./grocery-items";
 import { users } from "./users";
 
-export const groceryTags = pgTable("grocery_tags", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
+export const groceryTags = sqliteTable("grocery_tags", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   color: text("color").notNull().default("blue"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
 });
 
-export const groceryItemTags = pgTable(
+export const groceryItemTags = sqliteTable(
   "grocery_item_tags",
   {
-    itemId: uuid("item_id")
+    itemId: text("item_id")
       .notNull()
       .references(() => groceryItems.id, { onDelete: "cascade" }),
-    tagId: uuid("tag_id")
+    tagId: text("tag_id")
       .notNull()
       .references(() => groceryTags.id, { onDelete: "cascade" }),
   },
@@ -55,13 +62,16 @@ export const groceryItemTagsRelations = relations(
 
 // Relations for grocery_items (one-to-many with grocery_item_tags, many-to-one with users)
 // Defined here to avoid circular imports between grocery-items.ts and grocery-tags.ts
-export const groceryItemsRelations = relations(groceryItems, ({ many, one }) => ({
-  groceryItemTags: many(groceryItemTags),
-  createdByUser: one(users, {
-    fields: [groceryItems.createdByUserId],
-    references: [users.id],
-  }),
-}));
+export const groceryItemsRelations = relations(
+  groceryItems,
+  ({ many, one }) => ({
+    groceryItemTags: many(groceryItemTags),
+    createdByUser: one(users, {
+      fields: [groceryItems.createdByUserId],
+      references: [users.id],
+    }),
+  })
+);
 
 export type GroceryTag = typeof groceryTags.$inferSelect;
 export type NewGroceryTag = typeof groceryTags.$inferInsert;

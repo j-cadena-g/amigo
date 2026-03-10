@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -13,7 +13,36 @@
     "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
+    "types": ["@cloudflare/workers-types/2023-07-01", "vite/client"],
+    "rootDirs": [".", ".react-router/types"],
+    "paths": {
+      "@/*": ["./*"],
+      "@amigo/db": ["./packages/db/src/index.ts"],
+      "@amigo/db/*": ["./packages/db/src/*"],
   }
+  },
+  "include": [
+    ".react-router/types/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "server/**/*.ts",
+    "worker.ts",
+    "load-context.ts",
+    "env.d.ts",
+    "vite.config.ts",
+    "react-router.config.ts",
+    "packages/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    ".wrangler",
+    "packages/db/src/queries",
+    "packages/db/src/triggers.ts",
+    "packages/db/src/setup-triggers.ts",
+    "packages/db/src/seed.ts",
+    "apps"
+  ]
 }

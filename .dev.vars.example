@@ -1,0 +1,11 @@
+# =============================================================================
+# AMIGO - Local Development Secrets
+# =============================================================================
+# Key manifest for run-vite-with-dev-vars.sh. The script reads variable names
+# from this file and pulls their values from process.env (injected by op run).
+# See wrangler.jsonc for non-secret configuration (D1, KV, DO bindings).
+# =============================================================================
+
+# Clerk authentication
+CLERK_SECRET_KEY=sk_test_...
+CLERK_PUBLISHABLE_KEY=pk_test_...

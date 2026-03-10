@@ -1,7 +1,0 @@
-# =============================================================================
-# Audit Log Retention Cron Schedule
-# =============================================================================
-# Install with: crontab -e, then add these lines (adjust path as needed)
-#
-# Weekly audit log pruning (Sunday at 5:00 AM, after backup at 3:00 AM)
-0 5 * * 0 /home/cadmin/amigo/scripts/audit-retention.sh >> /home/cadmin/amigo/backups/audit-retention.log 2>&1

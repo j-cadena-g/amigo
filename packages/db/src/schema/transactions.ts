@@ -1,54 +1,45 @@
-import {
-  date,
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
 import { budgets } from "./budgets";
-import { currencyEnum } from "./currencies";
+import { CURRENCY_CODES } from "./currencies";
 
-export const transactionTypeEnum = pgEnum("transaction_type", [
-  "income",
-  "expense",
-]);
+export const TRANSACTION_TYPES = ["income", "expense"] as const;
 
-export const transactions = pgTable("transactions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
+export const transactions = sqliteTable("transactions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   // Denormalized user info for display when user is deleted
   userDisplayName: text("user_display_name"),
   // Track original creator when data is transferred during "fresh start" restore
-  transferredFromUserId: uuid("transferred_from_user_id").references(
+  transferredFromUserId: text("transferred_from_user_id").references(
     () => users.id,
     { onDelete: "set null" }
   ),
-  budgetId: uuid("budget_id").references(() => budgets.id, {
+  budgetId: text("budget_id").references(() => budgets.id, {
     onDelete: "set null",
   }),
-  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  currency: currencyEnum("currency").notNull().default("CAD"),
+  amount: integer("amount").notNull(), // Stored as integer cents (1234 = $12.34)
+  currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
   // Exchange rate to home currency at time of creation (null if same as home currency)
-  exchangeRateToHome: numeric("exchange_rate_to_home", { precision: 18, scale: 8 }),
+  exchangeRateToHome: real("exchange_rate_to_home"),
   category: text("category").notNull(),
   description: text("description"),
-  type: transactionTypeEnum("type").notNull(),
-  date: date("date", { mode: "date" }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  type: text("type", { enum: TRANSACTION_TYPES }).notNull(),
+  date: text("date").notNull(), // ISO 8601 YYYY-MM-DD
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
 });
 
 export type Transaction = typeof transactions.$inferSelect;

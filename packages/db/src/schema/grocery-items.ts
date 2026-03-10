@@ -1,33 +1,37 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
 
-export const groceryItems = pgTable("grocery_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  householdId: uuid("household_id")
+export const groceryItems = sqliteTable("grocery_items", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
   // Denormalized user info for display when user is deleted
   createdByUserDisplayName: text("created_by_user_display_name"),
   // Track original creator when data is transferred during "fresh start" restore
-  transferredFromCreatedByUserId: uuid(
+  transferredFromCreatedByUserId: text(
     "transferred_from_created_by_user_id"
   ).references(() => users.id, { onDelete: "set null" }),
   itemName: text("item_name").notNull(),
   category: text("category"),
-  isPurchased: boolean("is_purchased").notNull().default(false),
-  purchasedAt: timestamp("purchased_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  isPurchased: integer("is_purchased", { mode: "boolean" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .default(false),
+  purchasedAt: integer("purchased_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
 });
 
 export type GroceryItem = typeof groceryItems.$inferSelect;

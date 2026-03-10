@@ -1,38 +1,33 @@
 import {
-  date,
-  numeric,
-  pgEnum,
-  pgTable,
+  integer,
   primaryKey,
-  timestamp,
-} from "drizzle-orm/pg-core";
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
-// Supported currencies
-export const currencyEnum = pgEnum("currency_code", [
-  "CAD", // Canadian Dollar (default home currency)
-  "USD", // US Dollar
-  "EUR", // Euro
-  "GBP", // British Pound
-  "MXN", // Mexican Peso
-]);
+// Supported currencies — no pgEnum in SQLite, use text with enum constraint
+export const CURRENCY_CODES = ["CAD", "USD", "EUR", "GBP", "MXN"] as const;
 
 // Historical exchange rates table
-export const exchangeRates = pgTable(
+export const exchangeRates = sqliteTable(
   "exchange_rates",
   {
-    baseCurrency: currencyEnum("base_currency").notNull(),
-    targetCurrency: currencyEnum("target_currency").notNull(),
-    date: date("date", { mode: "date" }).notNull(),
-    rate: numeric("rate", { precision: 18, scale: 8 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    baseCurrency: text("base_currency", { enum: CURRENCY_CODES }).notNull(),
+    targetCurrency: text("target_currency", { enum: CURRENCY_CODES }).notNull(),
+    date: text("date").notNull(), // ISO 8601 YYYY-MM-DD
+    rate: real("rate").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .$defaultFn(() => new Date()),
   },
   (table) => [
-    primaryKey({ columns: [table.baseCurrency, table.targetCurrency, table.date] }),
+    primaryKey({
+      columns: [table.baseCurrency, table.targetCurrency, table.date],
+    }),
   ]
 );
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type NewExchangeRate = typeof exchangeRates.$inferInsert;
-export type CurrencyCode = "CAD" | "USD" | "EUR" | "GBP" | "MXN";
+export type CurrencyCode = (typeof CURRENCY_CODES)[number];

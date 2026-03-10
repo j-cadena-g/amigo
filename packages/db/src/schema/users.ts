@@ -1,27 +1,29 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 
-export const userRoleEnum = pgEnum("user_role", ["owner", "admin", "member"]);
+export const USER_ROLES = ["owner", "admin", "member"] as const;
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const users = sqliteTable("users", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   authId: text("auth_id").notNull().unique(),
   email: text("email").notNull(),
   name: text("name"),
-  householdId: uuid("household_id")
+  householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
-  role: userRoleEnum("role").notNull().default("member"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  role: text("role", { enum: USER_ROLES }).notNull().default("member"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow()
+    .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
 });
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-export type UserRole = "owner" | "admin" | "member";
+export type UserRole = (typeof USER_ROLES)[number];

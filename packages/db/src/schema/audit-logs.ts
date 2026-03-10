@@ -1,16 +1,18 @@
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const auditLogs = pgTable("audit_logs", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   tableName: text("table_name").notNull(),
-  recordId: uuid("record_id").notNull(),
+  recordId: text("record_id").notNull(),
   operation: text("operation").notNull(), // INSERT, UPDATE, DELETE
-  oldValues: jsonb("old_values"),
-  newValues: jsonb("new_values"),
+  oldValues: text("old_values", { mode: "json" }),
+  newValues: text("new_values", { mode: "json" }),
   changedBy: text("changed_by"), // auth_id of the user
-  createdAt: timestamp("created_at", { withTimezone: true })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date()),
 });
 
 export type AuditLog = typeof auditLogs.$inferSelect;

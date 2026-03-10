@@ -2,7 +2,6 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
-import nextPlugin from "@next/eslint-plugin-next";
 import globals from "globals";
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -13,15 +12,16 @@ export default [
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
-      "**/.next/**",
+      "**/build/**",
+      "**/.wrangler/**",
+      "**/.react-router/**",
       "**/drizzle/**",
       "**/*.config.js",
       "**/*.config.ts",
-      "**/next-env.d.ts",
       "**/public/sw.js",
     ],
   },
-  // Base TypeScript config for all packages
+  // Base TypeScript config
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
@@ -37,9 +37,9 @@ export default [
       "@typescript-eslint/no-explicit-any": "error",
     },
   },
-  // React/Next.js config for web app only
+  // React config for frontend
   {
-    files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
+    files: ["app/**/*.ts", "app/**/*.tsx"],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -53,13 +53,10 @@ export default [
     plugins: {
       react,
       "react-hooks": reactHooks,
-      "@next/next": nextPlugin,
     },
     rules: {
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
     },

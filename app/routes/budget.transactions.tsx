@@ -1,0 +1,46 @@
+import type { LoaderFunctionArgs } from "react-router";
+import { useLoaderData } from "react-router";
+import { requireSession, getEnv } from "@/app/lib/session.server";
+import { getDb, transactions, scopeToHousehold, eq, and, or, isNull, sql, desc } from "@amigo/db";
+import { TransactionList } from "@/app/components/transaction-list";
+
+export async function loader({ context }: LoaderFunctionArgs) {
+  const session = requireSession(context);
+  const env = getEnv(context);
+  const db = getDb(env.DB);
+
+  const items = await db.query.transactions.findMany({
+    where: and(
+      scopeToHousehold(transactions.householdId, session.householdId),
+      isNull(transactions.deletedAt),
+      or(
+        eq(transactions.userId, session.userId),
+        sql`EXISTS (SELECT 1 FROM budgets WHERE budgets.id = ${transactions.budgetId} AND budgets.user_id IS NULL)`
+      )
+    ),
+    orderBy: [desc(transactions.date), desc(transactions.createdAt)],
+    limit: 20,
+  });
+
+  const mapped = items.map((t) => ({
+    ...t,
+    createdAt: t.createdAt instanceof Date ? t.createdAt.getTime() : Number(t.createdAt),
+  }));
+
+  return {
+    transactions: mapped,
+    userId: session.userId,
+  };
+}
+
+export default function Transactions() {
+  const { transactions: initialTransactions, userId } =
+    useLoaderData<typeof loader>();
+
+  return (
+    <TransactionList
+      initialTransactions={initialTransactions}
+      currentUserId={userId}
+    />
+  );
+}

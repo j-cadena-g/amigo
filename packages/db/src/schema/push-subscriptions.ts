@@ -1,29 +1,31 @@
-import { pgTable, text, timestamp, uuid, jsonb, index } from "drizzle-orm/pg-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users";
 
-export const pushSubscriptions = pgTable(
+export const pushSubscriptions = sqliteTable(
   "push_subscriptions",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     endpoint: text("endpoint").notNull().unique(),
-    keys: jsonb("keys")
+    keys: text("keys", { mode: "json" })
       .$type<{
         p256dh: string;
         auth: string;
       }>()
       .notNull(),
     userAgent: text("user_agent"),
-    lastPushAt: timestamp("last_push_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    lastPushAt: integer("last_push_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow()
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date()),
   },
   (table) => [index("push_subscriptions_user_id_idx").on(table.userId)]

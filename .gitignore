@@ -32,6 +32,9 @@ packages/db/drizzle/
 # Bun
 bun.lockb
 
+# npm
+package-lock.json
+
 # Logs
 *.log
 npm-debug.log*

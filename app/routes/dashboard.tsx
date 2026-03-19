@@ -405,7 +405,7 @@ export default function Dashboard() {
       {/* Stat cards — top row */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-stagger-in mb-6">
         {/* Spending */}
-        <Link to="/budget/transactions?type=expense" className="block">
+        <Link to="/budget?type=expense" className="block">
           <Card className="card-interactive overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-orange-500/10 dark:from-red-500/20 dark:to-orange-500/20 pointer-events-none" />
             <CardContent className="relative p-4 md:p-5">
@@ -426,7 +426,7 @@ export default function Dashboard() {
         </Link>
 
         {/* Income */}
-        <Link to="/budget/transactions?type=income" className="block">
+        <Link to="/budget?type=income" className="block">
           <Card className="card-interactive overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 pointer-events-none" />
             <CardContent className="relative p-4 md:p-5">
@@ -447,7 +447,7 @@ export default function Dashboard() {
         </Link>
 
         {/* Net */}
-        <Link to="/budget/transactions" className="block">
+        <Link to="/budget" className="block">
           <Card className="card-interactive overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 pointer-events-none" />
             <CardContent className="relative p-4 md:p-5">
@@ -518,7 +518,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Recent Transactions</CardTitle>
               <Link
-                to="/budget/transactions"
+                to="/budget"
                 className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
               >
                 View all

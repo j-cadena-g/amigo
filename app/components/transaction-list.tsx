@@ -202,7 +202,7 @@ export function TransactionList({
           <span className="text-sm text-muted-foreground">
             Showing: <span className="font-medium text-foreground capitalize">{typeFilter}</span>
           </span>
-          <Link to="/budget/transactions" className="text-sm font-medium text-primary hover:text-primary/80">
+          <Link to="/budget" className="text-sm font-medium text-primary hover:text-primary/80">
             Clear filter
           </Link>
         </div>

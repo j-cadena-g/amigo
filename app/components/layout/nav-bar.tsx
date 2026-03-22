@@ -42,7 +42,7 @@ export function NavBar() {
           className="group mr-8 flex items-center gap-2"
         >
           <img
-            src="/amigo.png"
+            src="/icon-1024.png"
             alt="amigo"
             className="h-8 w-8 rounded-lg shadow-sm shadow-primary/20 transition-transform group-hover:scale-105"
           />

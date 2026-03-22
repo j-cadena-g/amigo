@@ -48,7 +48,7 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "/amigo.png",
+            src: "/icon-1024.png",
             sizes: "any",
             type: "image/png",
           },

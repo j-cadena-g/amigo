@@ -31,7 +31,7 @@ export default function Index() {
         {/* Brand */}
         <div className="text-center animate-fade-in">
           <img
-            src="/amigo.png"
+            src="/icon-1024.png"
             alt="amigo"
             className="mx-auto mb-6 h-16 w-16 rounded-2xl shadow-lg shadow-primary/20"
           />

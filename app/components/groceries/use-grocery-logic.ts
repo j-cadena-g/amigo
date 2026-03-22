@@ -1,80 +1,15 @@
-import { useOptimistic, useTransition, useCallback, useState, useRef, useEffect } from "react";
+import { useTransition, useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { useRevalidator } from "react-router";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags, OptimisticAction } from "./types";
+import {
+  applyOptimisticMutations,
+  clearSettledMutations,
+  createOptimisticMutation,
+  markMutationSettled,
+  type OptimisticMutation,
+} from "./optimistic-state";
 import { useWebSocket } from "@/app/lib/websocket";
-
-function applyOptimisticAction(
-  items: GroceryItemWithTags[],
-  action: OptimisticAction
-): GroceryItemWithTags[] {
-  switch (action.type) {
-    case "add":
-      return [action.item, ...items];
-
-    case "toggle":
-      return items.map((item) =>
-        item.id === action.id
-          ? {
-              ...item,
-              isPurchased: !item.isPurchased,
-              purchasedAt: item.isPurchased ? null : new Date(),
-            }
-          : item
-      );
-
-    case "toggle_with_date":
-      return items.map((item) =>
-        item.id === action.id
-          ? {
-              ...item,
-              isPurchased: !item.isPurchased,
-              purchasedAt: item.isPurchased ? null : action.purchasedAt,
-            }
-          : item
-      );
-
-    case "delete":
-      return items.filter((item) => item.id !== action.id);
-
-    case "update_tags":
-      return items.map((item) =>
-        item.id === action.id
-          ? {
-              ...item,
-              groceryItemTags: action.tagIds.flatMap((tagId) => {
-                const existing = item.groceryItemTags.find(
-                  (git) => git.groceryTag.id === tagId
-                );
-                if (existing) return [existing];
-                const tag = action.allTags.find((t) => t.id === tagId);
-                if (!tag) return [];
-                return [{
-                  itemId: item.id,
-                  tagId,
-                  groceryTag: tag,
-                } as GroceryItemWithTags["groceryItemTags"][number]];
-              }),
-            }
-          : item
-      );
-
-    case "edit_name":
-      return items.map((item) =>
-        item.id === action.id ? { ...item, itemName: action.name } : item
-      );
-
-    case "update_purchase_date":
-      return items.map((item) =>
-        item.id === action.id
-          ? { ...item, purchasedAt: action.purchasedAt }
-          : item
-      );
-
-    default:
-      return items;
-  }
-}
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
@@ -84,12 +19,21 @@ interface UseGroceryLogicOptions {
 export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
   const revalidator = useRevalidator();
   const [isPending, startTransition] = useTransition();
-  const [optimisticItems, addOptimisticAction] = useOptimistic(
-    items,
-    applyOptimisticAction
+  const [optimisticMutations, setOptimisticMutations] = useState<
+    OptimisticMutation[]
+  >([]);
+  const optimisticItems = useMemo(
+    () => applyOptimisticMutations(items, optimisticMutations),
+    [items, optimisticMutations]
   );
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [datePickerItemId, setDatePickerItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOptimisticMutations((currentMutations) =>
+      clearSettledMutations(currentMutations)
+    );
+  }, [items]);
 
   // Track isPending in a ref so the WebSocket handler always reads the
   // current value — the onMessage closure is captured at connection time
@@ -126,7 +70,11 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
   // Runs a fetch mutation with error handling, always revalidating afterward
   // so optimistic state reconciles even on network failure.
   const runMutation = useCallback(
-    async (label: string, request: () => Promise<Response>) => {
+    async (
+      label: string,
+      request: () => Promise<Response>,
+      mutationId?: string
+    ) => {
       try {
         const res = await request();
         if (!res.ok) {
@@ -135,11 +83,25 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
       } catch (error) {
         console.error(`${label} failed: network error`, error);
       } finally {
+        if (mutationId) {
+          setOptimisticMutations((currentMutations) =>
+            markMutationSettled(currentMutations, mutationId)
+          );
+        }
         revalidator.revalidate();
       }
     },
     [revalidator]
   );
+
+  const queueOptimisticAction = useCallback((action: OptimisticAction) => {
+    const mutation = createOptimisticMutation(action);
+    setOptimisticMutations((currentMutations) => [
+      ...currentMutations,
+      mutation,
+    ]);
+    return mutation.id;
+  }, []);
 
   // --- Actions ---
 
@@ -172,33 +134,35 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
       };
 
       startTransition(async () => {
-        addOptimisticAction({ type: "add", item: tempItem });
+        const mutationId = queueOptimisticAction({ type: "add", item: tempItem });
         await runMutation("Add grocery item", () =>
           fetch("/api/groceries", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, tagIds }),
-          })
+          }),
+          mutationId
         );
       });
     },
-    [allTags, addOptimisticAction, runMutation]
+    [allTags, queueOptimisticAction, runMutation]
   );
 
   const toggleItem = useCallback(
     (id: string) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "toggle", id });
+        const mutationId = queueOptimisticAction({ type: "toggle", id });
         await runMutation("Toggle grocery item", () =>
           fetch(`/api/groceries/${id}/toggle`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({}),
-          })
+          }),
+          mutationId
         );
       });
     },
-    [addOptimisticAction, runMutation]
+    [queueOptimisticAction, runMutation]
   );
 
   const toggleItemWithDate = useCallback(
@@ -211,79 +175,98 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
   const confirmToggleWithDate = useCallback(
     (id: string, purchasedAt: Date) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "toggle_with_date", id, purchasedAt });
+        const mutationId = queueOptimisticAction({
+          type: "toggle_with_date",
+          id,
+          purchasedAt,
+        });
         await runMutation("Toggle grocery item with date", () =>
           fetch(`/api/groceries/${id}/toggle`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
-          })
+          }),
+          mutationId
         );
       });
       setDatePickerItemId(null);
     },
-    [addOptimisticAction, runMutation]
+    [queueOptimisticAction, runMutation]
   );
 
   const confirmUpdatePurchaseDate = useCallback(
     (id: string, purchasedAt: Date) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "update_purchase_date", id, purchasedAt });
+        const mutationId = queueOptimisticAction({
+          type: "update_purchase_date",
+          id,
+          purchasedAt,
+        });
         await runMutation("Update purchase date", () =>
           fetch(`/api/groceries/${id}/purchase-date`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
-          })
+          }),
+          mutationId
         );
       });
       setDatePickerItemId(null);
     },
-    [addOptimisticAction, runMutation]
+    [queueOptimisticAction, runMutation]
   );
 
   const deleteItem = useCallback(
     (id: string) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "delete", id });
-        await runMutation("Delete grocery item", () =>
-          fetch(`/api/groceries/${id}`, { method: "DELETE" })
+        const mutationId = queueOptimisticAction({ type: "delete", id });
+        await runMutation(
+          "Delete grocery item",
+          () => fetch(`/api/groceries/${id}`, { method: "DELETE" }),
+          mutationId
         );
       });
     },
-    [addOptimisticAction, runMutation]
+    [queueOptimisticAction, runMutation]
   );
 
   const updateTags = useCallback(
     (id: string, tagIds: string[]) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "update_tags", id, tagIds, allTags });
+        const mutationId = queueOptimisticAction({
+          type: "update_tags",
+          id,
+          tagIds,
+          allTags,
+        });
         await runMutation("Update grocery item tags", () =>
           fetch(`/api/groceries/${id}/tags`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tagIds }),
-          })
+          }),
+          mutationId
         );
       });
     },
-    [allTags, addOptimisticAction, runMutation]
+    [allTags, queueOptimisticAction, runMutation]
   );
 
   const editName = useCallback(
     (id: string, name: string) => {
       startTransition(async () => {
-        addOptimisticAction({ type: "edit_name", id, name });
+        const mutationId = queueOptimisticAction({ type: "edit_name", id, name });
         await runMutation("Edit grocery item name", () =>
           fetch(`/api/groceries/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name }),
-          })
+          }),
+          mutationId
         );
       });
     },
-    [addOptimisticAction, runMutation]
+    [queueOptimisticAction, runMutation]
   );
 
   const createTag = useCallback(

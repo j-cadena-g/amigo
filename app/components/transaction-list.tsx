@@ -61,6 +61,7 @@ export function TransactionList({
     budgetId: null as string | null,
     currency: "CAD" as CurrencyCode,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
     amount: "",
@@ -113,7 +114,9 @@ export function TransactionList({
 
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
+    setFormError(null);
     try {
       const res = await fetch("/api/transactions", {
         method: "POST",
@@ -138,8 +141,16 @@ export function TransactionList({
           currency: "CAD",
         });
         setShowAddForm(false);
+        setFormError(null);
         revalidator.revalidate();
+      } else {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        console.error("Failed to add transaction:", res.status, err);
+        setFormError((err as { error?: string }).error ?? "Something went wrong. Please try again.");
       }
+    } catch (err) {
+      console.error("Transaction request failed:", err);
+      setFormError("Network error — could not reach the server.");
     } finally {
       setIsSubmitting(false);
     }
@@ -310,10 +321,14 @@ export function TransactionList({
             </div>
           )}
 
+          {formError && (
+            <p className="text-sm text-destructive">{formError}</p>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setShowAddForm(false)}
+              onClick={() => { setShowAddForm(false); setFormError(null); }}
               className="flex-1 rounded-md border border-input px-3 py-2 text-muted-foreground hover:bg-accent"
             >
               Cancel

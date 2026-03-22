@@ -195,7 +195,7 @@ export function BudgetCharts({
                 <BarChart data={monthlyComparison} layout="vertical">
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
+                    stroke="var(--color-border)"
                     opacity={0.5}
                   />
                   <XAxis
@@ -203,7 +203,7 @@ export function BudgetCharts({
                     tickFormatter={(v) =>
                       formatCents(v, currency, { compact: true })
                     }
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -211,12 +211,12 @@ export function BudgetCharts({
                     type="category"
                     dataKey="category"
                     width={70}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip
-                    cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
+                    cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
                     content={
                       <ComparisonTooltip
                         currency={currency}
@@ -246,7 +246,7 @@ export function BudgetCharts({
                 <BarChart data={categoryData} layout="vertical">
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
+                    stroke="var(--color-border)"
                     opacity={0.5}
                   />
                   <XAxis
@@ -254,7 +254,7 @@ export function BudgetCharts({
                     tickFormatter={(v) =>
                       formatCents(v, currency, { compact: true })
                     }
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -262,12 +262,12 @@ export function BudgetCharts({
                     type="category"
                     dataKey="category"
                     width={70}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip
-                    cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
+                    cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
                     content={<CustomTooltip currency={currency} />}
                   />
                   <Bar

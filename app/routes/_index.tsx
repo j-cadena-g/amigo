@@ -30,9 +30,11 @@ export default function Index() {
       <div className="relative z-10 flex flex-col items-center gap-8 px-4">
         {/* Brand */}
         <div className="text-center animate-fade-in">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20">
-            <span className="text-4xl leading-none">🥑</span>
-          </div>
+          <img
+            src="/amigo.png"
+            alt="amigo"
+            className="mx-auto mb-6 h-16 w-16 rounded-2xl shadow-lg shadow-primary/20"
+          />
           <h1 className="font-display text-5xl font-bold tracking-tight md:text-6xl">
             amigo
           </h1>

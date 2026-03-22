@@ -16,32 +16,32 @@
   --radius-xl: 1.125rem;
   --radius-2xl: 1.5rem;
 
-  /* Light mode — warm cream + terracotta accent */
-  --color-background: hsl(36 30% 97%);
-  --color-foreground: hsl(20 20% 14%);
-  --color-card: hsl(40 40% 99%);
-  --color-card-foreground: hsl(20 20% 14%);
-  --color-popover: hsl(40 40% 99%);
-  --color-popover-foreground: hsl(20 20% 14%);
-  --color-primary: hsl(14 76% 52%);
-  --color-primary-foreground: hsl(40 40% 99%);
-  --color-secondary: hsl(36 20% 92%);
-  --color-secondary-foreground: hsl(20 20% 22%);
-  --color-muted: hsl(36 16% 93%);
-  --color-muted-foreground: hsl(20 10% 48%);
-  --color-accent: hsl(152 28% 92%);
-  --color-accent-foreground: hsl(152 40% 26%);
+  /* Light mode — cool blue + teal accent */
+  --color-background: hsl(216 30% 97%);
+  --color-foreground: hsl(224 30% 16%);
+  --color-card: hsl(216 30% 99%);
+  --color-card-foreground: hsl(224 30% 16%);
+  --color-popover: hsl(216 30% 99%);
+  --color-popover-foreground: hsl(224 30% 16%);
+  --color-primary: hsl(215 65% 53%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(216 20% 93%);
+  --color-secondary-foreground: hsl(224 25% 22%);
+  --color-muted: hsl(216 16% 93%);
+  --color-muted-foreground: hsl(220 10% 48%);
+  --color-accent: hsl(174 28% 92%);
+  --color-accent-foreground: hsl(174 40% 26%);
   --color-destructive: hsl(0 72% 55%);
   --color-destructive-foreground: hsl(0 0% 100%);
-  --color-border: hsl(30 18% 88%);
-  --color-input: hsl(30 18% 86%);
-  --color-ring: hsl(14 76% 52%);
+  --color-border: hsl(216 16% 88%);
+  --color-input: hsl(216 16% 86%);
+  --color-ring: hsl(215 65% 53%);
 
   /* Semantic colors for finance UI */
-  --color-success: hsl(152 56% 38%);
+  --color-success: hsl(174 50% 38%);
   --color-success-foreground: hsl(0 0% 100%);
-  --color-warning: hsl(36 96% 50%);
-  --color-warning-foreground: hsl(36 90% 12%);
+  --color-warning: hsl(37 91% 55%);
+  --color-warning-foreground: hsl(37 90% 12%);
   --color-info: hsl(210 85% 52%);
   --color-info-foreground: hsl(0 0% 100%);
 
@@ -87,32 +87,32 @@
     background-size: 256px 256px;
   }
 
-  /* Dark mode overrides — warm charcoal + brighter terracotta */
+  /* Dark mode overrides — cool charcoal + brighter blue */
   .dark {
-    --color-background: hsl(20 16% 8%);
-    --color-foreground: hsl(36 16% 92%);
-    --color-card: hsl(20 14% 11%);
-    --color-card-foreground: hsl(36 16% 92%);
-    --color-popover: hsl(20 14% 11%);
-    --color-popover-foreground: hsl(36 16% 92%);
-    --color-primary: hsl(14 80% 58%);
-    --color-primary-foreground: hsl(20 16% 8%);
-    --color-secondary: hsl(20 12% 16%);
-    --color-secondary-foreground: hsl(36 16% 88%);
-    --color-muted: hsl(20 12% 16%);
-    --color-muted-foreground: hsl(20 10% 52%);
-    --color-accent: hsl(20 12% 16%);
-    --color-accent-foreground: hsl(14 80% 64%);
+    --color-background: hsl(220 20% 8%);
+    --color-foreground: hsl(216 16% 92%);
+    --color-card: hsl(220 18% 11%);
+    --color-card-foreground: hsl(216 16% 92%);
+    --color-popover: hsl(220 18% 11%);
+    --color-popover-foreground: hsl(216 16% 92%);
+    --color-primary: hsl(215 70% 60%);
+    --color-primary-foreground: hsl(220 20% 8%);
+    --color-secondary: hsl(220 14% 16%);
+    --color-secondary-foreground: hsl(216 16% 88%);
+    --color-muted: hsl(220 14% 16%);
+    --color-muted-foreground: hsl(220 10% 52%);
+    --color-accent: hsl(220 14% 16%);
+    --color-accent-foreground: hsl(174 50% 55%);
     --color-destructive: hsl(0 72% 51%);
     --color-destructive-foreground: hsl(0 0% 100%);
-    --color-border: hsl(20 12% 18%);
-    --color-input: hsl(20 12% 18%);
-    --color-ring: hsl(14 80% 58%);
+    --color-border: hsl(220 14% 18%);
+    --color-input: hsl(220 14% 18%);
+    --color-ring: hsl(215 70% 60%);
 
-    --color-success: hsl(152 56% 46%);
-    --color-success-foreground: hsl(20 16% 8%);
-    --color-warning: hsl(36 96% 58%);
-    --color-warning-foreground: hsl(36 90% 10%);
+    --color-success: hsl(174 50% 46%);
+    --color-success-foreground: hsl(220 20% 8%);
+    --color-warning: hsl(37 91% 60%);
+    --color-warning-foreground: hsl(37 90% 10%);
     --color-info: hsl(210 85% 60%);
     --color-info-foreground: hsl(0 0% 100%);
   }
@@ -244,12 +244,12 @@
 /* ---- Selection color ---- */
 
 ::selection {
-  background-color: hsl(14 76% 52% / 0.2);
+  background-color: hsl(215 65% 53% / 0.2);
   color: inherit;
 }
 
 .dark ::selection {
-  background-color: hsl(14 80% 58% / 0.3);
+  background-color: hsl(215 70% 60% / 0.3);
 }
 
 /* ---- Scrollbar styling ---- */
@@ -288,8 +288,8 @@
 
 .card-interactive:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px -4px hsl(20 20% 14% / 0.08),
-    0 2px 8px -2px hsl(20 20% 14% / 0.04);
+  box-shadow: 0 8px 24px -4px hsl(224 30% 16% / 0.08),
+    0 2px 8px -2px hsl(224 30% 16% / 0.04);
 }
 
 .dark .card-interactive:hover {

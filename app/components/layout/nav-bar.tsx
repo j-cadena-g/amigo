@@ -41,9 +41,11 @@ export function NavBar() {
           to="/dashboard"
           className="group mr-8 flex items-center gap-2"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/20 transition-transform group-hover:scale-105">
-            <span className="text-lg leading-none">🥑</span>
-          </div>
+          <img
+            src="/amigo.png"
+            alt="amigo"
+            className="h-8 w-8 rounded-lg shadow-sm shadow-primary/20 transition-transform group-hover:scale-105"
+          />
           <span className="font-display font-bold text-xl tracking-tight">
             amigo
           </span>

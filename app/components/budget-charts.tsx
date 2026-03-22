@@ -34,11 +34,11 @@ interface BudgetChartsProps {
   currency?: CurrencyCode;
 }
 
-// Warm palette that complements the terracotta theme
+// Palette that complements the blue/teal theme
 const CHART_COLORS = [
-  "hsl(14, 76%, 52%)",   // terracotta (primary)
-  "hsl(152, 56%, 38%)",  // sage green
-  "hsl(36, 96%, 50%)",   // amber
+  "hsl(215, 65%, 53%)",  // blue (primary)
+  "hsl(174, 50%, 38%)",  // teal green
+  "hsl(37, 91%, 55%)",   // amber
   "hsl(210, 85%, 52%)",  // blue
   "hsl(280, 60%, 55%)",  // violet
   "hsl(180, 50%, 42%)",  // teal
@@ -228,13 +228,13 @@ export function BudgetCharts({
                   <Bar
                     dataKey="thisMonth"
                     name={thisMonthName}
-                    fill="hsl(14, 76%, 52%)"
+                    fill="hsl(215, 65%, 53%)"
                     radius={[0, 4, 4, 0]}
                   />
                   <Bar
                     dataKey="lastMonth"
                     name={lastMonthName}
-                    fill="hsl(152, 56%, 38%)"
+                    fill="hsl(174, 50%, 38%)"
                     radius={[0, 4, 4, 0]}
                     opacity={0.6}
                   />
@@ -272,7 +272,7 @@ export function BudgetCharts({
                   />
                   <Bar
                     dataKey="amount"
-                    fill="hsl(14, 76%, 52%)"
+                    fill="hsl(215, 65%, 53%)"
                     radius={[0, 4, 4, 0]}
                   />
                 </BarChart>
@@ -285,7 +285,7 @@ export function BudgetCharts({
               <div className="flex items-center gap-1.5">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: "hsl(14, 76%, 52%)" }}
+                  style={{ backgroundColor: "hsl(215, 65%, 53%)" }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {thisMonthName}
@@ -294,7 +294,7 @@ export function BudgetCharts({
               <div className="flex items-center gap-1.5">
                 <span
                   className="h-2.5 w-2.5 rounded-full opacity-60"
-                  style={{ backgroundColor: "hsl(152, 56%, 38%)" }}
+                  style={{ backgroundColor: "hsl(174, 50%, 38%)" }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {lastMonthName}

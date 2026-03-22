@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags } from "./types";
 import { TagBadge } from "./tag-badge";
@@ -35,6 +35,16 @@ export function GroceryItem({
   const inputRef = useRef<HTMLInputElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
+
+  // Clean up long-press timer if component unmounts mid-press
+  // (e.g. item deleted by another user via WebSocket)
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   const selectedTagIds = item.groceryItemTags.map((git) => git.groceryTag.id);
 

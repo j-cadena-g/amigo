@@ -69,7 +69,7 @@ export function HistorySection({
       {isExpanded && (
         <div className="mt-2 space-y-4">
           {groups.map((group) => (
-            <div key={group.label}>
+            <div key={group.sortKey}>
               <h4 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </h4>

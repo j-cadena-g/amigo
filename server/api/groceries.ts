@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { HonoEnv } from "../env";
-import { getDb, groceryItems, groceryItemTags, scopeToHousehold, eq, and, isNull, isNotNull, lt } from "@amigo/db";
+import { getDb, groceryItems, groceryItemTags, groceryTags, scopeToHousehold, eq, and, inArray, isNull, isNotNull, lt } from "@amigo/db";
 import { enforceRateLimit, checkRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError, logServerError } from "../lib/errors";
@@ -85,6 +85,17 @@ groceriesRoute.post("/", async (c) => {
   }
 
   if (validated.tagIds && validated.tagIds.length > 0) {
+    // Verify all tags belong to this household
+    const validTags = await db.query.groceryTags.findMany({
+      where: and(
+        inArray(groceryTags.id, validated.tagIds),
+        scopeToHousehold(groceryTags.householdId, session.householdId)
+      ),
+    });
+    if (validTags.length !== validated.tagIds.length) {
+      throw new ActionError("One or more tag IDs are invalid", "VALIDATION_ERROR");
+    }
+
     await db.insert(groceryItemTags).values(
       validated.tagIds.map((tagId) => ({
         itemId: item.id,
@@ -209,6 +220,19 @@ groceriesRoute.put("/:id/tags", async (c) => {
 
   if (!existing) {
     throw new ActionError("Item not found", "NOT_FOUND");
+  }
+
+  // Verify all tags belong to this household
+  if (validated.tagIds.length > 0) {
+    const validTags = await db.query.groceryTags.findMany({
+      where: and(
+        inArray(groceryTags.id, validated.tagIds),
+        scopeToHousehold(groceryTags.householdId, session.householdId)
+      ),
+    });
+    if (validTags.length !== validated.tagIds.length) {
+      throw new ActionError("One or more tag IDs are invalid", "VALIDATION_ERROR");
+    }
   }
 
   await db.batch([

@@ -1,4 +1,4 @@
-import { useOptimistic, useTransition, useCallback, useState } from "react";
+import { useOptimistic, useTransition, useCallback, useState, useRef, useEffect } from "react";
 import { useRevalidator } from "react-router";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags, OptimisticAction } from "./types";
@@ -91,7 +91,18 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [datePickerItemId, setDatePickerItemId] = useState<string | null>(null);
 
-  // WebSocket for real-time updates
+  // Track isPending in a ref so the WebSocket handler always reads the
+  // current value — the onMessage closure is captured at connection time
+  // by useWebSocket's connectRef, so a plain closure would go stale.
+  const isPendingRef = useRef(false);
+  useEffect(() => {
+    isPendingRef.current = isPending;
+  }, [isPending]);
+
+  // WebSocket for real-time updates from other household members.
+  // Skip revalidation while a transition is pending — the transition
+  // already revalidates on completion, so an extra revalidation from
+  // our own broadcast would race and briefly flash stale data.
   const onMessage = useCallback(
     (data: unknown) => {
       if (
@@ -100,7 +111,9 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
         "type" in data &&
         (data as { type: string }).type === "GROCERY_UPDATE"
       ) {
-        revalidator.revalidate();
+        if (!isPendingRef.current) {
+          revalidator.revalidate();
+        }
       }
     },
     [revalidator]
@@ -140,11 +153,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
 
       startTransition(async () => {
         addOptimisticAction({ type: "add", item: tempItem });
-        await fetch("/api/groceries", {
+        const res = await fetch("/api/groceries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, tagIds }),
         });
+        if (!res.ok) {
+          console.error(`Failed to add grocery item: ${res.status}`);
+        }
         revalidator.revalidate();
       });
     },
@@ -155,11 +171,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string) => {
       startTransition(async () => {
         addOptimisticAction({ type: "toggle", id });
-        await fetch(`/api/groceries/${id}/toggle`, {
+        const res = await fetch(`/api/groceries/${id}/toggle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
+        if (!res.ok) {
+          console.error(`Failed to toggle grocery item: ${res.status}`);
+        }
         revalidator.revalidate();
       });
     },
@@ -177,11 +196,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string, purchasedAt: Date) => {
       startTransition(async () => {
         addOptimisticAction({ type: "toggle_with_date", id, purchasedAt });
-        await fetch(`/api/groceries/${id}/toggle`, {
+        const res = await fetch(`/api/groceries/${id}/toggle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
         });
+        if (!res.ok) {
+          console.error(`Failed to toggle grocery item with date: ${res.status}`);
+        }
         revalidator.revalidate();
       });
       setDatePickerItemId(null);
@@ -193,11 +215,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string, purchasedAt: Date) => {
       startTransition(async () => {
         addOptimisticAction({ type: "update_purchase_date", id, purchasedAt });
-        await fetch(`/api/groceries/${id}/purchase-date`, {
+        const res = await fetch(`/api/groceries/${id}/purchase-date`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
         });
+        if (!res.ok) {
+          console.error(`Failed to update purchase date: ${res.status}`);
+        }
         revalidator.revalidate();
       });
       setDatePickerItemId(null);
@@ -209,7 +234,10 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string) => {
       startTransition(async () => {
         addOptimisticAction({ type: "delete", id });
-        await fetch(`/api/groceries/${id}`, { method: "DELETE" });
+        const res = await fetch(`/api/groceries/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          console.error(`Failed to delete grocery item: ${res.status}`);
+        }
         revalidator.revalidate();
       });
     },
@@ -220,11 +248,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string, tagIds: string[]) => {
       startTransition(async () => {
         addOptimisticAction({ type: "update_tags", id, tagIds, allTags });
-        await fetch(`/api/groceries/${id}/tags`, {
+        const res = await fetch(`/api/groceries/${id}/tags`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tagIds }),
         });
+        if (!res.ok) {
+          console.error(`Failed to update grocery item tags: ${res.status}`);
+        }
         revalidator.revalidate();
       });
     },
@@ -235,11 +266,14 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     (id: string, name: string) => {
       startTransition(async () => {
         addOptimisticAction({ type: "edit_name", id, name });
-        await fetch(`/api/groceries/${id}`, {
+        const res = await fetch(`/api/groceries/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
         });
+        if (!res.ok) {
+          console.error(`Failed to edit grocery item name: ${res.status}`);
+        }
         revalidator.revalidate();
       });
     },

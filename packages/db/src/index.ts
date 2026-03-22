@@ -32,6 +32,7 @@ export {
   gte,
   lt,
   lte,
+  inArray,
   isNull,
   isNotNull,
   and,

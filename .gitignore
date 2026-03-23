@@ -21,6 +21,8 @@ build/
 .vscode/
 *.swp
 *.swo
+.playwright-cli/
+.claude/
 
 # OS
 .DS_Store

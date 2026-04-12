@@ -5,7 +5,7 @@ import { getDb, groceryItems, groceryItemTags, groceryTags, scopeToHousehold, eq
 import { enforceRateLimit, checkRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError, logServerError } from "../lib/errors";
-import { withAudit } from "../lib/audit";
+import { insertManyAuditLogs, withAudit } from "../lib/audit";
 
 const DEFAULT_GROCERY_CATEGORY = "General";
 
@@ -491,22 +491,19 @@ groceriesRoute.post("/clear-old", async (c) => {
     )
     .returning();
 
-  await Promise.allSettled(
-    deletedRows.map((row) =>
-      withAudit(
-        db,
-        {
-          householdId: session.householdId,
-          tableName: "grocery_items",
-          recordId: row.id,
-          operation: "DELETE",
-          oldValues: row,
-          changedBy: session.userId,
-        },
-        async () => row.id
-      )
-    )
-  );
+  if (deletedRows.length > 0) {
+    await insertManyAuditLogs(
+      db,
+      deletedRows.map((row) => ({
+        householdId: session.householdId,
+        tableName: "grocery_items",
+        recordId: row.id,
+        operation: "DELETE",
+        oldValues: row,
+        changedBy: session.userId,
+      }))
+    );
+  }
 
   return c.json({ deleted: deletedRows.length });
 });

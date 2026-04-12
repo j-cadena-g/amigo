@@ -10,7 +10,99 @@ vi.mock("@amigo/db", () => ({
   and: (...args: unknown[]) => ({ type: "and", args }),
 }));
 
-import { withAudit } from "./audit";
+import { insertManyAuditLogs, withAudit } from "./audit";
+
+describe("insertManyAuditLogs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("no-ops on an empty row list", async () => {
+    const db = { insert: vi.fn() };
+    await insertManyAuditLogs(db as never, []);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("inserts all rows in a single batch", async () => {
+    mocks.insertValues.mockResolvedValueOnce(undefined);
+    const db = {
+      insert: vi.fn(() => ({
+        values: mocks.insertValues,
+      })),
+    };
+
+    await insertManyAuditLogs(db as never, [
+      {
+        householdId: "h1",
+        tableName: "grocery_items",
+        recordId: "a",
+        operation: "DELETE",
+        oldValues: { id: "a" },
+        changedBy: "u1",
+      },
+      {
+        householdId: "h1",
+        tableName: "grocery_items",
+        recordId: "b",
+        operation: "DELETE",
+        oldValues: { id: "b" },
+        changedBy: "u1",
+      },
+    ]);
+
+    expect(mocks.insertValues).toHaveBeenCalledWith([
+      {
+        householdId: "h1",
+        tableName: "grocery_items",
+        recordId: "a",
+        operation: "DELETE",
+        oldValues: JSON.stringify({ id: "a" }),
+        newValues: null,
+        changedBy: "u1",
+      },
+      {
+        householdId: "h1",
+        tableName: "grocery_items",
+        recordId: "b",
+        operation: "DELETE",
+        oldValues: JSON.stringify({ id: "b" }),
+        newValues: null,
+        changedBy: "u1",
+      },
+    ]);
+  });
+
+  it("logs and swallows batch insert failures", async () => {
+    const auditError = new Error("D1 unavailable");
+    mocks.insertValues.mockRejectedValueOnce(auditError);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const db = {
+      insert: vi.fn(() => ({
+        values: mocks.insertValues,
+      })),
+    };
+
+    await insertManyAuditLogs(db as never, [
+      {
+        householdId: "h1",
+        tableName: "grocery_items",
+        recordId: "a",
+        operation: "DELETE",
+        changedBy: "u1",
+      },
+    ]);
+
+    expect(consoleError).toHaveBeenCalledWith("Batch audit log write failed", {
+      error: auditError,
+      count: 1,
+      householdId: "h1",
+      tableName: "grocery_items",
+      operation: "DELETE",
+      changedBy: "u1",
+    });
+    consoleError.mockRestore();
+  });
+});
 
 describe("withAudit", () => {
   beforeEach(() => {

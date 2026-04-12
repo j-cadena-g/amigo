@@ -16,6 +16,47 @@ export function buildAuditHistoryFilter(
   );
 }
 
+/**
+ * Inserts many audit rows in one statement (e.g. after a bulk delete).
+ * Failures are logged and swallowed so the committed mutation is not rolled back.
+ */
+export async function insertManyAuditLogs(
+  db: DrizzleD1,
+  rows: Array<{
+    householdId: string;
+    tableName: string;
+    recordId: string;
+    operation: "INSERT" | "UPDATE" | "DELETE";
+    oldValues?: unknown;
+    newValues?: unknown;
+    changedBy: string;
+  }>
+): Promise<void> {
+  if (rows.length === 0) return;
+  try {
+    await db.insert(auditLogs).values(
+      rows.map((row) => ({
+        householdId: row.householdId,
+        tableName: row.tableName,
+        recordId: row.recordId,
+        operation: row.operation,
+        oldValues: row.oldValues != null ? JSON.stringify(row.oldValues) : null,
+        newValues: row.newValues != null ? JSON.stringify(row.newValues) : null,
+        changedBy: row.changedBy,
+      }))
+    );
+  } catch (error) {
+    console.error("Batch audit log write failed", {
+      error,
+      count: rows.length,
+      householdId: rows[0]?.householdId,
+      tableName: rows[0]?.tableName,
+      operation: rows[0]?.operation,
+      changedBy: rows[0]?.changedBy,
+    });
+  }
+}
+
 type AuditSnapshot = string | number | boolean | null | Record<string, unknown> | unknown[];
 type AuditValue<T> = AuditSnapshot | ((result: T) => AuditSnapshot);
 

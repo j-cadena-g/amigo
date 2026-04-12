@@ -20,12 +20,25 @@ function clampInt(
 }
 
 const transactionsTypeSchema = z.enum(["income", "expense"]);
+type TransactionsListType = z.infer<typeof transactionsTypeSchema>;
 
 export function parseTransactionsListQuery(query: {
   page?: string;
   limit?: string;
   type?: string;
-}) {
+}): {
+  page: number;
+  limit: number;
+  type?: TransactionsListType;
+} {
+  let type: TransactionsListType | undefined;
+  if (query.type) {
+    const parsed = transactionsTypeSchema.safeParse(query.type);
+    if (parsed.success) {
+      type = parsed.data;
+    }
+  }
+
   return {
     page: clampInt(
       query.page,
@@ -39,14 +52,7 @@ export function parseTransactionsListQuery(query: {
       1,
       MAX_TRANSACTIONS_LIMIT
     ),
-    type:
-      query.type && transactionsTypeSchema.safeParse(query.type).success
-        ? query.type
-        : undefined,
-  } as {
-    page: number;
-    limit: number;
-    type?: z.infer<typeof transactionsTypeSchema>;
+    type,
   };
 }
 

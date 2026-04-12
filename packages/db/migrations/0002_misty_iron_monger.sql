@@ -1,0 +1,1 @@
+ALTER TABLE `audit_logs` ADD `household_id` text NOT NULL;

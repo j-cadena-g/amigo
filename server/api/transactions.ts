@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { HonoEnv } from "../env";
 import { getDb, transactions, budgets, households, scopeToHousehold, eq, and, or, isNull, sql } from "@amigo/db";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import type { CurrencyCode } from "@amigo/db";
+import { parseTransactionsListQuery } from "../lib/request-validation";
+import { withAudit } from "../lib/audit";
 
 const currencyEnum = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]);
 
@@ -43,11 +45,19 @@ async function getHomeCurrency(db: ReturnType<typeof getDb>, householdId: string
 // List transactions (paginated)
 transactionsRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:transactions:list`,
+    ROUTE_RATE_LIMITS.transactions.list
+  );
+
   const db = getDb(c.env.DB);
-  const page = parseInt(c.req.query("page") ?? "1");
-  const limit = parseInt(c.req.query("limit") ?? "20");
+  const { page, limit, type } = parseTransactionsListQuery({
+    page: c.req.query("page"),
+    limit: c.req.query("limit"),
+    type: c.req.query("type"),
+  });
   const offset = (page - 1) * limit;
-  const typeFilter = c.req.query("type");
 
   const conditions = [
     scopeToHousehold(transactions.householdId, session.householdId),
@@ -58,8 +68,8 @@ transactionsRoute.get("/", async (c) => {
     ),
   ];
 
-  if (typeFilter === "income" || typeFilter === "expense") {
-    conditions.push(eq(transactions.type, typeFilter));
+  if (type) {
+    conditions.push(eq(transactions.type, type));
   }
 
   const items = await db.query.transactions.findMany({
@@ -81,7 +91,11 @@ transactionsRoute.get("/", async (c) => {
 // Add transaction
 transactionsRoute.post("/", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:transactions:add`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:transactions:add`,
+    ROUTE_RATE_LIMITS.transactions.create
+  );
 
   const body = await c.req.json();
   const validated = addTransactionSchema.parse(body);
@@ -90,23 +104,37 @@ transactionsRoute.post("/", async (c) => {
   const currency = validated.currency ?? "CAD";
   const homeCurrency = await getHomeCurrency(db, session.householdId);
   const exchangeRateToHome = await getExchangeRateForRecord(c.env, currency, homeCurrency);
+  const transactionId = crypto.randomUUID();
 
-  const transaction = await db
-    .insert(transactions)
-    .values({
+  const transaction = await withAudit(
+    db,
+    {
       householdId: session.householdId,
-      userId: session.userId,
-      amount: toCents(validated.amount),
-      currency,
-      exchangeRateToHome,
-      description: validated.description?.trim() || null,
-      category: validated.category.trim(),
-      type: validated.type,
-      date: toISODate(validated.date),
-      budgetId: validated.budgetId || null,
-    })
-    .returning()
-    .get();
+      tableName: "transactions",
+      recordId: transactionId,
+      operation: "INSERT",
+      newValues: (result: typeof transaction) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .insert(transactions)
+        .values({
+          id: transactionId,
+          householdId: session.householdId,
+          userId: session.userId,
+          amount: toCents(validated.amount),
+          currency,
+          exchangeRateToHome,
+          description: validated.description?.trim() || null,
+          category: validated.category.trim(),
+          type: validated.type,
+          date: toISODate(validated.date),
+          budgetId: validated.budgetId || null,
+        })
+        .returning()
+        .get()
+  );
 
   await broadcastToHousehold(c.env, session.householdId, {
     type: "TRANSACTION_UPDATE",
@@ -120,7 +148,11 @@ transactionsRoute.post("/", async (c) => {
 // Update transaction
 transactionsRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:transactions:update`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:transactions:update`,
+    ROUTE_RATE_LIMITS.transactions.update
+  );
 
   const id = c.req.param("id");
   const body = await c.req.json();
@@ -163,19 +195,45 @@ transactionsRoute.patch("/:id", async (c) => {
     )`
   );
 
-  const updated = await db
-    .update(transactions)
-    .set(updateData)
-    .where(
-      and(
-        eq(transactions.id, id),
-        scopeToHousehold(transactions.householdId, session.householdId),
-        isNull(transactions.deletedAt),
-        visibilityCondition
-      )
-    )
-    .returning()
-    .get();
+  const existing = await db.query.transactions.findFirst({
+    where: and(
+      eq(transactions.id, id),
+      scopeToHousehold(transactions.householdId, session.householdId),
+      isNull(transactions.deletedAt),
+      visibilityCondition
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Transaction not found", "NOT_FOUND");
+  }
+
+  const updated = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "transactions",
+      recordId: id,
+      operation: "UPDATE",
+      oldValues: existing,
+      newValues: (result: typeof updated) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(transactions)
+        .set(updateData)
+        .where(
+          and(
+            eq(transactions.id, id),
+            scopeToHousehold(transactions.householdId, session.householdId),
+            isNull(transactions.deletedAt),
+            visibilityCondition
+          )
+        )
+        .returning()
+        .get()
+  );
 
   if (!updated) {
     throw new ActionError("Transaction not found", "NOT_FOUND");
@@ -193,7 +251,11 @@ transactionsRoute.patch("/:id", async (c) => {
 // Delete transaction (soft)
 transactionsRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:transactions:delete`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:transactions:delete`,
+    ROUTE_RATE_LIMITS.transactions.delete
+  );
 
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
@@ -207,19 +269,45 @@ transactionsRoute.delete("/:id", async (c) => {
     )`
   );
 
-  const deleted = await db
-    .update(transactions)
-    .set({ deletedAt: new Date() })
-    .where(
-      and(
-        eq(transactions.id, id),
-        scopeToHousehold(transactions.householdId, session.householdId),
-        isNull(transactions.deletedAt),
-        visibilityCondition
-      )
-    )
-    .returning()
-    .get();
+  const existing = await db.query.transactions.findFirst({
+    where: and(
+      eq(transactions.id, id),
+      scopeToHousehold(transactions.householdId, session.householdId),
+      isNull(transactions.deletedAt),
+      visibilityCondition
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Transaction not found", "NOT_FOUND");
+  }
+
+  const deleted = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "transactions",
+      recordId: id,
+      operation: "DELETE",
+      oldValues: existing,
+      newValues: (result: typeof deleted) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(transactions)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(transactions.id, id),
+            scopeToHousehold(transactions.householdId, session.householdId),
+            isNull(transactions.deletedAt),
+            visibilityCondition
+          )
+        )
+        .returning()
+        .get()
+  );
 
   if (!deleted) {
     throw new ActionError("Transaction not found", "NOT_FOUND");

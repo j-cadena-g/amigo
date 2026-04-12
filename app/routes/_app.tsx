@@ -15,6 +15,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
     throw redirect("/no-access");
   }
 
+  if (status === "revoked") {
+    throw redirect("/no-access");
+  }
+
   if (status === "needs_setup") {
     throw redirect("/setup");
   }
@@ -24,6 +28,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
     userId: session.userId,
     role: session.role,
     householdId: session.householdId,
+    orgId: session.orgId,
   };
 }
 

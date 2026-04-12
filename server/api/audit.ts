@@ -1,8 +1,10 @@
 import { Hono } from "hono";
-import { getDb, auditLogs, users, eq, and, desc } from "@amigo/db";
+import { getDb, auditLogs, users, eq, desc } from "@amigo/db";
 import type { HonoEnv } from "../env";
 import { ActionError } from "../lib/errors";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { z } from "zod";
+import { AUDIT_TABLES, buildAuditHistoryFilter } from "../lib/audit";
 
 interface AuditEntry {
   id: string;
@@ -12,15 +14,22 @@ interface AuditEntry {
   changes: Record<string, unknown> | null;
 }
 
+export const auditTableSchema = z.enum(AUDIT_TABLES);
+
 export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `audit:${session.userId}`, RATE_LIMIT_PRESETS.READ);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `audit:${session.userId}`,
+    ROUTE_RATE_LIMITS.audit.list
+  );
 
   const recordId = c.req.param("recordId");
-  const tableName = c.req.query("table");
-  if (!tableName) {
+  const tableNameParam = c.req.query("table");
+  if (!tableNameParam) {
     throw new ActionError("table query param required", "VALIDATION_ERROR");
   }
+  const tableName = auditTableSchema.parse(tableNameParam);
 
   const db = getDb(c.env.DB);
 
@@ -34,9 +43,7 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
       createdAt: auditLogs.createdAt,
     })
     .from(auditLogs)
-    .where(
-      and(eq(auditLogs.recordId, recordId), eq(auditLogs.tableName, tableName))
-    )
+    .where(buildAuditHistoryFilter(session.householdId, recordId, tableName))
     .orderBy(desc(auditLogs.createdAt))
     .limit(50);
 
@@ -45,12 +52,13 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
   const userMap = new Map<string, string>();
 
   if (authIds.length > 0) {
-    const allUsers = await db
+    const householdUsers = await db
       .select({ authId: users.authId, name: users.name, email: users.email })
       .from(users)
+      .where(eq(users.householdId, session.householdId))
       .all();
 
-    for (const u of allUsers) {
+    for (const u of householdUsers) {
       userMap.set(u.authId, u.name ?? u.email);
     }
   }

@@ -63,4 +63,37 @@
     "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWktYW1pZ28uY29tJA"
   },
 
+  "env": {
+    "preview": {
+      "workers_dev": true,
+      "routes": [],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "HOUSEHOLD",
+            "class_name": "HouseholdDO"
+          }
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "amigo-db-preview",
+          "database_id": "46903f44-7948-43bf-a5d1-ff51f4cddce0",
+          "migrations_dir": "packages/db/migrations"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "CACHE",
+          "id": "9ef0628bd6fc4a52bebf64a48aeb24a8"
+        }
+      ],
+      "vars": {
+        "APP_ENV": "preview",
+        "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWktYW1pZ28uY29tJA"
+      }
+    }
+  },
+
 }

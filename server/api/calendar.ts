@@ -13,7 +13,9 @@ import {
   isNotNull,
 } from "@amigo/db";
 import type { HonoEnv } from "../env";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { ActionError } from "../lib/errors";
+import { parseCalendarQuery } from "../lib/request-validation";
 
 export interface CalendarEvent {
   id: string;
@@ -117,16 +119,23 @@ function getRecurringOccurrences(
 
 export const calendarRoute = new Hono<HonoEnv>().get("/", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `calendar:${session.userId}`, RATE_LIMIT_PRESETS.READ);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `calendar:${session.userId}`,
+    ROUTE_RATE_LIMITS.calendar.list
+  );
 
-  const yearParam = c.req.query("year");
-  const monthParam = c.req.query("month");
-  if (!yearParam || !monthParam) {
-    return c.json({ error: "year and month are required" }, 400);
+  let parsedQuery: { year: number; month: number };
+  try {
+    parsedQuery = parseCalendarQuery({
+      year: c.req.query("year"),
+      month: c.req.query("month"),
+    });
+  } catch {
+    throw new ActionError("Valid year and month are required", "VALIDATION_ERROR");
   }
-
-  const year = parseInt(yearParam, 10);
-  const month = parseInt(monthParam, 10) - 1; // Convert 1-indexed API param to 0-indexed for JS Date
+  const year = parsedQuery.year;
+  const month = parsedQuery.month - 1; // Convert 1-indexed API param to 0-indexed for JS Date
 
   // Calculate month boundaries as ISO date strings
   const monthStart = new Date(Date.UTC(year, month, 1));

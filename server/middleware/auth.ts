@@ -33,6 +33,10 @@ export const resolveAppSession = createMiddleware<HonoEnv>(async (c, next) => {
     return c.json({ error: "Household setup required" }, 403);
   }
 
+  if (result.status === "revoked") {
+    return c.json({ error: "Account access revoked" }, 403);
+  }
+
   if (result.status !== "authenticated") {
     return c.json({ error: "Unauthorized" }, 401);
   }

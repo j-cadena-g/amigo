@@ -1,6 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
 import type { AppSession } from "../env";
 import { getDb, users, households, eq, and, isNull } from "@amigo/db";
+import { getSessionCacheKey } from "./session-cache";
 
 interface ClerkClaims {
   email?: string;
@@ -16,6 +17,7 @@ export type SessionResult =
   | { status: "authenticated"; session: AppSession }
   | { status: "no_org" }
   | { status: "needs_setup"; clerkOrgId: string }
+  | { status: "revoked" }
   | { status: "unauthenticated" };
 
 /**
@@ -41,14 +43,21 @@ export async function resolveSession(
   const db = getDb(d1);
 
   // Check KV cache first (keyed by user + org to handle org switching)
-  const cacheKey = `session:${clerkUserId}:${orgId}`;
+  const cacheKey = getSessionCacheKey(clerkUserId, orgId);
   const cached = await kv.get(cacheKey, "json");
   if (cached) {
     const session = cached as AppSession;
 
-    // Verify membership is still valid (guard against stale KV)
-    const membership = await db
-      .select({ id: users.id })
+    // Re-hydrate the session from the current user row so role changes
+    // and member removals take effect immediately even if KV is warm.
+    const currentUser = await db
+      .select({
+        id: users.id,
+        householdId: users.householdId,
+        role: users.role,
+        email: users.email,
+        name: users.name,
+      })
       .from(users)
       .where(
         and(
@@ -59,8 +68,21 @@ export async function resolveSession(
       )
       .get();
 
-    if (membership) {
-      return { status: "authenticated", session };
+    if (currentUser) {
+      const refreshedSession: AppSession = {
+        userId: currentUser.id,
+        householdId: currentUser.householdId,
+        orgId,
+        role: currentUser.role as AppSession["role"],
+        email: currentUser.email,
+        name: currentUser.name,
+      };
+
+      await kv.put(cacheKey, JSON.stringify(refreshedSession), {
+        expirationTtl: 86400,
+      });
+
+      return { status: "authenticated", session: refreshedSession };
     }
 
     // Stale session — evict from KV
@@ -79,7 +101,24 @@ export async function resolveSession(
     return { status: "needs_setup", clerkOrgId: orgId };
   }
 
-  // Check for existing user in this household
+  const existingUser = await db
+    .select({
+      id: users.id,
+      householdId: users.householdId,
+      role: users.role,
+      email: users.email,
+      name: users.name,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.authId, clerkUserId))
+    .get();
+
+  if (existingUser?.deletedAt) {
+    return { status: "revoked" };
+  }
+
+  // Check for existing active user in this household
   let user = await db
     .select()
     .from(users)
@@ -112,6 +151,7 @@ export async function resolveSession(
   const session: AppSession = {
     userId: user.id,
     householdId: user.householdId,
+    orgId,
     role: user.role as AppSession["role"],
     email: user.email,
     name: user.name,

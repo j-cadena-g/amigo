@@ -4,6 +4,7 @@ import { clerkMiddleware } from "@hono/clerk-auth";
 import type { HonoEnv } from "./env";
 import { ActionError } from "./lib/errors";
 import { resolveAppSession, resolveAppSessionSoft } from "./middleware/auth";
+import { buildSecurityHeaders, createCspNonce } from "./lib/security";
 
 // API route groups
 import { healthRoute } from "./api/health";
@@ -49,6 +50,21 @@ app.onError((err, c) => {
 // Global middleware
 app.use("*", logger());
 app.use("*", clerkMiddleware());
+app.use("*", async (c, next) => {
+  const cspNonce = createCspNonce();
+  c.set("cspNonce", cspNonce);
+
+  await next();
+
+  const securityHeaders = buildSecurityHeaders({
+    appEnv: c.env.APP_ENV,
+    cspNonce,
+  });
+
+  for (const [name, value] of Object.entries(securityHeaders)) {
+    c.res.headers.set(name, value);
+  }
+});
 
 // Health check (no auth required)
 app.route("/api", healthRoute);

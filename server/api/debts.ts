@@ -7,6 +7,7 @@ import { assertPermission, canManageSharedItems } from "../lib/permissions";
 import { toCents } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import type { CurrencyCode } from "@amigo/db";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 const currencySchema = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional();
 
@@ -52,6 +53,11 @@ function debtToCents(validated: z.infer<typeof addDebtSchema>): { balanceInitial
 // List debts
 debtsRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:debts:list`,
+    ROUTE_RATE_LIMITS.debts.list
+  );
   const db = getDb(c.env.DB);
 
   const userDebts = await db.query.debts.findMany({
@@ -69,6 +75,11 @@ debtsRoute.get("/", async (c) => {
 // Create debt
 debtsRoute.post("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:debts:create`,
+    ROUTE_RATE_LIMITS.debts.create
+  );
   const body = await c.req.json();
   const validated = addDebtSchema.parse(body);
   const db = getDb(c.env.DB);
@@ -103,6 +114,11 @@ debtsRoute.post("/", async (c) => {
 // Update debt
 debtsRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:debts:update`,
+    ROUTE_RATE_LIMITS.debts.update
+  );
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = addDebtSchema.parse(body);
@@ -158,6 +174,11 @@ debtsRoute.patch("/:id", async (c) => {
 // Delete debt (soft)
 debtsRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:debts:delete`,
+    ROUTE_RATE_LIMITS.debts.delete
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 

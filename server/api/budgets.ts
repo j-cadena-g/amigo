@@ -5,6 +5,7 @@ import { getDb, budgets, transactions, scopeToHousehold, eq, and, or, isNull, gt
 import { ActionError } from "../lib/errors";
 import { assertPermission, canManageSharedBudgets } from "../lib/permissions";
 import { toCents, toISODate } from "../lib/conversions";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 const budgetSchema = z.object({
   name: z.string().min(1),
@@ -53,6 +54,11 @@ function getPeriodBounds(period: "weekly" | "monthly" | "yearly"): { start: Date
 // List budgets (simple)
 budgetsRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:budgets:list`,
+    ROUTE_RATE_LIMITS.budgets.list
+  );
   const db = getDb(c.env.DB);
 
   const userBudgets = await db.query.budgets.findMany({
@@ -70,6 +76,11 @@ budgetsRoute.get("/", async (c) => {
 // List budgets with spending
 budgetsRoute.get("/with-spending", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:budgets:with-spending`,
+    ROUTE_RATE_LIMITS.budgets.withSpending
+  );
   const db = getDb(c.env.DB);
 
   const userBudgets = await db.query.budgets.findMany({
@@ -125,6 +136,11 @@ budgetsRoute.get("/with-spending", async (c) => {
 // Create budget
 budgetsRoute.post("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:budgets:create`,
+    ROUTE_RATE_LIMITS.budgets.create
+  );
   const body = await c.req.json();
   const validated = budgetSchema.parse(body);
   const db = getDb(c.env.DB);
@@ -153,6 +169,11 @@ budgetsRoute.post("/", async (c) => {
 // Update budget
 budgetsRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:budgets:update`,
+    ROUTE_RATE_LIMITS.budgets.update
+  );
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = budgetSchema.parse(body);
@@ -202,6 +223,11 @@ budgetsRoute.patch("/:id", async (c) => {
 // Delete budget (soft)
 budgetsRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:budgets:delete`,
+    ROUTE_RATE_LIMITS.budgets.delete
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 

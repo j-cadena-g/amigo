@@ -7,6 +7,7 @@ import { assertPermission, canManageSharedItems } from "../lib/permissions";
 import { toCents } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import type { CurrencyCode } from "@amigo/db";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 const assetSchema = z.object({
   name: z.string().min(1),
@@ -28,6 +29,11 @@ async function getHomeCurrency(db: ReturnType<typeof getDb>, householdId: string
 // List assets
 assetsRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:assets:list`,
+    ROUTE_RATE_LIMITS.assets.list
+  );
   const db = getDb(c.env.DB);
 
   const userAssets = await db.query.assets.findMany({
@@ -45,6 +51,11 @@ assetsRoute.get("/", async (c) => {
 // Create asset
 assetsRoute.post("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:assets:create`,
+    ROUTE_RATE_LIMITS.assets.create
+  );
   const body = await c.req.json();
   const validated = assetSchema.parse(body);
   const db = getDb(c.env.DB);
@@ -77,6 +88,11 @@ assetsRoute.post("/", async (c) => {
 // Update asset
 assetsRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:assets:update`,
+    ROUTE_RATE_LIMITS.assets.update
+  );
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = assetSchema.parse(body);
@@ -130,6 +146,11 @@ assetsRoute.patch("/:id", async (c) => {
 // Delete asset (soft)
 assetsRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:assets:delete`,
+    ROUTE_RATE_LIMITS.assets.delete
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 

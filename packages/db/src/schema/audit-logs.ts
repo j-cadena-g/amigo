@@ -4,6 +4,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  householdId: text("household_id").notNull(),
   tableName: text("table_name").notNull(),
   recordId: text("record_id").notNull(),
   operation: text("operation").notNull(), // INSERT, UPDATE, DELETE

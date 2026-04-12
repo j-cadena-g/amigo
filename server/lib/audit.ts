@@ -85,8 +85,8 @@ export async function withAudit<T>(
       tableName: opts.tableName,
       recordId: opts.recordId,
       operation: opts.operation,
-      oldValues: oldValues ? JSON.stringify(oldValues) : null,
-      newValues: newValues ? JSON.stringify(newValues) : null,
+      oldValues: oldValues != null ? JSON.stringify(oldValues) : null,
+      newValues: newValues != null ? JSON.stringify(newValues) : null,
       changedBy: opts.changedBy,
     });
   } catch (error) {

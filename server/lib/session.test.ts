@@ -120,6 +120,64 @@ describe("resolveSession", () => {
     expect(mocks.createClerkClient).not.toHaveBeenCalled();
   });
 
+  it("still authenticates when KV refresh write fails", async () => {
+    const db = createFakeDb([
+      {
+        id: "user-1",
+        householdId: "house-1",
+        role: "member",
+        email: "fresh@example.com",
+        name: "Fresh User",
+      },
+    ]);
+    mocks.getDb.mockReturnValue(db);
+
+    const kvError = new Error("KV unavailable");
+    const kv = {
+      get: vi.fn().mockResolvedValue({
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "owner",
+        email: "stale@example.com",
+        name: "Stale User",
+      }),
+      put: vi.fn().mockRejectedValue(kvError),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await resolveSession(
+      "clerk-user-1",
+      {} as D1Database,
+      kv,
+      "clerk-secret",
+      { orgId: "org-1" }
+    );
+
+    expect(result).toEqual({
+      status: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "member",
+        email: "fresh@example.com",
+        name: "Fresh User",
+      },
+    });
+    expect(kv.put).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("Session cache refresh failed", {
+      error: kvError,
+      cacheKey: "session:clerk-user-1:org-1",
+      clerkUserId: "clerk-user-1",
+      orgId: "org-1",
+    });
+
+    consoleError.mockRestore();
+  });
+
   it("fails closed for soft-deleted users instead of auto-creating them", async () => {
     const db = createFakeDb([
       {

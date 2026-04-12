@@ -78,9 +78,18 @@ export async function resolveSession(
         name: currentUser.name,
       };
 
-      await kv.put(cacheKey, JSON.stringify(refreshedSession), {
-        expirationTtl: 86400,
-      });
+      try {
+        await kv.put(cacheKey, JSON.stringify(refreshedSession), {
+          expirationTtl: 86400,
+        });
+      } catch (error) {
+        console.error("Session cache refresh failed", {
+          error,
+          cacheKey,
+          clerkUserId,
+          orgId,
+        });
+      }
 
       return { status: "authenticated", session: refreshedSession };
     }

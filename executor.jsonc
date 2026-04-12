@@ -1,0 +1,12 @@
+{
+  "sources": [
+    {
+      "kind": "mcp",
+      "transport": "remote",
+      "name": "Context7",
+      "endpoint": "https://mcp.context7.com/mcp",
+      "remoteTransport": "auto",
+      "namespace": "context7"
+    }
+  ]
+}

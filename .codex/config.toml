@@ -1,0 +1,3 @@
+[mcp_servers.executor]
+command = "executor"
+args = [ "mcp" ]

@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "executor": {
+      "type": "local",
+      "command": [
+        "executor",
+        "mcp"
+      ],
+      "enabled": true,
+      "environment": {}
+    }
+  }
+}

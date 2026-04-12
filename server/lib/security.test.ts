@@ -9,7 +9,7 @@ describe("security headers", () => {
   it("builds report-only CSP and transport headers for production", () => {
     const headers = buildSecurityHeaders({
       appEnv: "production",
-      cspNonce: "nonce-123",
+      cspNonce: "ABcd1234==",
     });
     const csp = headers["Content-Security-Policy-Report-Only"];
     if (!csp) {
@@ -22,8 +22,8 @@ describe("security headers", () => {
       .split("; ")
       .find((directive) => directive.startsWith("connect-src"));
 
-    expect(csp).toContain("script-src 'self' 'nonce-nonce-123'");
-    expect(scriptSrc).toBe("script-src 'self' 'nonce-nonce-123'");
+    expect(csp).toContain("script-src 'self' 'nonce-ABcd1234=='");
+    expect(scriptSrc).toBe("script-src 'self' 'nonce-ABcd1234=='");
     expect(connectSrc).toBe("connect-src 'self' https: wss:");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(headers["Strict-Transport-Security"]).toContain("max-age=31536000");
@@ -33,7 +33,7 @@ describe("security headers", () => {
   it("omits HSTS in development", () => {
     const headers = buildSecurityHeaders({
       appEnv: "development",
-      cspNonce: "nonce-123",
+      cspNonce: "ABcd1234==",
     });
 
     expect(headers["Strict-Transport-Security"]).toBeUndefined();

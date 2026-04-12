@@ -194,6 +194,10 @@ groceriesRoute.post("/:id/toggle", async (c) => {
         .get()
   );
 
+  if (!updated) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
+
   await broadcastToHousehold(c.env, session.householdId, {
     type: "GROCERY_UPDATE",
     action: "update",
@@ -257,6 +261,10 @@ groceriesRoute.patch("/:id", async (c) => {
         .returning()
         .get()
   );
+
+  if (!updated) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
 
   await broadcastToHousehold(c.env, session.householdId, {
     type: "GROCERY_UPDATE",
@@ -441,6 +449,10 @@ groceriesRoute.delete("/:id", async (c) => {
         .returning()
         .get()
   );
+
+  if (!deleted) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
 
   await broadcastToHousehold(c.env, session.householdId, {
     type: "GROCERY_UPDATE",

@@ -120,6 +120,42 @@ export async function resolveSession(
       return { status: "authenticated", session: refreshedSession };
     }
 
+    // Warm cache is stale: resolve household once, then check revocation before
+    // evicting KV so we avoid an extra cold-path round-trip for removed members.
+    const householdForStale = await db
+      .select({ id: households.id })
+      .from(households)
+      .where(eq(households.clerkOrgId, orgId))
+      .get();
+
+    if (householdForStale) {
+      const removedUser = await db
+        .select({ deletedAt: users.deletedAt })
+        .from(users)
+        .where(
+          and(
+            eq(users.authId, clerkUserId),
+            eq(users.householdId, session.householdId),
+            eq(users.householdId, householdForStale.id)
+          )
+        )
+        .get();
+
+      if (removedUser?.deletedAt) {
+        try {
+          await kv.delete(cacheKey);
+        } catch (error) {
+          console.error("Session cache eviction failed", {
+            error,
+            cacheKey,
+            clerkUserId,
+            orgId,
+          });
+        }
+        return { status: "revoked" };
+      }
+    }
+
     // Stale session — evict from KV
     try {
       await kv.delete(cacheKey);

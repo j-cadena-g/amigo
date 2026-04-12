@@ -433,7 +433,6 @@ groceriesRoute.delete("/:id", async (c) => {
       recordId: id,
       operation: "DELETE",
       oldValues: existing,
-      newValues: (result) => result,
       changedBy: session.userId,
     },
     async () =>

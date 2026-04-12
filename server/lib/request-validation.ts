@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActionError } from "./errors";
 
 export const DEFAULT_TRANSACTIONS_PAGE = 1;
 export const DEFAULT_TRANSACTIONS_LIMIT = 20;
@@ -32,11 +33,15 @@ export function parseTransactionsListQuery(query: {
   type?: TransactionsListType;
 } {
   let type: TransactionsListType | undefined;
-  if (query.type) {
+  if (query.type !== undefined && query.type !== "") {
     const parsed = transactionsTypeSchema.safeParse(query.type);
-    if (parsed.success) {
-      type = parsed.data;
+    if (!parsed.success) {
+      throw new ActionError(
+        'Invalid type filter; expected "income" or "expense".',
+        "VALIDATION_ERROR"
+      );
     }
+    type = parsed.data;
   }
 
   return {

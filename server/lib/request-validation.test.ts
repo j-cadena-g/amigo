@@ -2,24 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TRANSACTIONS_LIMIT,
   DEFAULT_TRANSACTIONS_PAGE,
-  MAX_TRANSACTIONS_LIMIT,
   parseCalendarQuery,
   parseTransactionsListQuery,
 } from "./request-validation";
 
 describe("parseTransactionsListQuery", () => {
-  it("clamps pagination values and drops invalid type filters", () => {
-    expect(
+  it("clamps pagination values and rejects invalid type filters", () => {
+    expect(() =>
       parseTransactionsListQuery({
         page: "0",
         limit: "999",
         type: "bogus",
       })
-    ).toEqual({
-      page: DEFAULT_TRANSACTIONS_PAGE,
-      limit: MAX_TRANSACTIONS_LIMIT,
-      type: undefined,
-    });
+    ).toThrow('Invalid type filter');
   });
 
   it("falls back to defaults for unparsable values", () => {

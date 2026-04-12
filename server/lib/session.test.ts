@@ -292,11 +292,6 @@ describe("resolveSession", () => {
         id: "house-1",
       },
       {
-        id: "user-1",
-        householdId: "house-1",
-        role: "member",
-        email: "user@example.com",
-        name: "Revoked User",
         deletedAt: new Date("2026-04-11T00:00:00.000Z"),
       },
     ]);
@@ -337,6 +332,41 @@ describe("resolveSession", () => {
     });
 
     consoleError.mockRestore();
+  });
+
+  it("returns revoked on stale warm cache without the cold-path user re-query", async () => {
+    const db = createFakeDb([
+      null,
+      { id: "house-1" },
+      { deletedAt: new Date("2026-04-11T00:00:00.000Z") },
+    ]);
+    mocks.getDb.mockReturnValue(db);
+
+    const kv = {
+      get: vi.fn().mockResolvedValue({
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "owner",
+        email: "stale@example.com",
+        name: "Stale User",
+        refreshedAt: fixedNow - 61_000,
+      }),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+
+    const result = await resolveSession(
+      "clerk-user-1",
+      {} as D1Database,
+      kv,
+      "clerk-secret",
+      { orgId: "org-1" }
+    );
+
+    expect(result).toEqual({ status: "revoked" });
+    expect(kv.delete).toHaveBeenCalledWith("session:clerk-user-1:org-1");
+    expect(db.whereMock).toHaveBeenCalledTimes(3);
   });
 
   it("fails closed for soft-deleted users instead of auto-creating them", async () => {

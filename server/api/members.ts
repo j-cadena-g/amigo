@@ -10,6 +10,7 @@ import { broadcastToHousehold, invalidateUserSession } from "../lib/realtime";
 import { ActionError, logSecurityEvent } from "../lib/errors";
 import { canManageMembers, canTransferOwnership, canChangeRole, assertPermission } from "../lib/permissions";
 import { invalidateSessionCachesForHouseholdMembers } from "../lib/session-cache";
+import { getTransferOwnershipUsers } from "../lib/member-queries";
 
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
@@ -112,13 +113,12 @@ membersRoute.post("/transfer-ownership", async (c) => {
     throw new ActionError("You are already the owner", "VALIDATION_ERROR");
   }
 
-  const newOwner = await db.query.users.findFirst({
-    where: and(
-      eq(users.id, newOwnerId),
-      scopeToHousehold(users.householdId, session.householdId),
-      isNull(users.deletedAt)
-    ),
-  });
+  const [newOwner, currentUser] = await getTransferOwnershipUsers(
+    db,
+    session.householdId,
+    session.userId,
+    newOwnerId
+  );
 
   if (!newOwner) {
     throw new ActionError("User not found in household", "NOT_FOUND");
@@ -129,14 +129,6 @@ membersRoute.post("/transfer-ownership", async (c) => {
     db.update(users).set({ role: "admin" }).where(eq(users.id, session.userId)),
     db.update(users).set({ role: "owner" }).where(eq(users.id, newOwnerId)),
   ]);
-
-  const currentUser = await db.query.users.findFirst({
-    where: and(
-      eq(users.id, session.userId),
-      scopeToHousehold(users.householdId, session.householdId),
-      isNull(users.deletedAt)
-    ),
-  });
 
   await invalidateSessionCachesForHouseholdMembers(c.env, [
     { authId: currentUser?.authId ?? null, orgId: session.orgId },

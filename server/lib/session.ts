@@ -118,18 +118,16 @@ export async function resolveSession(
     return { status: "revoked" };
   }
 
-  // Check for existing active user in this household
-  let user = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        eq(users.authId, clerkUserId),
-        eq(users.householdId, household.id),
-        isNull(users.deletedAt)
-      )
-    )
-    .get();
+  // Reuse the cold-path household user when present to avoid a second identical lookup.
+  let user = existingUser
+    ? {
+        id: existingUser.id,
+        householdId: existingUser.householdId,
+        role: existingUser.role,
+        email: existingUser.email,
+        name: existingUser.name,
+      }
+    : null;
 
   if (!user) {
     // Fetch user details from Clerk Backend API (JWT claims don't include email/name by default)

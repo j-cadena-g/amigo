@@ -18,9 +18,13 @@ describe("security headers", () => {
     const scriptSrc = csp
       .split("; ")
       .find((directive) => directive.startsWith("script-src"));
+    const connectSrc = csp
+      .split("; ")
+      .find((directive) => directive.startsWith("connect-src"));
 
     expect(csp).toContain("script-src 'self' 'nonce-nonce-123'");
     expect(scriptSrc).toBe("script-src 'self' 'nonce-nonce-123'");
+    expect(connectSrc).toBe("connect-src 'self' https: wss:");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(headers["Strict-Transport-Security"]).toContain("max-age=31536000");
     expect(headers["X-Frame-Options"]).toBe("DENY");

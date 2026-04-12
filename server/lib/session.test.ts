@@ -160,7 +160,6 @@ describe("resolveSession", () => {
       {
         id: "house-2",
       },
-      undefined,
       {
         id: "user-2",
         householdId: "house-2",
@@ -216,13 +215,51 @@ describe("resolveSession", () => {
         { type: "eq", args: [{ name: "household_id" }, "house-2"] },
       ],
     });
-    expect(db.whereMock).toHaveBeenNthCalledWith(3, {
-      type: "and",
-      args: [
-        { type: "eq", args: [{ name: "auth_id" }, "clerk-user-1"] },
-        { type: "eq", args: [{ name: "household_id" }, "house-2"] },
-        { type: "isNull", arg: { name: "deleted_at" } },
-      ],
+    expect(db.whereMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the cold-path household user without a redundant second lookup", async () => {
+    const db = createFakeDb([
+      {
+        id: "house-1",
+      },
+      {
+        id: "user-1",
+        householdId: "house-1",
+        role: "member",
+        email: "user@example.com",
+        name: "Existing User",
+        deletedAt: null,
+      },
+    ]);
+    mocks.getDb.mockReturnValue(db);
+
+    const kv = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+
+    const result = await resolveSession(
+      "clerk-user-1",
+      {} as D1Database,
+      kv,
+      "clerk-secret",
+      { orgId: "org-1" }
+    );
+
+    expect(result).toEqual({
+      status: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "member",
+        email: "user@example.com",
+        name: "Existing User",
+      },
     });
+    expect(db.whereMock).toHaveBeenCalledTimes(2);
+    expect(mocks.createClerkClient).not.toHaveBeenCalled();
   });
 });

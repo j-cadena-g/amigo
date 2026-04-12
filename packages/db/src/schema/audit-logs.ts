@@ -10,7 +10,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   operation: text("operation").notNull(), // INSERT, UPDATE, DELETE
   oldValues: text("old_values", { mode: "json" }),
   newValues: text("new_values", { mode: "json" }),
-  changedBy: text("changed_by"), // auth_id of the user
+  changedBy: text("changed_by"), // internal users.id of the actor
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

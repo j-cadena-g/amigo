@@ -47,19 +47,19 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
     .orderBy(desc(auditLogs.createdAt))
     .limit(50);
 
-  // Look up user names for changedBy auth IDs
-  const authIds = [...new Set(logs.map((l) => l.changedBy).filter(Boolean))];
+  // Look up user names for changedBy user IDs
+  const userIds = [...new Set(logs.map((l) => l.changedBy).filter(Boolean))];
   const userMap = new Map<string, string>();
 
-  if (authIds.length > 0) {
+  if (userIds.length > 0) {
     const householdUsers = await db
-      .select({ authId: users.authId, name: users.name, email: users.email })
+      .select({ id: users.id, name: users.name, email: users.email })
       .from(users)
       .where(eq(users.householdId, session.householdId))
       .all();
 
     for (const u of householdUsers) {
-      userMap.set(u.authId, u.name ?? u.email);
+      userMap.set(u.id, u.name ?? u.email);
     }
   }
 

@@ -178,6 +178,114 @@ describe("resolveSession", () => {
     consoleError.mockRestore();
   });
 
+  it("still authenticates when cold-path session cache write fails", async () => {
+    const db = createFakeDb([
+      {
+        id: "house-1",
+      },
+      {
+        id: "user-1",
+        householdId: "house-1",
+        role: "member",
+        email: "user@example.com",
+        name: "Existing User",
+        deletedAt: null,
+      },
+    ]);
+    mocks.getDb.mockReturnValue(db);
+
+    const kvError = new Error("KV unavailable");
+    const kv = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockRejectedValue(kvError),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await resolveSession(
+      "clerk-user-1",
+      {} as D1Database,
+      kv,
+      "clerk-secret",
+      { orgId: "org-1" }
+    );
+
+    expect(result).toEqual({
+      status: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "member",
+        email: "user@example.com",
+        name: "Existing User",
+      },
+    });
+    expect(kv.put).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("Session cache write failed", {
+      error: kvError,
+      cacheKey: "session:clerk-user-1:org-1",
+      clerkUserId: "clerk-user-1",
+      orgId: "org-1",
+    });
+
+    consoleError.mockRestore();
+  });
+
+  it("still revokes when stale cache eviction fails", async () => {
+    const db = createFakeDb([
+      null,
+      {
+        id: "house-1",
+      },
+      {
+        id: "user-1",
+        householdId: "house-1",
+        role: "member",
+        email: "user@example.com",
+        name: "Revoked User",
+        deletedAt: new Date("2026-04-11T00:00:00.000Z"),
+      },
+    ]);
+    mocks.getDb.mockReturnValue(db);
+
+    const kvError = new Error("KV unavailable");
+    const kv = {
+      get: vi.fn().mockResolvedValue({
+        userId: "user-1",
+        householdId: "house-1",
+        orgId: "org-1",
+        role: "owner",
+        email: "stale@example.com",
+        name: "Stale User",
+      }),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockRejectedValue(kvError),
+    } as unknown as KVNamespace;
+
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await resolveSession(
+      "clerk-user-1",
+      {} as D1Database,
+      kv,
+      "clerk-secret",
+      { orgId: "org-1" }
+    );
+
+    expect(result).toEqual({ status: "revoked" });
+    expect(kv.delete).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("Session cache eviction failed", {
+      error: kvError,
+      cacheKey: "session:clerk-user-1:org-1",
+      clerkUserId: "clerk-user-1",
+      orgId: "org-1",
+    });
+
+    consoleError.mockRestore();
+  });
+
   it("fails closed for soft-deleted users instead of auto-creating them", async () => {
     const db = createFakeDb([
       {

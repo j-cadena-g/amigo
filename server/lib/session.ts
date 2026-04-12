@@ -95,7 +95,16 @@ export async function resolveSession(
     }
 
     // Stale session — evict from KV
-    await kv.delete(cacheKey);
+    try {
+      await kv.delete(cacheKey);
+    } catch (error) {
+      console.error("Session cache eviction failed", {
+        error,
+        cacheKey,
+        clerkUserId,
+        orgId,
+      });
+    }
   }
 
   // Look up household by Clerk org ID
@@ -171,9 +180,18 @@ export async function resolveSession(
   };
 
   // Cache in KV (24h TTL)
-  await kv.put(cacheKey, JSON.stringify(session), {
-    expirationTtl: 86400,
-  });
+  try {
+    await kv.put(cacheKey, JSON.stringify(session), {
+      expirationTtl: 86400,
+    });
+  } catch (error) {
+    console.error("Session cache write failed", {
+      error,
+      cacheKey,
+      clerkUserId,
+      orgId,
+    });
+  }
 
   return { status: "authenticated", session };
 }

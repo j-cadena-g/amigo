@@ -12,7 +12,15 @@ export async function invalidateSessionCache(
   orgId: string | null | undefined
 ): Promise<void> {
   if (!authId || !orgId) return;
-  await kv.delete(getSessionCacheKey(authId, orgId));
+  try {
+    await kv.delete(getSessionCacheKey(authId, orgId));
+  } catch (err) {
+    console.error("Session cache invalidation failed (non-fatal)", {
+      error: err,
+      authId,
+      orgId,
+    });
+  }
 }
 
 export async function invalidateSessionCachesForHouseholdMembers(

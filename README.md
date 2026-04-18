@@ -99,7 +99,6 @@ wrangler.jsonc Cloudflare bindings configuration
 ### CI/CD (GitHub Actions)
 
 - **Push/PR to master:** Lint, typecheck, test
-- **PR:** Preview deployment with isolated D1 + KV
 - **Merge to master:** Production deploy via `wrangler deploy`
 
 Required GitHub secrets: `CLOUDFLARE_API_TOKEN`

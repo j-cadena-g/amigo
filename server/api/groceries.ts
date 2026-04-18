@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { HonoEnv } from "../env";
 import { getDb, groceryItems, groceryItemTags, groceryTags, scopeToHousehold, eq, and, inArray, isNull, isNotNull, lt } from "@amigo/db";
-import { enforceRateLimit, checkRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, checkRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError, logServerError } from "../lib/errors";
+import { insertManyAuditLogs, withAudit } from "../lib/audit";
 
 const DEFAULT_GROCERY_CATEGORY = "General";
 
@@ -38,6 +39,12 @@ export const groceriesRoute = new Hono<HonoEnv>();
 // List grocery items
 groceriesRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:list`,
+    ROUTE_RATE_LIMITS.groceries.list
+  );
+
   const db = getDb(c.env.DB);
 
   const items = await db.query.groceryItems.findMany({
@@ -62,22 +69,40 @@ groceriesRoute.get("/", async (c) => {
 // Add item
 groceriesRoute.post("/", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:add`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:add`,
+    ROUTE_RATE_LIMITS.groceries.add
+  );
 
   const body = await c.req.json();
   const validated = addItemSchema.parse(body);
   const db = getDb(c.env.DB);
 
-  const item = await db
-    .insert(groceryItems)
-    .values({
+  const itemId = crypto.randomUUID();
+  const item = await withAudit(
+    db,
+    {
       householdId: session.householdId,
-      createdByUserId: session.userId,
-      itemName: validated.name.trim(),
-      category: validated.category?.trim() || DEFAULT_GROCERY_CATEGORY,
-    })
-    .returning()
-    .get();
+      tableName: "grocery_items",
+      recordId: itemId,
+      operation: "INSERT",
+      newValues: (result) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .insert(groceryItems)
+        .values({
+          id: itemId,
+          householdId: session.householdId,
+          createdByUserId: session.userId,
+          itemName: validated.name.trim(),
+          category: validated.category?.trim() || DEFAULT_GROCERY_CATEGORY,
+        })
+        .returning()
+        .get()
+  );
 
   if (!item) {
     logServerError("addItem", new Error("Insert returned empty result"), { householdId: session.householdId });
@@ -116,7 +141,11 @@ groceriesRoute.post("/", async (c) => {
 // Toggle purchased
 groceriesRoute.post("/:id/toggle", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:toggle`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:toggle`,
+    ROUTE_RATE_LIMITS.groceries.toggle
+  );
 
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
@@ -137,20 +166,37 @@ groceriesRoute.post("/:id/toggle", async (c) => {
 
   const newPurchasedAt = existing.isPurchased ? null : (validated.purchasedAt ?? new Date());
 
-  const updated = await db
-    .update(groceryItems)
-    .set({
-      isPurchased: !existing.isPurchased,
-      purchasedAt: newPurchasedAt,
-    })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        scopeToHousehold(groceryItems.householdId, session.householdId)
-      )
-    )
-    .returning()
-    .get();
+  const updated = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "grocery_items",
+      recordId: id,
+      operation: "UPDATE",
+      oldValues: existing,
+      newValues: (result) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(groceryItems)
+        .set({
+          isPurchased: !existing.isPurchased,
+          purchasedAt: newPurchasedAt,
+        })
+        .where(
+          and(
+            eq(groceryItems.id, id),
+            scopeToHousehold(groceryItems.householdId, session.householdId)
+          )
+        )
+        .returning()
+        .get()
+  );
+
+  if (!updated) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
 
   await broadcastToHousehold(c.env, session.householdId, {
     type: "GROCERY_UPDATE",
@@ -164,28 +210,57 @@ groceriesRoute.post("/:id/toggle", async (c) => {
 // Update item name
 groceriesRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:update`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:update`,
+    ROUTE_RATE_LIMITS.groceries.update
+  );
 
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = updateItemSchema.parse(body);
   const db = getDb(c.env.DB);
 
-  const updated = await db
-    .update(groceryItems)
-    .set({
-      itemName: validated.name.trim(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        scopeToHousehold(groceryItems.householdId, session.householdId),
-        isNull(groceryItems.deletedAt)
-      )
-    )
-    .returning()
-    .get();
+  const existing = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, id),
+      scopeToHousehold(groceryItems.householdId, session.householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
+
+  const updated = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "grocery_items",
+      recordId: id,
+      operation: "UPDATE",
+      oldValues: existing,
+      newValues: (result) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(groceryItems)
+        .set({
+          itemName: validated.name.trim(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(groceryItems.id, id),
+            scopeToHousehold(groceryItems.householdId, session.householdId),
+            isNull(groceryItems.deletedAt)
+          )
+        )
+        .returning()
+        .get()
+  );
 
   if (!updated) {
     throw new ActionError("Item not found", "NOT_FOUND");
@@ -203,7 +278,11 @@ groceriesRoute.patch("/:id", async (c) => {
 // Update item tags
 groceriesRoute.put("/:id/tags", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:tags`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:tags`,
+    ROUTE_RATE_LIMITS.groceries.tags
+  );
 
   const id = c.req.param("id");
   const body = await c.req.json();
@@ -258,7 +337,11 @@ groceriesRoute.put("/:id/tags", async (c) => {
 // Update purchase date
 groceriesRoute.patch("/:id/purchase-date", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:updateDate`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:updateDate`,
+    ROUTE_RATE_LIMITS.groceries.updateDate
+  );
 
   const id = c.req.param("id");
   const body = await c.req.json();
@@ -277,20 +360,33 @@ groceriesRoute.patch("/:id/purchase-date", async (c) => {
     throw new ActionError("Item not found", "NOT_FOUND");
   }
 
-  const updated = await db
-    .update(groceryItems)
-    .set({
-      purchasedAt: validated.purchasedAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        scopeToHousehold(groceryItems.householdId, session.householdId)
-      )
-    )
-    .returning()
-    .get();
+  const updated = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "grocery_items",
+      recordId: id,
+      operation: "UPDATE",
+      oldValues: existing,
+      newValues: (result) => result,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(groceryItems)
+        .set({
+          purchasedAt: validated.purchasedAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(groceryItems.id, id),
+            scopeToHousehold(groceryItems.householdId, session.householdId)
+          )
+        )
+        .returning()
+        .get()
+  );
 
   if (!updated) {
     throw new ActionError("Item not found", "NOT_FOUND");
@@ -308,22 +404,50 @@ groceriesRoute.patch("/:id/purchase-date", async (c) => {
 // Soft-delete item
 groceriesRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:groceries:delete`, RATE_LIMIT_PRESETS.MUTATION);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:delete`,
+    ROUTE_RATE_LIMITS.groceries.delete
+  );
 
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 
-  const deleted = await db
-    .update(groceryItems)
-    .set({ deletedAt: new Date() })
-    .where(
-      and(
-        eq(groceryItems.id, id),
-        scopeToHousehold(groceryItems.householdId, session.householdId)
-      )
-    )
-    .returning()
-    .get();
+  const existing = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, id),
+      scopeToHousehold(groceryItems.householdId, session.householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+  });
+
+  if (!existing) {
+    throw new ActionError("Item not found", "NOT_FOUND");
+  }
+
+  const deleted = await withAudit(
+    db,
+    {
+      householdId: session.householdId,
+      tableName: "grocery_items",
+      recordId: id,
+      operation: "DELETE",
+      oldValues: existing,
+      changedBy: session.userId,
+    },
+    async () =>
+      db
+        .update(groceryItems)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(groceryItems.id, id),
+            scopeToHousehold(groceryItems.householdId, session.householdId)
+          )
+        )
+        .returning()
+        .get()
+  );
 
   if (!deleted) {
     throw new ActionError("Item not found", "NOT_FOUND");
@@ -341,7 +465,11 @@ groceriesRoute.delete("/:id", async (c) => {
 // Clear old purchased items (90+ days)
 groceriesRoute.post("/clear-old", async (c) => {
   const session = c.get("appSession");
-  const { allowed } = await checkRateLimit(c.env.CACHE, `${session.userId}:groceries:clear`, RATE_LIMIT_PRESETS.BULK);
+  const { allowed } = await checkRateLimit(
+    c.env.CACHE,
+    `${session.userId}:groceries:clear`,
+    ROUTE_RATE_LIMITS.groceries.clear
+  );
   if (!allowed) {
     return c.json({ deleted: 0, skipped: true });
   }
@@ -350,7 +478,7 @@ groceriesRoute.post("/clear-old", async (c) => {
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const result = await db
+  const deletedRows = await db
     .delete(groceryItems)
     .where(
       and(
@@ -360,7 +488,21 @@ groceriesRoute.post("/clear-old", async (c) => {
         lt(groceryItems.purchasedAt, ninetyDaysAgo)
       )
     )
-    .returning({ id: groceryItems.id });
+    .returning();
 
-  return c.json({ deleted: result.length });
+  if (deletedRows.length > 0) {
+    await insertManyAuditLogs(
+      db,
+      deletedRows.map((row) => ({
+        householdId: session.householdId,
+        tableName: "grocery_items",
+        recordId: row.id,
+        operation: "DELETE",
+        oldValues: row,
+        changedBy: session.userId,
+      }))
+    );
+  }
+
+  return c.json({ deleted: deletedRows.length });
 });

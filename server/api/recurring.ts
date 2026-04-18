@@ -7,6 +7,7 @@ import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import type { CurrencyCode } from "@amigo/db";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 type Frequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 
@@ -105,6 +106,11 @@ async function getHomeCurrency(db: ReturnType<typeof getDb>, householdId: string
 // List rules
 recurringRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:list`,
+    ROUTE_RATE_LIMITS.recurring.list
+  );
   const db = getDb(c.env.DB);
 
   const rules = await db.query.recurringTransactions.findMany({
@@ -121,6 +127,11 @@ recurringRoute.get("/", async (c) => {
 // Create rule
 recurringRoute.post("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:create`,
+    ROUTE_RATE_LIMITS.recurring.create
+  );
   const body = await c.req.json();
   const validated = createRuleSchema.parse(body);
   const db = getDb(c.env.DB);
@@ -170,6 +181,11 @@ recurringRoute.post("/", async (c) => {
 // Update rule
 recurringRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:update`,
+    ROUTE_RATE_LIMITS.recurring.update
+  );
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = updateRuleSchema.parse(body);
@@ -251,6 +267,11 @@ recurringRoute.patch("/:id", async (c) => {
 // Delete rule
 recurringRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:delete`,
+    ROUTE_RATE_LIMITS.recurring.delete
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 
@@ -281,6 +302,11 @@ recurringRoute.delete("/:id", async (c) => {
 // Toggle active/inactive
 recurringRoute.post("/:id/toggle", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:toggle`,
+    ROUTE_RATE_LIMITS.recurring.toggle
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 
@@ -320,6 +346,11 @@ recurringRoute.post("/:id/toggle", async (c) => {
 // Process due recurring transactions
 recurringRoute.post("/process", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:recurring:process`,
+    ROUTE_RATE_LIMITS.recurring.process
+  );
   const db = getDb(c.env.DB);
 
   const today = new Date();

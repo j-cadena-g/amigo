@@ -11,6 +11,7 @@ function getHonoContext(context: any) {
   const hono = context.get("hono") as {
     context: {
       get(key: "appSession"): AppSession | undefined;
+      get(key: "cspNonce"): string | undefined;
       get(key: "sessionStatus"): SessionStatus | undefined;
       env: Env;
     };
@@ -40,6 +41,12 @@ export function requireSession(context: any): AppSession {
 export function getSessionStatus(context: any): SessionStatus {
   const hono = getHonoContext(context);
   return hono.get("sessionStatus") ?? "unauthenticated";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getCspNonce(context: any): string | undefined {
+  const hono = getHonoContext(context);
+  return hono.get("cspNonce");
 }
 
 /**

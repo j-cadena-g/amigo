@@ -23,6 +23,9 @@ build/
 *.swo
 .playwright-cli/
 .claude/
+.codex/
+.cursor/
+.gemini/
 
 # OS
 .DS_Store
@@ -52,3 +55,8 @@ migration-checkpoint.json
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# local agent/editor config
+/.mcp.json
+/executor.jsonc
+/opencode.json

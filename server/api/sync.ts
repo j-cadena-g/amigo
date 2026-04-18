@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { HonoEnv } from "../env";
 import { getDb, groceryItems, groceryItemTags, scopeToHousehold, eq, and, isNull } from "@amigo/db";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { logServerError } from "../lib/errors";
 
@@ -31,7 +31,7 @@ export const syncRoute = new Hono<HonoEnv>();
 
 syncRoute.post("/", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:sync`, RATE_LIMIT_PRESETS.BULK);
+  await enforceRateLimit(c.env.CACHE, `${session.userId}:sync`, ROUTE_RATE_LIMITS.sync.batch);
 
   const body = await c.req.json();
   const validated = batchSyncSchema.parse(body);

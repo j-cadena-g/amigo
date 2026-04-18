@@ -4,6 +4,7 @@ import type { HonoEnv } from "../env";
 import { getDb, groceryTags, eq, and, sql } from "@amigo/db";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 const TAG_COLORS = [
   "blue", "red", "green", "yellow", "purple", "pink", "orange", "gray",
@@ -24,6 +25,11 @@ export const tagsRoute = new Hono<HonoEnv>();
 // List tags
 tagsRoute.get("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:tags:list`,
+    ROUTE_RATE_LIMITS.tags.list
+  );
   const db = getDb(c.env.DB);
 
   const tags = await db.query.groceryTags.findMany({
@@ -37,6 +43,11 @@ tagsRoute.get("/", async (c) => {
 // Create tag
 tagsRoute.post("/", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:tags:create`,
+    ROUTE_RATE_LIMITS.tags.create
+  );
   const body = await c.req.json();
   const validated = createTagSchema.parse(body);
   const db = getDb(c.env.DB);
@@ -75,6 +86,11 @@ tagsRoute.post("/", async (c) => {
 // Update tag
 tagsRoute.patch("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:tags:update`,
+    ROUTE_RATE_LIMITS.tags.update
+  );
   const id = c.req.param("id");
   const body = await c.req.json();
   const validated = updateTagSchema.parse(body);
@@ -125,6 +141,11 @@ tagsRoute.patch("/:id", async (c) => {
 // Delete tag
 tagsRoute.delete("/:id", async (c) => {
   const session = c.get("appSession");
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:tags:delete`,
+    ROUTE_RATE_LIMITS.tags.delete
+  );
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
 

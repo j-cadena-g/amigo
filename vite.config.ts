@@ -3,11 +3,13 @@ import adapter from "@hono/vite-dev-server/cloudflare";
 import tailwindcss from "@tailwindcss/vite";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 import { VitePWA } from "vite-plugin-pwa";
 import { getLoadContext } from "./load-context";
 
 export default defineConfig({
+  resolve: {
+    tsconfigPaths: true,
+  },
   build: {
     rollupOptions: {
       onwarn(warning, defaultHandler) {
@@ -24,7 +26,6 @@ export default defineConfig({
       entry: "server/index.ts",
       getLoadContext: getLoadContext as never,
     }),
-    tsconfigPaths(),
     VitePWA({
       registerType: "autoUpdate",
       manifest: {

@@ -5,10 +5,12 @@ import {
   getDb, users, transactions, recurringTransactions, budgets, assets, debts,
   groceryItems, pushSubscriptions, scopeToHousehold, eq, and, isNull, sql,
 } from "@amigo/db";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
-import { broadcastToHousehold } from "../lib/realtime";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { broadcastToHousehold, invalidateUserSession } from "../lib/realtime";
 import { ActionError, logSecurityEvent } from "../lib/errors";
 import { canManageMembers, canTransferOwnership, canChangeRole, assertPermission } from "../lib/permissions";
+import { invalidateSessionCachesForHouseholdMembers } from "../lib/session-cache";
+import { getTransferOwnershipUsers } from "../lib/member-queries";
 
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
@@ -19,7 +21,11 @@ export const membersRoute = new Hono<HonoEnv>();
 // List household members
 membersRoute.get("/", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:members:list`, RATE_LIMIT_PRESETS.READ);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:members:list`,
+    ROUTE_RATE_LIMITS.members.list
+  );
 
   const db = getDb(c.env.DB);
 
@@ -44,7 +50,11 @@ membersRoute.get("/", async (c) => {
 // Update member role
 membersRoute.patch("/:userId/role", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:members:role`, RATE_LIMIT_PRESETS.SENSITIVE);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:members:role`,
+    ROUTE_RATE_LIMITS.members.role
+  );
   assertPermission(canManageMembers(session), "Not authorized to manage members");
 
   const targetUserId = c.req.param("userId");
@@ -55,7 +65,8 @@ membersRoute.patch("/:userId/role", async (c) => {
   const targetUser = await db.query.users.findFirst({
     where: and(
       eq(users.id, targetUserId),
-      scopeToHousehold(users.householdId, session.householdId)
+      scopeToHousehold(users.householdId, session.householdId),
+      isNull(users.deletedAt)
     ),
   });
 
@@ -71,10 +82,10 @@ membersRoute.patch("/:userId/role", async (c) => {
 
   await db.update(users).set({ role }).where(eq(users.id, targetUserId));
 
-  // Invalidate target user's cached session
-  if (targetUser.authId) {
-    await c.env.CACHE.delete(`session:${targetUser.authId}`);
-  }
+  await invalidateSessionCachesForHouseholdMembers(c.env, [
+    { authId: targetUser.authId, orgId: session.orgId },
+  ]);
+  await invalidateUserSession(c.env, session.householdId, targetUserId);
 
   await broadcastToHousehold(c.env, session.householdId, {
     type: "MEMBER_UPDATE",
@@ -88,7 +99,11 @@ membersRoute.patch("/:userId/role", async (c) => {
 // Transfer ownership
 membersRoute.post("/transfer-ownership", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:members:transfer`, RATE_LIMIT_PRESETS.SENSITIVE);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:members:transfer`,
+    ROUTE_RATE_LIMITS.members.transfer
+  );
   assertPermission(canTransferOwnership(session), "Only the owner can transfer ownership");
 
   const { newOwnerId } = z.object({ newOwnerId: z.string().uuid() }).parse(await c.req.json());
@@ -98,15 +113,22 @@ membersRoute.post("/transfer-ownership", async (c) => {
     throw new ActionError("You are already the owner", "VALIDATION_ERROR");
   }
 
-  const newOwner = await db.query.users.findFirst({
-    where: and(
-      eq(users.id, newOwnerId),
-      scopeToHousehold(users.householdId, session.householdId)
-    ),
-  });
+  const [newOwner, currentUser] = await getTransferOwnershipUsers(
+    db,
+    session.householdId,
+    session.userId,
+    newOwnerId
+  );
 
   if (!newOwner) {
     throw new ActionError("User not found in household", "NOT_FOUND");
+  }
+
+  if (!currentUser) {
+    throw new ActionError(
+      "Session inconsistency — please sign out and back in",
+      "UNAUTHORIZED"
+    );
   }
 
   // Demote current owner → admin, promote new owner
@@ -115,11 +137,14 @@ membersRoute.post("/transfer-ownership", async (c) => {
     db.update(users).set({ role: "owner" }).where(eq(users.id, newOwnerId)),
   ]);
 
-  // Invalidate both users' cached sessions
-  await c.env.CACHE.delete(`session:${session.userId}`);
-  if (newOwner.authId) {
-    await c.env.CACHE.delete(`session:${newOwner.authId}`);
-  }
+  await invalidateSessionCachesForHouseholdMembers(c.env, [
+    { authId: currentUser.authId, orgId: session.orgId },
+    { authId: newOwner.authId, orgId: session.orgId },
+  ]);
+  await Promise.all([
+    invalidateUserSession(c.env, session.householdId, session.userId),
+    invalidateUserSession(c.env, session.householdId, newOwnerId),
+  ]);
 
   logSecurityEvent("ownership_transferred", {
     fromUserId: session.userId,
@@ -138,7 +163,11 @@ membersRoute.post("/transfer-ownership", async (c) => {
 // Get member data summary (for removal confirmation)
 membersRoute.get("/:userId/data-summary", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:members:summary`, RATE_LIMIT_PRESETS.READ);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:members:summary`,
+    ROUTE_RATE_LIMITS.members.summary
+  );
   assertPermission(canManageMembers(session), "Not authorized");
 
   const targetUserId = c.req.param("userId");
@@ -197,7 +226,11 @@ membersRoute.get("/:userId/data-summary", async (c) => {
 // Remove member (soft delete + denormalize display names)
 membersRoute.delete("/:userId", async (c) => {
   const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:members:remove`, RATE_LIMIT_PRESETS.SENSITIVE);
+  await enforceRateLimit(
+    c.env.CACHE,
+    `${session.userId}:members:remove`,
+    ROUTE_RATE_LIMITS.members.remove
+  );
   assertPermission(canManageMembers(session), "Not authorized to remove members");
 
   const targetUserId = c.req.param("userId");
@@ -240,10 +273,10 @@ membersRoute.delete("/:userId", async (c) => {
     db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, targetUserId)),
   ]);
 
-  // Invalidate removed user's session
-  if (targetUser.authId) {
-    await c.env.CACHE.delete(`session:${targetUser.authId}`);
-  }
+  await invalidateSessionCachesForHouseholdMembers(c.env, [
+    { authId: targetUser.authId, orgId: session.orgId },
+  ]);
+  await invalidateUserSession(c.env, session.householdId, targetUserId);
 
   logSecurityEvent("member_removed", {
     removedUserId: targetUserId,

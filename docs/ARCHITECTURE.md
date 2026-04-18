@@ -335,7 +335,6 @@ bun run db:migrate:remote        # Apply to production D1
 ### CI/CD (GitHub Actions)
 
 * **Push/PR:** Lint → Typecheck → Test
-* **PR:** Deploy preview (isolated D1 + KV via `--env preview`)
 * **Main:** Deploy production via `wrangler deploy`
 
 ### Required Secrets

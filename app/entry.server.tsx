@@ -8,12 +8,15 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  _loadContext: AppLoadContext
+  loadContext: AppLoadContext
 ) {
   const userAgent = request.headers.get("user-agent");
+  const cspNonce =
+    loadContext.hono?.context.get("cspNonce") || undefined;
   const body = await renderToReadableStream(
     <ServerRouter context={routerContext} url={request.url} />,
     {
+      nonce: cspNonce,
       signal: request.signal,
       onError(error: unknown) {
         console.error(error);

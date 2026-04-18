@@ -11,6 +11,7 @@ export interface Env {
 export interface AppSession {
   userId: string;
   householdId: string;
+  orgId: string;
   role: "owner" | "admin" | "member";
   email: string;
   name: string | null;
@@ -20,12 +21,18 @@ export interface AppSession {
  * Status of session resolution, set by resolveAppSessionSoft middleware.
  * Loaders use this to determine where to redirect.
  */
-export type SessionStatus = "authenticated" | "no_org" | "needs_setup" | "unauthenticated";
+export type SessionStatus =
+  | "authenticated"
+  | "no_org"
+  | "needs_setup"
+  | "revoked"
+  | "unauthenticated";
 
 export type HonoEnv = {
   Bindings: Env;
   Variables: {
     appSession: AppSession;
+    cspNonce: string;
     sessionStatus: SessionStatus;
   };
 };

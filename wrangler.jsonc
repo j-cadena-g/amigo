@@ -47,6 +47,17 @@
     "mode": "smart"
   },
 
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.25
+    }
+  },
+
   "workers_dev": false,
   "preview_urls": false,
 
@@ -61,6 +72,5 @@
   "vars": {
     "APP_ENV": "production",
     "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWktYW1pZ28uY29tJA"
-  },
-
+  }
 }

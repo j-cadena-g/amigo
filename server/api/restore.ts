@@ -14,7 +14,7 @@ import {
 import type { HonoEnv } from "../env";
 import { ActionError } from "../lib/errors";
 import { logSecurityEvent, logServerError } from "../lib/errors";
-import { enforceRateLimit, RATE_LIMIT_PRESETS } from "../middleware/rate-limit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 
 const RESTORE_TOKEN_PREFIX = "restore:";
 
@@ -41,7 +41,11 @@ export const restoreRoute = new Hono<HonoEnv>()
    * POST /restore — Reactivate user account, reconnect to previous data.
    */
   .post("/restore", async (c) => {
-    await enforceRateLimit(c.env.CACHE, `restore:${c.req.header("cf-connecting-ip") ?? "unknown"}`, RATE_LIMIT_PRESETS.SENSITIVE);
+    await enforceRateLimit(
+      c.env.CACHE,
+      `restore:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+      ROUTE_RATE_LIMITS.restore.restore
+    );
 
     const body = await c.req.json<{ token: string }>();
     if (!body.token) {
@@ -122,7 +126,11 @@ export const restoreRoute = new Hono<HonoEnv>()
    * POST /fresh-start — Reactivate as member, transfer all data to household owner.
    */
   .post("/fresh-start", async (c) => {
-    await enforceRateLimit(c.env.CACHE, `fresh-start:${c.req.header("cf-connecting-ip") ?? "unknown"}`, RATE_LIMIT_PRESETS.SENSITIVE);
+    await enforceRateLimit(
+      c.env.CACHE,
+      `fresh-start:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+      ROUTE_RATE_LIMITS.restore.freshStart
+    );
 
     const body = await c.req.json<{ token: string }>();
     if (!body.token) {

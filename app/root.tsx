@@ -6,16 +6,24 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
 import type { Route } from "./+types/root";
 import "./app.css";
+import { getCspNonce } from "@/app/lib/session.server";
 
 export const middleware: Route.MiddlewareFunction[] = [clerkMiddleware()];
 
-export const loader = (args: Route.LoaderArgs) => rootAuthLoader(args);
+export const loader = (args: Route.LoaderArgs) =>
+  rootAuthLoader(args, () => ({
+    cspNonce: getCspNonce(args.context) ?? "",
+  }));
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const rootData = useRouteLoaderData("root") as { cspNonce?: string } | undefined;
+  const cspNonce = rootData?.cspNonce || undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -35,17 +43,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
           rel="stylesheet"
         />
         <Meta />
-        <Links />
+        <Links nonce={cspNonce} />
       </head>
       <body className="font-sans antialiased">
         <script
+          nonce={cspNonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
           }}
         />
         {children}
-        <ScrollRestoration />
-        <Scripts />
+        <ScrollRestoration nonce={cspNonce} />
+        <Scripts nonce={cspNonce} />
       </body>
     </html>
   );

@@ -8,15 +8,10 @@ import type { AppSession, Env, SessionStatus } from "../../server/env";
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getHonoContext(context: any) {
-  const hono = context.get("hono") as {
-    context: {
-      get(key: "appSession"): AppSession | undefined;
-      get(key: "cspNonce"): string | undefined;
-      get(key: "sessionStatus"): SessionStatus | undefined;
-      env: Env;
-    };
-  };
-  return hono.context;
+  const legacyHono = context?.hono?.context;
+  if (legacyHono) return legacyHono;
+
+  throw new Error("Missing Hono router context");
 }
 
 /**
@@ -54,6 +49,8 @@ export function getCspNonce(context: any): string | undefined {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getEnv(context: any): Env {
-  const hono = getHonoContext(context);
-  return hono.env;
+  const legacyCloudflare = context?.cloudflare?.env;
+  if (legacyCloudflare) return legacyCloudflare;
+
+  return getHonoContext(context).env;
 }

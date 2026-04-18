@@ -11,8 +11,15 @@ export default async function handleRequest(
   loadContext: AppLoadContext
 ) {
   const userAgent = request.headers.get("user-agent");
-  const cspNonce =
-    loadContext.hono?.context.get("cspNonce") || undefined;
+  const cspNonce = (
+    loadContext as {
+      hono?: {
+        context?: {
+          get(key: "cspNonce"): string | undefined;
+        };
+      };
+    }
+  ).hono?.context?.get("cspNonce");
   const body = await renderToReadableStream(
     <ServerRouter context={routerContext} url={request.url} />,
     {

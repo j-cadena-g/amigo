@@ -1,4 +1,4 @@
-import handle from "hono-react-router-adapter/cloudflare-workers";
+import handle from "./react-router-worker";
 // @ts-expect-error - virtual module resolved at build time
 import * as build from "./build/server";
 import app from "./server/index";

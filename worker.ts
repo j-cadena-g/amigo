@@ -1,4 +1,4 @@
-import handle from "hono-react-router-adapter/cloudflare-workers";
+import handle from "./react-router-worker";
 // @ts-expect-error - virtual module resolved at build time
 import * as build from "./build/server";
 import app from "./server/index";
@@ -7,7 +7,7 @@ import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
 import type { Env } from "./server/env";
 
-const server = handle(build, app, { getLoadContext: getLoadContext as never });
+const server = handle(build, app, { getLoadContext });
 
 export default {
   fetch: server.fetch,

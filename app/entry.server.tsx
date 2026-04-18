@@ -2,6 +2,7 @@ import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
 import { isbot } from "isbot";
+import { getCspNonce } from "./lib/session.server";
 
 export default async function handleRequest(
   request: Request,
@@ -11,8 +12,7 @@ export default async function handleRequest(
   loadContext: AppLoadContext
 ) {
   const userAgent = request.headers.get("user-agent");
-  const cspNonce =
-    loadContext.hono?.context.get("cspNonce") || undefined;
+  const cspNonce = getCspNonce(loadContext);
   const body = await renderToReadableStream(
     <ServerRouter context={routerContext} url={request.url} />,
     {

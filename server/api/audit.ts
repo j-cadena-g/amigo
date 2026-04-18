@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getDb, auditLogs, users, eq, desc } from "@amigo/db";
+import { getDb, auditLogs, users, and, desc, eq, inArray } from "@amigo/db";
 import type { HonoEnv } from "../env";
 import { ActionError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
@@ -48,14 +48,25 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
     .limit(50);
 
   // Look up user names for changedBy user IDs
-  const userIds = [...new Set(logs.map((l) => l.changedBy).filter(Boolean))];
+  const userIds = [
+    ...new Set(
+      logs
+        .map((l) => l.changedBy)
+        .filter((userId): userId is string => typeof userId === "string")
+    ),
+  ];
   const userMap = new Map<string, string>();
 
   if (userIds.length > 0) {
     const householdUsers = await db
       .select({ id: users.id, name: users.name, email: users.email })
       .from(users)
-      .where(eq(users.householdId, session.householdId))
+      .where(
+        and(
+          eq(users.householdId, session.householdId),
+          inArray(users.id, userIds)
+        )
+      )
       .all();
 
     for (const u of householdUsers) {

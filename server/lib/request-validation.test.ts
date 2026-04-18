@@ -33,6 +33,19 @@ describe("parseTransactionsListQuery", () => {
         limit: "999",
       })
     ).toEqual({
+      page: 1,
+      limit: MAX_TRANSACTIONS_LIMIT,
+      type: undefined,
+    });
+  });
+
+  it("clamps negative and oversized pagination safely", () => {
+    expect(
+      parseTransactionsListQuery({
+        page: "-5",
+        limit: `${Number.MAX_SAFE_INTEGER + 1}`,
+      })
+    ).toEqual({
       page: DEFAULT_TRANSACTIONS_PAGE,
       limit: MAX_TRANSACTIONS_LIMIT,
       type: undefined,
@@ -106,6 +119,30 @@ describe("parseTransactionsListQuery", () => {
       type: undefined,
     });
   });
+
+  it("accepts minimum and maximum supported pagination boundaries", () => {
+    expect(
+      parseTransactionsListQuery({
+        page: "1",
+        limit: "1",
+      })
+    ).toEqual({
+      page: 1,
+      limit: 1,
+      type: undefined,
+    });
+
+    expect(
+      parseTransactionsListQuery({
+        page: "4",
+        limit: `${MAX_TRANSACTIONS_LIMIT}`,
+      })
+    ).toEqual({
+      page: 4,
+      limit: MAX_TRANSACTIONS_LIMIT,
+      type: undefined,
+    });
+  });
 });
 
 describe("parseCalendarQuery", () => {
@@ -141,7 +178,14 @@ describe("parseCalendarQuery", () => {
   });
 
   it("rejects non-numeric or missing calendar params", () => {
-    for (const query of [{ year: "abc", month: "4" }, { year: "2026", month: "0" }, {}, { year: "2026" }]) {
+    for (const query of [
+      { year: "abc", month: "4" },
+      { year: "2026", month: "0" },
+      { year: "2019", month: "4" },
+      { year: "2101", month: "4" },
+      {},
+      { year: "2026" },
+    ]) {
       expect(() => parseCalendarQuery(query)).toThrowError(
         expect.objectContaining({
           message: "Valid year and month are required",

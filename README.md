@@ -70,7 +70,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 
 Current Worker bindings in `wrangler.jsonc`:
 
-- D1 database: `amigo-db`
+- D1 database binding: `DB` (`amigo-db`)
 - KV namespace: `CACHE`
 - Durable Object: `HOUSEHOLD`
 - Static asset binding: `ASSETS`

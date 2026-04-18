@@ -12,7 +12,9 @@ type LoadContextArgs = {
   };
 };
 
-type GetLoadContext = (args: LoadContextArgs) => unknown | Promise<unknown>;
+export type GetLoadContext = (
+  args: LoadContextArgs
+) => unknown | Promise<unknown>;
 
 function createLoadContextArgs(c: import("hono").Context<HonoEnv>): LoadContextArgs {
   return {
@@ -31,12 +33,16 @@ function createLoadContextArgs(c: import("hono").Context<HonoEnv>): LoadContextA
   };
 }
 
-function createReactRouterMiddleware(build: unknown, getLoadContext?: GetLoadContext): MiddlewareHandler<HonoEnv> {
+function createReactRouterMiddleware(
+  build: unknown,
+  getLoadContext?: GetLoadContext
+): MiddlewareHandler<HonoEnv> {
+  const requestHandler = createRequestHandler(
+    build as Parameters<typeof createRequestHandler>[0],
+    "production"
+  );
+
   return async (c) => {
-    const requestHandler = createRequestHandler(
-      build as Parameters<typeof createRequestHandler>[0],
-      "production"
-    );
     const args = createLoadContextArgs(c);
     const loadContext = getLoadContext ? await getLoadContext(args) : args.context;
     return requestHandler(

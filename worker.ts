@@ -7,7 +7,7 @@ import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
 import type { Env } from "./server/env";
 
-const server = handle(build, app, { getLoadContext: getLoadContext as never });
+const server = handle(build, app, { getLoadContext });
 
 export default {
   fetch: server.fetch,

@@ -424,6 +424,7 @@ function transformRows(
       } catch (err) {
         throw new Error(
           `Transform error in ${tableDef.pgTable} row ${idx}, column "${col.pg}": ${err instanceof Error ? err.message : err}`,
+          { cause: err },
         );
       }
     }

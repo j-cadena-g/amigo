@@ -141,7 +141,7 @@ Notable API groups:
 
 ## Deployment
 
-`bun run deploy` uses the default Wrangler configuration in [`wrangler.jsonc`](./wrangler.jsonc). In this repo that includes:
+`bun run deploy` uses the default Wrangler configuration in [`wrangler.jsonc`](./wrangler.jsonc). In this repository, the configuration includes:
 
 - Worker name `amigo`
 - Smart placement enabled

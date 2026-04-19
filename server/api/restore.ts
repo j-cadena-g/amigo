@@ -234,6 +234,12 @@ export const handleRestoreRequest: ApiHandler = async ({
   }
 
   if (request.method === "POST" && path === "cancel") {
+    await enforceRateLimit(
+      env.CACHE,
+      `cancel:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+      ROUTE_RATE_LIMITS.restore.cancel
+    );
+
     const body = (await request.json()) as { token?: string };
     if (body.token) {
       await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);

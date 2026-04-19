@@ -39,7 +39,8 @@ export const handleMembersRequest: ApiHandler = async ({
   session,
 }) => {
   const path = getSplatPath(params);
-  const [userId, action] = getSplatSegments(params);
+  const splatSegments = getSplatSegments(params);
+  const [userId, action] = splatSegments;
   const db = getDb(env.DB);
 
   if (request.method === "GET" && !path) {
@@ -67,7 +68,12 @@ export const handleMembersRequest: ApiHandler = async ({
     return Response.json(members);
   }
 
-  if (request.method === "PATCH" && userId && action === "role") {
+  if (
+    request.method === "PATCH" &&
+    userId &&
+    action === "role" &&
+    splatSegments.length === 2
+  ) {
     await enforceRateLimit(
       env.CACHE,
       `${session!.userId}:members:role`,
@@ -184,7 +190,12 @@ export const handleMembersRequest: ApiHandler = async ({
     return Response.json({ success: true });
   }
 
-  if (request.method === "GET" && userId && action === "data-summary") {
+  if (
+    request.method === "GET" &&
+    userId &&
+    action === "data-summary" &&
+    splatSegments.length === 2
+  ) {
     await enforceRateLimit(
       env.CACHE,
       `${session!.userId}:members:summary`,
@@ -256,7 +267,12 @@ export const handleMembersRequest: ApiHandler = async ({
     });
   }
 
-  if (request.method === "DELETE" && userId && !action) {
+  if (
+    request.method === "DELETE" &&
+    userId &&
+    !action &&
+    splatSegments.length === 1
+  ) {
     await enforceRateLimit(
       env.CACHE,
       `${session!.userId}:members:remove`,

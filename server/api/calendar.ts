@@ -193,12 +193,26 @@ export const handleCalendarRequest: ApiHandler = async ({
       .all(),
   ]);
 
+  const recurringRules: RecurringRule[] = rules.map((rule) => ({
+    id: rule.id,
+    category: rule.category,
+    description: rule.description,
+    amount: rule.amount,
+    currency: rule.currency,
+    type: rule.type,
+    frequency: rule.frequency,
+    interval: rule.interval,
+    startDate: rule.startDate,
+    endDate: rule.endDate,
+    nextRunDate: rule.nextRunDate,
+    lastRunDate: rule.lastRunDate,
+    active: rule.active,
+  }));
+
   const events: CalendarEvent[] = [];
 
-  for (const rule of rules) {
-    events.push(
-      ...getRecurringOccurrences(rule as RecurringRule, monthStart, monthEnd)
-    );
+  for (const rule of recurringRules) {
+    events.push(...getRecurringOccurrences(rule, monthStart, monthEnd));
   }
 
   for (const item of purchasedGroceries) {
@@ -229,22 +243,6 @@ export const handleCalendarRequest: ApiHandler = async ({
       },
     });
   }
-
-  const recurringRules = rules.map((rule) => ({
-    id: rule.id,
-    category: rule.category,
-    description: rule.description,
-    amount: rule.amount,
-    currency: rule.currency,
-    type: rule.type,
-    frequency: rule.frequency,
-    interval: rule.interval,
-    startDate: rule.startDate,
-    endDate: rule.endDate,
-    nextRunDate: rule.nextRunDate,
-    lastRunDate: rule.lastRunDate,
-    active: rule.active,
-  }));
 
   return Response.json({ events, recurringRules });
 };

@@ -103,7 +103,12 @@ export const handleAuditRequest: ApiHandler = async ({
       const newValues = log.newValues as Record<string, unknown>;
       changes = {};
 
-      for (const key of Object.keys(newValues)) {
+      const changedKeys = new Set([
+        ...Object.keys(oldValues),
+        ...Object.keys(newValues),
+      ]);
+
+      for (const key of changedKeys) {
         if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
           changes[key] = { from: oldValues[key], to: newValues[key] };
         }

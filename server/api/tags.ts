@@ -16,13 +16,18 @@ const TAG_COLORS = [
   "gray",
 ] as const;
 
+const trimmedNameSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : value),
+  z.string().min(1).max(50)
+);
+
 const createTagSchema = z.object({
-  name: z.string().min(1).max(50),
+  name: trimmedNameSchema,
   color: z.enum(TAG_COLORS).optional(),
 });
 
 const updateTagSchema = z.object({
-  name: z.string().min(1).max(50),
+  name: trimmedNameSchema,
   color: z.enum(TAG_COLORS),
 });
 

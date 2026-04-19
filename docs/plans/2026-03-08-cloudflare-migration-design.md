@@ -12,7 +12,7 @@ Migrate amigo from a self-hosted Docker + Next.js + PostgreSQL + Valkey + Authen
 
 | Concern | Current | Target |
 |---------|---------|--------|
-| **Framework** | Next.js 15 (App Router) | Hono (server) + React Router v7 (client) |
+| **Framework** | Next.js 15 (App Router) | React Router v7 (framework mode on Cloudflare Workers) |
 | **Runtime** | Bun on Docker | Cloudflare Workers (V8 isolates) |
 | **Database** | PostgreSQL 17 + Drizzle | Cloudflare D1 (SQLite) + Drizzle |
 | **Auth** | Authentik (OIDC, self-hosted) | Clerk |
@@ -45,14 +45,14 @@ Migrate amigo from a self-hosted Docker + Next.js + PostgreSQL + Valkey + Authen
 
 ### Single Worker Model
 
-All requests hit one Cloudflare Worker. Hono is the entrypoint and server framework. React Router v7 handles client-side routing after hydration.
+All requests hit one Cloudflare Worker. `worker.ts` owns the platform entrypoint, routes `/ws` upgrades and scheduled jobs directly, and delegates application HTTP handling to React Router's `createRequestHandler`.
 
 ```
                     Cloudflare Edge
                     ┌─────────────────────────────────────────┐
                     │                                         │
-  Client ──────────►│  Worker (Hono entrypoint)               │
-                    │  ├── /api/*  → Hono API handlers        │
+  Client ──────────►│  Worker (`createRequestHandler`)        │
+                    │  ├── /api/*  → RR resource routes       │
                     │  ├── /ws    → Durable Object upgrade    │
                     │  └── /*     → SSR React app             │
                     │                                         │
@@ -66,10 +66,10 @@ All requests hit one Cloudflare Worker. Hono is the entrypoint and server framew
 **Request flow:**
 
 1. Every request enters through `worker.ts`
-2. React Router root middleware runs Clerk auth + app context resolution
-3. `/api/*` routes are handled by React Router resource routes
-4. `/ws` upgrades are handled directly in the Worker and proxied to the Durable Object stub
-5. All other routes SSR the React app, which hydrates with React Router v7
+2. `/ws` upgrades stay Worker-owned and proxy directly to the Durable Object stub
+3. `scheduled` events and security headers stay Worker-owned concerns
+4. All other requests flow through React Router root middleware for Clerk auth + app context resolution
+5. `/api/*` routes are handled by React Router resource routes and page requests SSR the React app before hydration
 
 ### SSR Strategy
 
@@ -109,28 +109,14 @@ amigo/
 │   │   └── utils.ts              # Client helpers
 │   ├── root.tsx                  # Root layout (html, head, body)
 │   └── entry.client.tsx          # Client hydration entry
-├── server/                       # Hono server code (runs in Worker)
-│   ├── index.ts                  # Hono app: middleware stack + route mounting
+├── server/                       # Worker-only server code
 │   ├── middleware/
-│   │   ├── auth.ts               # Clerk middleware + session helpers
-│   │   ├── rate-limit.ts         # KV-backed rate limiting
-│   │   └── household.ts          # Household context injection
-│   ├── api/                      # /api/* Hono route handlers
+│   │   ├── app-context.ts        # CSP + app session resolution
+│   │   └── rate-limit.ts         # KV-backed rate limiting
+│   ├── api/                      # /api/* resource-route handlers
 │   │   ├── groceries.ts          # Delta sync endpoint
 │   │   ├── transactions.ts       # Paginated fetch
 │   │   └── health.ts             # Health check
-│   ├── actions/                  # Mutation logic (called from RR7 actions)
-│   │   ├── groceries.ts
-│   │   ├── transactions.ts
-│   │   ├── budgets.ts
-│   │   ├── recurring.ts
-│   │   ├── assets.ts
-│   │   ├── debts.ts
-│   │   ├── tags.ts
-│   │   ├── calendar.ts
-│   │   ├── members.ts
-│   │   ├── settings.ts
-│   │   └── restore.ts
 │   ├── lib/
 │   │   ├── db.ts                 # D1 + Drizzle setup, withRLS, withAuditContext
 │   │   ├── permissions.ts        # RBAC helpers (port existing)
@@ -143,7 +129,7 @@ amigo/
 │   │   ├── src/schema/           # Table definitions
 │   │   └── drizzle.config.ts     # D1 HTTP driver config
 │   └── types/                    # Zod schemas (drizzle-zod)
-├── worker.ts                     # Worker entry: exports Hono fetch + DO classes
+├── worker.ts                     # Worker entry: request handler + DO classes
 ├── wrangler.jsonc                # Cloudflare bindings config
 ├── vite.config.ts                # Vite + cloudflare plugin + RR7 adapter
 ├── react-router.config.ts        # React Router v7 config
@@ -156,7 +142,7 @@ amigo/
 - **Monorepo simplification:** `apps/web` and `apps/api` merge. Turborepo is no longer needed since there's only one deployable unit. `packages/db` and `packages/types` stay as workspace packages for schema/type isolation.
 - **`packages/ui` inlined:** Shadcn components move into `app/components/ui/`. No need for a separate package when there's one app.
 - **Server/client split:** `server/` contains all Worker-side code (never ships to browser). `app/` contains route components, client libs, and shared React code.
-- **Actions pattern:** React Router v7 route actions call into `server/actions/*.ts` functions, which handle validation, auth checks, DB mutations, and Durable Object notifications.
+- **Actions pattern:** React Router loaders/actions and resource routes call shared server helpers directly for validation, auth checks, DB mutations, and Durable Object notifications.
 
 ## 4. Database Migration (PostgreSQL → D1/SQLite)
 
@@ -707,7 +693,7 @@ KV is eventually consistent, so rate limiting is approximate (fine for this use 
 
 - **Service worker:** Replace `@serwist/next` with `vite-plugin-pwa` (or manual SW registration)
 - **Sync target:** API endpoints are now on the same origin (`/api/groceries` instead of cross-origin)
-- **Server actions → API calls:** Offline mutations that previously called Next.js Server Actions now call Hono API endpoints
+- **Server actions → API calls:** Offline mutations that previously called Next.js Server Actions now call same-origin API resource routes
 
 ### Service Worker Strategy
 
@@ -1447,7 +1433,7 @@ These updates are included as explicit tasks in Phase 5.
 ## 24. Implementation Phases
 
 ### Phase 1: Foundation
-- Set up project scaffolding (Vite + Hono + React Router v7 + Cloudflare)
+- Set up project scaffolding (Vite + React Router v7 framework mode + Cloudflare)
 - Create `wrangler.jsonc` with D1, KV, DO bindings (incl. `preview` environment — section 18)
 - Create `.dev.vars` with Clerk secrets
 - Set up local dev bootstrap scripts (`dev:setup`, `dev:reset` — section 20)
@@ -1458,7 +1444,7 @@ These updates are included as explicit tasks in Phase 5.
 - Basic auth flow working (sign in → create user/household → dashboard)
 
 ### Phase 2: Core Features
-- Port all server actions to Hono action handlers
+- Port all server actions to React Router loaders/actions and resource routes
 - Port all React Router routes (dashboard, groceries, budget, transactions)
 - Port components (adapt from Next.js patterns to RR7 patterns)
 - Wire up loaders for SSR data fetching

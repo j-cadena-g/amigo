@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/react-router/server";
 import type { MiddlewareFunction } from "react-router";
+import { getClerkIdentity } from "../lib/clerk";
 import { createCspNonce } from "../lib/security";
 import { resolveSession } from "../lib/session";
 
@@ -21,17 +22,18 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
 
   try {
     const auth = await getAuth(args as Parameters<typeof getAuth>[0]);
+    const identity = getClerkIdentity(auth);
 
-    if (auth.userId) {
+    if (identity) {
       const result = await resolveSession(
-        auth.userId,
+        identity.userId,
         env.DB,
         env.CACHE,
         env.CLERK_SECRET_KEY,
         {
-          email: auth.sessionClaims?.email as string | undefined,
-          name: auth.sessionClaims?.name as string | undefined,
-          orgId: auth.orgId ?? undefined,
+          email: identity.email,
+          name: identity.name,
+          orgId: identity.orgId,
         }
       );
 

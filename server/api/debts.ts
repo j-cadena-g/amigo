@@ -33,14 +33,19 @@ const loanSchema = z
     path: ["totalPaid"],
   });
 
-const creditCardSchema = z.object({
-  type: z.literal("CREDIT_CARD"),
-  name: z.string().min(1),
-  creditLimit: z.number().positive(),
-  availableCredit: z.number().min(0),
-  currency: currencySchema,
-  isShared: z.boolean().optional().default(false),
-});
+const creditCardSchema = z
+  .object({
+    type: z.literal("CREDIT_CARD"),
+    name: z.string().min(1),
+    creditLimit: z.number().positive(),
+    availableCredit: z.number().min(0),
+    currency: currencySchema,
+    isShared: z.boolean().optional().default(false),
+  })
+  .refine((data) => data.availableCredit <= data.creditLimit, {
+    message: "Available credit cannot exceed credit limit",
+    path: ["availableCredit"],
+  });
 
 const addDebtSchema = z.discriminatedUnion("type", [
   loanSchema,

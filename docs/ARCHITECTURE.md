@@ -217,7 +217,7 @@ Client → Cloudflare Worker (`worker.ts`)
 
 ### Loader Pattern
 
-Loaders access Hono context via the adapter:
+Loaders access context via `AppLoadContext`:
 
 ```typescript
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -238,7 +238,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
 
 ### Mutation Pattern
 
-Client-side fetch to Hono API endpoints:
+Client-side fetch to API resource routes:
 
 ```typescript
 const res = await fetch("/api/transactions", {

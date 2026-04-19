@@ -5,6 +5,7 @@ import type { Cloudflare } from "./router-context";
 import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
 import type { Env } from "./server/env";
+import { getClerkIdentity } from "./server/lib/clerk";
 import { buildSecurityHeaders } from "./server/lib/security";
 import { resolveSession } from "./server/lib/session";
 
@@ -67,27 +68,21 @@ async function handleWebSocketUpgrade(request: Request, env: Env) {
   const authState = await clerk.authenticateRequest(request, {
     acceptsToken: "any",
   });
-  const auth = authState.toAuth() as
-    | {
-        userId?: string;
-        orgId?: string;
-        sessionClaims?: { email?: string; name?: string };
-      }
-    | null;
+  const identity = getClerkIdentity(authState.toAuth());
 
-  if (!auth?.userId) {
+  if (!identity) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const result = await resolveSession(
-    auth.userId,
+    identity.userId,
     env.DB,
     env.CACHE,
     env.CLERK_SECRET_KEY,
     {
-      email: auth.sessionClaims?.email as string | undefined,
-      name: auth.sessionClaims?.name as string | undefined,
-      orgId: auth.orgId ?? undefined,
+      email: identity.email,
+      name: identity.name,
+      orgId: identity.orgId,
     }
   );
 

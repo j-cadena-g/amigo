@@ -5,10 +5,27 @@ export type WebSocketStatus = "connecting" | "connected" | "disconnected";
 interface UseWebSocketOptions {
   onMessage: (data: unknown) => void;
   onSessionInvalidated?: () => void;
+  userId?: string | null;
   maxRetries?: number;
   baseDelay?: number;
   maxDelay?: number;
   pingInterval?: number;
+}
+
+export function buildWebSocketUrl(
+  currentUrl: string,
+  userId?: string | null
+): string {
+  const url = new URL(currentUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws";
+  url.search = "";
+
+  if (userId) {
+    url.searchParams.set("userId", userId);
+  }
+
+  return url.toString();
 }
 
 /**
@@ -20,6 +37,7 @@ interface UseWebSocketOptions {
 export function useWebSocket({
   onMessage,
   onSessionInvalidated,
+  userId,
   maxRetries = 10,
   baseDelay = 1000,
   maxDelay = 30000,
@@ -49,8 +67,7 @@ export function useWebSocket({
     connectRef.current = () => {
       if (!isMountedRef.current) return;
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = buildWebSocketUrl(window.location.href, userId);
 
       setStatus("connecting");
 
@@ -121,7 +138,16 @@ export function useWebSocket({
         }
       };
     };
-  }, [onMessage, onSessionInvalidated, maxRetries, baseDelay, maxDelay, pingInterval, clearTimers]);
+  }, [
+    onMessage,
+    onSessionInvalidated,
+    userId,
+    maxRetries,
+    baseDelay,
+    maxDelay,
+    pingInterval,
+    clearTimers,
+  ]);
 
   const disconnect = useCallback(() => {
     clearTimers();

@@ -14,9 +14,14 @@ import { useWebSocket } from "@/app/lib/websocket";
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
   allTags: GroceryTag[];
+  userId: string;
 }
 
-export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
+export function useGroceryLogic({
+  items,
+  allTags,
+  userId,
+}: UseGroceryLogicOptions) {
   const revalidator = useRevalidator();
   const [isPending, startTransition] = useTransition();
   const [optimisticMutations, setOptimisticMutations] = useState<
@@ -63,7 +68,7 @@ export function useGroceryLogic({ items, allTags }: UseGroceryLogicOptions) {
     [revalidator]
   );
 
-  useWebSocket({ onMessage });
+  useWebSocket({ onMessage, userId });
 
   // --- Helpers ---
 

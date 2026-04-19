@@ -158,7 +158,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "create",
       entityId: item.id,
-    });
+    }, session!.userId);
 
     return Response.json(item, { status: 201 });
   }
@@ -225,7 +225,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "update",
       entityId: id,
-    });
+    }, session!.userId);
 
     return Response.json(updated);
   }
@@ -287,7 +287,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "update",
       entityId: id,
-    });
+    }, session!.userId);
 
     return Response.json(updated);
   }
@@ -342,7 +342,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "update",
       entityId: id,
-    });
+    }, session!.userId);
 
     return Response.json({ success: true });
   }
@@ -410,7 +410,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "update",
       entityId: id,
-    });
+    }, session!.userId);
 
     return Response.json(updated);
   }
@@ -466,7 +466,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       type: "GROCERY_UPDATE",
       action: "delete",
       entityId: id,
-    });
+    }, session!.userId);
 
     return Response.json(deleted);
   }

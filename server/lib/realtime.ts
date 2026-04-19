@@ -7,6 +7,12 @@ export interface HouseholdUpdatePayload {
   count?: number;
 }
 
+export function buildHouseholdBroadcastUrl(senderId?: string): string {
+  return senderId
+    ? `https://do/broadcast?senderId=${encodeURIComponent(senderId)}`
+    : "https://do/broadcast";
+}
+
 export async function broadcastToHousehold(
   env: Env,
   householdId: string,
@@ -16,9 +22,7 @@ export async function broadcastToHousehold(
   try {
     const id = env.HOUSEHOLD.idFromName(householdId);
     const stub = env.HOUSEHOLD.get(id);
-    const url = senderId
-      ? `https://do/broadcast?senderId=${encodeURIComponent(senderId)}`
-      : "https://do/broadcast";
+    const url = buildHouseholdBroadcastUrl(senderId);
     const res = await stub.fetch(
       new Request(url, {
         method: "POST",

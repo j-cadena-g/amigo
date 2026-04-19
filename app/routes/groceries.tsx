@@ -40,7 +40,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
 }
 
 export default function Groceries() {
-  const { items, tags } = useLoaderData<typeof loader>();
+  const { items, tags, userId } = useLoaderData<typeof loader>();
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
@@ -55,6 +55,7 @@ export default function Groceries() {
       <GroceryList
         items={items}
         allTags={tags}
+        userId={userId}
       />
     </main>
   );

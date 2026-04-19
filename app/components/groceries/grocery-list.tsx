@@ -13,9 +13,10 @@ import { OfflineIndicator } from "@/app/components/offline-indicator";
 interface GroceryListProps {
   items: GroceryItemWithTags[];
   allTags: GroceryTag[];
+  userId: string;
 }
 
-export function GroceryList({ items, allTags }: GroceryListProps) {
+export function GroceryList({ items, allTags, userId }: GroceryListProps) {
   const [newItemName, setNewItemName] = useState("");
   const [newItemTagIds, setNewItemTagIds] = useState<string[]>([]);
   const [recentTags, setRecentTags] = useState<GroceryTag[]>([]);
@@ -47,7 +48,7 @@ export function GroceryList({ items, allTags }: GroceryListProps) {
     editTag,
     toggleFilterTag,
     setDatePickerItemId,
-  } = useGroceryLogic({ items, allTags: mergedTags });
+  } = useGroceryLogic({ items, allTags: mergedTags, userId });
 
   async function handleCreateTag(name: string, color: string) {
     const tag = await createTag(name, color);

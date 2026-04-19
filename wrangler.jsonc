@@ -11,6 +11,10 @@
     "binding": "ASSETS"
   },
 
+  "alias": {
+    "virtual:react-router/server-build": "./build/server/index.js"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

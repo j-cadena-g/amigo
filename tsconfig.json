@@ -29,7 +29,6 @@
     "app/**/*.tsx",
     "server/**/*.ts",
     "worker.ts",
-    "load-context.ts",
     "env.d.ts",
     "vite.config.ts",
     "react-router.config.ts",

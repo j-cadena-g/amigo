@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Runtime migration completed:** HTTP requests now run through React Router v7 framework mode directly from `worker.ts`
+- **Worker responsibilities clarified:** `worker.ts` owns `scheduled()`, security headers, Durable Object exports, and `/ws` upgrades
+- **Server context simplified:** `AppLoadContext` now exposes `context.cloudflare` and `context.app` instead of a bridged Hono context
+- **API routing moved:** `/api/*` endpoints now use React Router resource routes with a shared JSON/auth adapter
+
+### Removed
+
+- `hono`, `@hono/clerk-auth`, `@hono/vite-dev-server`, and `hono-react-router-adapter`
+- Hono request middleware, Hono route mounting, and the bridge-specific load-context plumbing
+
 ## [0.3.0] - 2026-03-09
 
 ### Breaking Changes
@@ -15,8 +29,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **Cloudflare Workers Runtime**
-  - Single Worker deployment with Hono server + React Router v7 SSR
-  - `hono-react-router-adapter` bridges server and client rendering
+  - Single Worker deployment with React Router v7 SSR and Cloudflare Worker entrypoints
   - Cron Trigger for weekly audit log pruning
 
 - **Cloudflare D1 Database**
@@ -34,8 +47,7 @@ All notable changes to this project will be documented in this file.
   - Rate limiting (4 presets: MUTATION, BULK, SENSITIVE, READ)
 
 - **Clerk Authentication**
-  - `@hono/clerk-auth` middleware for API routes
-  - `@clerk/react-router` for client-side auth
+  - `@clerk/react-router` middleware and loader integration
   - Auto-provisioning: first login creates household + user
 
 - **React Router v7 SSR**

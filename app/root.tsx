@@ -12,8 +12,12 @@ import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { getCspNonce } from "@/app/lib/session.server";
+import { appContextMiddleware } from "@/server/middleware/app-context";
 
-export const middleware: Route.MiddlewareFunction[] = [clerkMiddleware()];
+export const middleware: Route.MiddlewareFunction[] = [
+  clerkMiddleware(),
+  appContextMiddleware,
+];
 
 export const loader = (args: Route.LoaderArgs) =>
   rootAuthLoader(args, () => ({

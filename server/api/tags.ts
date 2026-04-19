@@ -1,13 +1,19 @@
-import { Hono } from "hono";
+import { and, eq, getDb, groceryTags, sql } from "@amigo/db";
 import { z } from "zod";
-import type { HonoEnv } from "../env";
-import { getDb, groceryTags, eq, and, sql } from "@amigo/db";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { getSplatSegments, type ApiHandler } from "./route";
 
 const TAG_COLORS = [
-  "blue", "red", "green", "yellow", "purple", "pink", "orange", "gray",
+  "blue",
+  "red",
+  "green",
+  "yellow",
+  "purple",
+  "pink",
+  "orange",
+  "gray",
 ] as const;
 
 const createTagSchema = z.object({
@@ -20,151 +26,157 @@ const updateTagSchema = z.object({
   color: z.enum(TAG_COLORS),
 });
 
-export const tagsRoute = new Hono<HonoEnv>();
+export const handleTagsRequest: ApiHandler = async ({
+  env,
+  params,
+  request,
+  session,
+}) => {
+  const [id] = getSplatSegments(params);
+  const db = getDb(env.DB);
 
-// List tags
-tagsRoute.get("/", async (c) => {
-  const session = c.get("appSession");
-  await enforceRateLimit(
-    c.env.CACHE,
-    `${session.userId}:tags:list`,
-    ROUTE_RATE_LIMITS.tags.list
-  );
-  const db = getDb(c.env.DB);
+  if (request.method === "GET" && !id) {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:tags:list`,
+      ROUTE_RATE_LIMITS.tags.list
+    );
 
-  const tags = await db.query.groceryTags.findMany({
-    where: eq(groceryTags.householdId, session.householdId),
-    orderBy: (tags, { asc }) => [asc(tags.name)],
-  });
+    const tags = await db.query.groceryTags.findMany({
+      where: eq(groceryTags.householdId, session!.householdId),
+      orderBy: (tag, { asc }) => [asc(tag.name)],
+    });
 
-  return c.json(tags);
-});
-
-// Create tag
-tagsRoute.post("/", async (c) => {
-  const session = c.get("appSession");
-  await enforceRateLimit(
-    c.env.CACHE,
-    `${session.userId}:tags:create`,
-    ROUTE_RATE_LIMITS.tags.create
-  );
-  const body = await c.req.json();
-  const validated = createTagSchema.parse(body);
-  const db = getDb(c.env.DB);
-  const trimmedName = validated.name.trim();
-
-  // Return existing tag if name matches (case-insensitive)
-  const existingTag = await db.query.groceryTags.findFirst({
-    where: and(
-      eq(groceryTags.householdId, session.householdId),
-      sql`lower(${groceryTags.name}) = lower(${trimmedName})`
-    ),
-  });
-
-  if (existingTag) {
-    return c.json(existingTag);
+    return Response.json(tags);
   }
 
-  const tag = await db
-    .insert(groceryTags)
-    .values({
-      householdId: session.householdId,
-      name: trimmedName,
-      color: validated.color ?? "blue",
-    })
-    .returning()
-    .get();
+  if (request.method === "POST" && !id) {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:tags:create`,
+      ROUTE_RATE_LIMITS.tags.create
+    );
 
-  await broadcastToHousehold(c.env, session.householdId, {
-    type: "GROCERY_UPDATE",
-    action: "tag_create",
-  });
+    const validated = createTagSchema.parse(await request.json());
+    const trimmedName = validated.name.trim();
 
-  return c.json(tag, 201);
-});
+    const existingTag = await db.query.groceryTags.findFirst({
+      where: and(
+        eq(groceryTags.householdId, session!.householdId),
+        sql`lower(${groceryTags.name}) = lower(${trimmedName})`
+      ),
+    });
 
-// Update tag
-tagsRoute.patch("/:id", async (c) => {
-  const session = c.get("appSession");
-  await enforceRateLimit(
-    c.env.CACHE,
-    `${session.userId}:tags:update`,
-    ROUTE_RATE_LIMITS.tags.update
-  );
-  const id = c.req.param("id");
-  const body = await c.req.json();
-  const validated = updateTagSchema.parse(body);
-  const db = getDb(c.env.DB);
-  const trimmedName = validated.name.trim();
+    if (existingTag) {
+      return Response.json(existingTag);
+    }
 
-  const existing = await db.query.groceryTags.findFirst({
-    where: and(
-      eq(groceryTags.id, id),
-      eq(groceryTags.householdId, session.householdId)
-    ),
-  });
+    const tag = await db
+      .insert(groceryTags)
+      .values({
+        householdId: session!.householdId,
+        name: trimmedName,
+        color: validated.color ?? "blue",
+      })
+      .returning()
+      .get();
 
-  if (!existing) {
-    throw new ActionError("Tag not found", "NOT_FOUND");
+    await broadcastToHousehold(env, session!.householdId, {
+      type: "GROCERY_UPDATE",
+      action: "tag_create",
+    });
+
+    return Response.json(tag, { status: 201 });
   }
 
-  // Check for duplicate name
-  const duplicate = await db.query.groceryTags.findFirst({
-    where: and(
-      eq(groceryTags.householdId, session.householdId),
-      sql`lower(${groceryTags.name}) = lower(${trimmedName})`,
-      sql`${groceryTags.id} != ${id}`
-    ),
-  });
+  if (request.method === "PATCH" && id) {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:tags:update`,
+      ROUTE_RATE_LIMITS.tags.update
+    );
 
-  if (duplicate) {
-    throw new ActionError("A tag with this name already exists", "VALIDATION_ERROR");
+    const validated = updateTagSchema.parse(await request.json());
+    const trimmedName = validated.name.trim();
+
+    const existing = await db.query.groceryTags.findFirst({
+      where: and(
+        eq(groceryTags.id, id),
+        eq(groceryTags.householdId, session!.householdId)
+      ),
+    });
+
+    if (!existing) {
+      throw new ActionError("Tag not found", "NOT_FOUND");
+    }
+
+    const duplicate = await db.query.groceryTags.findFirst({
+      where: and(
+        eq(groceryTags.householdId, session!.householdId),
+        sql`lower(${groceryTags.name}) = lower(${trimmedName})`,
+        sql`${groceryTags.id} != ${id}`
+      ),
+    });
+
+    if (duplicate) {
+      throw new ActionError(
+        "A tag with this name already exists",
+        "VALIDATION_ERROR"
+      );
+    }
+
+    const updated = await db
+      .update(groceryTags)
+      .set({ name: trimmedName, color: validated.color })
+      .where(
+        and(
+          eq(groceryTags.id, id),
+          eq(groceryTags.householdId, session!.householdId)
+        )
+      )
+      .returning()
+      .get();
+
+    await broadcastToHousehold(env, session!.householdId, {
+      type: "GROCERY_UPDATE",
+      action: "tag_update",
+    });
+
+    return Response.json(updated);
   }
 
-  const updated = await db
-    .update(groceryTags)
-    .set({ name: trimmedName, color: validated.color })
-    .where(
-      and(eq(groceryTags.id, id), eq(groceryTags.householdId, session.householdId))
-    )
-    .returning()
-    .get();
+  if (request.method === "DELETE" && id) {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:tags:delete`,
+      ROUTE_RATE_LIMITS.tags.delete
+    );
 
-  await broadcastToHousehold(c.env, session.householdId, {
-    type: "GROCERY_UPDATE",
-    action: "tag_update",
-  });
+    const deleted = await db
+      .delete(groceryTags)
+      .where(
+        and(
+          eq(groceryTags.id, id),
+          eq(groceryTags.householdId, session!.householdId)
+        )
+      )
+      .returning()
+      .get();
 
-  return c.json(updated);
-});
+    if (!deleted) {
+      throw new ActionError("Tag not found", "NOT_FOUND");
+    }
 
-// Delete tag
-tagsRoute.delete("/:id", async (c) => {
-  const session = c.get("appSession");
-  await enforceRateLimit(
-    c.env.CACHE,
-    `${session.userId}:tags:delete`,
-    ROUTE_RATE_LIMITS.tags.delete
-  );
-  const id = c.req.param("id");
-  const db = getDb(c.env.DB);
+    await broadcastToHousehold(env, session!.householdId, {
+      type: "GROCERY_UPDATE",
+      action: "tag_delete",
+    });
 
-  const deleted = await db
-    .delete(groceryTags)
-    .where(
-      and(eq(groceryTags.id, id), eq(groceryTags.householdId, session.householdId))
-    )
-    .returning()
-    .get();
-
-  if (!deleted) {
-    throw new ActionError("Tag not found", "NOT_FOUND");
+    return Response.json(deleted);
   }
 
-  await broadcastToHousehold(c.env, session.householdId, {
-    type: "GROCERY_UPDATE",
-    action: "tag_delete",
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET, POST, PATCH, DELETE" },
   });
-
-  return c.json(deleted);
-});
+};

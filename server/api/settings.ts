@@ -1,17 +1,23 @@
-import { Hono } from "hono";
-import type { HonoEnv } from "../env";
-import { getDb, households, eq } from "@amigo/db";
+import { eq, getDb, households } from "@amigo/db";
+import type { ApiHandler } from "./route";
 
-export const settingsRoute = new Hono<HonoEnv>();
+export const handleSettingsRequest: ApiHandler = async ({
+  env,
+  request,
+  session,
+}) => {
+  if (request.method !== "GET") {
+    return new Response(null, {
+      status: 405,
+      headers: { Allow: "GET" },
+    });
+  }
 
-// Get household info
-settingsRoute.get("/", async (c) => {
-  const session = c.get("appSession");
-  const db = getDb(c.env.DB);
+  const db = getDb(env.DB);
 
   const household = await db.query.households.findFirst({
-    where: eq(households.id, session.householdId),
+    where: eq(households.id, session!.householdId),
   });
 
-  return c.json(household);
-});
+  return Response.json(household);
+};

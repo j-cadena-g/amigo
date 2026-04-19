@@ -1,70 +1,73 @@
-import { Hono } from "hono";
 import {
-  getDb,
-  users,
-  transactions,
-  recurringTransactions,
-  budgets,
-  assets,
-  debts,
-  groceryItems,
-  eq,
   and,
+  assets,
+  budgets,
+  debts,
+  eq,
+  getDb,
+  groceryItems,
+  recurringTransactions,
+  transactions,
+  users,
 } from "@amigo/db";
-import type { HonoEnv } from "../env";
-import { ActionError } from "../lib/errors";
-import { logSecurityEvent, logServerError } from "../lib/errors";
+import { ActionError, logSecurityEvent, logServerError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { getSplatPath, type ApiHandler } from "./route";
 
 const RESTORE_TOKEN_PREFIX = "restore:";
 
-export const restoreRoute = new Hono<HonoEnv>()
-  /**
-   * GET /pending — Check for a pending restore token.
-   * Token is passed as a query param (set by auth callback redirect).
-   */
-  .get("/pending", async (c) => {
-    const token = c.req.query("token");
+export const handleRestoreRequest: ApiHandler = async ({
+  env,
+  params,
+  request,
+}) => {
+  const path = getSplatPath(params);
+
+  if (request.method === "GET" && path === "pending") {
+    const token = new URL(request.url).searchParams.get("token");
     if (!token) {
-      return c.json({ pending: false });
+      return Response.json({ pending: false });
     }
 
-    const data = await c.env.CACHE.get(`${RESTORE_TOKEN_PREFIX}${token}`, "json");
+    const data = await env.CACHE.get(`${RESTORE_TOKEN_PREFIX}${token}`, "json");
     if (!data) {
-      return c.json({ pending: false });
+      return Response.json({ pending: false });
     }
 
-    return c.json({ pending: true, data });
-  })
+    return Response.json({ pending: true, data });
+  }
 
-  /**
-   * POST /restore — Reactivate user account, reconnect to previous data.
-   */
-  .post("/restore", async (c) => {
+  if (request.method === "POST" && path === "restore") {
     await enforceRateLimit(
-      c.env.CACHE,
-      `restore:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+      env.CACHE,
+      `restore:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
       ROUTE_RATE_LIMITS.restore.restore
     );
 
-    const body = await c.req.json<{ token: string }>();
+    const body = (await request.json()) as { token?: string };
     if (!body.token) {
       throw new ActionError("Token required", "VALIDATION_ERROR");
     }
 
-    const restoreData = await c.env.CACHE.get(
+    const restoreData = (await env.CACHE.get(
       `${RESTORE_TOKEN_PREFIX}${body.token}`,
       "json"
-    ) as { userId: string; householdId: string; email: string; name: string | null } | null;
+    )) as
+      | {
+          userId: string;
+          householdId: string;
+          email: string;
+          name: string | null;
+        }
+      | null;
 
     if (!restoreData) {
       throw new ActionError("Restore session expired", "NOT_FOUND");
     }
 
     try {
-      const db = getDb(c.env.DB);
+      const db = getDb(env.DB);
 
-      // Reactivate user
       const [user] = await db
         .update(users)
         .set({
@@ -79,7 +82,6 @@ export const restoreRoute = new Hono<HonoEnv>()
         throw new ActionError("User not found", "NOT_FOUND");
       }
 
-      // Clear userDisplayName since user is back
       await db.batch([
         db
           .update(transactions)
@@ -103,8 +105,7 @@ export const restoreRoute = new Hono<HonoEnv>()
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      // Clean up restore token
-      await c.env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
+      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
 
       logSecurityEvent("account_restored", {
         userId: user.id,
@@ -112,7 +113,7 @@ export const restoreRoute = new Hono<HonoEnv>()
         email: user.email,
       });
 
-      return c.json({ success: true });
+      return Response.json({ success: true });
     } catch (error) {
       if (error instanceof ActionError) throw error;
       logServerError("restore-account", error, {
@@ -120,36 +121,39 @@ export const restoreRoute = new Hono<HonoEnv>()
       });
       throw new ActionError("Failed to restore account", "VALIDATION_ERROR");
     }
-  })
+  }
 
-  /**
-   * POST /fresh-start — Reactivate as member, transfer all data to household owner.
-   */
-  .post("/fresh-start", async (c) => {
+  if (request.method === "POST" && path === "fresh-start") {
     await enforceRateLimit(
-      c.env.CACHE,
-      `fresh-start:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+      env.CACHE,
+      `fresh-start:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
       ROUTE_RATE_LIMITS.restore.freshStart
     );
 
-    const body = await c.req.json<{ token: string }>();
+    const body = (await request.json()) as { token?: string };
     if (!body.token) {
       throw new ActionError("Token required", "VALIDATION_ERROR");
     }
 
-    const restoreData = await c.env.CACHE.get(
+    const restoreData = (await env.CACHE.get(
       `${RESTORE_TOKEN_PREFIX}${body.token}`,
       "json"
-    ) as { userId: string; householdId: string; email: string; name: string | null } | null;
+    )) as
+      | {
+          userId: string;
+          householdId: string;
+          email: string;
+          name: string | null;
+        }
+      | null;
 
     if (!restoreData) {
       throw new ActionError("Restore session expired", "NOT_FOUND");
     }
 
     try {
-      const db = getDb(c.env.DB);
+      const db = getDb(env.DB);
 
-      // Find household owner
       const owner = await db
         .select()
         .from(users)
@@ -165,7 +169,6 @@ export const restoreRoute = new Hono<HonoEnv>()
         throw new ActionError("Household owner not found", "NOT_FOUND");
       }
 
-      // Reactivate user with member role
       const [user] = await db
         .update(users)
         .set({
@@ -181,7 +184,6 @@ export const restoreRoute = new Hono<HonoEnv>()
         throw new ActionError("User not found", "NOT_FOUND");
       }
 
-      // Transfer all records to owner with provenance tracking
       await db.batch([
         db
           .update(transactions)
@@ -212,8 +214,7 @@ export const restoreRoute = new Hono<HonoEnv>()
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      // Clean up restore token
-      await c.env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
+      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
 
       logSecurityEvent("account_fresh_start", {
         userId: user.id,
@@ -222,7 +223,7 @@ export const restoreRoute = new Hono<HonoEnv>()
         transferredToUserId: owner.id,
       });
 
-      return c.json({ success: true });
+      return Response.json({ success: true });
     } catch (error) {
       if (error instanceof ActionError) throw error;
       logServerError("fresh-start-account", error, {
@@ -230,15 +231,18 @@ export const restoreRoute = new Hono<HonoEnv>()
       });
       throw new ActionError("Failed to start fresh", "VALIDATION_ERROR");
     }
-  })
+  }
 
-  /**
-   * POST /cancel — Delete the restore token.
-   */
-  .post("/cancel", async (c) => {
-    const body = await c.req.json<{ token: string }>();
+  if (request.method === "POST" && path === "cancel") {
+    const body = (await request.json()) as { token?: string };
     if (body.token) {
-      await c.env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
+      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
     }
-    return c.json({ success: true });
+    return Response.json({ success: true });
+  }
+
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET, POST" },
   });
+};

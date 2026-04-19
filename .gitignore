@@ -37,12 +37,11 @@ packages/db/drizzle/
 # Bun
 bun.lockb
 
-# npm
+# Legacy package-manager artifacts
 package-lock.json
 
 # Logs
 *.log
-npm-debug.log*
 
 # Test coverage
 coverage/

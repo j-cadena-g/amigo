@@ -1,24 +1,30 @@
 import { RouterContextProvider } from "react-router";
-import type { PlatformProxy } from "wrangler";
-import type { Context } from "hono";
-import type { HonoEnv } from "./server/env";
+import type { Env } from "./server/env";
+import type { AppSession, SessionStatus } from "./server/env";
 
-export type Cloudflare = Omit<PlatformProxy, "dispose">;
+export type Cloudflare = {
+  env: Env;
+  ctx: ExecutionContext;
+  cf?: Request["cf"];
+  caches: CacheStorage;
+};
 
-export type HonoContextValue = {
-  context: Context<HonoEnv>;
+export type AppContextValue = {
+  cspNonce: string;
+  sessionStatus: SessionStatus;
+  session?: AppSession;
 };
 
 declare module "react-router" {
   interface RouterContextProvider {
     cloudflare: Cloudflare;
-    hono: HonoContextValue;
+    app: AppContextValue;
   }
 }
 
 export function createRouterLoadContext(context: {
   cloudflare: Cloudflare;
-  hono: HonoContextValue;
+  app: AppContextValue;
 }): RouterContextProvider {
   const provider = new RouterContextProvider();
   return Object.assign(provider, context);

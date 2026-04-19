@@ -65,18 +65,18 @@ All requests hit one Cloudflare Worker. Hono is the entrypoint and server framew
 
 **Request flow:**
 
-1. Every request enters through `worker.ts` → Hono app
-2. Clerk middleware runs on all routes (validates session token)
-3. `/api/*` routes are handled directly by Hono handlers
-4. `/ws` routes upgrade to WebSocket via Durable Object stub
+1. Every request enters through `worker.ts`
+2. React Router root middleware runs Clerk auth + app context resolution
+3. `/api/*` routes are handled by React Router resource routes
+4. `/ws` upgrades are handled directly in the Worker and proxied to the Durable Object stub
 5. All other routes SSR the React app, which hydrates with React Router v7
 
 ### SSR Strategy
 
-Use `hono-react-router-adapter` to bridge Hono and React Router v7. This gives us:
-- Hono as the true server framework (middleware, API routes, context)
-- React Router v7 in framework mode for file-based routing, loaders, and actions
-- The Hono `Context` (with D1, KV, Clerk auth) is accessible inside React Router loaders/actions
+Use React Router v7 framework mode directly from the Cloudflare Worker entry. This gives us:
+- React Router v7 in framework mode for file-based routing, loaders, actions, middleware, and resource routes
+- Worker-owned platform concerns (`scheduled`, security headers, `/ws`, Durable Object exports)
+- `AppLoadContext` with Cloudflare bindings and app session data available inside loaders/actions
 - Vite builds both client and server bundles
 - `@cloudflare/vite-plugin` provides local Workers runtime with full bindings
 
@@ -334,7 +334,7 @@ Every server action calls `withAudit()` around its DB mutation. This replaces th
 
 ```bash
 # Generate migrations from schema changes
-npx drizzle-kit generate
+bun run db:generate
 
 # Apply to local D1 (wrangler dev creates a local SQLite)
 wrangler d1 migrations apply amigo-db --local
@@ -356,28 +356,19 @@ wrangler d1 migrations apply amigo-db --remote
 
 1. User visits app → Clerk's `<SignIn />` component handles UI
 2. Clerk authenticates (email/password, social, etc.) → sets session cookie
-3. Hono middleware (`@hono/clerk-auth`) validates the session token on every request
+3. React Router root middleware (`clerkMiddleware()`) validates the session token on requests that reach the app
 4. On first authenticated request: create user + household in D1 if not exists
 5. App session data (householdId, role) stored in KV keyed by Clerk userId
 
 ### Integration Points
 
-**Hono middleware (`server/middleware/auth.ts`):**
+**React Router root middleware (`app/root.tsx`, `server/middleware/app-context.ts`):**
 
 ```typescript
-import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
+import { clerkMiddleware } from "@clerk/react-router/server";
+import { appContextMiddleware } from "./server/middleware/app-context";
 
-// Apply to all routes
-app.use("*", clerkMiddleware());
-
-// Protected route example
-app.use("/api/*", async (c, next) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-  await next();
-});
+export const middleware = [clerkMiddleware(), appContextMiddleware];
 ```
 
 **First-login user provisioning (`server/middleware/household.ts`):**
@@ -916,10 +907,23 @@ Secrets (set via `wrangler secret put`):
 ### worker.ts
 
 ```typescript
-import app from "./server/index";
+import { createRequestHandler } from "react-router";
 import { HouseholdDO } from "./server/durable-objects/household";
 
-export default app;
+const requestHandler = createRequestHandler(
+  () => import("virtual:react-router/server-build"),
+  import.meta.env.MODE
+);
+
+export default {
+  fetch(request, env, ctx) {
+    return requestHandler(request, {
+      cloudflare: { env, ctx, cf: request.cf, caches: globalThis.caches },
+      app: { cspNonce: "", sessionStatus: "unauthenticated" },
+    });
+  },
+};
+
 export { HouseholdDO };
 ```
 
@@ -927,16 +931,16 @@ export { HouseholdDO };
 
 ```bash
 # Local development (full Workers runtime with D1, KV, DO bindings)
-vite dev
+bun run dev
 
 # Build for production
-vite build
+bun run build
 
 # Deploy
-wrangler deploy
+bun run deploy
 
 # Database migrations
-npx drizzle-kit generate
+bun run db:generate
 wrangler d1 migrations apply amigo-db --local   # local
 wrangler d1 migrations apply amigo-db --remote  # production
 ```
@@ -1000,7 +1004,7 @@ Session object shape stays the same, just sourced from KV instead of Valkey.
 | PostgreSQL RLS functions (`withRLS` using `set_config`) | Application-level query scoping |
 | `docker/` directory | No Docker infrastructure |
 | Turborepo config (`turbo.json`) | Single deployable, no build orchestration needed |
-| `postgres` npm package | Replaced by D1 driver |
+| `postgres` package | Replaced by D1 driver |
 | `scripts/audit-retention.sh` | Replaced by Cron Trigger |
 | `scripts/backup.sh` | Replaced by D1 automated backups (PITR) |
 | `scripts/cron/` directory | No system cron; Cron Triggers instead |
@@ -1010,14 +1014,10 @@ Session object shape stays the same, just sourced from KV instead of Valkey.
 
 | Package | Purpose |
 |---------|---------|
-| `hono` | Server framework (already used) |
-| `@hono/clerk-auth` | Clerk middleware for Hono |
 | `@clerk/backend` | Clerk server SDK |
 | `@clerk/react-router` | Clerk React Router v7 integration |
 | `react-router` | Client + server routing |
 | `@react-router/dev` | Vite plugin for RR7 framework mode |
-| `@react-router/cloudflare` | Cloudflare Workers adapter |
-| `hono-react-router-adapter` | Bridges Hono and React Router v7 |
 | `@cloudflare/vite-plugin` | Local Workers dev with bindings |
 | `drizzle-orm` | ORM (already used, switches to D1 driver) |
 | `drizzle-kit` | Migration CLI (already used) |

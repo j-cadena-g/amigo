@@ -28,7 +28,7 @@ A household management platform deployed on Cloudflare Workers. Manages budgetin
 
 ### Key Design Decisions
 
-* **Single Worker:** Hono server + React Router v7 SSR in one Cloudflare Worker
+* **Single Worker:** React Router v7 framework mode plus Cloudflare-specific entrypoints in one Worker module
 * **Integer Cents:** All money stored as integer cents in D1 (no floats)
 * **Application-Level RLS:** `scopeToHousehold()` filter on every query (no database-level policies)
 * **Optimistic Groceries:** Zero-latency UI updates with background sync via Dexie (IndexedDB)
@@ -52,8 +52,8 @@ A household management platform deployed on Cloudflare Workers. Manages budgetin
 
 ### Server
 
-* **Hono:** HTTP framework, API routes, middleware
-* **hono-react-router-adapter:** Bridges Hono and React Router v7 SSR
+* **React Router v7:** Framework mode for SSR, loaders, actions, middleware, and resource routes
+* **Cloudflare Worker module:** Owns `fetch`, `scheduled`, security headers, and `/ws`
 * **Zod v4:** Runtime validation
 
 ### Data Layer
@@ -66,8 +66,7 @@ A household management platform deployed on Cloudflare Workers. Manages budgetin
 ### Auth
 
 * **Clerk:** Authentication provider
-* **@hono/clerk-auth:** Hono middleware
-* **@clerk/react-router:** React Router integration
+* **@clerk/react-router:** Middleware and route integration
 
 ---
 
@@ -104,8 +103,8 @@ amigo/
 │   ├── root.tsx                  # Root layout
 │   └── app.css                   # Tailwind theme
 │
-├── server/                       # Hono backend
-│   ├── api/                      # API route groups
+├── server/                       # Server-side route/domain handlers
+│   ├── api/                      # Transport-neutral API domain handlers
 │   │   ├── groceries.ts          # CRUD, toggle, tags, purchase-date
 │   │   ├── tags.ts               # Grocery tag CRUD
 │   │   ├── transactions.ts       # Add, update, soft-delete
@@ -123,7 +122,7 @@ amigo/
 │   ├── durable-objects/
 │   │   └── household.ts          # WebSocket hub (HouseholdDO)
 │   ├── middleware/
-│   │   ├── auth.ts               # resolveAppSession, resolveAppSessionSoft
+│   │   ├── app-context.ts        # CSP + soft session resolution for RR middleware
 │   │   └── rate-limit.ts         # KV-backed rate limiting
 │   ├── lib/
 │   │   ├── session.ts            # resolveSession() shared logic
@@ -132,8 +131,7 @@ amigo/
 │   │   ├── conversions.ts        # toCents(), toISODate()
 │   │   ├── exchange-rates.ts     # 3-tier cache (Cache API → D1 → external)
 │   │   └── realtime.ts           # broadcastToHousehold()
-│   ├── env.ts                    # HonoEnv type definition
-│   └── index.ts                  # Hono app entrypoint
+│   └── env.ts                    # Cloudflare binding and session types
 │
 ├── packages/
 │   ├── db/                       # Drizzle ORM (D1/SQLite)
@@ -145,9 +143,9 @@ amigo/
 │
 ├── public/                       # Static assets (PWA icons, manifest)
 ├── worker.ts                     # Worker entrypoint (fetch + scheduled)
-├── load-context.ts               # React Router AppLoadContext type augmentation
+├── env.d.ts                      # React Router AppLoadContext type augmentation
 ├── wrangler.jsonc                # Cloudflare bindings config
-├── vite.config.ts                # Vite + React Router + Hono adapter
+├── vite.config.ts                # Vite + React Router + Cloudflare dev runtime
 ├── react-router.config.ts        # React Router framework config
 └── scripts/
     └── migrate-to-d1.ts          # PG → D1 data migration (one-time)
@@ -209,11 +207,12 @@ const items = await db.query.groceryItems.findMany({
 ### Request Flow
 
 ```
-Client → Cloudflare Worker
-  → Hono middleware (Clerk auth, rate limiting)
-    → /api/* → resolveAppSession (strict, 401 if unauthed)
-    → /* → resolveAppSessionSoft (sets session if available)
-      → React Router SSR (loaders access session via context)
+Client → Cloudflare Worker (`worker.ts`)
+  → `/ws` handled directly and proxied to HouseholdDO
+  → all other requests delegated to React Router request handler
+    → root middleware (`clerkMiddleware()`, app context middleware)
+      → `/api/*` resource routes enforce strict JSON auth
+      → page loaders/actions read `context.app` + `context.cloudflare`
 ```
 
 ### Loader Pattern
@@ -268,7 +267,7 @@ Each household gets a Durable Object instance (`HouseholdDO`) that manages WebSo
 ## Authentication (Clerk)
 
 * **Provider:** Clerk (SaaS)
-* **Server:** `@hono/clerk-auth` middleware verifies JWT
+* **Server:** `@clerk/react-router` middleware provides auth state to route middleware/loaders
 * **Client:** `@clerk/react-router` provides `<ClerkProvider>`, sign-in/up components
 * **Session cache:** KV with 24h TTL, keyed by `clerk_user_id`
 * **First login:** Auto-creates household + user record in D1

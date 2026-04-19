@@ -1,13 +1,14 @@
 import "react-router";
-import type { Context } from "hono";
-import type { HonoEnv } from "./server/env";
 import type { Cloudflare } from "./router-context";
+import type { AppSession, SessionStatus } from "./server/env";
 
 declare module "react-router" {
   export interface AppLoadContext {
     cloudflare: Cloudflare;
-    hono: {
-      context: Context<HonoEnv>;
+    app: {
+      cspNonce: string;
+      sessionStatus: SessionStatus;
+      session?: AppSession;
     };
   }
 }

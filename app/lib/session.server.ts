@@ -1,27 +1,21 @@
 import { redirect } from "react-router";
 import type { AppSession, Env, SessionStatus } from "../../server/env";
 
-/**
- * Extract the Hono context from a RouterContextProvider.
- * React Router middleware requires RouterContextProvider, so values
- * must be accessed via .get() rather than plain property access.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getHonoContext(context: any) {
-  const legacyHono = context?.hono?.context;
-  if (legacyHono) return legacyHono;
-
-  throw new Error("Missing Hono router context");
+function getAppContext(context: any) {
+  const app = context?.app;
+  if (app) return app;
+  throw new Error("Missing app router context");
 }
 
 /**
- * Get the app session from the Hono context in a React Router loader.
+ * Get the app session in a React Router loader.
  * Throws a redirect to "/" if the user is not authenticated.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function requireSession(context: any): AppSession {
-  const hono = getHonoContext(context);
-  const session = hono.get("appSession");
+  const app = getAppContext(context);
+  const session = app.session;
   if (!session) {
     throw redirect("/");
   }
@@ -34,14 +28,12 @@ export function requireSession(context: any): AppSession {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getSessionStatus(context: any): SessionStatus {
-  const hono = getHonoContext(context);
-  return hono.get("sessionStatus") ?? "unauthenticated";
+  return getAppContext(context).sessionStatus ?? "unauthenticated";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getCspNonce(context: any): string | undefined {
-  const hono = getHonoContext(context);
-  return hono.get("cspNonce");
+  return getAppContext(context).cspNonce;
 }
 
 /**
@@ -49,8 +41,6 @@ export function getCspNonce(context: any): string | undefined {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getEnv(context: any): Env {
-  const legacyCloudflare = context?.cloudflare?.env;
-  if (legacyCloudflare) return legacyCloudflare;
-
-  return getHonoContext(context).env;
+  if (context?.cloudflare?.env) return context.cloudflare.env;
+  throw new Error("Missing Cloudflare env in router context");
 }

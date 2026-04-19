@@ -1,10 +1,17 @@
-import { Hono } from "hono";
+import {
+  and,
+  eq,
+  getDb,
+  groceryItems,
+  groceryItemTags,
+  isNull,
+  scopeToHousehold,
+} from "@amigo/db";
 import { z } from "zod";
-import type { HonoEnv } from "../env";
-import { getDb, groceryItems, groceryItemTags, scopeToHousehold, eq, and, isNull } from "@amigo/db";
-import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { broadcastToHousehold } from "../lib/realtime";
 import { logServerError } from "../lib/errors";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import type { ApiHandler } from "./route";
 
 const MAX_BATCH_SIZE = 10;
 
@@ -27,22 +34,32 @@ interface MutationResult {
   error?: string;
 }
 
-export const syncRoute = new Hono<HonoEnv>();
+export const handleSyncRequest: ApiHandler = async ({
+  env,
+  request,
+  session,
+}) => {
+  if (request.method !== "POST") {
+    return new Response(null, {
+      status: 405,
+      headers: { Allow: "POST" },
+    });
+  }
 
-syncRoute.post("/", async (c) => {
-  const session = c.get("appSession");
-  await enforceRateLimit(c.env.CACHE, `${session.userId}:sync`, ROUTE_RATE_LIMITS.sync.batch);
+  await enforceRateLimit(
+    env.CACHE,
+    `${session!.userId}:sync`,
+    ROUTE_RATE_LIMITS.sync.batch
+  );
 
-  const body = await c.req.json();
-  const validated = batchSyncSchema.parse(body);
-
-  const db = getDb(c.env.DB);
+  const validated = batchSyncSchema.parse(await request.json());
+  const db = getDb(env.DB);
   const results: MutationResult[] = [];
   let processedCount = 0;
 
   for (const mutation of validated.mutations) {
     try {
-      const serverItem = await processMutation(db, session, mutation);
+      const serverItem = await processMutation(db, session!, mutation);
       results.push({
         id: mutation.id,
         success: true,
@@ -52,10 +69,14 @@ syncRoute.post("/", async (c) => {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      logServerError("sync", error instanceof Error ? error : new Error(errorMessage), {
-        mutationId: mutation.id,
-        operation: mutation.operation,
-      });
+      logServerError(
+        "sync",
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          mutationId: mutation.id,
+          operation: mutation.operation,
+        }
+      );
       results.push({
         id: mutation.id,
         success: false,
@@ -64,26 +85,25 @@ syncRoute.post("/", async (c) => {
     }
   }
 
-  // Single broadcast after all mutations
   if (processedCount > 0) {
     await broadcastToHousehold(
-      c.env,
-      session.householdId,
+      env,
+      session!.householdId,
       {
         type: "GROCERY_UPDATE",
         action: "bulk_sync",
         count: processedCount,
       },
-      session.userId
+      session!.userId
     );
   }
 
-  return c.json({
+  return Response.json({
     processed: processedCount,
     failed: validated.mutations.length - processedCount,
     results,
   });
-});
+};
 
 async function processMutation(
   db: ReturnType<typeof getDb>,
@@ -184,7 +204,9 @@ async function processMutation(
       if (!existing) throw new Error("Item not found");
 
       await db.batch([
-        db.delete(groceryItemTags).where(eq(groceryItemTags.itemId, mutation.entityId)),
+        db
+          .delete(groceryItemTags)
+          .where(eq(groceryItemTags.itemId, mutation.entityId)),
         ...(tagIds.length > 0
           ? [
               db.insert(groceryItemTags).values(

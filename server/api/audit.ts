@@ -1,37 +1,51 @@
-import { Hono } from "hono";
-import { getDb, auditLogs, users, and, desc, eq, inArray } from "@amigo/db";
-import type { HonoEnv } from "../env";
-import { ActionError } from "../lib/errors";
-import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { and, auditLogs, desc, eq, getDb, inArray, users } from "@amigo/db";
 import { z } from "zod";
+import { ActionError } from "../lib/errors";
 import { AUDIT_TABLES, buildAuditHistoryFilter } from "../lib/audit";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
+import { getSplatSegments, type ApiHandler } from "./route";
 
 interface AuditEntry {
   id: string;
   action: string;
   userName: string | null;
-  timestamp: number; // ms since epoch
+  timestamp: number;
   changes: Record<string, unknown> | null;
 }
 
 export const auditTableSchema = z.enum(AUDIT_TABLES);
 
-export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
-  const session = c.get("appSession");
+export const handleAuditRequest: ApiHandler = async ({
+  env,
+  params,
+  request,
+  session,
+}) => {
+  if (request.method !== "GET") {
+    return new Response(null, {
+      status: 405,
+      headers: { Allow: "GET" },
+    });
+  }
+
   await enforceRateLimit(
-    c.env.CACHE,
-    `audit:${session.userId}`,
+    env.CACHE,
+    `audit:${session!.userId}`,
     ROUTE_RATE_LIMITS.audit.list
   );
 
-  const recordId = c.req.param("recordId");
-  const tableNameParam = c.req.query("table");
+  const [recordId] = getSplatSegments(params);
+  if (!recordId) {
+    throw new ActionError("recordId path param required", "VALIDATION_ERROR");
+  }
+
+  const tableNameParam = new URL(request.url).searchParams.get("table");
   if (!tableNameParam) {
     throw new ActionError("table query param required", "VALIDATION_ERROR");
   }
-  const tableName = auditTableSchema.parse(tableNameParam);
 
-  const db = getDb(c.env.DB);
+  const tableName = auditTableSchema.parse(tableNameParam);
+  const db = getDb(env.DB);
 
   const logs = await db
     .select({
@@ -43,15 +57,14 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
       createdAt: auditLogs.createdAt,
     })
     .from(auditLogs)
-    .where(buildAuditHistoryFilter(session.householdId, recordId, tableName))
+    .where(buildAuditHistoryFilter(session!.householdId, recordId, tableName))
     .orderBy(desc(auditLogs.createdAt))
     .limit(50);
 
-  // Look up user names for changedBy user IDs
   const userIds = [
     ...new Set(
       logs
-        .map((l) => l.changedBy)
+        .map((log) => log.changedBy)
         .filter((userId): userId is string => typeof userId === "string")
     ),
   ];
@@ -63,14 +76,14 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
       .from(users)
       .where(
         and(
-          eq(users.householdId, session.householdId),
+          eq(users.householdId, session!.householdId),
           inArray(users.id, userIds)
         )
       )
       .all();
 
-    for (const u of householdUsers) {
-      userMap.set(u.id, u.name ?? u.email);
+    for (const user of householdUsers) {
+      userMap.set(user.id, user.name ?? user.email);
     }
   }
 
@@ -79,12 +92,13 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
 
     let changes: Record<string, unknown> | null = null;
     if (log.operation === "UPDATE" && log.oldValues && log.newValues) {
-      const oldVals = log.oldValues as Record<string, unknown>;
-      const newVals = log.newValues as Record<string, unknown>;
+      const oldValues = log.oldValues as Record<string, unknown>;
+      const newValues = log.newValues as Record<string, unknown>;
       changes = {};
-      for (const key of Object.keys(newVals)) {
-        if (JSON.stringify(oldVals[key]) !== JSON.stringify(newVals[key])) {
-          changes[key] = { from: oldVals[key], to: newVals[key] };
+
+      for (const key of Object.keys(newValues)) {
+        if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
+          changes[key] = { from: oldValues[key], to: newValues[key] };
         }
       }
     }
@@ -98,5 +112,5 @@ export const auditRoute = new Hono<HonoEnv>().get("/:recordId", async (c) => {
     };
   });
 
-  return c.json({ history });
-});
+  return Response.json({ history });
+};

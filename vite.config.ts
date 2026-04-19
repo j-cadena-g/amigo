@@ -1,32 +1,29 @@
-import serverAdapter from "hono-react-router-adapter/vite";
-import adapter from "@hono/vite-dev-server/cloudflare";
+import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { getLoadContext } from "./load-context";
 
-export default defineConfig({
-  resolve: {
-    tsconfigPaths: true,
-  },
-  build: {
-    rollupOptions: {
-      onwarn(warning, defaultHandler) {
-        if (warning.message.includes("Can't resolve original location of error")) return;
-        defaultHandler(warning);
+export default defineConfig(({ command }) => {
+  const isVitest = process.env.VITEST === "true";
+
+  return {
+    resolve: {
+      tsconfigPaths: true,
+    },
+    build: {
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          if (warning.message.includes("Can't resolve original location of error")) return;
+          defaultHandler(warning);
+        },
       },
     },
-  },
-  plugins: [
-    tailwindcss(),
-    reactRouter(),
-    serverAdapter({
-      adapter,
-      entry: "server/index.ts",
-      getLoadContext: getLoadContext as never,
-    }),
-    VitePWA({
+    plugins: [
+      command === "serve" && !isVitest ? cloudflare() : null,
+      tailwindcss(),
+      reactRouter(),
+      VitePWA({
       registerType: "autoUpdate",
       manifest: {
         name: "amigo",
@@ -84,6 +81,7 @@ export default defineConfig({
           },
         ],
       },
-    }),
-  ],
+      }),
+    ].filter(Boolean),
+  };
 });

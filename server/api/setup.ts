@@ -1,31 +1,32 @@
-import { Hono } from "hono";
-import { getAuth } from "@hono/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
+import { CURRENCY_CODES, eq, getDb, households, users } from "@amigo/db";
 import { z } from "zod";
-import type { HonoEnv } from "../env";
-import { getDb, households, users, eq, CURRENCY_CODES } from "@amigo/db";
+import { ActionError } from "../lib/errors";
+import type { ApiHandler } from "./route";
 
 const setupSchema = z.object({
   householdName: z.string().min(1).max(100),
   homeCurrency: z.enum(CURRENCY_CODES),
 });
 
-export const setupRoute = new Hono<HonoEnv>();
-
-/**
- * POST /api/setup — Create household + first user for a Clerk org.
- * This endpoint does NOT use resolveAppSession since the household doesn't exist yet.
- * It authenticates directly via Clerk and requires an active org.
- */
-setupRoute.post("/", async (c) => {
-  const auth = getAuth(c);
-  if (!auth?.userId || !auth.orgId) {
-    return c.json({ error: "Unauthorized" }, 401);
+export const handleSetupRequest: ApiHandler = async ({
+  auth,
+  env,
+  request,
+}) => {
+  if (request.method !== "POST") {
+    return new Response(null, {
+      status: 405,
+      headers: { Allow: "POST" },
+    });
   }
 
-  const db = getDb(c.env.DB);
+  if (!auth?.userId || !auth.orgId) {
+    throw new ActionError("Unauthorized", "UNAUTHORIZED");
+  }
 
-  // Prevent duplicate setup
+  const db = getDb(env.DB);
+
   const existing = await db
     .select({ id: households.id })
     .from(households)
@@ -33,13 +34,16 @@ setupRoute.post("/", async (c) => {
     .get();
 
   if (existing) {
-    return c.json({ error: "Household already exists for this organization" }, 409);
+    return Response.json(
+      { error: "Household already exists for this organization" },
+      { status: 409 }
+    );
   }
 
-  const body = await c.req.json();
-  const { householdName, homeCurrency } = setupSchema.parse(body);
+  const { householdName, homeCurrency } = setupSchema.parse(
+    await request.json()
+  );
 
-  // Create household linked to Clerk org
   const household = await db
     .insert(households)
     .values({
@@ -50,24 +54,25 @@ setupRoute.post("/", async (c) => {
     .returning()
     .get();
 
-  // Fetch user details from Clerk Backend API (JWT claims don't include email/name by default)
-  const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
+  const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
   const clerkUser = await clerk.users.getUser(auth.userId);
-  const email = clerkUser.emailAddresses.find(
-    (e) => e.id === clerkUser.primaryEmailAddressId
-  )?.emailAddress ?? "unknown@example.com";
-  const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
+  const email =
+    clerkUser.emailAddresses.find(
+      (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId
+    )?.emailAddress ?? "unknown@example.com";
+  const name =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
 
-  // Create the first user as owner
-  await db
-    .insert(users)
-    .values({
-      authId: auth.userId,
-      email,
-      name,
-      householdId: household.id,
-      role: "owner",
-    });
+  await db.insert(users).values({
+    authId: auth.userId,
+    email,
+    name,
+    householdId: household.id,
+    role: "owner",
+  });
 
-  return c.json({ success: true, householdId: household.id }, 201);
-});
+  return Response.json(
+    { success: true, householdId: household.id },
+    { status: 201 }
+  );
+};

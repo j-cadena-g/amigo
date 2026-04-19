@@ -61,7 +61,7 @@ export async function handleApiRoute(
       baseArgs.auth = auth;
     }
 
-    return options.handler(baseArgs);
+    return await options.handler(baseArgs);
   } catch (error) {
     return mapApiError(error);
   }

@@ -352,7 +352,7 @@ wrangler d1 migrations apply amigo-db --remote
 
 ```typescript
 import { clerkMiddleware } from "@clerk/react-router/server";
-import { appContextMiddleware } from "./server/middleware/app-context";
+import { appContextMiddleware } from "../server/middleware/app-context";
 
 export const middleware = [clerkMiddleware(), appContextMiddleware];
 ```
@@ -894,7 +894,11 @@ Secrets (set via `wrangler secret put`):
 
 ```typescript
 import { createRequestHandler } from "react-router";
+import { createRouterLoadContext } from "./router-context";
+import type { Cloudflare } from "./router-context";
 import { HouseholdDO } from "./server/durable-objects/household";
+import { getDb, auditLogs, lt } from "@amigo/db";
+import type { Env } from "./server/env";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -902,11 +906,35 @@ const requestHandler = createRequestHandler(
 );
 
 export default {
-  fetch(request, env, ctx) {
-    return requestHandler(request, {
-      cloudflare: { env, ctx, cf: request.cf, caches: globalThis.caches },
-      app: { cspNonce: "", sessionStatus: "unauthenticated" },
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/ws") {
+      return handleWebSocketUpgrade(request, env);
+    }
+
+    const loadContext = createRouterLoadContext({
+      cloudflare: {
+        env,
+        cf: request.cf,
+        ctx,
+        caches: globalThis.caches as unknown as Cloudflare["caches"],
+      },
+      app: {
+        cspNonce: "",
+        sessionStatus: "unauthenticated",
+      },
     });
+
+    return requestHandler(request, loadContext);
+  },
+
+  async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
+    if (event.cron === "0 3 * * SUN") {
+      const db = getDb(env.DB);
+      const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
+    }
   },
 };
 

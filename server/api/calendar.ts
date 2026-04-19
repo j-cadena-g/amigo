@@ -207,7 +207,7 @@ export const handleCalendarRequest: ApiHandler = async ({
     events.push({
       id: `grocery-${item.id}`,
       type: "grocery_purchase",
-      date: item.purchasedAt.getTime().toString(),
+      date: item.purchasedAt.toISOString().split("T")[0]!,
       title: item.itemName,
       color: "orange",
       metadata: { itemCount: 1 },

@@ -235,12 +235,14 @@ export const handleCalendarRequest: ApiHandler = async ({
     category: rule.category,
     description: rule.description,
     amount: rule.amount,
+    currency: rule.currency,
     type: rule.type,
     frequency: rule.frequency,
     interval: rule.interval,
     startDate: rule.startDate,
     endDate: rule.endDate,
     nextRunDate: rule.nextRunDate,
+    lastRunDate: rule.lastRunDate,
     active: rule.active,
   }));
 

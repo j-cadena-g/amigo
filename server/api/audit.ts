@@ -34,10 +34,17 @@ export const handleAuditRequest: ApiHandler = async ({
     ROUTE_RATE_LIMITS.audit.list
   );
 
-  const [recordId] = getSplatSegments(params);
-  if (!recordId) {
+  const splatSegments = getSplatSegments(params);
+  if (splatSegments.length === 0) {
     throw new ActionError("recordId path param required", "VALIDATION_ERROR");
   }
+  if (splatSegments.length > 1) {
+    throw new ActionError(
+      "recordId must be a single path segment",
+      "VALIDATION_ERROR"
+    );
+  }
+  const recordId = splatSegments[0]!;
 
   const tableNameParam = new URL(request.url).searchParams.get("table");
   if (!tableNameParam) {

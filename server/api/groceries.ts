@@ -96,6 +96,22 @@ export const handleGroceriesRequest: ApiHandler = async ({
     );
 
     const validated = addItemSchema.parse(await request.json());
+    if (validated.tagIds && validated.tagIds.length > 0) {
+      const validTags = await db.query.groceryTags.findMany({
+        where: and(
+          inArray(groceryTags.id, validated.tagIds),
+          scopeToHousehold(groceryTags.householdId, session!.householdId)
+        ),
+      });
+
+      if (validTags.length !== validated.tagIds.length) {
+        throw new ActionError(
+          "One or more tag IDs are invalid",
+          "VALIDATION_ERROR"
+        );
+      }
+    }
+
     const itemId = crypto.randomUUID();
 
     const item = await withAudit(
@@ -130,20 +146,6 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     if (validated.tagIds && validated.tagIds.length > 0) {
-      const validTags = await db.query.groceryTags.findMany({
-        where: and(
-          inArray(groceryTags.id, validated.tagIds),
-          scopeToHousehold(groceryTags.householdId, session!.householdId)
-        ),
-      });
-
-      if (validTags.length !== validated.tagIds.length) {
-        throw new ActionError(
-          "One or more tag IDs are invalid",
-          "VALIDATION_ERROR"
-        );
-      }
-
       await db.insert(groceryItemTags).values(
         validated.tagIds.map((tagId) => ({
           itemId: item.id,
@@ -364,6 +366,12 @@ export const handleGroceriesRequest: ApiHandler = async ({
     if (!existing) {
       throw new ActionError("Item not found", "NOT_FOUND");
     }
+    if (!existing.isPurchased) {
+      throw new ActionError(
+        "Item must be marked as purchased before updating purchase date",
+        "VALIDATION_ERROR"
+      );
+    }
 
     const updated = await withAudit(
       db,
@@ -380,6 +388,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
         db
           .update(groceryItems)
           .set({
+            isPurchased: true,
             purchasedAt: validated.purchasedAt,
             updatedAt: new Date(),
           })

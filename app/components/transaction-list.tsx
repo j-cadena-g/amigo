@@ -1,11 +1,30 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useRevalidator } from "react-router";
-import { Loader2, Plus, Trash2, ArrowDown, ArrowUp, Pencil, ChevronDown } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  ArrowDown,
+  ArrowUp,
+  Pencil,
+  ChevronDown,
+  Download,
+  Upload,
+} from "lucide-react";
 import { EmptyState } from "@/app/components/empty-state";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { formatCents } from "@/app/lib/currency";
 import type { CurrencyCode } from "@amigo/db";
+import { Button } from "@/app/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
 
 interface TransactionDTO {
   id: string;
@@ -34,12 +53,14 @@ interface TransactionListProps {
   initialTransactions: TransactionDTO[];
   currentUserId: string;
   typeFilter?: "income" | "expense" | null;
+  homeCurrency: CurrencyCode;
 }
 
 export function TransactionList({
   initialTransactions,
   currentUserId: _currentUserId,
   typeFilter,
+  homeCurrency,
 }: TransactionListProps) {
   const revalidator = useRevalidator();
   const [allTransactions, setAllTransactions] =
@@ -51,7 +72,18 @@ export function TransactionList({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const lastExpenseBudgetIdRef = useRef<string | null>(null);
+  const lastEditExpenseBudgetIdRef = useRef<string | null>(null);
+  const importCloseTimeoutRef = useRef<number | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importDryRun, setImportDryRun] = useState(true);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [newTransaction, setNewTransaction] = useState({
     amount: "",
@@ -59,7 +91,7 @@ export function TransactionList({
     category: "",
     type: "expense" as "income" | "expense",
     budgetId: null as string | null,
-    currency: "CAD" as CurrencyCode,
+    currency: homeCurrency,
   });
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -70,7 +102,7 @@ export function TransactionList({
     type: "expense" as "income" | "expense",
     date: "",
     budgetId: null as string | null,
-    currency: "CAD" as CurrencyCode,
+    currency: homeCurrency,
   });
 
   // Sync with loader data
@@ -98,6 +130,61 @@ export function TransactionList({
       setIsLoadingMore(false);
     }
   }, [page, hasMore, isLoadingMore, typeFilter]);
+
+  useEffect(() => {
+    if (!showAddForm || newTransaction.type !== "expense" || !allowBudgetSuggest) return;
+    const cat = newTransaction.category.trim();
+    if (cat.length < 2) return;
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/budgets/match-category?${new URLSearchParams({ category: cat })}`,
+            { signal: ac.signal }
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as { budgetId: string | null };
+          if (!data.budgetId) return;
+          setNewTransaction((p) => ({ ...p, budgetId: data.budgetId }));
+        } catch {
+          /* aborted */
+        }
+      })();
+    }, 400);
+    return () => {
+      ac.abort();
+      clearTimeout(timer);
+    };
+  }, [newTransaction.category, showAddForm, newTransaction.type, allowBudgetSuggest]);
+
+  useEffect(() => {
+    if (newTransaction.type === "expense") {
+      lastExpenseBudgetIdRef.current = newTransaction.budgetId;
+    }
+  }, [newTransaction.type, newTransaction.budgetId]);
+
+  useEffect(() => {
+    if (editingId && editForm.type === "expense") {
+      lastEditExpenseBudgetIdRef.current = editForm.budgetId;
+    }
+  }, [editingId, editForm.type, editForm.budgetId]);
+
+  useEffect(() => {
+    return () => {
+      if (importCloseTimeoutRef.current != null) {
+        clearTimeout(importCloseTimeoutRef.current);
+        importCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleOpenAddForm = () => {
+    lastExpenseBudgetIdRef.current = null;
+    setAllowBudgetSuggest(true);
+    setNewTransaction((prev) => ({ ...prev, currency: homeCurrency }));
+    setShowAddForm(true);
+  };
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -132,13 +219,14 @@ export function TransactionList({
         }),
       });
       if (res.ok) {
+        lastExpenseBudgetIdRef.current = null;
         setNewTransaction({
           amount: "",
           description: "",
           category: "",
           type: "expense",
           budgetId: null,
-          currency: "CAD",
+          currency: homeCurrency,
         });
         setShowAddForm(false);
         setFormError(null);
@@ -176,6 +264,82 @@ export function TransactionList({
 
   const handleCancelEdit = () => {
     setEditingId(null);
+  };
+
+  const handleExportCsv = async () => {
+    setExportError(null);
+    try {
+      const res = await fetch("/api/transactions/export");
+      if (!res.ok) {
+        setExportError(`Export failed (${res.status}). Try again or check your connection.`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "transactions-export.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Export failed — could not reach the server.");
+    }
+  };
+
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportBusy(true);
+    setImportFeedback(null);
+    try {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(importText) as unknown;
+      } catch {
+        setImportFeedback("Invalid JSON.");
+        return;
+      }
+      if (typeof parsed !== "object" || parsed === null || !("rows" in parsed)) {
+        setImportFeedback('JSON must be an object with a "rows" array.');
+        return;
+      }
+      const rows = (parsed as { rows: unknown }).rows;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setImportFeedback('"rows" must be a non-empty array.');
+        return;
+      }
+      const res = await fetch("/api/transactions/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, dryRun: importDryRun }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        count?: number;
+        inserted?: number;
+        error?: string;
+        message?: string;
+      } | null;
+      if (!res.ok) {
+        setImportFeedback(data?.error ?? data?.message ?? `Import failed (${res.status}).`);
+        return;
+      }
+      if (importDryRun) {
+        setImportFeedback(`Dry run OK — ${data?.count ?? rows.length} row(s) valid.`);
+        return;
+      }
+      setImportFeedback(`Import complete — ${data?.inserted ?? 0} transaction(s) added.`);
+      revalidator.revalidate();
+      if (importCloseTimeoutRef.current != null) {
+        clearTimeout(importCloseTimeoutRef.current);
+      }
+      importCloseTimeoutRef.current = window.setTimeout(() => {
+        importCloseTimeoutRef.current = null;
+        setImportOpen(false);
+        setImportText("");
+      }, 1800);
+    } finally {
+      setImportBusy(false);
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -219,6 +383,97 @@ export function TransactionList({
         </div>
       )}
 
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => void handleExportCsv()}>
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setImportFeedback(null);
+            setImportOpen(true);
+          }}
+        >
+          <Upload className="h-4 w-4" />
+          Import JSON
+        </Button>
+        </div>
+        {exportError && <p className="text-sm text-destructive">{exportError}</p>}
+      </div>
+
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) {
+            if (importCloseTimeoutRef.current != null) {
+              clearTimeout(importCloseTimeoutRef.current);
+              importCloseTimeoutRef.current = null;
+            }
+            setImportFeedback(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Import transactions</DialogTitle>
+            <DialogDescription>
+              Paste JSON with a <code className="text-xs">rows</code> array. Each row needs{" "}
+              <code className="text-xs">date</code>, <code className="text-xs">type</code>,{" "}
+              <code className="text-xs">category</code>, and <code className="text-xs">amount</code> in
+              major units (for example 12.34). Optional fields:{" "}
+              <code className="text-xs">description</code>, <code className="text-xs">currency</code>,{" "}
+              <code className="text-xs">budgetId</code>, <code className="text-xs">accountId</code>,{" "}
+              <code className="text-xs">externalId</code>. Maximum 200 rows per request.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleImportSubmit} className="space-y-3">
+            <textarea
+              aria-label="Import transactions JSON"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={10}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
+              placeholder={`{\n  "rows": [\n    {\n      "date": "2026-01-15",\n      "type": "expense",\n      "category": "Groceries",\n      "amount": 12.34\n    }\n  ]\n}`}
+              required
+            />
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={importDryRun}
+                onChange={(e) => setImportDryRun(e.target.checked)}
+                className="rounded border-input"
+              />
+              Dry run (validate only, no writes)
+            </label>
+            {importFeedback && (
+              <p
+                className={`text-sm ${
+                  importFeedback.startsWith("Import complete") ||
+                  importFeedback.startsWith("Dry run OK")
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-destructive"
+                }`}
+              >
+                {importFeedback}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={importBusy || !importText.trim()}>
+                {importBusy ? "Sending…" : importDryRun ? "Validate" : "Import"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Transaction */}
       {showAddForm ? (
         <form
@@ -229,7 +484,11 @@ export function TransactionList({
             <button
               type="button"
               onClick={() =>
-                setNewTransaction((prev) => ({ ...prev, type: "expense" }))
+                setNewTransaction((prev) => ({
+                  ...prev,
+                  type: "expense",
+                  budgetId: prev.type === "income" ? lastExpenseBudgetIdRef.current : prev.budgetId,
+                }))
               }
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                 newTransaction.type === "expense"
@@ -314,9 +573,10 @@ export function TransactionList({
               </label>
               <BudgetSelect
                 value={newTransaction.budgetId}
-                onChange={(budgetId) =>
-                  setNewTransaction((prev) => ({ ...prev, budgetId }))
-                }
+                onChange={(budgetId) => {
+                  setAllowBudgetSuggest(false);
+                  setNewTransaction((prev) => ({ ...prev, budgetId }));
+                }}
               />
             </div>
           )}
@@ -344,7 +604,7 @@ export function TransactionList({
         </form>
       ) : (
         <button
-          onClick={() => setShowAddForm(true)}
+          onClick={handleOpenAddForm}
           className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:text-foreground"
         >
           <Plus className="h-5 w-5" />
@@ -368,7 +628,14 @@ export function TransactionList({
                     <button
                       type="button"
                       onClick={() =>
-                        setEditForm((prev) => ({ ...prev, type: "expense" }))
+                        setEditForm((prev) => ({
+                          ...prev,
+                          type: "expense",
+                          budgetId:
+                            prev.type === "income"
+                              ? lastEditExpenseBudgetIdRef.current
+                              : prev.budgetId,
+                        }))
                       }
                       className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                         editForm.type === "expense"

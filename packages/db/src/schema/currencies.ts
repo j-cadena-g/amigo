@@ -9,6 +9,18 @@ import {
 // Supported currencies — no pgEnum in SQLite, use text with enum constraint
 export const CURRENCY_CODES = ["CAD", "USD", "EUR", "GBP", "MXN"] as const;
 
+export type CurrencyCode = (typeof CURRENCY_CODES)[number];
+
+/** Default when household home currency is missing or invalid in DB. */
+export const DEFAULT_HOME_CURRENCY: CurrencyCode = "CAD";
+
+export function parseHomeCurrency(raw: string | null | undefined): CurrencyCode {
+  if (raw != null && (CURRENCY_CODES as readonly string[]).includes(raw)) {
+    return raw as CurrencyCode;
+  }
+  return DEFAULT_HOME_CURRENCY;
+}
+
 // Historical exchange rates table
 export const exchangeRates = sqliteTable(
   "exchange_rates",
@@ -30,4 +42,3 @@ export const exchangeRates = sqliteTable(
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type NewExchangeRate = typeof exchangeRates.$inferInsert;
-export type CurrencyCode = (typeof CURRENCY_CODES)[number];

@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   CreditCard,
   Landmark,
+  Building2,
   CalendarDays,
   Settings,
   LogOut,
@@ -24,6 +25,7 @@ const navLinks = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/debts", label: "Debts", icon: CreditCard },
   { href: "/assets", label: "Assets", icon: Landmark },
+  { href: "/accounts", label: "Accounts", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -59,7 +61,9 @@ export function NavBar() {
               ? location.pathname.startsWith("/budget")
               : link.href === "/dashboard"
                 ? location.pathname === "/dashboard"
-                : location.pathname.startsWith(link.href);
+                : link.href === "/assets" || link.href === "/accounts"
+                  ? location.pathname === link.href
+                  : location.pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
@@ -123,7 +127,9 @@ export function NavBar() {
                 ? location.pathname.startsWith("/budget")
                 : link.href === "/dashboard"
                   ? location.pathname === "/dashboard"
-                  : location.pathname.startsWith(link.href);
+                  : link.href === "/assets" || link.href === "/accounts"
+                    ? location.pathname === link.href
+                    : location.pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}

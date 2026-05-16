@@ -7,6 +7,7 @@ export * from "./grocery-tags";
 export * from "./budgets";
 export * from "./debts";
 export * from "./assets";
+export * from "./financial-accounts";
 export * from "./audit-logs";
 export * from "./recurring";
 export * from "./push-subscriptions";

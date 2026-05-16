@@ -3,7 +3,6 @@ import {
   debts,
   eq,
   getDb,
-  households,
   isNull,
   or,
   scopeToHousehold,
@@ -16,6 +15,7 @@ import { assertPermission, canManageSharedItems } from "../lib/permissions";
 import { toCents } from "../lib/conversions";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
+import { getHomeCurrency } from "../lib/household-currency";
 
 const currencySchema = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional();
 
@@ -51,16 +51,6 @@ const addDebtSchema = z.discriminatedUnion("type", [
   loanSchema,
   creditCardSchema,
 ]);
-
-async function getHomeCurrency(
-  db: ReturnType<typeof getDb>,
-  householdId: string
-): Promise<CurrencyCode> {
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  return (household?.homeCurrency as CurrencyCode) ?? "CAD";
-}
 
 function debtToCents(validated: z.infer<typeof addDebtSchema>) {
   if (validated.type === "LOAN") {

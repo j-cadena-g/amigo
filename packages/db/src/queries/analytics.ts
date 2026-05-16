@@ -1,5 +1,7 @@
-import { db, eq, and, or, isNull, gte, lt, sql } from "../index";
-import { transactions, budgets } from "../schema";
+import { db, eq, and, isNull, gte, lt, sql } from "../index";
+import { transactions } from "../schema";
+import { sqlTransactionAmountHomeCents } from "../sql-money";
+import { visibleFinancialTransactionsCondition } from "../financial-visibility";
 
 export interface CategorySpending {
   category: string;
@@ -30,23 +32,6 @@ function getMonthBounds(year: number, month: number): { start: Date; end: Date }
 }
 
 /**
- * Build visibility condition for user-scoped transactions
- * User can see:
- * 1. Their own transactions
- * 2. Transactions linked to a shared budget (budget.userId IS NULL)
- */
-function buildVisibilityCondition(userId: string) {
-  return or(
-    eq(transactions.userId, userId),
-    sql`EXISTS (
-      SELECT 1 FROM ${budgets}
-      WHERE ${budgets.id} = ${transactions.budgetId}
-      AND ${budgets.userId} IS NULL
-    )`
-  );
-}
-
-/**
  * Fetch total spending for a user within a date range
  * Includes user's own transactions + transactions on shared budgets
  */
@@ -56,9 +41,10 @@ async function getTotalSpending(
   startDate: Date,
   endDate: Date
 ): Promise<number> {
+  const txnHome = sqlTransactionAmountHomeCents();
   const result = await db
     .select({
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`,
+      total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
     })
     .from(transactions)
     .where(
@@ -68,11 +54,11 @@ async function getTotalSpending(
         isNull(transactions.deletedAt),
         gte(transactions.date, startDate),
         lt(transactions.date, endDate),
-        buildVisibilityCondition(userId)
+        visibleFinancialTransactionsCondition(userId)
       )
     );
 
-  return parseFloat(result[0]?.total ?? "0");
+  return result[0]?.total ?? 0;
 }
 
 /**
@@ -85,10 +71,11 @@ async function getSpendingByCategory(
   startDate: Date,
   endDate: Date
 ): Promise<CategorySpending[]> {
+  const txnHome = sqlTransactionAmountHomeCents();
   const result = await db
     .select({
       category: transactions.category,
-      total: sql<string>`SUM(${transactions.amount})`,
+      total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
     })
     .from(transactions)
     .where(
@@ -98,14 +85,14 @@ async function getSpendingByCategory(
         isNull(transactions.deletedAt),
         gte(transactions.date, startDate),
         lt(transactions.date, endDate),
-        buildVisibilityCondition(userId)
+        visibleFinancialTransactionsCondition(userId)
       )
     )
     .groupBy(transactions.category);
 
   return result.map((row) => ({
     category: row.category,
-    amount: parseFloat(row.total ?? "0"),
+    amount: row.total ?? 0,
   }));
 }
 
@@ -182,6 +169,7 @@ export async function getCategoryTrend(
 ): Promise<{ month: string; amount: number }[]> {
   const now = new Date();
   const results: { month: string; amount: number }[] = [];
+  const txnHome = sqlTransactionAmountHomeCents();
 
   for (let i = 0; i < months; i++) {
     const targetMonth = now.getMonth() - i;
@@ -192,7 +180,7 @@ export async function getCategoryTrend(
 
     const result = await db
       .select({
-        total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`,
+        total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
       })
       .from(transactions)
       .where(
@@ -203,7 +191,7 @@ export async function getCategoryTrend(
           isNull(transactions.deletedAt),
           gte(transactions.date, bounds.start),
           lt(transactions.date, bounds.end),
-          buildVisibilityCondition(userId)
+          visibleFinancialTransactionsCondition(userId)
         )
       );
 
@@ -214,7 +202,7 @@ export async function getCategoryTrend(
 
     results.unshift({
       month: monthName,
-      amount: parseFloat(result[0]?.total ?? "0"),
+      amount: result[0]?.total ?? 0,
     });
   }
 

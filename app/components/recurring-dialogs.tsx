@@ -326,7 +326,8 @@ export function AddRecurringDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: form.type,
-          amount: Math.round(parseFloat(form.amount) * 100),
+          // API expects dollars; server applies toCents() (same contract as transactions).
+          amount: parseFloat(form.amount),
           currency: form.currency,
           category: form.category,
           description: form.description || null,
@@ -442,7 +443,8 @@ export function EditRecurringDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: form.type,
-          amount: Math.round(parseFloat(form.amount) * 100),
+          // API expects dollars; server applies toCents() (same contract as transactions).
+          amount: parseFloat(form.amount),
           currency: form.currency,
           category: form.category,
           description: form.description || null,

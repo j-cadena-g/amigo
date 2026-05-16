@@ -29,6 +29,41 @@
       "when": 1776482046283,
       "tag": "0003_amused_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1778877641005,
+      "tag": "0004_budget_limit_home",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778879984123,
+      "tag": "0005_financial_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1778883618234,
+      "tag": "0006_budget_limit_home_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1778887234091,
+      "tag": "0007_financial_accounts_household_deleted_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1778889001456,
+      "tag": "0008_transactions_account_id_idx",
+      "breakpoints": true
     }
   ]
 }

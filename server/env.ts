@@ -27,12 +27,3 @@ export type SessionStatus =
   | "needs_setup"
   | "revoked"
   | "unauthenticated";
-
-export type HonoEnv = {
-  Bindings: Env;
-  Variables: {
-    appSession: AppSession;
-    cspNonce: string;
-    sessionStatus: SessionStatus;
-  };
-};

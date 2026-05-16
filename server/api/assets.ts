@@ -3,7 +3,6 @@ import {
   assets,
   eq,
   getDb,
-  households,
   isNull,
   or,
   scopeToHousehold,
@@ -16,6 +15,7 @@ import { assertPermission, canManageSharedItems } from "../lib/permissions";
 import { toCents } from "../lib/conversions";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
+import { getHomeCurrency } from "../lib/household-currency";
 
 const assetSchema = z.object({
   name: z.string().min(1),
@@ -24,16 +24,6 @@ const assetSchema = z.object({
   currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
   isShared: z.boolean().optional().default(false),
 });
-
-async function getHomeCurrency(
-  db: ReturnType<typeof getDb>,
-  householdId: string
-): Promise<CurrencyCode> {
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  return (household?.homeCurrency as CurrencyCode) ?? "CAD";
-}
 
 export const handleAssetsRequest: ApiHandler = async ({
   env,

@@ -2,15 +2,15 @@ import {
   and,
   budgets,
   eq,
+  financialAccounts,
   getDb,
-  households,
+  inArray,
   isNull,
-  or,
   scopeToHousehold,
-  sql,
   transactions,
+  visibleFinancialTransactionsCondition,
 } from "@amigo/db";
-import type { CurrencyCode } from "@amigo/db";
+import type { CurrencyCode, DrizzleD1 } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
@@ -20,8 +20,86 @@ import { parseTransactionsListQuery } from "../lib/request-validation";
 import { withAudit } from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
+import { getHomeCurrency } from "../lib/household-currency";
 
 const currencyEnum = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]);
+
+function isValidImportDateString(val: string): boolean {
+  const head = val.includes("T") ? (val.split("T")[0] ?? "") : val;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(head)) return false;
+  const parts = head.split("-").map((x) => Number(x));
+  const y = parts[0];
+  const mo = parts[1];
+  const d = parts[2];
+  if (y === undefined || mo === undefined || d === undefined) return false;
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+
+const importDateString = z
+  .string()
+  .min(10)
+  .max(32)
+  .refine(isValidImportDateString, {
+    message:
+      "date must be a valid ISO 8601 calendar day (YYYY-MM-DD, optional time suffix after 'T')",
+  });
+
+async function validateImportBudgetAndAccountIds(
+  db: DrizzleD1,
+  householdId: string,
+  rows: { budgetId?: string | null; accountId?: string | null }[]
+) {
+  const budgetIds = [
+    ...new Set(rows.map((r) => r.budgetId).filter((id): id is string => Boolean(id))),
+  ];
+  const accountIds = [
+    ...new Set(rows.map((r) => r.accountId).filter((id): id is string => Boolean(id))),
+  ];
+
+  if (budgetIds.length > 0) {
+    const found = await db
+      .select({ id: budgets.id })
+      .from(budgets)
+      .where(
+        and(
+          scopeToHousehold(budgets.householdId, householdId),
+          inArray(budgets.id, budgetIds),
+          isNull(budgets.deletedAt)
+        )
+      );
+    const ok = new Set(found.map((r) => r.id));
+    const missing = budgetIds.filter((id) => !ok.has(id));
+    if (missing.length > 0) {
+      throw new ActionError(
+        `Unknown or inaccessible budget(s): ${missing.join(", ")}`,
+        "VALIDATION_ERROR"
+      );
+    }
+  }
+
+  if (accountIds.length > 0) {
+    const found = await db
+      .select({ id: financialAccounts.id })
+      .from(financialAccounts)
+      .where(
+        and(
+          scopeToHousehold(financialAccounts.householdId, householdId),
+          inArray(financialAccounts.id, accountIds),
+          isNull(financialAccounts.deletedAt)
+        )
+      );
+    const ok = new Set(found.map((r) => r.id));
+    const missing = accountIds.filter((id) => !ok.has(id));
+    if (missing.length > 0) {
+      throw new ActionError(
+        `Unknown or inaccessible account(s): ${missing.join(", ")}`,
+        "VALIDATION_ERROR"
+      );
+    }
+  }
+}
 
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
@@ -30,6 +108,7 @@ const addTransactionSchema = z.object({
   type: z.enum(["income", "expense"]),
   date: z.coerce.date(),
   budgetId: z.string().uuid().nullable().optional(),
+  accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
 });
 
@@ -40,18 +119,34 @@ const updateTransactionSchema = z.object({
   type: z.enum(["income", "expense"]).optional(),
   date: z.coerce.date().optional(),
   budgetId: z.string().uuid().nullable().optional(),
+  accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
 });
 
-async function getHomeCurrency(
-  db: ReturnType<typeof getDb>,
-  householdId: string
-): Promise<CurrencyCode> {
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  return (household?.homeCurrency as CurrencyCode) ?? "CAD";
+const importRowSchema = z.object({
+  date: importDateString,
+  type: z.enum(["income", "expense"]),
+  category: z.string().min(1).max(100),
+  amount: z.number().positive(),
+  description: z.string().max(500).optional(),
+  currency: currencyEnum.optional(),
+  budgetId: z.string().uuid().nullable().optional(),
+  accountId: z.string().uuid().nullable().optional(),
+  externalId: z.string().max(200).optional(),
+});
+
+const importBodySchema = z.object({
+  dryRun: z.boolean().optional().default(false),
+  rows: z.array(importRowSchema).min(1).max(200),
+});
+
+function csvEscape(value: string | number | boolean | null | undefined): string {
+  const s = value === null || value === undefined ? "" : String(value);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
 }
+
+const RESERVED_TXN_SPLATS = new Set(["export", "import"]);
 
 export const handleTransactionsRequest: ApiHandler = async ({
   env,
@@ -59,8 +154,71 @@ export const handleTransactionsRequest: ApiHandler = async ({
   request,
   session,
 }) => {
-  const [id] = getSplatSegments(params);
+  const segments = getSplatSegments(params);
+  const id = segments[0];
   const db = getDb(env.DB);
+
+  if (request.method === "GET" && id === "export") {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:transactions:export`,
+      ROUTE_RATE_LIMITS.transactions.export
+    );
+
+    const conditions = [
+      scopeToHousehold(transactions.householdId, session!.householdId),
+      isNull(transactions.deletedAt),
+      visibleFinancialTransactionsCondition(session!.userId),
+    ];
+
+    const rows = await db.query.transactions.findMany({
+      where: and(...conditions),
+      orderBy: (transaction, { desc }) => [
+        desc(transaction.date),
+        desc(transaction.createdAt),
+      ],
+      limit: 5000,
+    });
+
+    const header = [
+      "date",
+      "type",
+      "category",
+      "amount_cents",
+      "currency",
+      "description",
+      "budget_id",
+      "account_id",
+      "external_id",
+      "import_batch_id",
+      "reviewed",
+    ];
+    const lines = [
+      header.join(","),
+      ...rows.map((t) =>
+        [
+          csvEscape(t.date),
+          csvEscape(t.type),
+          csvEscape(t.category),
+          csvEscape(t.amount),
+          csvEscape(t.currency),
+          csvEscape(t.description),
+          csvEscape(t.budgetId),
+          csvEscape(t.accountId),
+          csvEscape(t.externalId),
+          csvEscape(t.importBatchId),
+          csvEscape(t.reviewed),
+        ].join(",")
+      ),
+    ];
+
+    return new Response(lines.join("\n"), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="transactions-export.csv"',
+      },
+    });
+  }
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
@@ -80,10 +238,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     const conditions = [
       scopeToHousehold(transactions.householdId, session!.householdId),
       isNull(transactions.deletedAt),
-      or(
-        eq(transactions.userId, session!.userId),
-        sql`EXISTS (SELECT 1 FROM budgets WHERE budgets.id = ${transactions.budgetId} AND budgets.user_id IS NULL)`
-      ),
+      visibleFinancialTransactionsCondition(session!.userId),
     ];
 
     if (type) {
@@ -107,6 +262,71 @@ export const handleTransactionsRequest: ApiHandler = async ({
       data,
       pagination: { page, limit, hasMore },
     });
+  }
+
+  if (request.method === "POST" && id === "import") {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:transactions:import`,
+      ROUTE_RATE_LIMITS.transactions.import
+    );
+
+    const parsed = importBodySchema.parse(await request.json());
+    await validateImportBudgetAndAccountIds(db, session!.householdId, parsed.rows);
+    const batchId = crypto.randomUUID();
+
+    if (parsed.dryRun) {
+      return Response.json({
+        ok: true,
+        dryRun: true,
+        count: parsed.rows.length,
+        batchId,
+      });
+    }
+
+    const homeCurrency = await getHomeCurrency(db, session!.householdId);
+
+    const distinctCurrencies = [
+      ...new Set(parsed.rows.map((row) => row.currency ?? "CAD")),
+    ] as CurrencyCode[];
+    const rateByCurrency = new Map<CurrencyCode, number | null>();
+    for (const c of distinctCurrencies) {
+      rateByCurrency.set(c, await getExchangeRateForRecord(env, c, homeCurrency));
+    }
+
+    const values = parsed.rows.map((row) => {
+      const currency = (row.currency ?? "CAD") as CurrencyCode;
+      return {
+        id: crypto.randomUUID(),
+        householdId: session!.householdId,
+        userId: session!.userId,
+        amount: toCents(row.amount),
+        currency,
+        exchangeRateToHome: rateByCurrency.get(currency) ?? null,
+        description: row.description?.trim() || null,
+        category: row.category.trim(),
+        type: row.type,
+        date: row.date.split("T")[0]!,
+        budgetId: row.budgetId ?? null,
+        accountId: row.accountId ?? null,
+        importBatchId: batchId,
+        externalId: row.externalId?.trim() || null,
+      };
+    });
+
+    await db.transaction(async (tx) => {
+      await tx.insert(transactions).values(values);
+    });
+
+    const inserted = values.length;
+
+    await broadcastToHousehold(env, session!.householdId, {
+      type: "TRANSACTION_UPDATE",
+      action: "batch_create",
+      count: inserted,
+    });
+
+    return Response.json({ ok: true, inserted, batchId }, { status: 201 });
   }
 
   if (request.method === "POST" && !id) {
@@ -151,6 +371,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             type: validated.type,
             date: toISODate(validated.date),
             budgetId: validated.budgetId || null,
+            accountId: validated.accountId || null,
           })
           .returning()
           .get()
@@ -165,7 +386,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     return Response.json(transaction, { status: 201 });
   }
 
-  if (request.method === "PATCH" && id) {
+  if (request.method === "PATCH" && id && !RESERVED_TXN_SPLATS.has(id)) {
     await enforceRateLimit(
       env.CACHE,
       `${session!.userId}:transactions:update`,
@@ -193,6 +414,9 @@ export const handleTransactionsRequest: ApiHandler = async ({
     if (validated.budgetId !== undefined) {
       updateData.budgetId = validated.budgetId || null;
     }
+    if (validated.accountId !== undefined) {
+      updateData.accountId = validated.accountId || null;
+    }
     if (validated.currency !== undefined) {
       updateData.currency = validated.currency;
       const homeCurrency = await getHomeCurrency(db, session!.householdId);
@@ -203,14 +427,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       );
     }
 
-    const visibilityCondition = or(
-      eq(transactions.userId, session!.userId),
-      sql`EXISTS (
-        SELECT 1 FROM ${budgets}
-        WHERE ${budgets.id} = ${transactions.budgetId}
-        AND ${budgets.userId} IS NULL
-      )`
-    );
+    const visibilityCondition = visibleFinancialTransactionsCondition(session!.userId);
 
     const existing = await db.query.transactions.findFirst({
       where: and(
@@ -265,21 +482,14 @@ export const handleTransactionsRequest: ApiHandler = async ({
     return Response.json(updated);
   }
 
-  if (request.method === "DELETE" && id) {
+  if (request.method === "DELETE" && id && !RESERVED_TXN_SPLATS.has(id)) {
     await enforceRateLimit(
       env.CACHE,
       `${session!.userId}:transactions:delete`,
       ROUTE_RATE_LIMITS.transactions.delete
     );
 
-    const visibilityCondition = or(
-      eq(transactions.userId, session!.userId),
-      sql`EXISTS (
-        SELECT 1 FROM ${budgets}
-        WHERE ${budgets.id} = ${transactions.budgetId}
-        AND ${budgets.userId} IS NULL
-      )`
-    );
+    const visibilityCondition = visibleFinancialTransactionsCondition(session!.userId);
 
     const existing = await db.query.transactions.findFirst({
       where: and(

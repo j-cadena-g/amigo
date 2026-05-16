@@ -1,7 +1,18 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
-import { getDb, transactions, scopeToHousehold, eq, and, or, isNull, sql, desc } from "@amigo/db";
+import {
+  getDb,
+  transactions,
+  households,
+  scopeToHousehold,
+  eq,
+  and,
+  isNull,
+  desc,
+  parseHomeCurrency,
+} from "@amigo/db";
+import { visibleFinancialTransactionsCondition } from "@/server/lib/financial-visibility";
 import { TransactionList } from "@/app/components/transaction-list";
 
 export async function loader({ context, request }: LoaderFunctionArgs) {
@@ -14,15 +25,16 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   const conditions = [
     scopeToHousehold(transactions.householdId, session.householdId),
     isNull(transactions.deletedAt),
-    or(
-      eq(transactions.userId, session.userId),
-      sql`EXISTS (SELECT 1 FROM budgets WHERE budgets.id = ${transactions.budgetId} AND budgets.user_id IS NULL)`
-    ),
+    visibleFinancialTransactionsCondition(session.userId),
   ];
 
   if (typeFilter === "income" || typeFilter === "expense") {
     conditions.push(eq(transactions.type, typeFilter));
   }
+
+  const household = await db.query.households.findFirst({
+    where: eq(households.id, session.householdId),
+  });
 
   const items = await db.query.transactions.findMany({
     where: and(...conditions),
@@ -39,11 +51,12 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     transactions: mapped,
     userId: session.userId,
     typeFilter: typeFilter === "income" || typeFilter === "expense" ? typeFilter : null,
+    homeCurrency: parseHomeCurrency(household?.homeCurrency),
   };
 }
 
 export default function Transactions() {
-  const { transactions: initialTransactions, userId, typeFilter } =
+  const { transactions: initialTransactions, userId, typeFilter, homeCurrency } =
     useLoaderData<typeof loader>();
 
   return (
@@ -51,6 +64,7 @@ export default function Transactions() {
       initialTransactions={initialTransactions}
       currentUserId={userId}
       typeFilter={typeFilter}
+      homeCurrency={homeCurrency}
     />
   );
 }

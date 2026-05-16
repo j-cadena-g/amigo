@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRevalidator } from "react-router";
 import { formatCents } from "@/app/lib/currency";
+import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -29,13 +30,16 @@ interface BudgetWithSpending {
   name: string;
   category: string | null;
   limitAmount: number;
+  limitAmountHome: number;
   currency: CurrencyCode;
+  homeCurrency: CurrencyCode;
   period: string;
   isShared: boolean;
   userId: string | null;
-  currentSpending: number;
+  currentSpendingHomeCents: number;
   percentUsed: number;
-  remainingAmount: number;
+  remainingHomeCents: number;
+  alertLevel: "ok" | "warn" | "critical" | "over";
 }
 
 interface BudgetListProps {
@@ -61,8 +65,9 @@ const EMPTY_FORM: BudgetFormData = {
   isShared: false,
 };
 
-function getProgressColor(percent: number): string {
-  if (percent > 90) return "bg-red-500";
+function getProgressColor(percent: number, remaining: number): string {
+  if (remaining < 0 || percent >= 100) return "bg-red-500";
+  if (percent >= 90) return "bg-red-500";
   if (percent >= 75) return "bg-yellow-500";
   return "bg-green-500";
 }
@@ -76,14 +81,36 @@ function BudgetCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const isOverBudget = budget.remainingAmount < 0;
+  const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
+  const showBudgetCurrency =
+    budget.currency !== budget.homeCurrency;
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{budget.name}</CardTitle>
+          <div className="flex items-center gap-2 min-w-0">
+            <CardTitle className="text-base truncate">{budget.name}</CardTitle>
+            {budget.alertLevel !== "ok" && (
+              <span
+                className={cn(
+                  "text-[10px] font-semibold uppercase shrink-0 px-1.5 py-0.5 rounded",
+                  budget.alertLevel === "over"
+                    ? "bg-red-500/15 text-red-600"
+                    : budget.alertLevel === "critical"
+                      ? "bg-red-500/10 text-red-600"
+                      : "bg-amber-500/15 text-amber-700"
+                )}
+              >
+                {budget.alertLevel === "over"
+                  ? "Over"
+                  : budget.alertLevel === "critical"
+                    ? "90%+"
+                    : "75%+"}
+              </span>
+            )}
+          </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={onEdit}>
               Edit
@@ -101,27 +128,33 @@ function BudgetCard({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>
-              {formatCents(budget.currentSpending, budget.currency)} of{" "}
-              {formatCents(budget.limitAmount, budget.currency)}
+              {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency)} of{" "}
+              {formatCents(budget.limitAmountHome, budget.homeCurrency)}
             </span>
             <span className="text-muted-foreground capitalize">
               {budget.period}
             </span>
           </div>
+          {showBudgetCurrency && (
+            <p className="text-xs text-muted-foreground">
+              Limit in budget currency:{" "}
+              {formatCents(budget.limitAmount, budget.currency)}
+            </p>
+          )}
           <div className="h-2 w-full rounded-full bg-muted">
             <div
-              className={`h-2 rounded-full transition-all ${getProgressColor(budget.percentUsed)}`}
+              className={`h-2 rounded-full transition-all ${getProgressColor(budget.percentUsed, budget.remainingHomeCents)}`}
               style={{ width: `${clampedPercent}%` }}
             />
           </div>
           {isOverBudget ? (
             <p className="text-sm font-medium text-red-500">
               Over budget by{" "}
-              {formatCents(Math.abs(budget.remainingAmount), budget.currency)}
+              {formatCents(Math.abs(budget.remainingHomeCents), budget.homeCurrency)}
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {formatCents(budget.remainingAmount, budget.currency)} remaining
+              {formatCents(budget.remainingHomeCents, budget.homeCurrency)} remaining
             </p>
           )}
         </div>

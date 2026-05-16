@@ -2,6 +2,7 @@ import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core
 import { households } from "./households";
 import { users } from "./users";
 import { budgets } from "./budgets";
+import { financialAccounts } from "./financial-accounts";
 import { CURRENCY_CODES } from "./currencies";
 
 export const TRANSACTION_TYPES = ["income", "expense"] as const;
@@ -26,6 +27,14 @@ export const transactions = sqliteTable(
     budgetId: text("budget_id").references(() => budgets.id, {
       onDelete: "set null",
     }),
+    accountId: text("account_id").references(() => financialAccounts.id, {
+      onDelete: "set null",
+    }),
+    /** Posted / cleared timestamp (ms); null = pending */
+    postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    externalId: text("external_id"),
+    importBatchId: text("import_batch_id"),
+    reviewed: integer("reviewed", { mode: "boolean" }).notNull().default(false),
     amount: integer("amount").notNull(), // Stored as integer cents (1234 = $12.34)
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
     // Exchange rate to home currency at time of creation (null if same as home currency)

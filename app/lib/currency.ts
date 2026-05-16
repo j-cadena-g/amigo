@@ -1,4 +1,5 @@
 import type { CurrencyCode } from "@amigo/db";
+import { DEFAULT_HOME_CURRENCY } from "@amigo/db";
 
 const CURRENCY_CONFIG: Record<CurrencyCode, { locale: string; symbol: string }> =
   {
@@ -26,7 +27,7 @@ export function formatCurrency(
   currency: CurrencyCode | null | undefined,
   options?: { compact?: boolean }
 ): string {
-  const safeCurrency: CurrencyCode = currency ?? "CAD";
+  const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
   const config = CURRENCY_CONFIG[safeCurrency];
 
   return new Intl.NumberFormat(config.locale, {
@@ -75,7 +76,7 @@ export function formatWithConversion(
 export function getCurrencySymbol(
   currency: CurrencyCode | null | undefined
 ): string {
-  const safeCurrency: CurrencyCode = currency ?? "CAD";
+  const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
   return CURRENCY_CONFIG[safeCurrency].symbol;
 }
 

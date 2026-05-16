@@ -70,7 +70,7 @@
   ],
 
   "triggers": {
-    "crons": ["0 3 * * SUN"]
+    "crons": ["0 3 * * SUN", "23 4 * * *"]
   },
 
   "vars": {

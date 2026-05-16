@@ -28,6 +28,10 @@ describe("money", () => {
     await expect(
       computeLimitAmountHomeCents({} as never, {} as never, "household", -1, "USD")
     ).rejects.toThrow(/invalid limitCentsInBudgetCurrency/);
+
+    await expect(
+      computeLimitAmountHomeCents({} as never, {} as never, "household", 10.5, "USD")
+    ).rejects.toThrow(/invalid limitCentsInBudgetCurrency/);
   });
 
   it("same currency returns input and does not call FX", async () => {

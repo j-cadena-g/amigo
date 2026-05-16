@@ -37,7 +37,13 @@ function AccountCard({
             {account.isShared ? " · Shared" : " · Personal"}
           </p>
         </div>
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={onEdit}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          onClick={onEdit}
+          aria-label={`Edit account ${account.name}`}
+        >
           <Pencil className="h-4 w-4" />
         </Button>
       </CardHeader>

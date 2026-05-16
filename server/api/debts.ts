@@ -7,7 +7,6 @@ import {
   or,
   scopeToHousehold,
 } from "@amigo/db";
-import type { CurrencyCode } from "@amigo/db";
 import { z } from "zod";
 import { ActionError } from "../lib/errors";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";

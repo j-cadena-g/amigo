@@ -95,7 +95,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
         .where(and(...baseConditions));
 
       const currentSpendingHomeCents = spendingResult[0]?.total ?? 0;
-      const limitHomeCents = budget.limitAmountHome;
+      const limitHomeCents = budget.limitAmountHome ?? budget.limitAmount;
       const percentUsed =
         limitHomeCents > 0 ? (currentSpendingHomeCents / limitHomeCents) * 100 : 0;
       const remainingHomeCents = limitHomeCents - currentSpendingHomeCents;

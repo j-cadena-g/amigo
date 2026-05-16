@@ -24,10 +24,11 @@ export async function computeLimitAmountHomeCents(
   if (
     typeof limitCentsInBudgetCurrency !== "number" ||
     !Number.isFinite(limitCentsInBudgetCurrency) ||
+    !Number.isSafeInteger(limitCentsInBudgetCurrency) ||
     limitCentsInBudgetCurrency < 0
   ) {
     throw new TypeError(
-      "invalid limitCentsInBudgetCurrency: must be a non-negative finite number"
+      "invalid limitCentsInBudgetCurrency: must be a non-negative safe integer"
     );
   }
   const home = await getHomeCurrency(db, householdId);

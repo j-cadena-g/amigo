@@ -2,7 +2,8 @@
 -- accurate FX snapshots existed: use household home_currency and latest row in exchange_rates
 -- (base = budget currency, target = home). Same-currency budgets copy `limit_amount`; with a rate,
 -- converted home cents match `computeLimitAmountHomeCents` (positive limits never round to 0).
--- If the budget currency differs from home and no FX row exists, `limit_amount_home` is unknown — NULL.
+-- If the budget currency differs from home and no FX row exists, keep the prior
+-- `limit_amount_home` (from migration 0004: copy of `limit_amount`) so NOT NULL is preserved.
 
 WITH `fx` AS (
   SELECT
@@ -35,7 +36,7 @@ SET
         WHEN CAST(ROUND(CAST(`fx`.`lim` AS REAL) * `fx`.`r`) AS INTEGER) < 1 THEN 1
         ELSE CAST(ROUND(CAST(`fx`.`lim` AS REAL) * `fx`.`r`) AS INTEGER)
       END
-    ELSE NULL
+    ELSE `budgets`.`limit_amount_home`
   END
 FROM `fx`
 WHERE `budgets`.`id` = `fx`.`budget_id`;

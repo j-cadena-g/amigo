@@ -29,12 +29,21 @@ const zAccountType = z.enum(
   ]
 );
 
-const accountSchema = z.object({
+const createAccountSchema = z.object({
   name: z.string().min(1),
   type: zAccountType,
   balance: z.number(),
   currency: zCurrencyCode.optional(),
   isShared: z.boolean().optional().default(false),
+  archived: z.boolean().optional(),
+});
+
+const updateAccountSchema = z.object({
+  name: z.string().min(1),
+  type: zAccountType,
+  balance: z.number(),
+  currency: zCurrencyCode.optional(),
+  isShared: z.boolean().optional(),
   archived: z.boolean().optional(),
 });
 
@@ -76,7 +85,7 @@ export const handleAccountsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.accounts.create
     );
 
-    const validated = accountSchema.parse(await request.json());
+    const validated = createAccountSchema.parse(await request.json());
     if (validated.isShared) {
       assertPermission(
         canManageSharedItems(session!),
@@ -112,7 +121,7 @@ export const handleAccountsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.accounts.update
     );
 
-    const validated = accountSchema.parse(await request.json());
+    const validated = updateAccountSchema.parse(await request.json());
     const existing = await db.query.financialAccounts.findFirst({
       where: and(
         eq(financialAccounts.id, id),
@@ -126,7 +135,7 @@ export const handleAccountsRequest: ApiHandler = async ({
     }
 
     const isCurrentlyShared = existing.userId === null;
-    if (isCurrentlyShared || validated.isShared) {
+    if (isCurrentlyShared || validated.isShared === true) {
       assertPermission(
         canManageSharedItems(session!),
         "Only owners and admins can modify shared accounts"
@@ -145,7 +154,12 @@ export const handleAccountsRequest: ApiHandler = async ({
     const updated = await db
       .update(financialAccounts)
       .set({
-        userId: validated.isShared ? null : session!.userId,
+        userId:
+          validated.isShared === undefined
+            ? existing.userId
+            : validated.isShared
+              ? null
+              : session!.userId,
         name: validated.name.trim(),
         type: validated.type,
         balance: toCents(validated.balance),

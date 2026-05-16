@@ -40,6 +40,7 @@ export function EditAccountDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (deleting) return;
     setError(null);
     const trimmed = balance.trim();
     let balanceNum = 0;
@@ -111,12 +112,22 @@ export function EditAccountDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            <label className="text-sm font-medium" htmlFor="edit-acct-name">
+              Name
+            </label>
+            <Input
+              id="edit-acct-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Type</label>
+            <label className="text-sm font-medium" htmlFor="edit-acct-type">
+              Type
+            </label>
             <select
+              id="edit-acct-type"
               value={type}
               onChange={(e) => setType(e.target.value as typeof type)}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -130,8 +141,11 @@ export function EditAccountDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Balance</label>
+              <label className="text-sm font-medium" htmlFor="edit-acct-bal">
+                Balance
+              </label>
               <Input
+                id="edit-acct-bal"
                 type="number"
                 step="0.01"
                 value={balance}
@@ -139,8 +153,11 @@ export function EditAccountDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Currency</label>
+              <label className="text-sm font-medium" htmlFor="edit-acct-cur">
+                Currency
+              </label>
               <select
+                id="edit-acct-cur"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -178,7 +195,7 @@ export function EditAccountDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading || !name}>
+              <Button type="submit" disabled={loading || deleting || !name.trim()}>
                 {loading ? "Saving…" : "Save"}
               </Button>
             </div>

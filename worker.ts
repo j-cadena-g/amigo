@@ -51,13 +51,14 @@ export default {
   },
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Each wrangler.jsonc cron fires separately; Sundays get both triggers at different
+    // times for different work (audit prune vs recurring), not duplicate recurring runs.
     if (event.cron === "0 3 * * SUN") {
       // Weekly audit log pruning (Sunday 3 AM UTC) — retain 90 days
       const db = getDb(env.DB);
       const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
       await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
-    }
-    if (event.cron === "23 4 * * *") {
+    } else if (event.cron === "23 4 * * *") {
       // Daily recurring postings (4:23 AM UTC), idempotent by deterministic txn ids
       ctx.waitUntil(
         (async () => {
@@ -86,6 +87,10 @@ export default {
             );
           }
         })()
+      );
+    } else {
+      console.warn(
+        JSON.stringify({ message: "scheduled: unhandled cron", cron: event.cron })
       );
     }
   },

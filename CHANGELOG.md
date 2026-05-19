@@ -21,8 +21,8 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
-- README and [`docs/README.md`](docs/README.md); removed committed Cloudflare migration design draft (CHANGELOG + ARCHITECTURE carry the narrative)
-- ARCHITECTURE and **0.3.0** changelog: CI described as lint/typecheck/test only (no deploy from GitHub Actions)
+- README cleanup; removed committed Cloudflare migration design draft (narrative now in CHANGELOG and README **How it works**)
+- **0.3.0** changelog: CI described as lint/typecheck/test only (no deploy from GitHub Actions)
 
 ### Changed
 

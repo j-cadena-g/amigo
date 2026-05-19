@@ -85,6 +85,7 @@ export default {
                 stack: err instanceof Error ? err.stack : undefined,
               })
             );
+            throw err;
           }
         })()
       );

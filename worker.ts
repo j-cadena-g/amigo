@@ -13,7 +13,7 @@ import { resolveSession } from "./server/lib/session";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
-  getRequestHandlerMode(import.meta)
+  getRequestHandlerMode(import.meta.env.MODE)
 );
 
 export default {

@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
 import { CURRENCY_CODES } from "./currencies";
@@ -25,6 +25,10 @@ export const budgets = sqliteTable(
     name: text("name").notNull(),
     category: text("category"),
     limitAmount: integer("limit_amount").notNull(), // Stored as integer cents
+    /** Same limit expressed in household home currency cents (at last save). */
+    limitAmountHome: integer("limit_amount_home").notNull().default(0),
+    /** FX from budget currency → home when limit was saved (null if same currency). */
+    exchangeRateLimitToHome: real("exchange_rate_limit_to_home"),
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
     period: text("period", { enum: BUDGET_PERIODS }).notNull().default("monthly"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })

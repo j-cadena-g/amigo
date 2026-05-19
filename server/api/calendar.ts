@@ -13,6 +13,7 @@ import {
 } from "@amigo/db";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { parseCalendarQuery } from "../lib/request-validation";
+import { visibleFinancialTransactionsCondition, visibleRecurringRulesCondition } from "../lib/financial-visibility";
 import type { ApiHandler } from "./route";
 
 export interface CalendarEvent {
@@ -162,7 +163,7 @@ export const handleCalendarRequest: ApiHandler = async ({
     db
       .select()
       .from(recurringTransactions)
-      .where(and(householdScope, eq(recurringTransactions.userId, session!.userId)))
+      .where(and(householdScope, visibleRecurringRulesCondition(session!.userId)))
       .all(),
     db
       .select()
@@ -184,7 +185,7 @@ export const handleCalendarRequest: ApiHandler = async ({
       .where(
         and(
           scopeToHousehold(transactions.householdId, session!.householdId),
-          eq(transactions.userId, session!.userId),
+          visibleFinancialTransactionsCondition(session!.userId),
           gte(transactions.date, startStr),
           lte(transactions.date, endStr),
           isNull(transactions.deletedAt)

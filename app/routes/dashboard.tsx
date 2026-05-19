@@ -31,20 +31,36 @@ import {
   gte,
   lte,
   desc,
+  asc,
   sql,
+  inArray,
+  parseHomeCurrency,
 } from "@amigo/db";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { BudgetCharts } from "@/app/components/budget-charts";
 import type { CurrencyCode } from "@amigo/db";
+import {
+  sqlAssetBalanceHomeCents,
+  sqlDebtLiabilityHomeCents,
+  sqlTransactionAmountHomeCents,
+} from "@/server/lib/money";
+import {
+  visibleBudgetsCondition,
+  visibleFinancialTransactionsCondition,
+  visibleRecurringRulesCondition,
+} from "@/server/lib/financial-visibility";
+import { getExchangeRateForRecord } from "@/server/lib/exchange-rates";
 
 interface BudgetWithSpending {
   id: string;
   name: string;
-  limitAmount: number;
-  spent: number;
-  currency: string;
+  spentHomeCents: number;
+  limitHomeCents: number;
+  limitOriginalCents: number;
+  budgetCurrency: string;
   period: string;
+  recurringImpactHomeCents: number;
 }
 
 interface RecentTransaction {
@@ -88,11 +104,21 @@ export async function loader({ context }: LoaderFunctionArgs) {
     .toISOString()
     .split("T")[0]!;
 
-  const expenseBaseWhere = [
+  const txnVis = visibleFinancialTransactionsCondition(session.userId);
+  const expenseVisibleBase = [
     scopeToHousehold(transactions.householdId, session.householdId),
     eq(transactions.type, "expense"),
     isNull(transactions.deletedAt),
+    txnVis,
   ];
+  const incomeVisibleBase = [
+    scopeToHousehold(transactions.householdId, session.householdId),
+    eq(transactions.type, "income"),
+    isNull(transactions.deletedAt),
+    txnVis,
+  ];
+
+  const txnHome = sqlTransactionAmountHomeCents();
 
   // All queries in parallel
   const [
@@ -108,28 +134,24 @@ export async function loader({ context }: LoaderFunctionArgs) {
     categoryRows,
     lastMonthCategoryRows,
   ] = await Promise.all([
-    // Monthly spending
+    // Monthly spending (home currency)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${txnHome}), 0)` })
       .from(transactions)
       .where(
         and(
-          scopeToHousehold(transactions.householdId, session.householdId),
-          eq(transactions.type, "expense"),
-          isNull(transactions.deletedAt),
+          ...expenseVisibleBase,
           gte(transactions.date, monthStart),
           lte(transactions.date, monthEnd)
         )
       ),
-    // Monthly income
+    // Monthly income (home currency)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${txnHome}), 0)` })
       .from(transactions)
       .where(
         and(
-          scopeToHousehold(transactions.householdId, session.householdId),
-          eq(transactions.type, "income"),
-          isNull(transactions.deletedAt),
+          ...incomeVisibleBase,
           gte(transactions.date, monthStart),
           lte(transactions.date, monthEnd)
         )
@@ -149,7 +171,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
     db.query.transactions.findMany({
       where: and(
         scopeToHousehold(transactions.householdId, session.householdId),
-        isNull(transactions.deletedAt)
+        isNull(transactions.deletedAt),
+        txnVis
       ),
       orderBy: [desc(transactions.date), desc(transactions.createdAt)],
       limit: 6,
@@ -160,10 +183,11 @@ export async function loader({ context }: LoaderFunctionArgs) {
         id: budgets.id,
         name: budgets.name,
         limitAmount: budgets.limitAmount,
+        limitAmountHome: budgets.limitAmountHome,
         currency: budgets.currency,
         period: budgets.period,
         spent: sql<number>`COALESCE((
-          SELECT SUM(${transactions.amount})
+          SELECT SUM(${txnHome})
           FROM ${transactions}
           WHERE ${transactions.budgetId} = ${budgets.id}
             AND ${transactions.type} = 'expense'
@@ -176,7 +200,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
       .where(
         and(
           scopeToHousehold(budgets.householdId, session.householdId),
-          isNull(budgets.deletedAt)
+          isNull(budgets.deletedAt),
+          visibleBudgetsCondition(session.userId)
         )
       )
       .limit(5),
@@ -187,16 +212,17 @@ export async function loader({ context }: LoaderFunctionArgs) {
           recurringTransactions.householdId,
           session.householdId
         ),
+        visibleRecurringRulesCondition(session.userId),
         eq(recurringTransactions.active, true),
         gte(recurringTransactions.nextRunDate, todayStr)
       ),
-      orderBy: [desc(recurringTransactions.nextRunDate)],
+      orderBy: [asc(recurringTransactions.nextRunDate)],
       limit: 5,
     }),
-    // Total assets (personal + shared)
+    // Total assets (home currency)
     db
       .select({
-        total: sql<number>`COALESCE(SUM(${assets.balance}), 0)`,
+        total: sql<number>`COALESCE(SUM(${sqlAssetBalanceHomeCents()}), 0)`,
       })
       .from(assets)
       .where(
@@ -206,16 +232,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
           isNull(assets.deletedAt)
         )
       ),
-    // Total debts (personal + shared — remaining balance for loans, used credit for cards)
+    // Total debts (home currency — liability amounts)
     db
       .select({
-        total: sql<number>`COALESCE(SUM(
-          CASE
-            WHEN ${debts.type} = 'LOAN' THEN ${debts.balanceInitial} - ${debts.balanceCurrent}
-            WHEN ${debts.type} = 'CREDIT_CARD' THEN ${debts.balanceInitial} - ${debts.balanceCurrent}
-            ELSE 0
-          END
-        ), 0)`,
+        total: sql<number>`COALESCE(SUM(${sqlDebtLiabilityHomeCents()}), 0)`,
       })
       .from(debts)
       .where(
@@ -236,12 +256,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
     db
       .select({
         category: transactions.category,
-        amount: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+        amount: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
       })
       .from(transactions)
       .where(
         and(
-          ...expenseBaseWhere,
+          ...expenseVisibleBase,
           gte(transactions.date, monthStart),
           lte(transactions.date, monthEnd)
         )
@@ -251,12 +271,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
     db
       .select({
         category: transactions.category,
-        amount: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+        amount: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
       })
       .from(transactions)
       .where(
         and(
-          ...expenseBaseWhere,
+          ...expenseVisibleBase,
           gte(transactions.date, lastMonthStart),
           lte(transactions.date, lastMonthEnd)
         )
@@ -268,7 +288,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const incomeCents = incomeResult[0]?.total ?? 0;
   const groceryCount = groceryCountResult[0]?.count ?? 0;
   const netCents = incomeCents - spendingCents;
-  const currency = (household?.homeCurrency as CurrencyCode) ?? "CAD";
+  const currency = parseHomeCurrency(household?.homeCurrency);
   const monthName = now.toLocaleString("default", { month: "long" });
   const assetsCents = totalAssets[0]?.total ?? 0;
   const debtsCents = totalDebts[0]?.total ?? 0;
@@ -292,6 +312,49 @@ export async function loader({ context }: LoaderFunctionArgs) {
     lastMonth: lastMonthMap.get(category) ?? 0,
   }));
 
+  const recurringImpactByBudget = new Map<string, number>();
+  const budgetIdsForImpact = budgetRows.map((b) => b.id);
+  if (budgetIdsForImpact.length > 0) {
+    const rules = await db.query.recurringTransactions.findMany({
+      where: and(
+        scopeToHousehold(recurringTransactions.householdId, session.householdId),
+        visibleRecurringRulesCondition(session.userId),
+        eq(recurringTransactions.active, true),
+        eq(recurringTransactions.type, "expense"),
+        inArray(recurringTransactions.budgetId, budgetIdsForImpact),
+        gte(recurringTransactions.nextRunDate, monthStart),
+        lte(recurringTransactions.nextRunDate, monthEnd)
+      ),
+    });
+    const distinctCurrencies = [...new Set(rules.map((r) => r.currency))].filter(
+      (c) => c !== currency
+    );
+    const rateByCurrency = new Map<string, number>();
+    await Promise.all(
+      distinctCurrencies.map(async (c) => {
+        const rt = await getExchangeRateForRecord(env, c, currency);
+        if (rt === null) {
+          console.warn(
+            `[dashboard] missing exchange rate ${c} -> ${currency}; skipping recurring rules in ${c}`
+          );
+          return;
+        }
+        rateByCurrency.set(c, rt);
+      })
+    );
+    for (const r of rules) {
+      if (!r.budgetId) continue;
+      const mult =
+        r.currency === currency ? 1 : rateByCurrency.get(r.currency);
+      if (mult === undefined) continue;
+      const homeAmt = Math.round(r.amount * mult);
+      recurringImpactByBudget.set(
+        r.budgetId,
+        (recurringImpactByBudget.get(r.budgetId) ?? 0) + homeAmt
+      );
+    }
+  }
+
   return {
     spendingCents,
     incomeCents,
@@ -312,10 +375,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
     budgetsWithSpending: budgetRows.map((b) => ({
       id: b.id,
       name: b.name,
-      limitAmount: b.limitAmount,
-      spent: b.spent,
-      currency: b.currency,
+      spentHomeCents: b.spent,
+      limitHomeCents: b.limitAmountHome,
+      limitOriginalCents: b.limitAmount,
+      budgetCurrency: b.currency,
       period: b.period,
+      recurringImpactHomeCents: recurringImpactByBudget.get(b.id) ?? 0,
     })) as BudgetWithSpending[],
     upcomingRecurring: upcomingRecurring.map((r) => ({
       id: r.id,
@@ -592,11 +657,19 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {budgetsWithSpending.map((b) => {
-                  const pct = b.limitAmount > 0
-                    ? Math.min(100, Math.round((b.spent / b.limitAmount) * 100))
+                  const pct = b.limitHomeCents > 0
+                    ? Math.min(100, Math.round((b.spentHomeCents / b.limitHomeCents) * 100))
                     : 0;
-                  const isOver = b.spent > b.limitAmount;
-                  const isWarning = pct >= 80 && !isOver;
+                  const isOver = b.spentHomeCents > b.limitHomeCents;
+                  const isCritical = !isOver && pct >= 90;
+                  const isWarn = !isOver && pct >= 75 && pct < 90;
+                  const budgetCur = b.budgetCurrency as CurrencyCode;
+                  const showOriginal = budgetCur !== cur;
+                  const projectedSpend = b.spentHomeCents + b.recurringImpactHomeCents;
+                  const projectedPct =
+                    b.limitHomeCents > 0
+                      ? Math.round((projectedSpend / b.limitHomeCents) * 100)
+                      : 0;
 
                   return (
                     <div key={b.id}>
@@ -605,17 +678,23 @@ export default function Dashboard() {
                           {b.name}
                         </span>
                         <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap ml-2">
-                          {formatCents(b.spent, b.currency as CurrencyCode)} /{" "}
-                          {formatCents(b.limitAmount, b.currency as CurrencyCode)}
+                          {formatCents(b.spentHomeCents, cur)} /{" "}
+                          {formatCents(b.limitHomeCents, cur)}
                         </span>
                       </div>
+                      {showOriginal && (
+                        <p className="text-[10px] text-muted-foreground mb-1">
+                          Limit in budget currency:{" "}
+                          {formatCents(b.limitOriginalCents, budgetCur)}
+                        </p>
+                      )}
                       <div className="h-2 rounded-full bg-secondary overflow-hidden">
                         <div
                           className={cn(
                             "h-full rounded-full transition-all duration-500 ease-out",
-                            isOver
+                            isOver || isCritical
                               ? "bg-red-500"
-                              : isWarning
+                              : isWarn
                                 ? "bg-amber-500"
                                 : "bg-primary"
                           )}
@@ -628,19 +707,37 @@ export default function Dashboard() {
                             "text-[10px] font-semibold uppercase tracking-wider",
                             isOver
                               ? "text-red-500"
-                              : isWarning
-                                ? "text-amber-500"
-                                : "text-muted-foreground"
+                              : isCritical
+                                ? "text-red-500"
+                                : isWarn
+                                  ? "text-amber-500"
+                                  : "text-muted-foreground"
                           )}
                         >
                           {isOver
                             ? "Over budget"
-                            : `${pct}% used`}
+                            : isCritical
+                              ? "90%+ used"
+                              : isWarn
+                                ? "75%+ used"
+                                : `${pct}% used`}
                         </span>
                         <span className="text-[10px] text-muted-foreground capitalize">
                           {b.period}
                         </span>
                       </div>
+                      {b.recurringImpactHomeCents > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Upcoming recurring (est.):{" "}
+                          {formatCents(b.recurringImpactHomeCents, cur)}
+                          {projectedPct > 100 && (
+                            <span className="text-amber-600 font-medium">
+                              {" "}
+                              — with recurring, ~{projectedPct}% of limit
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   );
                 })}

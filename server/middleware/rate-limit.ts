@@ -19,12 +19,19 @@ export const ROUTE_RATE_LIMITS = {
     update: RATE_LIMIT_PRESETS.MUTATION,
     delete: RATE_LIMIT_PRESETS.MUTATION,
   },
+  accounts: {
+    list: RATE_LIMIT_PRESETS.READ,
+    create: RATE_LIMIT_PRESETS.MUTATION,
+    update: RATE_LIMIT_PRESETS.MUTATION,
+    delete: RATE_LIMIT_PRESETS.MUTATION,
+  },
   audit: {
     list: RATE_LIMIT_PRESETS.READ,
   },
   budgets: {
     list: RATE_LIMIT_PRESETS.READ,
     withSpending: RATE_LIMIT_PRESETS.READ,
+    matchCategory: RATE_LIMIT_PRESETS.READ,
     create: RATE_LIMIT_PRESETS.MUTATION,
     update: RATE_LIMIT_PRESETS.MUTATION,
     delete: RATE_LIMIT_PRESETS.MUTATION,
@@ -80,6 +87,8 @@ export const ROUTE_RATE_LIMITS = {
   },
   transactions: {
     list: RATE_LIMIT_PRESETS.READ,
+    export: RATE_LIMIT_PRESETS.READ,
+    import: RATE_LIMIT_PRESETS.BULK,
     create: RATE_LIMIT_PRESETS.MUTATION,
     update: RATE_LIMIT_PRESETS.MUTATION,
     delete: RATE_LIMIT_PRESETS.MUTATION,

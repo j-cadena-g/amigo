@@ -2,7 +2,7 @@
 
 **Project:** Household Budgeting Application with Grocery Tracking
 **Deployment:** Cloudflare Workers
-**Date:** March 2026
+**Date:** March 2026 (server layout updated May 2026 — React Router owns all HTTP; see changelog)
 
 ---
 
@@ -103,8 +103,8 @@ amigo/
 │   ├── root.tsx                  # Root layout
 │   └── app.css                   # Tailwind theme
 │
-├── server/                       # Server-side route/domain handlers
-│   ├── api/                      # Transport-neutral API domain handlers
+├── server/                       # Domain logic shared by RR loaders and `/api/*` routes
+│   ├── api/                      # Handlers invoked from `app/routes/api.*.ts` resource routes
 │   │   ├── groceries.ts          # CRUD, toggle, tags, purchase-date
 │   │   ├── tags.ts               # Grocery tag CRUD
 │   │   ├── transactions.ts       # Add, update, soft-delete
@@ -203,6 +203,11 @@ const items = await db.query.groceryItems.findMany({
 ---
 
 ## Server Architecture
+
+### API surface
+
+* **Pages and data:** React Router route modules under `app/routes/*.tsx` use loaders and actions with `context.app` (session, CSP nonce) and `context.cloudflare` (bindings, `ctx`, `cf`).
+* **JSON APIs:** `app/routes/api.*.ts` resource routes map HTTP verbs to handlers in `server/api/*` (shared Zod validation, D1 access, rate limits). There is no separate HTTP framework; the Worker entrypoint delegates non-`/ws` traffic to `createRequestHandler()` from React Router.
 
 ### Request Flow
 
@@ -333,8 +338,8 @@ bun run db:migrate:remote        # Apply to production D1
 
 ### CI/CD (GitHub Actions)
 
-* **Push/PR:** Lint → Typecheck → Test
-* **Main:** Deploy production via `wrangler deploy`
+* **Push/PR to `main`:** Lint → Typecheck → Test (see `.github/workflows/ci.yaml`)
+* **Deploy:** Not automated in this repo; use `bun run deploy` or configure Cloudflare Workers Builds / a separate workflow if you want CI deploys
 
 ### Required Secrets
 

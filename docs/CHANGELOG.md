@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Financial hardening: home-currency aggregates, shared visibility helpers, scheduled recurring processing (`worker.ts` daily cron), budget category/recurring match API, CSV transaction export and JSON bulk import (`POST /api/transactions/import`), `financial_accounts` table + optional `transactions.account_id` / reconciliation fields (migration `0005_financial_accounts.sql`)
+- Root [`LICENSE`](../LICENSE): **GNU Affero General Public License v3.0** (AGPL-3.0); `license` field in workspace `package.json` files
+
+### Documentation
+
+- README and [`docs/README.md`](./README.md); removed committed Cloudflare migration design draft (CHANGELOG + ARCHITECTURE carry the narrative)
+- ARCHITECTURE and **0.3.0** changelog: CI described as lint/typecheck/test only (no deploy from GitHub Actions)
+
 ### Changed
 
 - **Runtime migration completed:** HTTP requests now run through React Router v7 framework mode directly from `worker.ts`
@@ -81,10 +91,8 @@ All notable changes to this project will be documented in this file.
   - Resumable with checkpoint file, dry-run mode
   - Transforms: timestamps → ms, amounts → cents, booleans → 0/1
 
-- **CI/CD Pipeline**
-  - GitHub Actions: lint, typecheck, test, deploy
-  - Preview deployments with isolated D1/KV (`--env preview`)
-  - Production deploy via `wrangler deploy`
+- **CI pipeline**
+  - GitHub Actions on `main`: lint, typecheck, test (no automated deploy in this repository)
 
 ### Removed
 

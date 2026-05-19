@@ -7,14 +7,17 @@ import {
   isNull,
   lte,
   or,
+  recurringTransactions,
   scopeToHousehold,
   sql,
   transactions,
+  visibleRecurringRulesCondition,
 } from "@amigo/db";
 import { z } from "zod";
 import { ActionError } from "../lib/errors";
 import { assertPermission, canManageSharedBudgets } from "../lib/permissions";
 import { toCents, toISODate } from "../lib/conversions";
+import { computeLimitAmountHomeCents, sqlTransactionAmountHomeCents } from "../lib/money";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 
@@ -67,7 +70,8 @@ export const handleBudgetsRequest: ApiHandler = async ({
   session,
 }) => {
   const [path] = getSplatSegments(params);
-  const id = path && path !== "with-spending" ? path : undefined;
+  const id =
+    path && path !== "with-spending" && path !== "match-category" ? path : undefined;
   const db = getDb(env.DB);
 
   if (request.method === "GET" && !path) {
@@ -94,6 +98,53 @@ export const handleBudgetsRequest: ApiHandler = async ({
     );
   }
 
+  if (request.method === "GET" && path === "match-category") {
+    await enforceRateLimit(
+      env.CACHE,
+      `${session!.userId}:budgets:match-category`,
+      ROUTE_RATE_LIMITS.budgets.matchCategory
+    );
+
+    const url = new URL(request.url);
+    const category = url.searchParams.get("category")?.trim() ?? "";
+    const recurringRuleId = url.searchParams.get("recurringRuleId")?.trim();
+
+    if (recurringRuleId) {
+      const rule = await db.query.recurringTransactions.findFirst({
+        where: and(
+          eq(recurringTransactions.id, recurringRuleId),
+          scopeToHousehold(recurringTransactions.householdId, session!.householdId),
+          visibleRecurringRulesCondition(session!.userId)
+        ),
+      });
+      if (rule?.budgetId) {
+        return Response.json({ budgetId: rule.budgetId, matchSource: "recurring" });
+      }
+    }
+
+    if (!category) {
+      return Response.json({ budgetId: null, matchSource: null });
+    }
+
+    const needle = category.toLowerCase();
+    const candidates = await db.query.budgets.findMany({
+      where: and(
+        scopeToHousehold(budgets.householdId, session!.householdId),
+        or(eq(budgets.userId, session!.userId), isNull(budgets.userId)),
+        isNull(budgets.deletedAt)
+      ),
+    });
+
+    const match = candidates
+      .filter((b) => (b.category ?? "").trim().toLowerCase() === needle)
+      .sort((a, b) => (a.userId === null ? 1 : 0) - (b.userId === null ? 1 : 0))[0];
+
+    return Response.json({
+      budgetId: match?.id ?? null,
+      matchSource: match ? "category" : null,
+    });
+  }
+
   if (request.method === "GET" && path === "with-spending") {
     await enforceRateLimit(
       env.CACHE,
@@ -110,6 +161,11 @@ export const handleBudgetsRequest: ApiHandler = async ({
       orderBy: (budget, { desc }) => [desc(budget.createdAt)],
     });
 
+    const legacyRemaining =
+      request.headers.get("x-api-version") === "1" ||
+      new URL(request.url).searchParams.get("api_version") === "1";
+
+    const txnHome = sqlTransactionAmountHomeCents();
     const budgetsWithSpending = await Promise.all(
       userBudgets.map(async (budget) => {
         const { start, end } = getPeriodBounds(budget.period);
@@ -130,23 +186,28 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
         const spendingResult = await db
           .select({
-            total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+            total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
           })
           .from(transactions)
           .where(and(...baseConditions));
 
-        const currentSpendingCents = spendingResult[0]?.total ?? 0;
-        const limitCents = budget.limitAmount;
+        const currentSpendingHomeCents = spendingResult[0]?.total ?? 0;
+        const limitHomeCents = budget.limitAmountHome;
         const percentUsed =
-          limitCents > 0 ? (currentSpendingCents / limitCents) * 100 : 0;
-        const remainingCents = Math.max(0, limitCents - currentSpendingCents);
+          limitHomeCents > 0 ? (currentSpendingHomeCents / limitHomeCents) * 100 : 0;
+        const remainingHomeCents = limitHomeCents - currentSpendingHomeCents;
+        const remainingAmount = legacyRemaining
+          ? Math.max(0, remainingHomeCents)
+          : remainingHomeCents;
 
         return {
           ...budget,
           isShared,
-          currentSpending: currentSpendingCents,
+          currentSpending: currentSpendingHomeCents,
           percentUsed,
-          remainingAmount: remainingCents,
+          remainingHomeCents,
+          /** @deprecated use remainingHomeCents — signed home cents; use X-API-Version: 1 for clamped-to-zero legacy */
+          remainingAmount,
         };
       })
     );
@@ -169,6 +230,17 @@ export const handleBudgetsRequest: ApiHandler = async ({
       );
     }
 
+    const currency = (validated.currency ?? "CAD") as import("@amigo/db").CurrencyCode;
+    const limitCents = toCents(validated.limitAmount);
+    const { limitAmountHome, exchangeRateLimitToHome } =
+      await computeLimitAmountHomeCents(
+        env,
+        db,
+        session!.householdId,
+        limitCents,
+        currency
+      );
+
     const budget = await db
       .insert(budgets)
       .values({
@@ -176,8 +248,10 @@ export const handleBudgetsRequest: ApiHandler = async ({
         userId: validated.isShared ? null : session!.userId,
         name: validated.name.trim(),
         category: validated.category?.trim() || null,
-        limitAmount: toCents(validated.limitAmount),
-        currency: validated.currency ?? "CAD",
+        limitAmount: limitCents,
+        limitAmountHome,
+        exchangeRateLimitToHome,
+        currency,
         period: validated.period,
       })
       .returning()
@@ -219,14 +293,27 @@ export const handleBudgetsRequest: ApiHandler = async ({
       );
     }
 
+    const currency = (validated.currency ?? "CAD") as import("@amigo/db").CurrencyCode;
+    const limitCents = toCents(validated.limitAmount);
+    const { limitAmountHome, exchangeRateLimitToHome } =
+      await computeLimitAmountHomeCents(
+        env,
+        db,
+        session!.householdId,
+        limitCents,
+        currency
+      );
+
     const updated = await db
       .update(budgets)
       .set({
         userId: validated.isShared ? null : session!.userId,
         name: validated.name.trim(),
         category: validated.category?.trim() || null,
-        limitAmount: toCents(validated.limitAmount),
-        currency: validated.currency ?? "CAD",
+        limitAmount: limitCents,
+        limitAmountHome,
+        exchangeRateLimitToHome,
+        currency,
         period: validated.period,
         updatedAt: new Date(),
       })

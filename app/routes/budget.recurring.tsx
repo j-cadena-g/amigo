@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
-import { getDb, recurringTransactions, scopeToHousehold } from "@amigo/db";
+import { getDb, recurringTransactions, scopeToHousehold, and, visibleRecurringRulesCondition } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -10,7 +10,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const db = getDb(env.DB);
 
   const rules = await db.query.recurringTransactions.findMany({
-    where: scopeToHousehold(recurringTransactions.householdId, session.householdId),
+    where: and(
+      scopeToHousehold(recurringTransactions.householdId, session.householdId),
+      visibleRecurringRulesCondition(session.userId)
+    ),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });
 

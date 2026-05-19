@@ -1,11 +1,3 @@
-interface RequestHandlerImportMetaLike {
-  env?: {
-    MODE?: string;
-  };
-}
-
-export function getRequestHandlerMode(
-  meta: RequestHandlerImportMetaLike
-): string {
-  return meta.env?.MODE ?? "production";
+export function getRequestHandlerMode(mode?: string): string {
+  return mode ?? "production";
 }

@@ -2,24 +2,18 @@ import {
   and,
   eq,
   getDb,
-  households,
-  lte,
   recurringTransactions,
   scopeToHousehold,
   sql,
-  transactions,
+  visibleRecurringRulesCondition,
 } from "@amigo/db";
-import type { CurrencyCode } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
-import { getExchangeRateForRecord } from "../lib/exchange-rates";
+import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurring-processor";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
-
-type Frequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
-type RecurringRule = typeof recurringTransactions.$inferSelect;
 
 const createRuleSchema = z.object({
   amount: z.number().positive(),
@@ -49,125 +43,6 @@ const updateRuleSchema = z.object({
   currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
 });
 
-function calculateNextRunDate(
-  frequency: Frequency,
-  interval: number,
-  fromDate: Date,
-  dayOfMonth?: number | null
-) {
-  const next = new Date(fromDate);
-  switch (frequency) {
-    case "DAILY":
-      next.setDate(next.getDate() + interval);
-      break;
-    case "WEEKLY":
-      next.setDate(next.getDate() + interval * 7);
-      break;
-    case "MONTHLY":
-      {
-        const desiredDay = dayOfMonth ?? next.getUTCDate();
-        next.setUTCDate(1);
-        next.setUTCMonth(next.getUTCMonth() + interval);
-        const lastDay = new Date(
-          Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)
-        ).getUTCDate();
-        next.setUTCDate(Math.min(desiredDay, lastDay));
-      }
-      break;
-    case "YEARLY":
-      next.setFullYear(next.getFullYear() + interval);
-      break;
-  }
-  return next;
-}
-
-function getInitialNextRunDate(
-  startDate: Date,
-  frequency: Frequency,
-  interval: number,
-  dayOfMonth?: number | null,
-  endDate?: Date | null
-) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-  const end = endDate ? new Date(endDate) : null;
-  if (end) end.setHours(0, 0, 0, 0);
-
-  if (start > today) {
-    if (end && start > end) return null;
-    return start;
-  }
-
-  let nextRun = new Date(start);
-  while (nextRun < today) {
-    nextRun = calculateNextRunDate(frequency, interval, nextRun, dayOfMonth);
-  }
-
-  if (end && nextRun > end) return null;
-  return nextRun;
-}
-
-async function getHomeCurrency(
-  db: ReturnType<typeof getDb>,
-  householdId: string
-): Promise<CurrencyCode> {
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  return (household?.homeCurrency as CurrencyCode) ?? "CAD";
-}
-
-function buildRecurringOccurrenceTransactionId(ruleId: string, runDate: string) {
-  return `recurring:${ruleId}:${runDate}`;
-}
-
-function isSqlitePrimaryKeyConflict(error: unknown) {
-  return (
-    error instanceof Error &&
-    /(?:UNIQUE constraint failed: transactions\.id|PRIMARY KEY constraint failed: transactions\.id)/i.test(
-      error.message
-    )
-  );
-}
-
-async function advanceRecurringRuleIfCurrent(
-  db: ReturnType<typeof getDb>,
-  rule: RecurringRule
-) {
-  const nextRunDate = calculateNextRunDate(
-    rule.frequency,
-    rule.interval,
-    new Date(rule.nextRunDate),
-    rule.dayOfMonth
-  );
-
-  const endDate = rule.endDate ? new Date(rule.endDate) : null;
-  if (endDate) endDate.setHours(0, 0, 0, 0);
-
-  const update =
-    endDate && nextRunDate > endDate
-      ? { lastRunDate: rule.nextRunDate, active: false }
-      : {
-          lastRunDate: rule.nextRunDate,
-          nextRunDate: toISODate(nextRunDate),
-        };
-
-  return await db
-    .update(recurringTransactions)
-    .set(update)
-    .where(
-      and(
-        eq(recurringTransactions.id, rule.id),
-        eq(recurringTransactions.active, true),
-        eq(recurringTransactions.nextRunDate, rule.nextRunDate)
-      )
-    )
-    .returning({ id: recurringTransactions.id })
-    .get();
-}
-
 export const handleRecurringRequest: ApiHandler = async ({
   env,
   params,
@@ -188,7 +63,7 @@ export const handleRecurringRequest: ApiHandler = async ({
     const rules = await db.query.recurringTransactions.findMany({
       where: and(
         scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-        eq(recurringTransactions.userId, session!.userId)
+        visibleRecurringRulesCondition(session!.userId)
       ),
       orderBy: (rule, { desc }) => [desc(rule.createdAt)],
     });
@@ -414,80 +289,13 @@ export const handleRecurringRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.recurring.process
     );
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = toISODate(today);
-
-    const dueRules = await db.query.recurringTransactions.findMany({
-      where: and(
-        scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-        eq(recurringTransactions.userId, session!.userId),
-        eq(recurringTransactions.active, true),
-        lte(recurringTransactions.nextRunDate, todayStr)
-      ),
+    const { processed } = await processDueRecurringRules(env, db, {
+      mode: "household_user",
+      householdId: session!.householdId,
+      userId: session!.userId,
     });
 
-    if (dueRules.length === 0) {
-      return Response.json({ processed: 0 });
-    }
-
-    let processedCount = 0;
-
-    for (const rule of dueRules) {
-      const transactionId = buildRecurringOccurrenceTransactionId(
-        rule.id,
-        rule.nextRunDate
-      );
-      let inserted = false;
-
-      try {
-        const homeCurrency = await getHomeCurrency(db, rule.householdId);
-        const exchangeRateToHome = await getExchangeRateForRecord(
-          env,
-          rule.currency,
-          homeCurrency
-        );
-
-        await db.insert(transactions).values({
-          id: transactionId,
-          householdId: rule.householdId,
-          userId: rule.userId,
-          amount: rule.amount,
-          currency: rule.currency,
-          exchangeRateToHome,
-          category: rule.category,
-          description: rule.description,
-          type: rule.type,
-          date: rule.nextRunDate,
-          budgetId: rule.budgetId,
-        });
-
-        inserted = true;
-      } catch (error) {
-        if (!isSqlitePrimaryKeyConflict(error)) {
-          throw error;
-        }
-      }
-
-      const advanced = await advanceRecurringRuleIfCurrent(db, rule);
-      if (!advanced) {
-        continue;
-      }
-
-      if (inserted) {
-        processedCount++;
-      }
-    }
-
-    if (processedCount > 0) {
-      await broadcastToHousehold(env, session!.householdId, {
-        type: "TRANSACTION_UPDATE",
-        action: "batch_create",
-        count: processedCount,
-      });
-    }
-
-    return Response.json({ processed: processedCount });
+    return Response.json({ processed });
   }
 
   return new Response(null, {

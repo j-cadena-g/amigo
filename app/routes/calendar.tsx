@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
+import { visibleFinancialTransactionsCondition } from "@/server/lib/financial-visibility";
 import {
   getDb,
   transactions,
@@ -13,8 +14,9 @@ import {
   gte,
   lte,
   sql,
+  sqlTransactionAmountHomeCents,
+  parseHomeCurrency,
 } from "@amigo/db";
-import type { CurrencyCode } from "@amigo/db";
 import { Calendar as CalendarView, type CalendarEvent } from "@/app/components/calendar";
 import { formatCents } from "@/app/lib/currency";
 import {
@@ -45,6 +47,8 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   const end = new Date(year, month + 1, 0).toISOString().split("T")[0]!;
 
   const events: CalendarEvent[] = [];
+  const txnHome = sqlTransactionAmountHomeCents();
+  const txnVis = visibleFinancialTransactionsCondition(session.userId);
 
   // All queries in parallel
   const [txns, groceries, monthExpenses, monthIncome, groceryPurchaseCount, household] =
@@ -54,6 +58,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
         where: and(
           scopeToHousehold(transactions.householdId, session.householdId),
           isNull(transactions.deletedAt),
+          txnVis,
           gte(transactions.date, start),
           lte(transactions.date, end)
         ),
@@ -82,10 +87,10 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
           )
         )
         .groupBy(sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`),
-      // Month total expenses
+      // Month total expenses (home currency)
       db
         .select({
-          total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+          total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
         })
         .from(transactions)
         .where(
@@ -93,14 +98,15 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
             scopeToHousehold(transactions.householdId, session.householdId),
             eq(transactions.type, "expense"),
             isNull(transactions.deletedAt),
+            txnVis,
             gte(transactions.date, start),
             lte(transactions.date, end)
           )
         ),
-      // Month total income
+      // Month total income (home currency)
       db
         .select({
-          total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
+          total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
         })
         .from(transactions)
         .where(
@@ -108,6 +114,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
             scopeToHousehold(transactions.householdId, session.householdId),
             eq(transactions.type, "income"),
             isNull(transactions.deletedAt),
+            txnVis,
             gte(transactions.date, start),
             lte(transactions.date, end)
           )
@@ -171,7 +178,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   }
 
   const currentMonth = `${year}-${String(month + 1).padStart(2, "0")}`;
-  const currency = (household?.homeCurrency as CurrencyCode) ?? "CAD";
+  const currency = parseHomeCurrency(household?.homeCurrency);
   const monthName = new Date(year, month).toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
@@ -200,8 +207,6 @@ export default function Calendar() {
     groceryPurchases,
   } = useLoaderData<typeof loader>();
 
-  const cur = currency as CurrencyCode;
-
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
       <div className="mb-6 animate-fade-in">
@@ -226,7 +231,7 @@ export default function Calendar() {
                 Expenses
               </p>
               <p className="font-display text-lg font-bold tracking-tight truncate">
-                {formatCents(expensesCents, cur)}
+                {formatCents(expensesCents, currency)}
               </p>
             </div>
           </CardContent>
@@ -243,7 +248,7 @@ export default function Calendar() {
                 Income
               </p>
               <p className="font-display text-lg font-bold tracking-tight truncate">
-                {formatCents(incomeCents, cur)}
+                {formatCents(incomeCents, currency)}
               </p>
             </div>
           </CardContent>

@@ -4,7 +4,7 @@
   <img src="public/icon-1024.png" alt="amigo" width="200" />
 </p>
 
-Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with server-rendered React routes, Hono APIs, real-time household updates, and offline-first grocery syncing.
+Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v7 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
 
 ## What It Does
 
@@ -19,8 +19,8 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 ## Stack
 
 - Runtime: Cloudflare Workers
-- Backend: Hono
-- Frontend: React Router v7 framework mode, React 19, Tailwind CSS 4, shadcn/ui
+- Server: React Router v7 framework mode (HTTP + `/api/*` resource routes), `worker.ts` for `/ws`, cron, and security headers
+- Frontend: React 19, Tailwind CSS 4, shadcn/ui (route modules under `app/routes/`)
 - Data: Cloudflare D1 (SQLite) with Drizzle ORM
 - Realtime and caching: Durable Objects, KV, Workers Cache API
 - Offline: Dexie + `vite-plugin-pwa`
@@ -99,14 +99,14 @@ Current Worker bindings in `wrangler.jsonc`:
 ## Project Layout
 
 ```text
-app/                 React Router UI, route modules, and client-side utilities
-server/              Hono app, API routes, middleware, and Durable Objects
+app/                 React Router UI, route modules (pages + `api.*` resource routes), client utilities
+server/              Shared API handlers, middleware, libs, and Durable Objects (called from route modules)
 packages/db/         Shared D1 schema, migrations, seed data, and DB helpers
 public/              PWA icons and other static assets
 scripts/             Local development and migration helper scripts
 worker.ts            Cloudflare Worker entrypoint with fetch + scheduled handlers
 wrangler.jsonc       Cloudflare configuration and bindings
-docs/                Architecture notes, changelog, and planning docs
+docs/                README (index), architecture, changelog
 ```
 
 Notable route groups:
@@ -163,9 +163,12 @@ on pushes to `main` and pull requests targeting `main`.
 
 This workflow does not deploy the app.
 
+## License
+
+Copyright © 2026 James Cadena.
+
+[GNU Affero General Public License v3.0](LICENSE) (SPDX `AGPL-3.0`). AGPL is a **strong copyleft** license: modified versions must stay under the same license when conveyed, and if you run a modified version as a **network service** for others, you generally must offer them the corresponding source as well (see section 13 of the license). This is not legal advice; read the full text in `LICENSE`.
+
 ## Additional Docs
 
-- [Architecture notes](./docs/ARCHITECTURE.md)
-- [Changelog](./docs/CHANGELOG.md)
-- [Cloudflare migration design](./docs/plans/2026-03-08-cloudflare-migration-design.md)
-- [`scripts/migrate-to-d1.ts`](./scripts/migrate-to-d1.ts) for the one-time PostgreSQL to D1 migration path
+- [Documentation index](./docs/README.md) — architecture, changelog, scripts

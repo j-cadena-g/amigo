@@ -54,7 +54,7 @@
   "observability": {
     "enabled": true,
     "logs": {
-      "head_sampling_rate": 1
+      "head_sampling_rate": 0.25
     },
     "traces": {
       "enabled": true,
@@ -70,7 +70,8 @@
   ],
 
   "triggers": {
-    "crons": ["0 3 * * SUN"]
+    // Sunday 03:00 UTC: audit prune. Daily 04:23 UTC: recurring (worker.ts branches on event.cron).
+    "crons": ["0 3 * * SUN", "23 4 * * *"]
   },
 
   "vars": {

@@ -21,6 +21,8 @@ export function scopeToHousehold(householdIdColumn: Column, householdId: string)
 }
 
 export * from "./schema";
+export * from "./sql-money";
+export * from "./financial-visibility";
 
 // Re-export commonly used drizzle-orm operators
 export {

@@ -54,7 +54,7 @@
   "observability": {
     "enabled": true,
     "logs": {
-      "head_sampling_rate": 1
+      "head_sampling_rate": 0.25
     },
     "traces": {
       "enabled": true,

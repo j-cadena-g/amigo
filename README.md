@@ -1,8 +1,6 @@
 # amigo
 
-<p align="center">
-  <img src="public/icon-1024.png" alt="amigo" width="200" />
-</p>
+![amigo](public/icon-192.png)
 
 Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v7 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
 
@@ -26,6 +24,69 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 - Offline: Dexie + `vite-plugin-pwa`
 - Auth: Clerk
 - Tooling: Bun, Vite, Wrangler, ESLint, Vitest
+
+## How it works
+
+One Cloudflare Worker (`worker.ts`) serves everything. React Router v7 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
+
+**Design choices**
+
+- **Single Worker** — RR plus Worker-only concerns (`/ws`, cron, security headers) in one deployable unit
+- **Integer cents** — all money in D1 is stored as integer cents (never floats)
+- **Application-level tenancy** — every D1 query must filter with `scopeToHousehold()` from `@amigo/db` (no DB-level RLS)
+- **Optimistic groceries** — Dexie (IndexedDB) for instant UI; background sync via `/api/sync` (max 10 mutations per request)
+
+**Request flow**
+
+```text
+Client → worker.ts
+  → /ws → Household Durable Object (WebSocket hub)
+  → else → React Router (createRequestHandler)
+      → clerkMiddleware + app context middleware
+      → /api/* resource routes → server/api/* handlers
+      → page loaders/actions (context.app + context.cloudflare)
+```
+
+**Code layout**
+
+- `app/routes/*.tsx` — pages and `api.*` resource routes
+- `server/api/*` — shared handlers (Zod validation, D1, rate limits)
+- `server/durable-objects/household.ts` — per-household WebSocket hub (Hibernation API)
+- `packages/db/` — Drizzle schema, migrations, `getDb()`, `scopeToHousehold()`
+
+Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packages/db/src/schema/`.
+
+**Realtime**
+
+1. Client opens `/ws` → routed to the household’s Durable Object
+2. Mutations call `broadcastToHousehold()` in `server/lib/realtime.ts`
+3. Connected clients receive an event and revalidate loaders
+4. Optional `senderId` skips the connection that initiated the mutation
+
+**Auth (Clerk)**
+
+- `@clerk/react-router` for middleware, loaders, and client provider
+- Session cache in KV (24h TTL, keyed by Clerk user id)
+- First login auto-creates household + user rows in D1
+
+**Security**
+
+KV-backed rate limits (`server/middleware/rate-limit.ts`):
+
+| Preset | Limit | Use case |
+| --- | --- | --- |
+| MUTATION | 30/min | Standard writes |
+| BULK | 10/min | Bulk operations |
+| SENSITIVE | 10/min | Settings, members |
+| READ | 60/min | List reads |
+
+Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canManageMembers` require owner or admin; `canTransferOwnership` is owner-only. Helpers live in `server/lib/permissions.ts`.
+
+**Offline groceries**
+
+- Local state in Dexie; sync queue flushed in chunks to `/api/sync`
+- Conflicts: server-wins with field-level merge
+- PWA via `vite-plugin-pwa` (NetworkFirst for API, CacheFirst for static assets)
 
 ## Quick Start
 
@@ -106,7 +167,7 @@ public/              PWA icons and other static assets
 scripts/             Local development and migration helper scripts
 worker.ts            Cloudflare Worker entrypoint with fetch + scheduled handlers
 wrangler.jsonc       Cloudflare configuration and bindings
-docs/                README (index), architecture, changelog
+CHANGELOG.md         Release history
 ```
 
 Notable route groups:
@@ -171,4 +232,6 @@ Copyright © 2026 James Cadena.
 
 ## Additional Docs
 
-- [Documentation index](./docs/README.md) — architecture, changelog, scripts
+- [Changelog](./CHANGELOG.md) — release history
+- [Contributing](./CONTRIBUTING.md) — development setup, PR expectations, AGPL note
+- [Security](./SECURITY.md) — reporting vulnerabilities responsibly

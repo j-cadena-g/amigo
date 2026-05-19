@@ -46,9 +46,6 @@ package-lock.json
 # Test coverage
 coverage/
 
-# Migration checkpoints
-migration-checkpoint.json
-
 # 1Password
 .op/refs.env
 

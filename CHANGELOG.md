@@ -4,14 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- `docs/` directory (unused images and index; core docs live at repo root)
+- `scripts/migrate-to-d1.ts` one-time PostgreSQL → D1 migration tool (platform migration complete)
+- `ARCHITECTURE.md` (non-obvious design notes folded into README **How it works**)
+
+### Changed
+
+- README: added **How it works** (request flow, tenancy, realtime, auth, security, offline)
+
 ### Added
 
 - Financial hardening: home-currency aggregates, shared visibility helpers, scheduled recurring processing (`worker.ts` daily cron), budget category/recurring match API, CSV transaction export and JSON bulk import (`POST /api/transactions/import`), `financial_accounts` table + optional `transactions.account_id` / reconciliation fields (migration `0005_financial_accounts.sql`)
-- Root [`LICENSE`](../LICENSE): **GNU Affero General Public License v3.0** (AGPL-3.0); `license` field in workspace `package.json` files
+- Root [`LICENSE`](LICENSE): **GNU Affero General Public License v3.0** (AGPL-3.0); `license` field in workspace `package.json` files
 
 ### Documentation
 
-- README and [`docs/README.md`](./README.md); removed committed Cloudflare migration design draft (CHANGELOG + ARCHITECTURE carry the narrative)
+- README and [`docs/README.md`](docs/README.md); removed committed Cloudflare migration design draft (CHANGELOG + ARCHITECTURE carry the narrative)
 - ARCHITECTURE and **0.3.0** changelog: CI described as lint/typecheck/test only (no deploy from GitHub Actions)
 
 ### Changed

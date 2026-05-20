@@ -517,7 +517,7 @@ export function TransactionList({
             </button>
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <input
               type="number"
               step="0.01"

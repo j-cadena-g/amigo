@@ -15,16 +15,16 @@ import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurrin
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
-const createRuleSchema = z.object({
+export const createRuleSchema = z.object({
   amount: z.number().positive(),
   category: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).nullable().optional(),
   type: z.enum(["income", "expense"]),
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
   interval: z.number().int().positive().optional(),
-  dayOfMonth: z.number().int().min(1).max(31).optional(),
+  dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
   startDate: z.coerce.date(),
-  endDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
   currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
 });

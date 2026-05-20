@@ -54,6 +54,10 @@ interface RecurringRule {
   budgetId: string | null;
 }
 
+function localDateString(date = new Date()): string {
+  return date.toLocaleDateString("en-CA");
+}
+
 function emptyForm(currency: CurrencyCode): RecurringFormData {
   return {
     type: "expense",
@@ -65,7 +69,7 @@ function emptyForm(currency: CurrencyCode): RecurringFormData {
     customFrequency: "MONTHLY",
     customInterval: "1",
     customDayOfMonth: "1",
-    startDate: new Date().toISOString().slice(0, 10),
+    startDate: localDateString(),
     endDate: "",
     budgetId: null,
   };
@@ -330,9 +334,11 @@ export function AddRecurringDialog({
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() => emptyForm(defaultCurrency));
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
     setSubmitting(true);
+    setError(null);
     try {
       const schedule = presetToSchedule(form.schedulePreset, form);
       const res = await fetch("/api/recurring", {
@@ -354,11 +360,15 @@ export function AddRecurringDialog({
           budgetId: form.type === "expense" ? form.budgetId : null,
         }),
       });
-      if (res.ok) {
-        setForm(emptyForm(defaultCurrency));
-        onOpenChange(false);
-        revalidator.revalidate();
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "Failed to add recurring transaction");
       }
+      setForm(emptyForm(defaultCurrency));
+      onOpenChange(false);
+      revalidator.revalidate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
@@ -366,9 +376,13 @@ export function AddRecurringDialog({
 
   return (
     <Dialog
+      key={defaultCurrency}
       open={open}
       onOpenChange={(v) => {
-        if (!v) setForm(emptyForm(defaultCurrency));
+        if (!v) {
+          setForm(emptyForm(defaultCurrency));
+          setError(null);
+        }
         onOpenChange(v);
       }}
     >
@@ -376,6 +390,11 @@ export function AddRecurringDialog({
         <DialogHeader>
           <DialogTitle>Add Recurring Transaction</DialogTitle>
         </DialogHeader>
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
         <RecurringForm
           form={form}
           setForm={setForm}
@@ -436,6 +455,7 @@ export function EditRecurringDialog({
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() => emptyForm("CAD"));
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState<string | null>(null);
 
   // Sync form state when the rule changes
@@ -450,6 +470,7 @@ export function EditRecurringDialog({
   async function handleSubmit() {
     if (!rule) return;
     setSubmitting(true);
+    setError(null);
     try {
       const schedule = presetToSchedule(form.schedulePreset, form);
       const res = await fetch(`/api/recurring/${rule.id}`, {
@@ -471,10 +492,14 @@ export function EditRecurringDialog({
           budgetId: form.type === "expense" ? form.budgetId : null,
         }),
       });
-      if (res.ok) {
-        onOpenChange(false);
-        revalidator.revalidate();
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "Failed to update recurring transaction");
       }
+      onOpenChange(false);
+      revalidator.revalidate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
@@ -486,6 +511,11 @@ export function EditRecurringDialog({
         <DialogHeader>
           <DialogTitle>Edit Recurring Transaction</DialogTitle>
         </DialogHeader>
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
         <RecurringForm
           form={form}
           setForm={setForm}

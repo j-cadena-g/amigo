@@ -26,6 +26,7 @@ import {
   debts,
   scopeToHousehold,
   eq,
+  ne,
   and,
   or,
   isNull,
@@ -253,7 +254,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
           scopeToHousehold(financialAccounts.householdId, session.householdId),
           or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
           isNull(financialAccounts.deletedAt),
-          eq(financialAccounts.archived, false)
+          eq(financialAccounts.archived, false),
+          ne(financialAccounts.type, "CREDIT")
         )
       ),
     // Total debts (home currency — liability amounts)

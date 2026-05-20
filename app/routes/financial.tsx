@@ -3,6 +3,7 @@ import { cn } from "@/app/lib/utils";
 
 const tabs = [
   { href: "/financial", label: "Accounts" },
+  { href: "/financial/assets", label: "Assets" },
   { href: "/financial/debts", label: "Debts" },
 ];
 
@@ -16,7 +17,7 @@ export default function FinancialLayout() {
           Financial
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Accounts and debts for your household net worth
+          Accounts, assets, and debts for your household net worth
         </p>
       </div>
 
@@ -30,6 +31,7 @@ export default function FinancialLayout() {
             <Link
               key={tab.href}
               to={tab.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
                 active

@@ -23,6 +23,28 @@ const navLinks = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+function isNavLinkActive(pathname: string, href: string) {
+  if (href === "/budget") {
+    return pathname.startsWith("/budget");
+  }
+
+  if (href === "/dashboard") {
+    return pathname === "/dashboard";
+  }
+
+  if (href === "/financial") {
+    return (
+      pathname === "/financial" ||
+      pathname.startsWith("/financial/") ||
+      pathname === "/assets" ||
+      pathname === "/debts" ||
+      pathname === "/accounts"
+    );
+  }
+
+  return pathname.startsWith(href);
+}
+
 export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -51,17 +73,7 @@ export function NavBar() {
         <div className="hidden md:flex items-center gap-0.5 flex-1">
           {navLinks.map((link) => {
             const Icon = link.icon;
-            const active = link.href === "/budget"
-              ? location.pathname.startsWith("/budget")
-              : link.href === "/dashboard"
-                ? location.pathname === "/dashboard"
-                : link.href === "/financial"
-                  ? location.pathname === "/financial" ||
-                    location.pathname.startsWith("/financial/") ||
-                    location.pathname === "/assets" ||
-                    location.pathname === "/debts" ||
-                    location.pathname === "/accounts"
-                  : location.pathname.startsWith(link.href);
+            const active = isNavLinkActive(location.pathname, link.href);
             return (
               <Link
                 key={link.href}
@@ -121,17 +133,7 @@ export function NavBar() {
           <div className="space-y-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const active = link.href === "/budget"
-                ? location.pathname.startsWith("/budget")
-                : link.href === "/dashboard"
-                  ? location.pathname === "/dashboard"
-                  : link.href === "/financial"
-                    ? location.pathname === "/financial" ||
-                      location.pathname.startsWith("/financial/") ||
-                      location.pathname === "/assets" ||
-                      location.pathname === "/debts" ||
-                      location.pathname === "/accounts"
-                    : location.pathname.startsWith(link.href);
+              const active = isNavLinkActive(location.pathname, link.href);
               return (
                 <Link
                   key={link.href}

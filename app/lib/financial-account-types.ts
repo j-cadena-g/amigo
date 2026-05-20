@@ -8,7 +8,6 @@ export const ACCOUNT_TYPE_SELECT_OPTIONS: readonly {
   { value: "CHECKING", label: "Checking" },
   { value: "SAVINGS", label: "Savings" },
   { value: "CASH", label: "Cash" },
-  { value: "CREDIT", label: "Credit card" },
   { value: "INVESTMENT", label: "Investment" },
   { value: "PROPERTY", label: "Property" },
 ] as const;
@@ -18,6 +17,7 @@ const LABEL_BY_TYPE: Record<string, string> = {
     ACCOUNT_TYPE_SELECT_OPTIONS.map((o) => [o.value, o.label])
   ),
   OTHER: "Other",
+  CREDIT: "Credit card",
 };
 
 export type AccountTypeSelectValue =
@@ -39,4 +39,9 @@ export function accountTypeLabel(type: string): string {
 
 export function isAssetHoldingType(type: string): boolean {
   return type === "INVESTMENT" || type === "PROPERTY";
+}
+
+/** Bank/cash accounts on the Accounts tab (credit cards belong under Debts). */
+export function isTransactionalAccountType(type: string): boolean {
+  return !isAssetHoldingType(type) && type !== "CREDIT";
 }

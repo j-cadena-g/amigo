@@ -101,8 +101,8 @@ export function AddAccountDialog({
         <DialogHeader>
           <DialogTitle>Add account</DialogTitle>
           <DialogDescription>
-            Track bank accounts, credit cards, investments, and property in one place.
-            Transactions and CSV imports link to checking, savings, cash, and credit cards.
+            Track bank accounts, investments, and property. Transactions and CSV imports
+            link to checking, savings, and cash. Add credit cards under Debts.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

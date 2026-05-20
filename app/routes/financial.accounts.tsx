@@ -9,6 +9,7 @@ import {
   households,
   scopeToHousehold,
   eq,
+  ne,
   and,
   or,
   isNull,
@@ -18,7 +19,10 @@ import { AccountCards } from "@/app/components/account-cards";
 import { AssetCards } from "@/app/components/asset-cards";
 import { AddAccountDialog } from "@/app/components/add-account-dialog";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
-import { isAssetHoldingType } from "@/app/lib/financial-account-types";
+import {
+  isAssetHoldingType,
+  isTransactionalAccountType,
+} from "@/app/lib/financial-account-types";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -44,7 +48,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
         householdScope,
         visibility,
         isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, false)
+        eq(financialAccounts.archived, false),
+        ne(financialAccounts.type, "CREDIT")
       ),
       orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
     }),
@@ -75,7 +80,7 @@ export default function FinancialAccounts() {
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
 
-  const transactional = accounts.filter((a) => !isAssetHoldingType(a.type));
+  const transactional = accounts.filter((a) => isTransactionalAccountType(a.type));
   const holdings = accounts.filter((a) => isAssetHoldingType(a.type));
 
   return (
@@ -83,7 +88,7 @@ export default function FinancialAccounts() {
       <div className="space-y-6">
         <FinancialSectionHeader
           title="Holdings"
-          description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, cash, and credit cards."
+          description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, and cash. Use Debts for credit cards."
           action={
             <button
               type="button"

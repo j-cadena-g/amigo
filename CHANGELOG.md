@@ -6,25 +6,55 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Financial hardening: home-currency aggregates, shared visibility helpers, scheduled recurring processing (`worker.ts` daily cron), budget category/recurring match API, CSV transaction export and JSON bulk import (`POST /api/transactions/import`), `financial_accounts` table + optional `transactions.account_id` / reconciliation fields (migration `0005_financial_accounts.sql`)
-- Root [`LICENSE`](../LICENSE): **GNU Affero General Public License v3.0** (AGPL-3.0); `license` field in workspace `package.json` files
-
-### Documentation
-
-- README and [`docs/README.md`](./README.md); removed committed Cloudflare migration design draft (CHANGELOG + ARCHITECTURE carry the narrative)
-- ARCHITECTURE and **0.3.0** changelog: CI described as lint/typecheck/test only (no deploy from GitHub Actions)
+- `CONTRIBUTING.md` and `SECURITY.md`
+- README badges (CI, license, Bun, TypeScript, Cloudflare Workers, CodeRabbit)
 
 ### Changed
 
-- **Runtime migration completed:** HTTP requests now run through React Router v7 framework mode directly from `worker.ts`
-- **Worker responsibilities clarified:** `worker.ts` owns `scheduled()`, security headers, Durable Object exports, and `/ws` upgrades
-- **Server context simplified:** `AppLoadContext` now exposes `context.cloudflare` and `context.app` instead of a bridged Hono context
-- **API routing moved:** `/api/*` endpoints now use React Router resource routes with a shared JSON/auth adapter
+- README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
+- `CHANGELOG.md` moved to repository root
 
 ### Removed
 
-- `hono`, `@hono/clerk-auth`, `@hono/vite-dev-server`, and `hono-react-router-adapter`
-- Hono request middleware, Hono route mounting, and the bridge-specific load-context plumbing
+- `docs/` directory (unused images and index)
+- `ARCHITECTURE.md` (content folded into README)
+- `scripts/migrate-to-d1.ts` (one-time PostgreSQL → D1 migration; platform migration complete)
+
+## [0.4.0] - 2026-05-19
+
+### Added
+
+- **Financial accounts** — `financial_accounts` table; optional `transactions.account_id` and reconciliation fields ([`0005_financial_accounts.sql`](packages/db/migrations/0005_financial_accounts.sql))
+- Home-currency aggregates and shared visibility helpers for budget views
+- Scheduled recurring transaction processing (`worker.ts` daily cron)
+- Budget category / recurring match API
+- CSV transaction export and JSON bulk import (`POST /api/transactions/import`)
+- Root [`LICENSE`](LICENSE): **GNU Affero General Public License v3.0** (AGPL-3.0); `license` field in workspace `package.json` files
+
+### Changed
+
+- **React Router v7 framework mode** — HTTP served by React Router (`createRequestHandler`) from `worker.ts`; no separate Hono app
+- `worker.ts` owns `scheduled()`, security headers, Durable Object exports, and `/ws` upgrades
+- `AppLoadContext` exposes `context.cloudflare` and `context.app` (removed Hono bridge)
+- `/api/*` JSON via React Router resource routes → `server/api/*` handlers
+- README refreshed for current Cloudflare layout and scripts
+- CI: GitHub Actions runs lint, typecheck, and test only (no automated deploy); `actions/checkout` v6
+- Dependency updates (React Router 7.14, Wrangler 4.93, ESLint 10, Vitest 4, TypeScript 6, and related)
+
+### Fixed
+
+- Worker deploy when `import.meta.env` is undefined
+- Worker React Router request handler / server-build alias (Wrangler)
+- Grocery item toggle flicker
+- Recurring transaction edge cases and restore pending limit
+- Restore fallback status codes; malformed JSON request bodies return 400
+- Audit: falsy snapshot serialization in `withAudit`; `audit_logs` household scoping notes for legacy rows
+- Security and validation hardening ([#38](https://github.com/j-cadena-g/amigo/pull/38))
+
+### Removed
+
+- `hono`, `@hono/clerk-auth`, `@hono/vite-dev-server`, `hono-react-router-adapter`, and related middleware/routing
+- Cloudflare preview environment configuration from `wrangler.jsonc`
 
 ## [0.3.0] - 2026-03-09
 

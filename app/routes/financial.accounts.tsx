@@ -9,7 +9,6 @@ import {
   households,
   scopeToHousehold,
   eq,
-  ne,
   and,
   or,
   isNull,
@@ -19,6 +18,7 @@ import { AccountCards } from "@/app/components/account-cards";
 import { AssetCards } from "@/app/components/asset-cards";
 import { AddAccountDialog } from "@/app/components/add-account-dialog";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
+import { isAssetHoldingType } from "@/app/lib/financial-account-types";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -44,9 +44,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
         householdScope,
         visibility,
         isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, false),
-        ne(financialAccounts.type, "INVESTMENT"),
-        ne(financialAccounts.type, "PROPERTY")
+        eq(financialAccounts.archived, false)
       ),
       orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
     }),
@@ -77,12 +75,15 @@ export default function FinancialAccounts() {
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
 
+  const transactional = accounts.filter((a) => !isAssetHoldingType(a.type));
+  const holdings = accounts.filter((a) => isAssetHoldingType(a.type));
+
   return (
     <div className="space-y-8">
-      <div className="space-y-4">
+      <div className="space-y-6">
         <FinancialSectionHeader
           title="Holdings"
-          description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, and cash accounts."
+          description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, cash, and credit cards."
           action={
             <button
               type="button"
@@ -93,7 +94,29 @@ export default function FinancialAccounts() {
             </button>
           }
         />
-        <AccountCards accounts={accounts} />
+
+        {transactional.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Accounts
+            </h2>
+            <AccountCards accounts={transactional} />
+          </div>
+        )}
+
+        {holdings.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Investments & property
+            </h2>
+            <AccountCards accounts={holdings} />
+          </div>
+        )}
+
+        {accounts.length === 0 && (
+          <AccountCards accounts={[]} />
+        )}
+
         <AddAccountDialog
           open={addOpen}
           onOpenChange={setAddOpen}
@@ -105,7 +128,7 @@ export default function FinancialAccounts() {
         <div className="space-y-4">
           <FinancialSectionHeader
             title="Legacy assets"
-            description="These use the older assets list. Re-create them as accounts above when you can, then delete these entries."
+            description="Older asset entries. Re-create them as accounts above when you can, then delete these."
           />
           <AssetCards assets={legacyAssets} session={{ userId, role }} />
         </div>

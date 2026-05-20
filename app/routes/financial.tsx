@@ -3,7 +3,6 @@ import { cn } from "@/app/lib/utils";
 
 const tabs = [
   { href: "/financial", label: "Accounts" },
-  { href: "/financial/assets", label: "Assets" },
   { href: "/financial/debts", label: "Debts" },
 ];
 
@@ -17,7 +16,7 @@ export default function FinancialLayout() {
           Financial
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Accounts, assets, and debts for your household net worth
+          Accounts and debts for your household net worth
         </p>
       </div>
 

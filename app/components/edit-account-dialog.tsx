@@ -14,7 +14,8 @@ import { Input } from "@/app/components/ui/input";
 import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
 import { Trash2 } from "lucide-react";
 import type { AccountRow } from "@/app/components/account-cards";
-import { FINANCIAL_ACCOUNT_TYPE_OPTIONS, type CurrencyCode } from "@amigo/db";
+import type { CurrencyCode } from "@amigo/db";
+import { getAccountTypeSelectOptions } from "@/app/lib/financial-account-types";
 
 interface EditAccountDialogProps {
   account: AccountRow;
@@ -37,6 +38,7 @@ export function EditAccountDialog({
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const typeOptions = getAccountTypeSelectOptions(account.type);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -132,7 +134,7 @@ export function EditAccountDialog({
               onChange={(e) => setType(e.target.value as typeof type)}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {FINANCIAL_ACCOUNT_TYPE_OPTIONS.map((t) => (
+              {typeOptions.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>

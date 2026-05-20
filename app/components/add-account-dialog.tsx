@@ -11,7 +11,11 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
-import { FINANCIAL_ACCOUNT_TYPE_OPTIONS, type CurrencyCode } from "@amigo/db";
+import type { CurrencyCode } from "@amigo/db";
+import {
+  ACCOUNT_TYPE_SELECT_OPTIONS,
+  type AccountTypeSelectValue,
+} from "@/app/lib/financial-account-types";
 
 interface AddAccountDialogProps {
   open: boolean;
@@ -26,7 +30,7 @@ export function AddAccountDialog({
 }: AddAccountDialogProps) {
   const revalidator = useRevalidator();
   const [name, setName] = useState("");
-  const [type, setType] = useState<(typeof FINANCIAL_ACCOUNT_TYPE_OPTIONS)[number]["value"]>("CHECKING");
+  const [type, setType] = useState<AccountTypeSelectValue>("CHECKING");
   const [balance, setBalance] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [isShared, setIsShared] = useState(false);
@@ -97,9 +101,8 @@ export function AddAccountDialog({
         <DialogHeader>
           <DialogTitle>Add account</DialogTitle>
           <DialogDescription>
-            Track checking, savings, cash, credit cards, and other transactional accounts.
-            Transactions and CSV imports link to these accounts. For investments or
-            property, use Add investment or property instead.
+            Track bank accounts, credit cards, investments, and property in one place.
+            Transactions and CSV imports link to checking, savings, cash, and credit cards.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -125,7 +128,7 @@ export function AddAccountDialog({
               onChange={(e) => setType(e.target.value as typeof type)}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {FINANCIAL_ACCOUNT_TYPE_OPTIONS.map((t) => (
+              {ACCOUNT_TYPE_SELECT_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>

@@ -182,8 +182,7 @@ Notable route groups:
 - `/dashboard`
 - `/groceries`
 - `/budget`, `/budget/budgets`, `/budget/recurring`
-- `/financial` — parent layout; index route is bank/cash **accounts** (legacy `/accounts` → `/financial`)
-- `/financial/assets` — investments/property (legacy `/assets` → `/financial/assets`)
+- `/financial` — accounts and holdings (checking, savings, investments, property; legacy `/accounts` and `/assets` redirect here)
 - `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
 
 `/calendar` redirects to `/dashboard`.

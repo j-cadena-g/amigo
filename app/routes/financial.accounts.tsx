@@ -9,6 +9,7 @@ import {
   households,
   scopeToHousehold,
   eq,
+  ne,
   and,
   or,
   isNull,
@@ -43,7 +44,9 @@ export async function loader({ context }: LoaderFunctionArgs) {
         householdScope,
         visibility,
         isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, false)
+        eq(financialAccounts.archived, false),
+        ne(financialAccounts.type, "INVESTMENT"),
+        ne(financialAccounts.type, "PROPERTY")
       ),
       orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
     }),

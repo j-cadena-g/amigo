@@ -21,14 +21,19 @@ const ASSET_TYPES = [
 interface AddAssetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultCurrency?: CurrencyCode;
 }
 
-export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
+export function AddAssetDialog({
+  open,
+  onOpenChange,
+  defaultCurrency = "CAD",
+}: AddAssetDialogProps) {
   const revalidator = useRevalidator();
   const [name, setName] = useState("");
   const [type, setType] = useState<"INVESTMENT" | "PROPERTY">("INVESTMENT");
   const [balance, setBalance] = useState("");
-  const [currency, setCurrency] = useState<CurrencyCode>("CAD");
+  const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +44,25 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/assets", {
+      const trimmed = balance.trim();
+      let balanceNum = 0;
+      if (trimmed !== "") {
+        const parsed = parseFloat(trimmed);
+        if (!Number.isFinite(parsed)) {
+          setError("Enter a valid balance.");
+          setLoading(false);
+          return;
+        }
+        balanceNum = parsed;
+      }
+
+      const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           type,
-          balance: parseFloat(balance) || 0,
+          balance: balanceNum,
           currency,
           isShared,
         }),
@@ -70,7 +87,7 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
     setName("");
     setType("INVESTMENT");
     setBalance("");
-    setCurrency("CAD");
+    setCurrency(defaultCurrency);
     setIsShared(false);
     setError(null);
   }

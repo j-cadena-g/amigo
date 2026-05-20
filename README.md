@@ -1,7 +1,7 @@
 # amigo
 
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
-[![License](https://img.shields.io/github/license/j-cadena-g/amigo)](https://github.com/j-cadena-g/amigo/blob/main/LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Bun](https://img.shields.io/badge/Bun-1.3.10-000?logo=bun&logoColor=fff)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=fff)](https://developers.cloudflare.com/workers/)

@@ -41,7 +41,14 @@ export function isAssetHoldingType(type: string): boolean {
   return type === "INVESTMENT" || type === "PROPERTY";
 }
 
+/** Bank/cash account types on the Accounts tab (credit cards belong under Debts). */
+export const TRANSACTIONAL_ACCOUNT_TYPES = [
+  "CHECKING",
+  "SAVINGS",
+  "CASH",
+] as const satisfies readonly FinancialAccount["type"][];
+
 /** Bank/cash accounts on the Accounts tab (credit cards belong under Debts). */
 export function isTransactionalAccountType(type: string): boolean {
-  return !isAssetHoldingType(type) && type !== "CREDIT";
+  return (TRANSACTIONAL_ACCOUNT_TYPES as readonly string[]).includes(type);
 }

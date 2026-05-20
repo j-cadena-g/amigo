@@ -182,7 +182,7 @@ Notable route groups:
 - `/dashboard`
 - `/groceries`
 - `/budget`, `/budget/budgets`, `/budget/recurring`
-- `/financial` — accounts and holdings (checking, savings, investments, property; legacy `/accounts` and `/assets` redirect here)
+- `/financial` — accounts and holdings (checking, savings, investments, property; legacy `/accounts` → `/financial`, `/assets` → `/financial`)
 - `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
 
 `/calendar` redirects to `/dashboard`.

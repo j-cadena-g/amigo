@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 # CI only. Deployments require either Cloudflare Workers Builds to be configured
 # for this repo/branch or a separate deploy workflow.
 

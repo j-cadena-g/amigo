@@ -97,8 +97,9 @@ export function AddAccountDialog({
         <DialogHeader>
           <DialogTitle>Add account</DialogTitle>
           <DialogDescription>
-            Track a bank or cash account. You can link transactions and CSV imports to these
-            records.
+            Track checking, savings, cash, credit cards, and other transactional accounts.
+            Transactions and CSV imports link to these accounts. For investments or
+            property, use Add investment or property instead.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

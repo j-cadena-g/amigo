@@ -5,6 +5,6 @@ export async function loader(_args: LoaderFunctionArgs) {
   return redirect("/financial");
 }
 
-export default function AccountsRedirect() {
+export default function FinancialAssetsRedirect() {
   return null;
 }

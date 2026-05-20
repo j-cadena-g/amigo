@@ -14,9 +14,7 @@ import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
 import type { CurrencyCode } from "@amigo/db";
 
 const ASSET_TYPES = [
-  { value: "BANK", label: "Bank Account" },
   { value: "INVESTMENT", label: "Investment" },
-  { value: "CASH", label: "Cash" },
   { value: "PROPERTY", label: "Property" },
 ] as const;
 
@@ -28,7 +26,7 @@ interface AddAssetDialogProps {
 export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
   const revalidator = useRevalidator();
   const [name, setName] = useState("");
-  const [type, setType] = useState<"BANK" | "INVESTMENT" | "CASH" | "PROPERTY">("BANK");
+  const [type, setType] = useState<"INVESTMENT" | "PROPERTY">("INVESTMENT");
   const [balance, setBalance] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("CAD");
   const [isShared, setIsShared] = useState(false);
@@ -70,7 +68,7 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
 
   function resetForm() {
     setName("");
-    setType("BANK");
+    setType("INVESTMENT");
     setBalance("");
     setCurrency("CAD");
     setIsShared(false);
@@ -87,9 +85,10 @@ export function AddAssetDialog({ open, onOpenChange }: AddAssetDialogProps) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Asset</DialogTitle>
+          <DialogTitle>Add investment or property</DialogTitle>
           <DialogDescription>
-            Track a new asset like a bank account, investment, or property.
+            Track investments or property. For checking, savings, or cash, add an account
+            under Financial → Accounts.
           </DialogDescription>
         </DialogHeader>
 

@@ -47,6 +47,11 @@ export default [
       route("budgets", "routes/budget.budgets.tsx"),
       route("recurring", "routes/budget.recurring.tsx"),
     ]),
+    route("financial", "routes/financial.tsx", [
+      index("routes/financial.accounts.tsx"),
+      route("assets", "routes/financial.assets.tsx"),
+      route("debts", "routes/financial.debts.tsx"),
+    ]),
     route("debts", "routes/debts.tsx"),
     route("assets", "routes/assets.tsx"),
     route("accounts", "routes/accounts.tsx"),

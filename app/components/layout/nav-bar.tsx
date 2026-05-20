@@ -5,10 +5,7 @@ import {
   LayoutDashboard,
   Wallet,
   ShoppingCart,
-  CreditCard,
   Landmark,
-  Building2,
-  CalendarDays,
   Settings,
   LogOut,
   Menu,
@@ -20,12 +17,9 @@ import { ModeToggle } from "@/app/components/mode-toggle";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/groceries", label: "Groceries", icon: ShoppingCart },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/assets", label: "Assets", icon: Landmark },
-  { href: "/accounts", label: "Accounts", icon: Building2 },
+  { href: "/budget", label: "Budget", icon: Wallet },
+  { href: "/financial", label: "Financial", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -61,8 +55,12 @@ export function NavBar() {
               ? location.pathname.startsWith("/budget")
               : link.href === "/dashboard"
                 ? location.pathname === "/dashboard"
-                : link.href === "/assets" || link.href === "/accounts"
-                  ? location.pathname === link.href
+                : link.href === "/financial"
+                  ? location.pathname === "/financial" ||
+                    location.pathname.startsWith("/financial/") ||
+                    location.pathname === "/assets" ||
+                    location.pathname === "/debts" ||
+                    location.pathname === "/accounts"
                   : location.pathname.startsWith(link.href);
             return (
               <Link
@@ -127,8 +125,12 @@ export function NavBar() {
                 ? location.pathname.startsWith("/budget")
                 : link.href === "/dashboard"
                   ? location.pathname === "/dashboard"
-                  : link.href === "/assets" || link.href === "/accounts"
-                    ? location.pathname === link.href
+                  : link.href === "/financial"
+                    ? location.pathname === "/financial" ||
+                      location.pathname.startsWith("/financial/") ||
+                      location.pathname === "/assets" ||
+                      location.pathname === "/debts" ||
+                      location.pathname === "/accounts"
                     : location.pathname.startsWith(link.href);
               return (
                 <Link

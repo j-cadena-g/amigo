@@ -37,9 +37,12 @@ export interface CalendarEvent {
 interface CalendarProps {
   initialEvents: CalendarEvent[];
   initialMonth: string; // YYYY-MM
+  /** Smaller grid for dashboard embedding (~half height). */
+  compact?: boolean;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_COMPACT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 const EVENT_DOT_CLASSES: Record<CalendarEvent["color"], string> = {
   green: "bg-emerald-500",
@@ -83,7 +86,11 @@ function normalizeEventDate(dateStr: string): string {
   return dateStr.split("T")[0]!;
 }
 
-export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
+export function Calendar({
+  initialEvents,
+  initialMonth,
+  compact = false,
+}: CalendarProps) {
   const initial = parseMonth(initialMonth);
   const [year, setYear] = useState(initial.year);
   const [month, setMonth] = useState(initial.month);
@@ -176,37 +183,51 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
   });
 
   const selectedEvents = selectedDay ? eventsByDate[selectedDay] ?? [] : [];
+  const weekdayLabels = compact ? WEEKDAYS_COMPACT : WEEKDAYS;
+  const cellMinHeight = compact
+    ? "min-h-[2.5rem] md:min-h-[2.75rem]"
+    : "min-h-[5.5rem] md:min-h-[6.5rem]";
+  const cellPadding = compact ? "p-0.5" : "p-1.5";
 
   return (
     <>
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">{monthLabel}</CardTitle>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={goToToday}>
+        <CardHeader className={cn("pb-3", compact && "pb-2 px-4 pt-4")}>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className={cn("text-xl", compact && "text-base")}>
+              {monthLabel}
+            </CardTitle>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className={compact ? "h-7 px-2 text-xs" : undefined}
+                onClick={goToToday}
+              >
                 Today
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
+                className={compact ? "h-7 w-7" : undefined}
                 onClick={() => navigate(-1)}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
                 <span className="sr-only">Previous month</span>
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
+                className={compact ? "h-7 w-7" : undefined}
                 onClick={() => navigate(1)}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
                 <span className="sr-only">Next month</span>
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className={compact ? "px-4 pb-4 pt-0" : undefined}>
           {loading && (
             <div className="text-center text-sm text-muted-foreground py-2 animate-pulse-soft">
               Loading events...
@@ -214,11 +235,14 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
           )}
 
           {/* Weekday headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {WEEKDAYS.map((day) => (
+          <div className="grid grid-cols-7 mb-0.5">
+            {weekdayLabels.map((day, i) => (
               <div
-                key={day}
-                className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider"
+                key={`${day}-${i}`}
+                className={cn(
+                  "text-center font-semibold text-muted-foreground uppercase tracking-wider",
+                  compact ? "text-[10px] py-0.5" : "text-xs py-2"
+                )}
               >
                 {day}
               </div>
@@ -226,13 +250,18 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
           </div>
 
           {/* Day grid */}
-          <div className="grid grid-cols-7 gap-px bg-border/50 rounded-xl overflow-hidden">
+          <div
+            className={cn(
+              "grid grid-cols-7 gap-px bg-border/50 overflow-hidden",
+              compact ? "rounded-lg" : "rounded-xl"
+            )}
+          >
             {cells.map((cell, i) => {
               if (cell.day === null) {
                 return (
                   <div
                     key={`empty-${i}`}
-                    className="bg-card min-h-[5.5rem] md:min-h-[6.5rem] p-1.5"
+                    className={cn("bg-card", cellMinHeight, cellPadding)}
                   />
                 );
               }
@@ -241,8 +270,6 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
                 cell.dateStr ? eventsByDate[cell.dateStr] ?? [] : [];
               const isToday = cell.dateStr === todayStr;
               const hasEvents = dayEvents.length > 0;
-
-              // Show up to 2 event previews on desktop, dots on mobile
               const previewEvents = dayEvents.slice(0, 2);
               const moreCount = dayEvents.length - 2;
 
@@ -254,7 +281,9 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
                     cell.dateStr && setSelectedDay(cell.dateStr)
                   }
                   className={cn(
-                    "bg-card min-h-[5.5rem] md:min-h-[6.5rem] p-1.5 text-left transition-all duration-150",
+                    "bg-card text-left transition-all duration-150",
+                    cellMinHeight,
+                    cellPadding,
                     "hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:z-10",
                     selectedDay === cell.dateStr && "bg-accent/60",
                     hasEvents && "cursor-pointer"
@@ -262,7 +291,8 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
                 >
                   <span
                     className={cn(
-                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium",
+                      "inline-flex items-center justify-center rounded-full font-medium",
+                      compact ? "h-5 w-5 text-[11px]" : "h-6 w-6 text-sm",
                       isToday &&
                         "bg-primary text-primary-foreground font-bold shadow-sm"
                     )}
@@ -270,8 +300,7 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
                     {cell.day}
                   </span>
 
-                  {/* Desktop: event previews */}
-                  {hasEvents && (
+                  {hasEvents && !compact && (
                     <div className="hidden md:flex flex-col gap-0.5 mt-1">
                       {previewEvents.map((ev) => (
                         <div
@@ -294,22 +323,32 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
                     </div>
                   )}
 
-                  {/* Mobile: color dots */}
                   {hasEvents && (
-                    <div className="flex md:hidden gap-0.5 mt-1 flex-wrap">
+                    <div
+                      className={cn(
+                        "flex gap-0.5 flex-wrap",
+                        compact ? "mt-0" : "mt-1 md:hidden"
+                      )}
+                    >
                       {Array.from(
                         new Set(dayEvents.map((e) => e.color))
                       ).map((color) => (
                         <span
                           key={color}
                           className={cn(
-                            "h-1.5 w-1.5 rounded-full",
+                            "rounded-full",
+                            compact ? "h-1 w-1" : "h-1.5 w-1.5",
                             EVENT_DOT_CLASSES[color]
                           )}
                         />
                       ))}
                       {dayEvents.length > 3 && (
-                        <span className="text-[9px] leading-none text-muted-foreground ml-0.5">
+                        <span
+                          className={cn(
+                            "leading-none text-muted-foreground",
+                            compact ? "text-[8px]" : "text-[9px] ml-0.5"
+                          )}
+                        >
                           {dayEvents.length}
                         </span>
                       )}
@@ -321,7 +360,12 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 justify-center">
+          <div
+            className={cn(
+              "flex flex-wrap gap-x-4 gap-y-1 justify-center",
+              compact ? "mt-2 gap-x-3" : "mt-3"
+            )}
+          >
             {(
               [
                 { color: "red", label: "Expense" },
@@ -333,11 +377,17 @@ export function Calendar({ initialEvents, initialMonth }: CalendarProps) {
               <div key={color} className="flex items-center gap-1.5">
                 <span
                   className={cn(
-                    "h-2 w-2 rounded-full",
+                    "rounded-full",
+                    compact ? "h-1.5 w-1.5" : "h-2 w-2",
                     EVENT_DOT_CLASSES[color]
                   )}
                 />
-                <span className="text-xs text-muted-foreground">
+                <span
+                  className={cn(
+                    "text-muted-foreground",
+                    compact ? "text-[10px]" : "text-xs"
+                  )}
+                >
                   {label}
                 </span>
               </div>

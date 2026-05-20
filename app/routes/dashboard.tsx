@@ -22,12 +22,14 @@ import {
   budgets,
   recurringTransactions,
   assets,
+  financialAccounts,
   debts,
   scopeToHousehold,
   eq,
   and,
   or,
   isNull,
+  isNotNull,
   gte,
   lte,
   desc,
@@ -39,9 +41,14 @@ import {
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { BudgetCharts } from "@/app/components/budget-charts";
+import {
+  Calendar,
+  type CalendarEvent,
+} from "@/app/components/calendar";
 import type { CurrencyCode } from "@amigo/db";
 import {
   sqlAssetBalanceHomeCents,
+  sqlFinancialAccountBalanceHomeCents,
   sqlDebtLiabilityHomeCents,
   sqlTransactionAmountHomeCents,
 } from "@/server/lib/money";
@@ -129,10 +136,13 @@ export async function loader({ context }: LoaderFunctionArgs) {
     budgetRows,
     upcomingRecurring,
     totalAssets,
+    totalAccounts,
     totalDebts,
     household,
     categoryRows,
     lastMonthCategoryRows,
+    calendarMonthTxns,
+    calendarGroceriesByDate,
   ] = await Promise.all([
     // Monthly spending (home currency)
     db
@@ -232,6 +242,20 @@ export async function loader({ context }: LoaderFunctionArgs) {
           isNull(assets.deletedAt)
         )
       ),
+    // Bank/cash accounts (home currency)
+    db
+      .select({
+        total: sql<number>`COALESCE(SUM(${sqlFinancialAccountBalanceHomeCents()}), 0)`,
+      })
+      .from(financialAccounts)
+      .where(
+        and(
+          scopeToHousehold(financialAccounts.householdId, session.householdId),
+          or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
+          isNull(financialAccounts.deletedAt),
+          eq(financialAccounts.archived, false)
+        )
+      ),
     // Total debts (home currency — liability amounts)
     db
       .select({
@@ -282,7 +306,70 @@ export async function loader({ context }: LoaderFunctionArgs) {
         )
       )
       .groupBy(transactions.category),
+    // Calendar: transactions for current month
+    db.query.transactions.findMany({
+      where: and(
+        scopeToHousehold(transactions.householdId, session.householdId),
+        isNull(transactions.deletedAt),
+        txnVis,
+        gte(transactions.date, monthStart),
+        lte(transactions.date, monthEnd)
+      ),
+    }),
+    // Calendar: grocery purchases grouped by date
+    db
+      .select({
+        date: sql<string>`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(groceryItems)
+      .where(
+        and(
+          scopeToHousehold(groceryItems.householdId, session.householdId),
+          eq(groceryItems.isPurchased, true),
+          isNotNull(groceryItems.purchasedAt),
+          isNull(groceryItems.deletedAt),
+          gte(
+            sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
+            monthStart
+          ),
+          lte(
+            sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
+            monthEnd
+          )
+        )
+      )
+      .groupBy(sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`),
   ]);
+
+  const calendarEvents: CalendarEvent[] = [];
+  for (const t of calendarMonthTxns) {
+    calendarEvents.push({
+      id: t.id,
+      date: t.date,
+      type: "transaction",
+      title: t.description || t.category,
+      color: t.type === "income" ? "green" : "red",
+      metadata: {
+        amount: t.amount,
+        currency: t.currency,
+        transactionType: t.type as "income" | "expense",
+      },
+    });
+  }
+  for (const g of calendarGroceriesByDate) {
+    calendarEvents.push({
+      id: `grocery-${g.date}`,
+      date: g.date,
+      type: "grocery_purchase",
+      title: `${g.count} item${g.count !== 1 ? "s" : ""} purchased`,
+      color: "orange",
+      metadata: {
+        itemCount: g.count,
+      },
+    });
+  }
+  const calendarMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const spendingCents = spendingResult[0]?.total ?? 0;
   const incomeCents = incomeResult[0]?.total ?? 0;
@@ -290,7 +377,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const netCents = incomeCents - spendingCents;
   const currency = parseHomeCurrency(household?.homeCurrency);
   const monthName = now.toLocaleString("default", { month: "long" });
-  const assetsCents = totalAssets[0]?.total ?? 0;
+  const assetsCents =
+    (totalAssets[0]?.total ?? 0) + (totalAccounts[0]?.total ?? 0);
   const debtsCents = totalDebts[0]?.total ?? 0;
   const netWorthCents = assetsCents - debtsCents;
 
@@ -397,6 +485,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
     netWorthCents,
     categoryData,
     monthlyComparison: monthlyComparison.length > 0 ? monthlyComparison : undefined,
+    calendarEvents,
+    calendarMonth,
   };
 }
 
@@ -451,6 +541,8 @@ export default function Dashboard() {
     netWorthCents,
     categoryData,
     monthlyComparison,
+    calendarEvents,
+    calendarMonth,
   } = useLoaderData<typeof loader>();
 
   const cur = currency as CurrencyCode;
@@ -575,6 +667,15 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* Activity calendar */}
+      <section className="mb-6 animate-fade-in" aria-label="Monthly activity">
+        <Calendar
+          compact
+          initialEvents={calendarEvents}
+          initialMonth={calendarMonth}
+        />
+      </section>
+
       {/* Main content — 2 column layout */}
       <div className="grid gap-4 lg:grid-cols-5 animate-stagger-in">
         {/* Left column — Recent transactions (wider) */}
@@ -688,19 +789,18 @@ export default function Dashboard() {
                           {formatCents(b.limitOriginalCents, budgetCur)}
                         </p>
                       )}
-                      <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-all duration-500 ease-out",
-                            isOver || isCritical
-                              ? "bg-red-500"
-                              : isWarn
-                                ? "bg-amber-500"
-                                : "bg-primary"
-                          )}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
-                        />
-                      </div>
+                      <progress
+                        value={Math.min(pct, 100)}
+                        max={100}
+                        className={cn(
+                          "budget-progress",
+                          isOver || isCritical
+                            ? "budget-progress--danger"
+                            : isWarn
+                              ? "budget-progress--warn"
+                              : "budget-progress--default"
+                        )}
+                      />
                       <div className="flex items-center justify-between mt-1">
                         <span
                           className={cn(
@@ -838,7 +938,7 @@ export default function Dashboard() {
 
             <div className="space-y-2.5">
               <Link
-                to="/assets"
+                to="/financial"
                 className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50 group"
               >
                 <div className="flex items-center gap-2.5">
@@ -856,7 +956,7 @@ export default function Dashboard() {
               </Link>
 
               <Link
-                to="/debts"
+                to="/financial/debts"
                 className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50 group"
               >
                 <div className="flex items-center gap-2.5">

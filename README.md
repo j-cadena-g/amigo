@@ -36,14 +36,14 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 
 One Cloudflare Worker (`worker.ts`) serves everything. React Router v7 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
 
-**Design choices**
+### Design choices
 
 - **Single Worker** — RR plus Worker-only concerns (`/ws`, cron, security headers) in one deployable unit
 - **Integer cents** — all money in D1 is stored as integer cents (never floats)
 - **Application-level tenancy** — every D1 query must filter with `scopeToHousehold()` from `@amigo/db` (no DB-level RLS)
 - **Optimistic groceries** — Dexie (IndexedDB) for instant UI; background sync via `/api/sync` (max 10 mutations per request)
 
-**Request flow**
+### Request flow
 
 ```text
 Client → worker.ts
@@ -54,7 +54,7 @@ Client → worker.ts
       → page loaders/actions (context.app + context.cloudflare)
 ```
 
-**Code layout**
+### Code layout
 
 - `app/routes/*.tsx` — pages and `api.*` resource routes
 - `server/api/*` — shared handlers (Zod validation, D1, rate limits)
@@ -63,20 +63,20 @@ Client → worker.ts
 
 Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packages/db/src/schema/`.
 
-**Realtime**
+### Realtime
 
 1. Client opens `/ws` → routed to the household’s Durable Object
 2. Mutations call `broadcastToHousehold()` in `server/lib/realtime.ts`
 3. Connected clients receive an event and revalidate loaders
 4. Optional `senderId` skips the connection that initiated the mutation
 
-**Auth (Clerk)**
+### Auth (Clerk)
 
 - `@clerk/react-router` for middleware, loaders, and client provider
 - Session cache in KV (24h TTL, keyed by Clerk user id)
 - First login auto-creates household + user rows in D1
 
-**Security**
+### Security
 
 KV-backed rate limits (`server/middleware/rate-limit.ts`):
 
@@ -89,7 +89,7 @@ KV-backed rate limits (`server/middleware/rate-limit.ts`):
 
 Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canManageMembers` require owner or admin; `canTransferOwnership` is owner-only. Helpers live in `server/lib/permissions.ts`.
 
-**Offline groceries**
+### Offline groceries
 
 - Local state in Dexie; sync queue flushed in chunks to `/api/sync`
 - Conflicts: server-wins with field-level merge
@@ -184,7 +184,6 @@ Notable route groups:
 - `/budget`, `/budget/budgets`, `/budget/recurring`
 - `/assets`
 - `/debts`
-- `/calendar`
 - `/settings`
 - `/setup`
 - `/restore-account`

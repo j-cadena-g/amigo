@@ -517,7 +517,7 @@ export function TransactionList({
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <input
               type="number"
               step="0.01"
@@ -529,10 +529,11 @@ export function TransactionList({
                   amount: e.target.value,
                 }))
               }
-              className="col-span-2 rounded-md border border-input bg-background px-3 py-2"
+              className="min-w-0 rounded-md border border-input bg-background px-3 py-2"
               required
             />
             <CurrencySelect
+              compact
               value={newTransaction.currency}
               onChange={(v) =>
                 setNewTransaction((prev) => ({ ...prev, currency: v as CurrencyCode }))
@@ -584,6 +585,13 @@ export function TransactionList({
           {formError && (
             <p className="text-sm text-destructive">{formError}</p>
           )}
+
+          <p className="text-sm text-muted-foreground">
+            Need this on a schedule?{" "}
+            <Link to="/budget/recurring" className="font-medium text-primary hover:underline">
+              Set up a recurring transaction
+            </Link>
+          </p>
 
           <div className="flex gap-2">
             <button
@@ -668,6 +676,8 @@ export function TransactionList({
                     <input
                       type="number"
                       step="0.01"
+                      placeholder="Amount"
+                      aria-label="Amount"
                       value={editForm.amount}
                       onChange={(e) =>
                         setEditForm((prev) => ({
@@ -686,6 +696,7 @@ export function TransactionList({
                     />
                     <input
                       type="date"
+                      aria-label="Date"
                       value={editForm.date}
                       onChange={(e) =>
                         setEditForm((prev) => ({

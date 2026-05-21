@@ -5,10 +5,7 @@ import {
   LayoutDashboard,
   Wallet,
   ShoppingCart,
-  CreditCard,
   Landmark,
-  Building2,
-  CalendarDays,
   Settings,
   LogOut,
   Menu,
@@ -20,14 +17,33 @@ import { ModeToggle } from "@/app/components/mode-toggle";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/groceries", label: "Groceries", icon: ShoppingCart },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/assets", label: "Assets", icon: Landmark },
-  { href: "/accounts", label: "Accounts", icon: Building2 },
+  { href: "/budget", label: "Budget", icon: Wallet },
+  { href: "/financial", label: "Financial", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+function isNavLinkActive(pathname: string, href: string) {
+  if (href === "/budget") {
+    return pathname.startsWith("/budget");
+  }
+
+  if (href === "/dashboard") {
+    return pathname === "/dashboard";
+  }
+
+  if (href === "/financial") {
+    return (
+      pathname === "/financial" ||
+      pathname.startsWith("/financial/") ||
+      pathname === "/assets" ||
+      pathname === "/debts" ||
+      pathname === "/accounts"
+    );
+  }
+
+  return pathname.startsWith(href);
+}
 
 export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -57,13 +73,7 @@ export function NavBar() {
         <div className="hidden md:flex items-center gap-0.5 flex-1">
           {navLinks.map((link) => {
             const Icon = link.icon;
-            const active = link.href === "/budget"
-              ? location.pathname.startsWith("/budget")
-              : link.href === "/dashboard"
-                ? location.pathname === "/dashboard"
-                : link.href === "/assets" || link.href === "/accounts"
-                  ? location.pathname === link.href
-                  : location.pathname.startsWith(link.href);
+            const active = isNavLinkActive(location.pathname, link.href);
             return (
               <Link
                 key={link.href}
@@ -123,13 +133,7 @@ export function NavBar() {
           <div className="space-y-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const active = link.href === "/budget"
-                ? location.pathname.startsWith("/budget")
-                : link.href === "/dashboard"
-                  ? location.pathname === "/dashboard"
-                  : link.href === "/assets" || link.href === "/accounts"
-                    ? location.pathname === link.href
-                    : location.pathname.startsWith(link.href);
+              const active = isNavLinkActive(location.pathname, link.href);
               return (
                 <Link
                   key={link.href}

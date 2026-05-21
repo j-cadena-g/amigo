@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { assets, debts, transactions } from "./schema";
+import { assets, debts, financialAccounts, transactions } from "./schema";
 
 /**
  * Transaction amount in cents converted to household home currency using the
@@ -11,6 +11,10 @@ export function sqlTransactionAmountHomeCents() {
 
 export function sqlAssetBalanceHomeCents() {
   return sql<number>`CASE WHEN ${assets.exchangeRateToHome} IS NULL THEN ${assets.balance} ELSE ROUND(CAST(${assets.balance} AS REAL) * ${assets.exchangeRateToHome}) END`;
+}
+
+export function sqlFinancialAccountBalanceHomeCents() {
+  return sql<number>`CASE WHEN ${financialAccounts.exchangeRateToHome} IS NULL THEN ${financialAccounts.balance} ELSE ROUND(CAST(${financialAccounts.balance} AS REAL) * ${financialAccounts.exchangeRateToHome}) END`;
 }
 
 /** Liability in original cents → home cents */

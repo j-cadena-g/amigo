@@ -56,3 +56,6 @@ coverage/
 /.mcp.json
 /executor.jsonc
 /opencode.json
+
+# Debugging
+.debug/

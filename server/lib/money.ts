@@ -7,6 +7,7 @@ import { getHomeCurrency } from "./household-currency";
 export {
   sqlAssetBalanceHomeCents,
   sqlDebtLiabilityHomeCents,
+  sqlFinancialAccountBalanceHomeCents,
   sqlTransactionAmountHomeCents,
 } from "@amigo/db";
 

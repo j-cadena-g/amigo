@@ -5,6 +5,7 @@ import { formatCents } from "@/app/lib/currency";
 import { Pencil } from "lucide-react";
 import { EditAccountDialog } from "@/app/components/edit-account-dialog";
 import type { CurrencyCode } from "@amigo/db";
+import { accountTypeLabel } from "@/app/lib/financial-account-types";
 
 export type AccountRow = {
   id: string;
@@ -32,8 +33,8 @@ function AccountCard({
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
         <div className="min-w-0">
           <CardTitle className="text-base truncate">{account.name}</CardTitle>
-          <p className="text-xs text-muted-foreground capitalize mt-0.5">
-            {account.type.toLowerCase().replace(/_/g, " ")}
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {accountTypeLabel(account.type)}
             {account.isShared ? " · Shared" : " · Personal"}
           </p>
         </div>
@@ -90,8 +91,8 @@ export function AccountCards({ accounts }: AccountCardsProps) {
         )}
         {accounts.length === 0 && (
           <p className="text-center text-muted-foreground py-10 text-sm">
-            No accounts yet. Add a checking, savings, or cash account to link imports and
-            reconciliation to transactions later.
+            No accounts yet. Add a checking account, investment, or other holding to get
+            started.
           </p>
         )}
       </div>

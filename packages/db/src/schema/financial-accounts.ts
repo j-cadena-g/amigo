@@ -9,6 +9,7 @@ export const FINANCIAL_ACCOUNT_TYPES = [
   "SAVINGS",
   "CREDIT",
   "INVESTMENT",
+  "PROPERTY",
   "OTHER",
 ] as const;
 
@@ -22,6 +23,7 @@ export const FINANCIAL_ACCOUNT_TYPE_OPTIONS: readonly {
   { value: "CASH", label: "Cash" },
   { value: "CREDIT", label: "Credit card" },
   { value: "INVESTMENT", label: "Investment" },
+  { value: "PROPERTY", label: "Property" },
   { value: "OTHER", label: "Other" },
 ];
 

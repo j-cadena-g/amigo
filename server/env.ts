@@ -6,6 +6,10 @@ export interface Env {
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   APP_ENV: string;
+  /** mailto: or https: URI for Web Push VAPID */
+  VAPID_SUBJECT?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
 }
 
 export interface AppSession {

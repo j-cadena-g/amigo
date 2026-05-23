@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, groceryItems, groceryTags, scopeToHousehold, and, isNull } from "@amigo/db";
 import { GroceryList } from "@/app/components/groceries/grocery-list";
+import { PushNotificationButton } from "@/app/components/push-notification-button";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -44,13 +45,16 @@ export default function Groceries() {
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 animate-fade-in">
-        <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Groceries
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Your household shopping list
-        </p>
+      <div className="mb-6 flex animate-fade-in items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+            Groceries
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Your household shopping list
+          </p>
+        </div>
+        <PushNotificationButton />
       </div>
       <GroceryList
         items={items}

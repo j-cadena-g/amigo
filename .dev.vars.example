@@ -9,3 +9,8 @@
 # Clerk authentication
 CLERK_SECRET_KEY=sk_test_...
 CLERK_PUBLISHABLE_KEY=pk_test_...
+
+# Web Push (VAPID) — generate with: npx web-push generate-vapid-keys
+VAPID_SUBJECT=mailto:you@example.com
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

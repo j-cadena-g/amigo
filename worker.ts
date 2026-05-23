@@ -5,6 +5,7 @@ import type { Cloudflare } from "./router-context";
 import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
 import { processDueRecurringRules } from "./server/lib/recurring-processor";
+import { cleanupStalePushSubscriptions } from "./server/api/push";
 import type { Env } from "./server/env";
 import { getClerkIdentity } from "./server/lib/clerk";
 import { getRequestHandlerMode } from "./server/lib/request-handler-mode";
@@ -58,6 +59,7 @@ export default {
       const db = getDb(env.DB);
       const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
       await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
+      await cleanupStalePushSubscriptions(env);
     } else if (event.cron === "23 4 * * *") {
       // Daily recurring postings (4:23 AM UTC), idempotent by deterministic txn ids.
       // Await directly so failures propagate to the scheduled handler (waitUntil would not).

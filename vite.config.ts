@@ -24,7 +24,13 @@ export default defineConfig(({ command }) => {
       tailwindcss(),
       reactRouter(),
       VitePWA({
+        strategies: "injectManifest",
+        srcDir: "app",
+        filename: "sw.ts",
         registerType: "autoUpdate",
+        injectManifest: {
+          globPatterns: ["**/*.{js,css,html,png,svg,ico,woff,woff2}"],
+        },
         manifest: {
           name: "amigo",
           short_name: "amigo",
@@ -52,42 +58,9 @@ export default defineConfig(({ command }) => {
             },
           ],
         },
-        workbox: {
-          globPatterns: ["**/*.{js,css,html,png,svg,ico,woff,woff2}"],
-          runtimeCaching: [
-            {
-              urlPattern: /^\/api\/health$/,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "api-health-cache",
-                cacheableResponse: { statuses: [200] },
-                expiration: { maxEntries: 1, maxAgeSeconds: 300 },
-              },
-            },
-            {
-              urlPattern: /^\/api\//,
-              handler: "NetworkOnly",
-            },
-            {
-              urlPattern: /\.(?:js|css|png|jpg|svg|woff2?)$/,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "static-cache",
-                expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-              },
-            },
-            {
-              urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "google-fonts",
-                expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              },
-            },
-          ],
+        devOptions: {
+          enabled: true,
+          type: "module",
         },
       }),
     ].filter(Boolean),

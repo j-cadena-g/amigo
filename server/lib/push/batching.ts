@@ -1,3 +1,12 @@
+import { z } from "zod";
+
+export const groceryPushEventInputSchema = z.object({
+  type: z.enum(["add", "purchase"]),
+  itemName: z.string().min(1).max(255),
+  actorUserId: z.string().min(1),
+  actorName: z.string().min(1).max(255),
+});
+
 export interface GroceryPushEvent {
   type: "add" | "purchase";
   itemName: string;

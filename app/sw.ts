@@ -21,13 +21,54 @@ interface PushPayload {
   };
 }
 
+function parsePushPayload(data: PushMessageData | null): PushPayload | null {
+  if (!data) return null;
+
+  let raw: unknown;
+  try {
+    raw = data.json();
+  } catch {
+    return null;
+  }
+
+  if (typeof raw !== "object" || raw === null) return null;
+
+  const record = raw as Record<string, unknown>;
+  if (typeof record.title !== "string" || typeof record.body !== "string") {
+    return null;
+  }
+
+  const payload: PushPayload = {
+    title: record.title,
+    body: record.body,
+  };
+
+  if (typeof record.icon === "string") payload.icon = record.icon;
+  if (typeof record.badge === "string") payload.badge = record.badge;
+  if (typeof record.tag === "string") payload.tag = record.tag;
+
+  if (typeof record.data === "object" && record.data !== null) {
+    const dataRecord = record.data as Record<string, unknown>;
+    payload.data = {};
+    if (typeof dataRecord.url === "string") payload.data.url = dataRecord.url;
+    if (typeof dataRecord.type === "string") payload.data.type = dataRecord.type;
+  }
+
+  return payload;
+}
+
 self.addEventListener("push", (event: PushEvent) => {
   if (!event.data) return;
 
   event.waitUntil(
     (async () => {
+      const payload = parsePushPayload(event.data);
+      if (!payload) {
+        console.error("Push notification error: invalid payload");
+        return;
+      }
+
       try {
-        const payload = event.data!.json() as PushPayload;
         const options: NotificationOptions = {
           body: payload.body,
           icon: payload.icon ?? "/icon-192.png",
@@ -53,22 +94,30 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
 
   event.waitUntil(
     (async () => {
-      const windowClients = await self.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
+      try {
+        const windowClients = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
 
-      for (const client of windowClients) {
-        if ("focus" in client) {
-          await client.focus();
-          if ("navigate" in client) {
-            await (client as WindowClient).navigate(url);
+        for (const client of windowClients) {
+          if ("focus" in client) {
+            await client.focus();
+            if ("navigate" in client) {
+              await (client as WindowClient).navigate(url);
+            }
+            return;
           }
-          return;
         }
-      }
 
-      await self.clients.openWindow(url);
+        await self.clients.openWindow(url);
+      } catch (err) {
+        console.error("notificationclick handler failed", {
+          err,
+          data: event.notification.data,
+          url,
+        });
+      }
     })()
   );
 });

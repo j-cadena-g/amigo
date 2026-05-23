@@ -23,6 +23,7 @@ export async function queueGroceryPush(
         `https://do/queue-push?householdId=${encodeURIComponent(householdId)}`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(event),
         }
       )

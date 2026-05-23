@@ -22,7 +22,7 @@ export function isPWAInstalled(): boolean {
   );
 }
 
-export function isIOSSafari(): boolean {
+export function isIOS(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent;
   return /iPad|iPhone|iPod/.test(ua);
@@ -84,16 +84,33 @@ export async function unsubscribeFromPush(): Promise<void> {
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
 
-  if (subscription) {
-    const endpoint = subscription.endpoint;
-    await subscription.unsubscribe();
+  if (!subscription) return;
 
-    await fetch("/api/push", {
+  const endpoint = subscription.endpoint;
+
+  let res: Response;
+  try {
+    res = await fetch("/api/push", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ endpoint }),
     });
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? `Failed to remove subscription: ${err.message}`
+        : "Failed to remove subscription";
+    throw new Error(message, { cause: err });
   }
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(
+      data.error ?? `Failed to remove subscription (${res.status})`
+    );
+  }
+
+  await subscription.unsubscribe();
 }
 
 export async function isSubscribed(): Promise<boolean> {

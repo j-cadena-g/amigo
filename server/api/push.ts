@@ -43,10 +43,16 @@ export const handlePushRequest: ApiHandler = async ({
     });
 
     if (existing) {
+      if (existing.userId !== session!.userId) {
+        return Response.json(
+          { error: "Subscription endpoint belongs to another user" },
+          { status: 403 }
+        );
+      }
+
       await db
         .update(pushSubscriptions)
         .set({
-          userId: session!.userId,
           keys: parsed.keys,
           updatedAt: new Date(),
         })

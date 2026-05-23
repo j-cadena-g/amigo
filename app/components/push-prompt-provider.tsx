@@ -15,7 +15,18 @@ interface PushPromptContextValue {
   showPrompt: () => void;
 }
 
+const PUSH_PROMPT_STORAGE_KEY = "push-notification-prompted";
+
 const PushPromptContext = createContext<PushPromptContextValue | null>(null);
+
+function clearPushPromptedFlag(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(PUSH_PROMPT_STORAGE_KEY);
+  } catch {
+    // Storage may be unavailable (private mode, quota, etc.)
+  }
+}
 
 export function usePushPrompt(): PushPromptContextValue {
   const context = useContext(PushPromptContext);
@@ -36,7 +47,7 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
     async function checkShouldPrompt(): Promise<boolean> {
       if (typeof window === "undefined") return false;
 
-      if (localStorage.getItem("push-notification-prompted") === "true") {
+      if (localStorage.getItem(PUSH_PROMPT_STORAGE_KEY) === "true") {
         return false;
       }
 
@@ -67,7 +78,14 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
   }, []);
 
   return (
-    <PushPromptContext.Provider value={{ showPrompt: () => setShowModal(true) }}>
+    <PushPromptContext.Provider
+      value={{
+        showPrompt: () => {
+          clearPushPromptedFlag();
+          setShowModal(true);
+        },
+      }}
+    >
       {children}
       {showModal && (
         <PushNotificationModal onClose={() => setShowModal(false)} />

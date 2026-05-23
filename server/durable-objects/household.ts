@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env";
 import {
+  groceryPushEventInputSchema,
   PUSH_BATCH_DELAY_MS,
   PUSH_BATCH_STORAGE_KEY,
   type GroceryPushEvent,
@@ -75,13 +76,20 @@ export class HouseholdDO extends DurableObject<Env> {
         return new Response("householdId required", { status: 400 });
       }
 
-      const event = (await request.json()) as Omit<
-        GroceryPushEvent,
-        "householdId" | "timestamp"
-      >;
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("Invalid JSON body", { status: 400 });
+      }
+
+      const parsed = groceryPushEventInputSchema.safeParse(body);
+      if (!parsed.success) {
+        return new Response("Invalid push event", { status: 400 });
+      }
 
       const fullEvent: GroceryPushEvent = {
-        ...event,
+        ...parsed.data,
         householdId,
         timestamp: Date.now(),
       };

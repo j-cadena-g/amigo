@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   subscribeToPush,
   getNotificationPermissionStatus,
-  isIOSSafari,
+  isIOS,
   isPWAInstalled,
 } from "@/app/lib/push/client";
 
@@ -14,9 +14,9 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isIOS = isIOSSafari();
+  const isIOSDevice = isIOS();
   const isPWA = isPWAInstalled();
-  const needsIOSInstall = isIOS && !isPWA;
+  const needsIOSInstall = isIOSDevice && !isPWA;
 
   async function handleEnable() {
     setIsLoading(true);
@@ -24,7 +24,11 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
 
     try {
       await subscribeToPush();
-      localStorage.setItem("push-notification-prompted", "true");
+      try {
+        localStorage.setItem("push-notification-prompted", "true");
+      } catch (storageErr) {
+        console.warn("Failed to persist push prompt state:", storageErr);
+      }
       onClose();
     } catch (err) {
       setError(
@@ -36,7 +40,11 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
   }
 
   function handleSkip() {
-    localStorage.setItem("push-notification-prompted", "true");
+    try {
+      localStorage.setItem("push-notification-prompted", "true");
+    } catch (storageErr) {
+      console.warn("Failed to persist push prompt state:", storageErr);
+    }
     onClose();
   }
 

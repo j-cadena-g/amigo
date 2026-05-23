@@ -1,4 +1,4 @@
-import { eq, getDb, lt, pushSubscriptions } from "@amigo/db";
+import { and, eq, getDb, lt, pushSubscriptions } from "@amigo/db";
 import { z } from "zod";
 import type { ApiHandler } from "./route";
 
@@ -84,7 +84,12 @@ export const handlePushRequest: ApiHandler = async ({
 
     await db
       .delete(pushSubscriptions)
-      .where(eq(pushSubscriptions.endpoint, parsed.endpoint));
+      .where(
+        and(
+          eq(pushSubscriptions.endpoint, parsed.endpoint),
+          eq(pushSubscriptions.userId, session!.userId)
+        )
+      );
 
     return Response.json({ success: true });
   }

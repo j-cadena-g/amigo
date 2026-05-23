@@ -71,6 +71,17 @@ export const handlePushRequest: ApiHandler = async ({
   if (request.method === "DELETE" && !path) {
     const parsed = unsubscribeSchema.parse(await request.json());
 
+    const existing = await db.query.pushSubscriptions.findFirst({
+      where: eq(pushSubscriptions.endpoint, parsed.endpoint),
+    });
+
+    if (existing && existing.userId !== session!.userId) {
+      return Response.json(
+        { error: "Subscription endpoint belongs to another user" },
+        { status: 403 }
+      );
+    }
+
     await db
       .delete(pushSubscriptions)
       .where(eq(pushSubscriptions.endpoint, parsed.endpoint));

@@ -5,6 +5,7 @@ import {
   isIOS,
   isPWAInstalled,
 } from "@/app/lib/push/client";
+import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
 
 interface PushNotificationModalProps {
   onClose: () => void;
@@ -25,7 +26,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
     try {
       await subscribeToPush();
       try {
-        localStorage.setItem("push-notification-prompted", "true");
+        localStorage.setItem(PUSH_PROMPT_STORAGE_KEY, "true");
       } catch (storageErr) {
         console.warn("Failed to persist push prompt state:", storageErr);
       }
@@ -41,7 +42,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
 
   function handleSkip() {
     try {
-      localStorage.setItem("push-notification-prompted", "true");
+      localStorage.setItem(PUSH_PROMPT_STORAGE_KEY, "true");
     } catch (storageErr) {
       console.warn("Failed to persist push prompt state:", storageErr);
     }

@@ -10,12 +10,11 @@ import {
   getNotificationPermissionStatus,
   isSubscribed,
 } from "@/app/lib/push/client";
+import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
 
 interface PushPromptContextValue {
   showPrompt: () => void;
 }
-
-const PUSH_PROMPT_STORAGE_KEY = "push-notification-prompted";
 
 const PushPromptContext = createContext<PushPromptContextValue | null>(null);
 
@@ -47,8 +46,12 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
     async function checkShouldPrompt(): Promise<boolean> {
       if (typeof window === "undefined") return false;
 
-      if (localStorage.getItem(PUSH_PROMPT_STORAGE_KEY) === "true") {
-        return false;
+      try {
+        if (localStorage.getItem(PUSH_PROMPT_STORAGE_KEY) === "true") {
+          return false;
+        }
+      } catch {
+        // Storage unavailable; continue with prompt eligibility checks.
       }
 
       const permission = getNotificationPermissionStatus();

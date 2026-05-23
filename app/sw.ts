@@ -88,9 +88,20 @@ self.addEventListener("push", (event: PushEvent) => {
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
 
-  const url =
+  const rawUrl =
     (event.notification.data as { url?: string } | undefined)?.url ??
     "/groceries";
+
+  const url = (() => {
+    try {
+      const parsed = new URL(rawUrl, self.location.origin);
+      return parsed.origin === self.location.origin
+        ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+        : "/groceries";
+    } catch {
+      return "/groceries";
+    }
+  })();
 
   event.waitUntil(
     (async () => {
@@ -131,7 +142,7 @@ self.addEventListener("sync", (event) => {
 
 self.addEventListener("message", (event: ExtendableMessageEvent) => {
   if (event.data?.type === "SYNC_NOW") {
-    void notifyClientsToSync();
+    event.waitUntil(notifyClientsToSync());
   }
 });
 

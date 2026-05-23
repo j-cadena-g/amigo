@@ -37,6 +37,10 @@ async function fetchPushConfig(): Promise<{ vapidPublicKey: string | null }> {
 }
 
 export async function subscribeToPush(): Promise<void> {
+  if (getNotificationPermissionStatus() === "unsupported") {
+    throw new Error("Push notifications are not supported in this browser");
+  }
+
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
@@ -81,6 +85,10 @@ export async function subscribeToPush(): Promise<void> {
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
 

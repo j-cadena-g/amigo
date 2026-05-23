@@ -116,7 +116,6 @@ export class HouseholdDO extends DurableObject<Env> {
     const events =
       (await this.ctx.storage.get<GroceryPushEvent[]>(PUSH_BATCH_STORAGE_KEY)) ??
       [];
-    await this.ctx.storage.delete(PUSH_BATCH_STORAGE_KEY);
 
     if (events.length === 0) return;
 
@@ -125,8 +124,10 @@ export class HouseholdDO extends DurableObject<Env> {
 
     try {
       await processPushBatch(this.env, householdId, events);
+      await this.ctx.storage.delete(PUSH_BATCH_STORAGE_KEY);
     } catch (error) {
       console.error("Failed to process push batch:", error);
+      await this.ctx.storage.setAlarm(Date.now() + PUSH_BATCH_DELAY_MS);
     }
   }
 

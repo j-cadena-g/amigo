@@ -1,5 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env";
+import {
+  groceryPushEventInputSchema,
+  PUSH_BATCH_DELAY_MS,
+  PUSH_BATCH_STORAGE_KEY,
+  type GroceryPushEvent,
+} from "../lib/push/batching";
+import { processPushBatch } from "../lib/push/sender";
 
 interface WebSocketAttachment {
   userId: string | null;
@@ -63,7 +70,65 @@ export class HouseholdDO extends DurableObject<Env> {
       return Response.json({ connections: count });
     }
 
+    if (url.pathname === "/queue-push" && request.method === "POST") {
+      const householdId = url.searchParams.get("householdId");
+      if (!householdId) {
+        return new Response("householdId required", { status: 400 });
+      }
+
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("Invalid JSON body", { status: 400 });
+      }
+
+      const parsed = groceryPushEventInputSchema.safeParse(body);
+      if (!parsed.success) {
+        return new Response("Invalid push event", { status: 400 });
+      }
+
+      const fullEvent: GroceryPushEvent = {
+        ...parsed.data,
+        householdId,
+        timestamp: Date.now(),
+      };
+
+      const existing =
+        (await this.ctx.storage.get<GroceryPushEvent[]>(
+          PUSH_BATCH_STORAGE_KEY
+        )) ?? [];
+      existing.push(fullEvent);
+      await this.ctx.storage.put(PUSH_BATCH_STORAGE_KEY, existing);
+
+      const alarm = await this.ctx.storage.getAlarm();
+      if (alarm === null) {
+        await this.ctx.storage.setAlarm(Date.now() + PUSH_BATCH_DELAY_MS);
+      }
+
+      return new Response("ok");
+    }
+
     return new Response("not found", { status: 404 });
+  }
+
+  override async alarm(): Promise<void> {
+    const events =
+      (await this.ctx.storage.get<GroceryPushEvent[]>(PUSH_BATCH_STORAGE_KEY)) ??
+      [];
+
+    if (events.length === 0) return;
+
+    const householdId = events[0]?.householdId;
+    if (!householdId) return;
+
+    try {
+      await processPushBatch(this.env, householdId, events);
+      await this.ctx.storage.delete(PUSH_BATCH_STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to process push batch:", error);
+      await this.ctx.storage.setAlarm(Date.now() + PUSH_BATCH_DELAY_MS);
+    }
   }
 
   override async webSocketMessage(

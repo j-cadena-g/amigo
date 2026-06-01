@@ -38,6 +38,8 @@ export default [
   route("api/restore", "routes/api.restore.ts", { id: "api-restore" }),
   route("api/restore/*", "routes/api.restore.ts", { id: "api-restore-splat" }),
   route("api/audit/*", "routes/api.audit.ts"),
+  route("api/push", "routes/api.push.ts", { id: "api-push" }),
+  route("api/push/*", "routes/api.push.ts", { id: "api-push-splat" }),
   // Authenticated routes with app shell layout
   layout("routes/_app.tsx", [
     route("dashboard", "routes/dashboard.tsx"),

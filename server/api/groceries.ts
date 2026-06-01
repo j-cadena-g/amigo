@@ -13,6 +13,7 @@ import {
 } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
+import { queueGroceryPush } from "../lib/push/queue";
 import {
   ActionError,
   logServerError,
@@ -160,6 +161,13 @@ export const handleGroceriesRequest: ApiHandler = async ({
       entityId: item.id,
     }, session!.userId);
 
+    await queueGroceryPush(env, session!.householdId, {
+      type: "add",
+      itemName: item.itemName,
+      actorUserId: session!.userId,
+      actorName: session!.name ?? "Someone",
+    });
+
     return Response.json(item, { status: 201 });
   }
 
@@ -226,6 +234,15 @@ export const handleGroceriesRequest: ApiHandler = async ({
       action: "update",
       entityId: id,
     }, session!.userId);
+
+    if (!existing.isPurchased && updated.isPurchased) {
+      await queueGroceryPush(env, session!.householdId, {
+        type: "purchase",
+        itemName: existing.itemName,
+        actorUserId: session!.userId,
+        actorName: session!.name ?? "Someone",
+      });
+    }
 
     return Response.json(updated);
   }

@@ -27,9 +27,11 @@ const requiredValues = {
     description: "custom domain or route pattern without protocol",
   },
   CLERK_PUBLISHABLE_KEY: {
+    // Clerk's $ delimiter is inside the base64 payload (decodes to …dev$), not a
+    // literal trailing character — see clerk.com/docs/guides/how-clerk-works/overview
     pattern: /^pk_(test|live)_[A-Za-z0-9_-]+={0,2}$/,
     description:
-      "Clerk publishable key (pk_test_/pk_live_ + URL-safe base64 payload)",
+      "Clerk publishable key (pk_test_/pk_live_ + URL-safe base64 FAPI URL)",
   },
 };
 

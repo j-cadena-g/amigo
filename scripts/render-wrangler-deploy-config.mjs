@@ -27,8 +27,9 @@ const requiredValues = {
     description: "custom domain or route pattern without protocol",
   },
   CLERK_PUBLISHABLE_KEY: {
-    pattern: /^pk_(test|live)_[A-Za-z0-9+/=]+\$$/,
-    description: "Clerk publishable key (pk_test_/pk_live_ + base64 payload + $)",
+    pattern: /^pk_(test|live)_[A-Za-z0-9_-]+={0,2}\$$/,
+    description:
+      "Clerk publishable key (pk_test_/pk_live_ + URL-safe base64 payload + $)",
   },
 };
 

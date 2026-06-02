@@ -125,6 +125,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 - `scripts/run-vite-with-dev-vars.sh` generates a temporary `.dev.vars` file from the keys listed in `.dev.vars.example`, pulling values from the current shell environment.
 - `scripts/run-with-1password-environment.sh` will automatically wrap the dev command in `op run` when `OP_ENVIRONMENT_ID` is available in your shell or in `.op/refs.env`.
 - If you do not use 1Password, exporting the required environment variables before `bun run dev` is enough.
+- `bun run deploy` renders an ignored `.wrangler.deploy.jsonc` from environment variables so live Cloudflare IDs and domains do not need to live in git.
 
 ## Environment and Config
 
@@ -133,10 +134,11 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 | `.dev.vars.example` | Key manifest for local secrets consumed by the dev helper script |
 | `.dev.vars` | Temporary file generated at runtime for local Workers bindings |
 | `.op/refs.env` or `OP_ENVIRONMENT_ID` | Optional 1Password environment reference for local secret injection |
-| `wrangler.jsonc` | Worker name, bindings, routes, cron trigger, observability, and other non-secret config |
+| `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
+| `.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
 | `wrangler secret put ...` | Production secret management, including `CLERK_SECRET_KEY` |
 
-Current Worker bindings in `wrangler.jsonc`:
+Current Worker bindings in the public `wrangler.jsonc` template:
 
 - D1 database binding: `DB` (`amigo-db`)
 - KV namespace: `CACHE`
@@ -210,15 +212,28 @@ Notable API groups:
 
 ## Deployment
 
-`bun run deploy` uses the default Wrangler configuration in [`wrangler.jsonc`](./wrangler.jsonc). In this repository, the configuration includes:
+`bun run deploy` first renders `.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`wrangler.jsonc`](./wrangler.jsonc) stays as a public-safe template.
+
+Export these values before `bun run deploy` (or provide them through `op run` / your CI secret store):
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_D1_DATABASE_ID`
+- `CLOUDFLARE_KV_NAMESPACE_ID`
+- `CLOUDFLARE_CUSTOM_DOMAIN`
+- `CLERK_PUBLISHABLE_KEY`
+- Optional: `APP_ENV` (defaults to `production` for deploys)
+
+Production secrets such as `CLERK_SECRET_KEY` should continue to be managed with `wrangler secret put`.
+
+The generated deploy config contains:
 
 - Worker name `amigo`
 - Smart placement enabled
 - Observability and tracing enabled
-- Custom domain route for `mi-amigo.com`
+- Custom domain route from `CLOUDFLARE_CUSTOM_DOMAIN`
 - `workers_dev` disabled
 
-If you want to deploy this project to a different Cloudflare account or domain, update the account, route, and binding IDs in `wrangler.jsonc` before deploying.
+If you want to deploy this project to a different Cloudflare account or domain, change the deploy-time environment variables instead of editing the committed `wrangler.jsonc`.
 
 ## CI
 

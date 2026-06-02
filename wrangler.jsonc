@@ -1,7 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Public template only. Real production identifiers are rendered into the
+  // ignored .wrangler.deploy.jsonc by scripts/render-wrangler-deploy-config.mjs.
+  // Keep placeholder IDs syntactically valid so local Wrangler commands work.
   "name": "amigo",
-  "account_id": "25d6de6017afd7b3592d69835ab8f7ee",
+  "account_id": "00000000000000000000000000000000",
   "main": "./worker.ts",
   "compatibility_date": "2026-03-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -19,7 +22,7 @@
     {
       "binding": "DB",
       "database_name": "amigo-db",
-      "database_id": "c5c09768-673a-4cd8-b197-a17aa1679fa9",
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "packages/db/migrations"
     }
   ],
@@ -27,7 +30,7 @@
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "e8a6dad5bc5b45a79916d514736171d3"
+      "id": "00000000000000000000000000000000"
     }
   ],
 
@@ -66,7 +69,7 @@
   "preview_urls": false,
 
   "routes": [
-    { "pattern": "mi-amigo.com", "custom_domain": true }
+    { "pattern": "example.com", "custom_domain": true }
   ],
 
   "triggers": {
@@ -75,7 +78,7 @@
   },
 
   "vars": {
-    "APP_ENV": "production",
-    "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWktYW1pZ28uY29tJA"
+    "APP_ENV": "development",
+    "CLERK_PUBLISHABLE_KEY": "pk_test_replace_me"
   }
 }

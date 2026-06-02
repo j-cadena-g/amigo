@@ -15,9 +15,8 @@ const requiredValues = {
     description: "32-character Cloudflare account id",
   },
   CLOUDFLARE_D1_DATABASE_ID: {
-    pattern:
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    description: "D1 database UUID",
+    pattern: /^[a-f0-9]{32}$/i,
+    description: "32-character D1 database id",
   },
   CLOUDFLARE_KV_NAMESPACE_ID: {
     pattern: /^[a-f0-9]{32}$/i,
@@ -28,8 +27,8 @@ const requiredValues = {
     description: "custom domain or route pattern without protocol",
   },
   CLERK_PUBLISHABLE_KEY: {
-    pattern: /^pk_(test|live)_[A-Za-z0-9_]+$/,
-    description: "Clerk publishable key",
+    pattern: /^pk_(test|live)_[A-Za-z0-9+/=]+\$$/,
+    description: "Clerk publishable key (pk_test_/pk_live_ + base64 payload + $)",
   },
 };
 

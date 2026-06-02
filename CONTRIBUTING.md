@@ -92,7 +92,7 @@ Good candidates:
 - Documentation improvements in README or CHANGELOG
 - Accessibility and UX improvements with brief testing notes
 
-Please avoid drive-by refactors, dependency major bumps without discussion, and changes that commit live deployment-specific IDs or domains. Keep real Cloudflare binding identifiers in the deploy-time environment, not in tracked config.
+Please avoid drive-by refactors, dependency major bumps without discussion, and changes that embed deployment-specific IDs or domains unless they are clearly documented as examples.
 
 ## Security
 

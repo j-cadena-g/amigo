@@ -9,7 +9,6 @@ build/
 
 # Cloudflare
 .wrangler/
-.wrangler.deploy.jsonc
 .dev.vars
 
 # Environment

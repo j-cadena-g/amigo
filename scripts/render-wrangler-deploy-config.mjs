@@ -7,6 +7,23 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const templatePath = path.join(rootDir, "wrangler.jsonc");
+const secretsExamplePath = path.join(rootDir, ".wrangler.secrets.example");
+const manifestKeyPattern = /^\s*#?\s*([A-Z0-9_]+)=/;
+
+function parseManifestKeys(source) {
+  const keys = [];
+  const seen = new Set();
+
+  for (const line of source.split(/\r?\n/)) {
+    const match = line.match(manifestKeyPattern);
+    if (!match || seen.has(match[1])) continue;
+    seen.add(match[1]);
+    keys.push(match[1]);
+  }
+
+  return keys;
+}
+
 const outputPath = process.env.WRANGLER_RENDER_OUTPUT
   ? path.resolve(rootDir, process.env.WRANGLER_RENDER_OUTPUT)
   : path.join(rootDir, ".wrangler.deploy.jsonc");
@@ -131,6 +148,26 @@ async function main() {
       /"placement"\s*:\s*\{[\s\S]*?\},/,
       "",
     );
+
+    const secretsExample = await readFile(secretsExamplePath, "utf8");
+    const requiredSecrets = parseManifestKeys(secretsExample);
+    if (requiredSecrets.length === 0) {
+      throw new Error(`No secret keys found in ${path.basename(secretsExamplePath)}.`);
+    }
+
+    const secretsBlock = [
+      '  "secrets": {',
+      '    "required": [',
+      ...requiredSecrets.map((key) => `      "${key}",`),
+      "    ]",
+      "  },",
+    ].join("\n");
+
+    const varsBlockStart = /\n(\s*"vars"\s*:\s*\{)/;
+    if (!varsBlockStart.test(rendered)) {
+      throw new Error(`Could not find vars block in ${path.basename(templatePath)}.`);
+    }
+    rendered = rendered.replace(varsBlockStart, `\n\n${secretsBlock}\n$1`);
   }
 
   await mkdir(path.dirname(outputPath), { recursive: true });

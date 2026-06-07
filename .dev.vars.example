@@ -2,8 +2,8 @@
 # AMIGO - Local Development Secrets
 # =============================================================================
 # Key manifest for local Workers dev. `bun run dev` uses op run to inject these
-# keys from the amigo (dev) Environment; a temporary `.dev.vars` is written for
-# the Cloudflare Vite plugin. `bun run dev:verify` checks names only.
+# keys into process.env; Wrangler reads them via CLOUDFLARE_INCLUDE_PROCESS_ENV.
+# `bun run dev:verify` checks names only. Do not mount or commit `.dev.vars`.
 # Deploy keys live in .deploy.env.example and .wrangler.secrets.example.
 # =============================================================================
 

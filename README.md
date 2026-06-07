@@ -123,7 +123,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 ### Local Environment Notes
 
 - Copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
-- `bun run dev` uses `op run --environment` to inject secrets into `process.env`, writes a temporary `.dev.vars` for the Cloudflare Vite plugin, then starts Vite.
+- `bun run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
 - `bun run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
 - `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
@@ -132,10 +132,9 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 
 | File / Source | Purpose |
 | --- | --- |
-| `.dev.vars.example` | Key manifest for local secrets consumed by the dev helper script |
+| `.dev.vars.example` | Key manifest for local dev (`op run` + `dev:verify`) |
 | `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
-| `.wrangler.secrets.example` | Worker secrets uploaded on deploy (`wrangler deploy --secrets-file`) |
-| `.dev.vars` | Gitignored temporary file written during `bun run dev` for the Cloudflare Vite plugin |
+| `.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
 | `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
 | `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally, prod in Workers Builds) |
 | `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |

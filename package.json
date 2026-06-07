@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bash scripts/run-with-1password-environment.sh -- bash scripts/run-vite-with-dev-vars.sh node scripts/run-vite-dev.mjs vite dev",
+    "dev": "bash scripts/run-with-1password-environment.sh -- node scripts/run-vite-dev.mjs vite dev",
     "dev:verify": "bash scripts/run-with-1password-environment.sh -- node scripts/verify-dev-environment.mjs",
     "dev:setup": "bun run db:migrate:local && bun run db:seed:local",
     "dev:reset": "rm -rf .wrangler/state && bun run dev:setup",

@@ -36,7 +36,7 @@ bun run dev:verify
 bun run dev
 ```
 
-`bun run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env`; a temporary `.dev.vars` is written for the Cloudflare Vite plugin and removed on exit. Do not commit `.dev.vars` or real secrets.
+`bun run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
 
 If `bun run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Starts Vite + Cloudflare local dev under op run. Expects secrets in
- * process.env (injected by op run). run-vite-with-dev-vars.sh writes a
- * temporary `.dev.vars` for the Cloudflare Vite plugin and removes it on exit.
+ * process.env (injected by op run). CLOUDFLARE_INCLUDE_PROCESS_ENV lets the
+ * Cloudflare Vite plugin read declared secrets from the process environment
+ * instead of a .dev.vars file.
  */
 
 import { spawn } from "node:child_process";
@@ -65,7 +66,10 @@ const spawnArgs = useVite[0] === viteBin ? useVite : args;
 
 const child = spawn(executable, spawnArgs, {
   cwd: rootDir,
-  env: process.env,
+  env: {
+    ...process.env,
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
+  },
   stdio: "inherit",
 });
 

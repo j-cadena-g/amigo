@@ -134,7 +134,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 | `.dev.vars.example` | Key manifest for local secrets consumed by the dev helper script |
 | `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
 | `.wrangler.secrets.example` | Worker secrets uploaded on deploy (`wrangler deploy --secrets-file`) |
-| `.dev.vars` | Temporary file generated at runtime for local Workers bindings |
+| `.dev.vars` | 1Password FIFO mount at repo root; scripts read secrets from it (read-only; not created by the repo) |
 | `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
 | `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally, prod in Workers Builds) |
 | `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
@@ -189,8 +189,7 @@ Notable route groups:
 - `/budget`, `/budget/budgets`, `/budget/recurring`
 - `/financial` — accounts and holdings (checking, savings, cash, investments, property, credit cards; legacy `/accounts` → `/financial`, `/assets` → `/financial`)
 - `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
-
-`/calendar` redirects to `/dashboard`.
+- `/calendar` — redirects to `/dashboard`
 - `/settings`
 - `/setup`
 - `/restore-account`

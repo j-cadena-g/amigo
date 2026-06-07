@@ -21,6 +21,15 @@ export default [
       "**/public/sw.js",
     ],
   },
+  // Node scripts
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // Base TypeScript config
   {
     files: ["**/*.ts", "**/*.tsx"],

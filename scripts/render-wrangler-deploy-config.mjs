@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const templatePath = path.join(rootDir, "wrangler.jsonc");
-const outputPath = path.join(rootDir, ".wrangler.deploy.jsonc");
+const outputPath = process.env.WRANGLER_RENDER_OUTPUT
+  ? path.resolve(rootDir, process.env.WRANGLER_RENDER_OUTPUT)
+  : path.join(rootDir, ".wrangler.deploy.jsonc");
 
 const requiredValues = {
   CLOUDFLARE_ACCOUNT_ID: {
@@ -15,8 +17,8 @@ const requiredValues = {
     description: "32-character Cloudflare account id",
   },
   CLOUDFLARE_D1_DATABASE_ID: {
-    pattern: /^[a-f0-9]{32}$/i,
-    description: "32-character D1 database id",
+    pattern: /^[a-f0-9]{32}$|^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i,
+    description: "D1 database id (32 hex chars or UUID)",
   },
   CLOUDFLARE_KV_NAMESPACE_ID: {
     pattern: /^[a-f0-9]{32}$/i,
@@ -107,7 +109,9 @@ async function main() {
     CLOUDFLARE_KV_NAMESPACE_ID: getRequiredValue("CLOUDFLARE_KV_NAMESPACE_ID"),
     CLOUDFLARE_CUSTOM_DOMAIN: getRequiredValue("CLOUDFLARE_CUSTOM_DOMAIN"),
     CLERK_PUBLISHABLE_KEY: getRequiredValue("CLERK_PUBLISHABLE_KEY"),
-    APP_ENV: globalThis.process.env.APP_ENV?.trim() || "production",
+    APP_ENV:
+      globalThis.process.env.APP_ENV?.trim() ||
+      (outputPath.endsWith(".wrangler.dev.jsonc") ? "development" : "production"),
   };
 
   let rendered = template;
@@ -116,6 +120,16 @@ async function main() {
       rendered,
       replacement,
       deployValues[replacement.envName]
+    );
+  }
+
+  if (outputPath.endsWith(".wrangler.dev.jsonc")) {
+    rendered = rendered.replace(/\n\s*"account_id"\s*:\s*"[^"]*",/, "\n");
+    rendered = rendered.replace(/"workers_dev"\s*:\s*false/, '"workers_dev": true');
+    rendered = rendered.replace(/"routes"\s*:\s*\[[\s\S]*?\],/, '"routes": [],');
+    rendered = rendered.replace(
+      /"placement"\s*:\s*\{[\s\S]*?\},/,
+      "",
     );
   }
 

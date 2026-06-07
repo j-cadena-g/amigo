@@ -1,11 +1,17 @@
 # =============================================================================
 # AMIGO - Local Development Secrets
 # =============================================================================
-# Key manifest for run-vite-with-dev-vars.sh. The script reads variable names
-# from this file and pulls their values from process.env (injected by op run).
-# See wrangler.jsonc for the public template config.
-# Production deploy identifiers are rendered into .wrangler.deploy.jsonc.
+# Key manifest for local Workers dev. Mount amigo (dev) from the 1Password desktop
+# app to `.dev.vars` (named pipe). `bun run dev:verify-mount` checks the mount.
+# Deploy keys live in .deploy.env.example and .wrangler.secrets.example.
 # =============================================================================
+
+# Cloudflare (same account/DB/KV IDs as prod; local Vite uses simulated D1/KV)
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_D1_DATABASE_ID=
+CLOUDFLARE_KV_NAMESPACE_ID=
+CLOUDFLARE_CUSTOM_DOMAIN=
+APP_ENV=development
 
 # Clerk authentication
 CLERK_SECRET_KEY=sk_test_...

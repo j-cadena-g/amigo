@@ -10,6 +10,7 @@ build/
 # Cloudflare
 .wrangler/
 .wrangler.deploy.jsonc
+.wrangler.dev.jsonc
 .dev.vars
 
 # Environment
@@ -37,6 +38,9 @@ packages/db/drizzle/
 
 # Bun
 bun.lockb
+
+# Pinned 1Password CLI for Workers Builds
+/bin/
 
 # Legacy package-manager artifacts
 package-lock.json

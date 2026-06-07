@@ -126,7 +126,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 - `bun run dev` uses `op run --environment` to inject secrets into `process.env`, writes a temporary `.dev.vars` for the Cloudflare Vite plugin, then starts Vite.
 - `bun run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
-- `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables so live Cloudflare IDs and domains do not need to live in git.
+- `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
 ## Environment and Config
 

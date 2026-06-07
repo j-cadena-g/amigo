@@ -21,8 +21,7 @@ If you run a modified version as a network service, AGPL obligations may apply t
 - [Bun](https://bun.sh) `1.3.10+` (see `packageManager` in `package.json`)
 - Node.js on `PATH` (used by helper scripts)
 - [Wrangler](https://developers.cloudflare.com/workers/wrangler/) `4+`
-- Clerk development keys (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`)
-- Optional: [1Password CLI](https://developer.1password.com/docs/cli/) if you use the repo’s secret injection flow
+- [1Password CLI](https://developer.1password.com/docs/cli/) and access to the **`amigo (dev)`** Environment (see `.op/refs.env.example`)
 
 ### First run
 
@@ -30,13 +29,16 @@ If you run a modified version as a network service, AGPL obligations may apply t
 bun install
 bun run dev:setup
 
-export CLERK_SECRET_KEY=sk_test_...
-export CLERK_PUBLISHABLE_KEY=pk_test_...
+cp .op/refs.env.example .op/refs.env
+# Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
+bun run dev:verify
 bun run dev
 ```
 
-`bun run dev` generates a temporary `.dev.vars` from `.dev.vars.example` and your shell environment. Do not commit `.dev.vars` or real secrets.
+`bun run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
+
+If `bun run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 
 To reset local D1 state: `bun run dev:reset`.
 
@@ -92,7 +94,7 @@ Good candidates:
 - Documentation improvements in README or CHANGELOG
 - Accessibility and UX improvements with brief testing notes
 
-Please avoid drive-by refactors, dependency major bumps without discussion, and changes that commit live deployment-specific IDs or domains. Keep real Cloudflare binding identifiers in the deploy-time environment, not in tracked config.
+Please avoid drive-by refactors, dependency major bumps without discussion, and changes that commit live deployment-specific IDs or domains. Keep real Cloudflare binding identifiers in a 1Password Environment (see `.deploy.env.example` and `.op/refs.env.example`) or another deploy-time secret store, not in tracked config.
 
 ## Security
 

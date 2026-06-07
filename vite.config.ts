@@ -20,7 +20,13 @@ export default defineConfig(({ command }) => {
       },
     },
     plugins: [
-      command === "serve" && !isVitest ? cloudflare() : null,
+      command === "serve" && !isVitest
+        ? cloudflare(
+            process.env.AMIGO_WRANGLER_CONFIG
+              ? { configPath: process.env.AMIGO_WRANGLER_CONFIG }
+              : undefined,
+          )
+        : null,
       tailwindcss(),
       reactRouter(),
       VitePWA({

@@ -103,7 +103,7 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 - Node.js on `PATH` for local helper scripts
 - Wrangler `4+`
 - Clerk development keys
-- Optional: 1Password CLI if you use the built-in secret injection flow
+- [1Password CLI](https://developer.1password.com/docs/cli/) and a 1Password Environment for secrets (recommended)
 
 ### Install and Run
 
@@ -111,9 +111,10 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 bun install
 bun run dev:setup
 
-export CLERK_SECRET_KEY=sk_test_...
-export CLERK_PUBLISHABLE_KEY=pk_test_...
+cp .op/refs.env.example .op/refs.env
+# Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
+bun run dev:verify
 bun run dev
 ```
 
@@ -121,22 +122,23 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 
 ### Local Environment Notes
 
-- `bun run dev` does not expect you to maintain `.dev.vars` manually.
-- `scripts/run-vite-with-dev-vars.sh` generates a temporary `.dev.vars` file from the keys listed in `.dev.vars.example`, pulling values from the current shell environment.
-- `scripts/run-with-1password-environment.sh` will automatically wrap the dev command in `op run` when `OP_ENVIRONMENT_ID` is available in your shell or in `.op/refs.env`.
-- If you do not use 1Password, exporting the required environment variables before `bun run dev` is enough.
-- `bun run deploy` renders an ignored `.wrangler.deploy.jsonc` from environment variables so live Cloudflare IDs and domains do not need to live in git.
+- Copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
+- `bun run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
+- `bun run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
+- All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
+- `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
 ## Environment and Config
 
 | File / Source | Purpose |
 | --- | --- |
-| `.dev.vars.example` | Key manifest for local secrets consumed by the dev helper script |
-| `.dev.vars` | Temporary file generated at runtime for local Workers bindings |
-| `.op/refs.env` or `OP_ENVIRONMENT_ID` | Optional 1Password environment reference for local secret injection |
+| `.dev.vars.example` | Key manifest for local dev (`op run` + `dev:verify`) |
+| `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
+| `.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
+| `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
+| `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally, prod in Workers Builds) |
 | `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
 | `.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
-| `wrangler secret put ...` | Production secret management, including `CLERK_SECRET_KEY` |
 
 Current Worker bindings in the public `wrangler.jsonc` template:
 
@@ -151,6 +153,7 @@ Current Worker bindings in the public `wrangler.jsonc` template:
 | Command | Description |
 | --- | --- |
 | `bun run dev` | Start the local Vite + Workers development server |
+| `bun run dev:verify` | Verify the amigo (dev) Environment via `op run` (names only) |
 | `bun run dev:setup` | Apply local D1 migrations and seed the local database |
 | `bun run dev:reset` | Remove local Wrangler state and re-run local setup |
 | `bun run build` | Build the React Router app for production |
@@ -186,8 +189,7 @@ Notable route groups:
 - `/budget`, `/budget/budgets`, `/budget/recurring`
 - `/financial` — accounts and holdings (checking, savings, cash, investments, property, credit cards; legacy `/accounts` → `/financial`, `/assets` → `/financial`)
 - `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
-
-`/calendar` redirects to `/dashboard`.
+- `/calendar` — redirects to `/dashboard`
 - `/settings`
 - `/setup`
 - `/restore-account`
@@ -214,16 +216,26 @@ Notable API groups:
 
 `bun run deploy` first renders `.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`wrangler.jsonc`](./wrangler.jsonc) stays as a public-safe template.
 
-Export these values before `bun run deploy` (or provide them through `op run` / your CI secret store):
+All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `bun run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
 
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_D1_DATABASE_ID`
-- `CLOUDFLARE_KV_NAMESPACE_ID`
-- `CLOUDFLARE_CUSTOM_DOMAIN`
-- `CLERK_PUBLISHABLE_KEY`
-- Optional: `APP_ENV` (defaults to `production` for deploys)
+**`amigo (dev)`** — local `bun run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `.op/refs.env`).
 
-Production secrets such as `CLERK_SECRET_KEY` should continue to be managed with `wrangler secret put`.
+**`amigo (prod)`** — Cloudflare Workers Builds (`OP_ENVIRONMENT_ID` build secret).
+
+Each Environment should define every key from both manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
+
+Local deploy: copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `bun run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
+
+### Cloudflare Workers Builds
+
+Git-connected production deploys must not use the placeholder [`wrangler.jsonc`](./wrangler.jsonc) alone. After [#53](https://github.com/j-cadena-g/amigo/pull/53), the build must render `.wrangler.deploy.jsonc` with real binding IDs.
+
+1. Use the **`amigo (prod)`** 1Password Environment (production binding IDs and deploy keys). Keep **`amigo (dev)`** for local development only.
+2. Add every key from [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
+3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to the **`amigo (prod)`** Environment UUID from 1Password.
+4. Set the deploy step to run [`scripts/workers-build-deploy.sh`](./scripts/workers-build-deploy.sh) after `bun install` and `bun run build`.
+
+If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and switch the deploy command to the script above.
 
 The generated deploy config contains:
 

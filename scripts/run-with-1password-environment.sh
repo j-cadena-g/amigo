@@ -82,14 +82,30 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
-OP_ENVIRONMENT_VALUE="$(resolve_op_environment_id)"
+ensure_op_cli() {
+  if command -v op >/dev/null 2>&1; then
+    return 0
+  fi
 
-if [ -n "${OP_ENVIRONMENT_VALUE}" ]; then
+  export OP_BIN_DIR="${ROOT_DIR}/.bin"
+  bash "${ROOT_DIR}/scripts/install-op.sh"
+  export PATH="${OP_BIN_DIR}:${PATH}"
+
   if ! command -v op >/dev/null 2>&1; then
-    echo "error: ${REF_KEY} is set but 1Password CLI ('op') is not installed or not on PATH." >&2
+    echo "error: 1Password CLI (op) is required but could not be installed." >&2
     exit 1
   fi
 
+  if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+    echo "error: set OP_SERVICE_ACCOUNT_TOKEN for non-interactive op run (e.g. Workers Builds)." >&2
+    exit 1
+  fi
+}
+
+OP_ENVIRONMENT_VALUE="$(resolve_op_environment_id)"
+
+if [ -n "${OP_ENVIRONMENT_VALUE}" ]; then
+  ensure_op_cli
   exec op run --environment "${OP_ENVIRONMENT_VALUE}" -- "$@"
 fi
 

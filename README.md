@@ -111,9 +111,10 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 bun install
 bun run dev:setup
 
-# In 1Password → Developer → Environments → amigo (dev):
-# set the local mount target to <repo>/.dev.vars
-bun run dev:verify-mount
+cp .op/refs.env.example .op/refs.env
+# Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
+
+bun run dev:verify
 bun run dev
 ```
 
@@ -121,11 +122,11 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 
 ### Local Environment Notes
 
-- Mount **`amigo (dev)`** from the 1Password desktop app to **`.dev.vars`** at the repo root (named pipe / FIFO).
-- `bun run dev` reads that mount once into `process.env`, then starts Vite; it never deletes or overwrites `.dev.vars`.
-- `bun run dev:verify-mount` checks the FIFO is present and lists which manifest keys have values (no secret values printed).
+- Copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
+- `bun run dev` uses `op run --environment` to inject secrets into `process.env`, writes a temporary `.dev.vars` for the Cloudflare Vite plugin, then starts Vite.
+- `bun run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
-- `bun run deploy` renders an ignored `.wrangler.deploy.jsonc` from environment variables so live Cloudflare IDs and domains do not need to live in git. When `OP_ENVIRONMENT_ID` is set (shell or `.op/refs.env`), deploy is wrapped in `op run` like local dev.
+- `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables so live Cloudflare IDs and domains do not need to live in git.
 
 ## Environment and Config
 
@@ -134,7 +135,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 | `.dev.vars.example` | Key manifest for local secrets consumed by the dev helper script |
 | `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
 | `.wrangler.secrets.example` | Worker secrets uploaded on deploy (`wrangler deploy --secrets-file`) |
-| `.dev.vars` | 1Password FIFO mount at repo root; scripts read secrets from it (read-only; not created by the repo) |
+| `.dev.vars` | Gitignored temporary file written during `bun run dev` for the Cloudflare Vite plugin |
 | `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
 | `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally, prod in Workers Builds) |
 | `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
@@ -153,7 +154,7 @@ Current Worker bindings in the public `wrangler.jsonc` template:
 | Command | Description |
 | --- | --- |
 | `bun run dev` | Start the local Vite + Workers development server |
-| `bun run dev:verify-mount` | Verify the 1Password `.dev.vars` FIFO mount (names only) |
+| `bun run dev:verify` | Verify the amigo (dev) Environment via `op run` (names only) |
 | `bun run dev:setup` | Apply local D1 migrations and seed the local database |
 | `bun run dev:reset` | Remove local Wrangler state and re-run local setup |
 | `bun run build` | Build the React Router app for production |

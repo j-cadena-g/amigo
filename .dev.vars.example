@@ -1,8 +1,9 @@
 # =============================================================================
 # AMIGO - Local Development Secrets
 # =============================================================================
-# Key manifest for local Workers dev. Mount amigo (dev) from the 1Password desktop
-# app to `.dev.vars` (named pipe). `bun run dev:verify-mount` checks the mount.
+# Key manifest for local Workers dev. `bun run dev` uses op run to inject these
+# keys from the amigo (dev) Environment; a temporary `.dev.vars` is written for
+# the Cloudflare Vite plugin. `bun run dev:verify` checks names only.
 # Deploy keys live in .deploy.env.example and .wrangler.secrets.example.
 # =============================================================================
 

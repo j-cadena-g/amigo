@@ -32,15 +32,13 @@ bun run dev:setup
 cp .op/refs.env.example .op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
-# In 1Password → Developer → Environments → amigo (dev):
-# set the local mount target to <repo>/.dev.vars
-bun run dev:verify-mount
+bun run dev:verify
 bun run dev
 ```
 
-`bun run dev` reads the mounted `.dev.vars` FIFO into `process.env`, then starts Vite; it does not generate or overwrite `.dev.vars`. Do not commit `.dev.vars` or real secrets.
+`bun run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env`; a temporary `.dev.vars` is written for the Cloudflare Vite plugin and removed on exit. Do not commit `.dev.vars` or real secrets.
 
-If `bun run dev:verify-mount` fails, confirm the 1Password desktop app is running and unlocked, the **`amigo (dev)`** Environment mount target is `<repo>/.dev.vars`, and every key from `.dev.vars.example` has a value in that Environment. Fix the mount in 1Password, then re-run the command.
+If `bun run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 
 To reset local D1 state: `bun run dev:reset`.
 

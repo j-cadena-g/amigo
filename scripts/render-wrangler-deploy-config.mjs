@@ -3,26 +3,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const templatePath = path.join(rootDir, "wrangler.jsonc");
 const secretsExamplePath = path.join(rootDir, ".wrangler.secrets.example");
-const manifestKeyPattern = /^\s*#?\s*([A-Z0-9_]+)=/;
-
-function parseManifestKeys(source) {
-  const keys = [];
-  const seen = new Set();
-
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(manifestKeyPattern);
-    if (!match || seen.has(match[1])) continue;
-    seen.add(match[1]);
-    keys.push(match[1]);
-  }
-
-  return keys;
-}
 
 const outputPath = process.env.WRANGLER_RENDER_OUTPUT
   ? path.resolve(rootDir, process.env.WRANGLER_RENDER_OUTPUT)

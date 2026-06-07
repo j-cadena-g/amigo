@@ -10,28 +10,15 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const examplePath = path.join(rootDir, ".dev.vars.example");
 
-const keyPattern = /^\s*#?\s*([A-Z0-9_]+)=/;
-
-function expectedKeys(source) {
-  const keys = [];
-  const seen = new Set();
-  for (const line of source.split(/\r?\n/)) {
-    const match = line.match(keyPattern);
-    if (!match || seen.has(match[1])) continue;
-    seen.add(match[1]);
-    keys.push(match[1]);
-  }
-  return keys;
-}
-
 function assertRequiredKeys() {
   const manifest = readFileSync(examplePath, "utf8");
-  const required = expectedKeys(manifest);
+  const required = parseManifestKeys(manifest);
   const missing = required.filter((key) => !process.env[key]?.trim());
 
   if (missing.length > 0) {

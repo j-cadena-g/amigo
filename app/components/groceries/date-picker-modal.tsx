@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { GroceryItemWithTags } from "./types";
+import { toDateInputValue } from "./constants";
 
 interface DatePickerModalProps {
   item: GroceryItemWithTags;
@@ -8,11 +9,10 @@ interface DatePickerModalProps {
 }
 
 export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalProps) {
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = toDateInputValue(new Date());
 
   const initialDate = item.purchasedAt
-    ? new Date(item.purchasedAt).toISOString().split("T")[0]
+    ? toDateInputValue(new Date(item.purchasedAt))
     : todayStr;
 
   const [selectedDate, setSelectedDate] = useState(initialDate);

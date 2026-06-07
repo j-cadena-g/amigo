@@ -58,10 +58,38 @@ export const handleGroceriesRequest: ApiHandler = async ({
   params,
   request,
   session,
+  loadContext,
 }) => {
   const path = getSplatPath(params);
   const [id, action] = getSplatSegments(params);
   const db = getDb(env.DB);
+
+  // Run notifications (WebSocket broadcast + push) after the response is sent so
+  // the client isn't blocked on a Durable Object fetch + queue write per tap.
+  const ctx = loadContext.cloudflare?.ctx;
+  const runAfterResponse = (task: Promise<unknown>) => {
+    const settled = task.catch((err) => {
+      console.warn(
+        "groceries: deferred task failed",
+        err instanceof Error ? err.message : err
+      );
+    });
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(settled);
+    } else {
+      void settled;
+    }
+  };
+
+  const broadcastUpdate = (broadcastAction: string, entityId: string) =>
+    runAfterResponse(
+      broadcastToHousehold(
+        env,
+        session!.householdId,
+        { type: "GROCERY_UPDATE", action: broadcastAction, entityId },
+        session!.userId
+      )
+    );
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(
@@ -155,18 +183,16 @@ export const handleGroceriesRequest: ApiHandler = async ({
       );
     }
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "create",
-      entityId: item.id,
-    }, session!.userId);
+    broadcastUpdate("create", item.id);
 
-    await queueGroceryPush(env, session!.householdId, {
-      type: "add",
-      itemName: item.itemName,
-      actorUserId: session!.userId,
-      actorName: session!.name ?? "Someone",
-    });
+    runAfterResponse(
+      queueGroceryPush(env, session!.householdId, {
+        type: "add",
+        itemName: item.itemName,
+        actorUserId: session!.userId,
+        actorName: session!.name ?? "Someone",
+      })
+    );
 
     return Response.json(item, { status: 201 });
   }
@@ -229,19 +255,17 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "update",
-      entityId: id,
-    }, session!.userId);
+    broadcastUpdate("update", id);
 
     if (!existing.isPurchased && updated.isPurchased) {
-      await queueGroceryPush(env, session!.householdId, {
-        type: "purchase",
-        itemName: existing.itemName,
-        actorUserId: session!.userId,
-        actorName: session!.name ?? "Someone",
-      });
+      runAfterResponse(
+        queueGroceryPush(env, session!.householdId, {
+          type: "purchase",
+          itemName: existing.itemName,
+          actorUserId: session!.userId,
+          actorName: session!.name ?? "Someone",
+        })
+      );
     }
 
     return Response.json(updated);
@@ -300,11 +324,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "update",
-      entityId: id,
-    }, session!.userId);
+    broadcastUpdate("update", id);
 
     return Response.json(updated);
   }
@@ -355,11 +375,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
         : []),
     ]);
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "update",
-      entityId: id,
-    }, session!.userId);
+    broadcastUpdate("update", id);
 
     return Response.json({ success: true });
   }
@@ -423,11 +439,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "update",
-      entityId: id,
-    }, session!.userId);
+    broadcastUpdate("update", id);
 
     return Response.json(updated);
   }
@@ -479,11 +491,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    await broadcastToHousehold(env, session!.householdId, {
-      type: "GROCERY_UPDATE",
-      action: "delete",
-      entityId: id,
-    }, session!.userId);
+    broadcastUpdate("delete", id);
 
     return Response.json(deleted);
   }

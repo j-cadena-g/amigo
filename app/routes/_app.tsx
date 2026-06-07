@@ -1,6 +1,7 @@
 import { redirect, Outlet, type LoaderFunctionArgs } from "react-router";
 import { NavBar } from "@/app/components/layout/nav-bar";
 import { ConfirmProvider } from "@/app/components/confirm-provider";
+import { ToastProvider } from "@/app/components/toast-provider";
 import { PushPromptProvider } from "@/app/components/push-prompt-provider";
 import { ThemeProvider } from "@/app/components/theme-provider";
 import { requireSession, getSessionStatus } from "@/app/lib/session.server";
@@ -36,16 +37,18 @@ export async function loader({ context }: LoaderFunctionArgs) {
 export default function AppLayout() {
   return (
     <ThemeProvider>
-      <ConfirmProvider>
-        <PushPromptProvider>
-          <div className="min-h-screen bg-background relative">
-            <NavBar />
-            <div className="page-enter relative z-10">
-              <Outlet />
+      <ToastProvider>
+        <ConfirmProvider>
+          <PushPromptProvider>
+            <div className="min-h-screen bg-background relative">
+              <NavBar />
+              <div className="page-enter relative z-10">
+                <Outlet />
+              </div>
             </div>
-          </div>
-        </PushPromptProvider>
-      </ConfirmProvider>
+          </PushPromptProvider>
+        </ConfirmProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

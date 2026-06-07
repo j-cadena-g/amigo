@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags } from "./types";
 import { useGroceryLogic } from "./use-grocery-logic";
@@ -22,16 +22,20 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
   const [recentTags, setRecentTags] = useState<GroceryTag[]>([]);
 
   // Merge loader tags with locally-created tags so they're available
-  // before revalidation completes (for chip display + optimistic updates)
-  const mergedTags = [
-    ...allTags,
-    ...recentTags.filter((rt) => !allTags.some((t) => t.id === rt.id)),
-  ];
+  // before revalidation completes (for chip display + optimistic updates).
+  // Memoized so it stays referentially stable for the memoized rows below.
+  const mergedTags = useMemo(
+    () => [
+      ...allTags,
+      ...recentTags.filter((rt) => !allTags.some((t) => t.id === rt.id)),
+    ],
+    [allTags, recentTags]
+  );
 
   const {
+    optimisticItems,
     activeItems,
     purchasedItems,
-    isPending,
     filterTagIds,
     datePickerItem,
     datePickerItemId,
@@ -50,13 +54,16 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
     setDatePickerItemId,
   } = useGroceryLogic({ items, allTags: mergedTags, userId });
 
-  async function handleCreateTag(name: string, color: string) {
-    const tag = await createTag(name, color);
-    if (tag) {
-      setRecentTags((prev) => [...prev, tag]);
-    }
-    return tag;
-  }
+  const handleCreateTag = useCallback(
+    async (name: string, color: string) => {
+      const tag = await createTag(name, color);
+      if (tag) {
+        setRecentTags((prev) => [...prev, tag]);
+      }
+      return tag;
+    },
+    [createTag]
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,11 +75,13 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
     setRecentTags([]);
   }
 
-  function handleToggleNewItemTag(tagId: string) {
+  const handleToggleNewItemTag = useCallback((tagId: string) => {
     setNewItemTagIds((prev) =>
       prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     );
-  }
+  }, []);
+
+  const hasAnyItems = optimisticItems.length > 0;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -90,7 +99,7 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
           />
           <button
             type="submit"
-            disabled={!newItemName.trim() || isPending}
+            disabled={!newItemName.trim()}
             className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add
@@ -130,7 +139,7 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
       </div>
 
       {/* Active items */}
-      {activeItems.length === 0 && purchasedItems.length === 0 ? (
+      {!hasAnyItems ? (
         <EmptyState
           title="No grocery items"
           description="Add your first item above to get started."

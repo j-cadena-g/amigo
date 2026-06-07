@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { memo, useState, useRef, useCallback, useEffect } from "react";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags } from "./types";
 import { TagBadge } from "./tag-badge";
@@ -18,7 +18,7 @@ interface GroceryItemProps {
   onEditTag: (tagId: string, name: string, color: string) => Promise<void>;
 }
 
-export function GroceryItem({
+function GroceryItemComponent({
   item,
   allTags,
   onToggle,
@@ -69,6 +69,14 @@ export function GroceryItem({
     setIsEditing(false);
   }
 
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  // Long-press is a pointer-only enhancement that opens the date picker.
   const handleCheckboxPointerDown = useCallback(() => {
     isLongPressRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
@@ -77,32 +85,28 @@ export function GroceryItem({
     }, 500);
   }, [item.id, onToggleWithDate]);
 
-  const handleCheckboxPointerUp = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+  // The primary toggle runs on click, so it works for mouse, touch, and
+  // keyboard (Enter/Space dispatch a click on a native button). When a
+  // long-press already fired, swallow the trailing click.
+  const handleCheckboxClick = useCallback(() => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
     }
-    if (!isLongPressRef.current) {
-      onToggle(item.id);
-    }
+    onToggle(item.id);
   }, [item.id, onToggle]);
-
-  const handleCheckboxPointerLeave = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
 
   return (
     <div className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-accent">
       <button
         type="button"
+        onClick={handleCheckboxClick}
         onPointerDown={handleCheckboxPointerDown}
-        onPointerUp={handleCheckboxPointerUp}
-        onPointerLeave={handleCheckboxPointerLeave}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-input hover:border-muted-foreground"
-        aria-label={`Toggle ${item.itemName}`}
+        onPointerUp={clearLongPressTimer}
+        onPointerLeave={clearLongPressTimer}
+        onPointerCancel={clearLongPressTimer}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-input hover:border-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Mark ${item.itemName} as purchased`}
       />
 
       <div className="flex flex-1 items-center gap-2 overflow-hidden">
@@ -117,6 +121,7 @@ export function GroceryItem({
               if (e.key === "Enter") handleSaveEdit();
               if (e.key === "Escape") setIsEditing(false);
             }}
+            aria-label={`Edit name for ${item.itemName}`}
             className="flex-1 rounded border border-primary bg-transparent px-1 py-0.5 text-sm text-foreground focus:outline-none"
           />
         ) : (
@@ -148,6 +153,7 @@ export function GroceryItem({
       <button
         type="button"
         onClick={() => onDelete(item.id)}
+        aria-label={`Delete ${item.itemName}`}
         className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
       >
         <TrashIcon className="h-4 w-4" />
@@ -155,3 +161,8 @@ export function GroceryItem({
     </div>
   );
 }
+
+// Memoized so toggling one row doesn't re-render the whole list. Relies on the
+// parent passing stable callbacks and an item reference that only changes when
+// that specific item changes.
+export const GroceryItem = memo(GroceryItemComponent);

@@ -30,8 +30,9 @@ if [ -z "${OP_ENVIRONMENT_ID:-}" ]; then
 fi
 
 if ! command -v op >/dev/null 2>&1; then
+  export OP_BIN_DIR="${ROOT_DIR}/.bin"
   bash "${ROOT_DIR}/scripts/install-op.sh"
-  export PATH="${ROOT_DIR}/bin:${PATH}"
+  export PATH="${OP_BIN_DIR}:${PATH}"
 fi
 
 if ! command -v op >/dev/null 2>&1; then

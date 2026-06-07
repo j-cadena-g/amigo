@@ -40,7 +40,7 @@ packages/db/drizzle/
 bun.lockb
 
 # Pinned 1Password CLI for Workers Builds
-/bin/
+.bin/
 
 # Legacy package-manager artifacts
 package-lock.json

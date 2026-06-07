@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Downloads the 1Password CLI beta into ./bin/op for the current build.
+# Downloads the 1Password CLI beta into .bin/op for the current build.
 # The beta channel is required for `op run --environment`.
 # Pin the version explicitly so builds are reproducible.
 
 set -euo pipefail
 
 OP_VERSION="${OP_VERSION:-2.35.0-beta.01}"
-OP_BIN_DIR="${OP_BIN_DIR:-./bin}"
+OP_BIN_DIR="${OP_BIN_DIR:-.bin}"
 
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -56,11 +56,21 @@ case "$arch" in
   *) echo "install-op: unsupported arch: $arch" >&2; exit 1 ;;
 esac
 
-os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+os="$(lowercase "$(uname -s)")"
 case "$os" in
   linux | darwin) ;;
   *) echo "install-op: unsupported os: $os" >&2; exit 1 ;;
 esac
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "install-op: curl is required but not found" >&2
+  exit 1
+fi
+
+if ! command -v unzip >/dev/null 2>&1; then
+  echo "install-op: unzip is required but not found" >&2
+  exit 1
+fi
 
 url="https://cache.agilebits.com/dist/1P/op2/pkg/v${OP_VERSION}/op_${os}_${op_arch}_v${OP_VERSION}.zip"
 

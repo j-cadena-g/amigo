@@ -32,10 +32,13 @@ bun run dev:setup
 cp .op/refs.env.example .op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
+# 1Password → Developer → Environments → amigo (dev) → mount local .env to:
+#   <repo>/.dev.vars
+bun run dev:verify-mount
 bun run dev
 ```
 
-`bun run dev` generates a temporary `.dev.vars` from `.dev.vars.example` and your shell environment. Do not commit `.dev.vars` or real secrets.
+`bun run dev` reads the mounted `.dev.vars` FIFO into `process.env`, then starts Vite; it does not generate or overwrite `.dev.vars`. Do not commit `.dev.vars` or real secrets.
 
 To reset local D1 state: `bun run dev:reset`.
 

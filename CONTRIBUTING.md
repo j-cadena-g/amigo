@@ -32,13 +32,15 @@ bun run dev:setup
 cp .op/refs.env.example .op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
-# 1Password → Developer → Environments → amigo (dev) → mount local .env to:
-#   <repo>/.dev.vars
+# In 1Password → Developer → Environments → amigo (dev):
+# set the local mount target to <repo>/.dev.vars
 bun run dev:verify-mount
 bun run dev
 ```
 
 `bun run dev` reads the mounted `.dev.vars` FIFO into `process.env`, then starts Vite; it does not generate or overwrite `.dev.vars`. Do not commit `.dev.vars` or real secrets.
+
+If `bun run dev:verify-mount` fails, confirm the 1Password desktop app is running and unlocked, the **`amigo (dev)`** Environment mount target is `<repo>/.dev.vars`, and every key from `.dev.vars.example` has a value in that Environment. Fix the mount in 1Password, then re-run the command.
 
 To reset local D1 state: `bun run dev:reset`.
 

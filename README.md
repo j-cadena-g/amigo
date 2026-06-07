@@ -111,8 +111,8 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 bun install
 bun run dev:setup
 
-# 1Password → Developer → Environments → amigo (dev) → mount local .env to:
-#   <repo>/.dev.vars
+# In 1Password → Developer → Environments → amigo (dev):
+# set the local mount target to <repo>/.dev.vars
 bun run dev:verify-mount
 bun run dev
 ```

@@ -3,10 +3,9 @@ import type { GroceryItemWithTags, OptimisticAction } from "./types";
 export interface OptimisticMutation {
   id: string;
   action: OptimisticAction;
-  status: "pending" | "settled";
 }
 
-function applyOptimisticAction(
+export function applyOptimisticAction(
   items: GroceryItemWithTags[],
   action: OptimisticAction
 ): GroceryItemWithTags[] {
@@ -86,25 +85,7 @@ export function createOptimisticMutation(
   return {
     id: crypto.randomUUID(),
     action,
-    status: "pending",
   };
-}
-
-export function markMutationSettled(
-  mutations: OptimisticMutation[],
-  mutationId: string
-): OptimisticMutation[] {
-  return mutations.map((mutation) =>
-    mutation.id === mutationId
-      ? { ...mutation, status: "settled" }
-      : mutation
-  );
-}
-
-export function clearSettledMutations(
-  mutations: OptimisticMutation[]
-): OptimisticMutation[] {
-  return mutations.filter((mutation) => mutation.status !== "settled");
 }
 
 export function applyOptimisticMutations(

@@ -8,6 +8,12 @@ export default defineConfig(({ command }) => {
   const isVitest = process.env.VITEST === "true";
 
   return {
+    // Quick tunnels (cloudflared trycloudflare.com) get a random subdomain each
+    // run; the leading dot allows any *.trycloudflare.com hostname in dev.
+    server:
+      command === "serve" && !isVitest
+        ? { allowedHosts: [".trycloudflare.com"] }
+        : undefined,
     resolve: {
       tsconfigPaths: true,
     },

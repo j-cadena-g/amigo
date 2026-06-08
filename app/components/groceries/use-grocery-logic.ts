@@ -1,20 +1,114 @@
-import { useTransition, useCallback, useState, useRef, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags, OptimisticAction } from "./types";
 import {
+  applyOptimisticAction,
   applyOptimisticMutations,
-  clearSettledMutations,
   createOptimisticMutation,
-  markMutationSettled,
   type OptimisticMutation,
 } from "./optimistic-state";
 import { useWebSocket } from "@/app/lib/websocket";
+import { useToast } from "@/app/components/toast-provider";
+import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
   allTags: GroceryTag[];
   userId: string;
+}
+
+// Shape of a grocery item as serialized by `Response.json` (dates become ISO strings).
+interface SerializedGroceryItem {
+  id: string;
+  householdId: string;
+  createdByUserId: string | null;
+  createdByUserDisplayName: string | null;
+  transferredFromCreatedByUserId: string | null;
+  itemName: string;
+  category: string | null;
+  isPurchased: boolean;
+  purchasedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+// Operations the offline sync queue (`/api/sync`) understands. Other actions
+// (renames, explicit purchase dates) require a live connection.
+function toQueuedMutation(action: OptimisticAction): QueuedMutation | null {
+  switch (action.type) {
+    case "add":
+      return {
+        operation: "add",
+        entityType: "groceryItem",
+        entityId: action.item.id,
+        payload: {
+          name: action.item.itemName,
+          tagIds: action.item.groceryItemTags.map((git) => git.groceryTag.id),
+        },
+      };
+    case "toggle":
+      return {
+        operation: "toggle",
+        entityType: "groceryItem",
+        entityId: action.id,
+        payload: {},
+      };
+    case "delete":
+      return {
+        operation: "delete",
+        entityType: "groceryItem",
+        entityId: action.id,
+        payload: {},
+      };
+    case "update_tags":
+      return {
+        operation: "updateTags",
+        entityType: "groceryItem",
+        entityId: action.id,
+        payload: { tagIds: action.tagIds },
+      };
+    default:
+      return null;
+  }
+}
+
+async function readErrorMessage(res: Response): Promise<string | null> {
+  try {
+    const data = (await res.json()) as { error?: unknown };
+    if (typeof data?.error === "string") return data.error;
+  } catch {
+    // Non-JSON body; fall back to a generic message.
+  }
+  return null;
+}
+
+function buildItemFromServer(
+  tempItem: GroceryItemWithTags,
+  raw: SerializedGroceryItem
+): GroceryItemWithTags {
+  return {
+    id: raw.id,
+    householdId: raw.householdId,
+    createdByUserId: raw.createdByUserId,
+    createdByUserDisplayName: raw.createdByUserDisplayName,
+    transferredFromCreatedByUserId: raw.transferredFromCreatedByUserId,
+    itemName: raw.itemName,
+    category: raw.category,
+    isPurchased: raw.isPurchased,
+    purchasedAt: raw.purchasedAt ? new Date(raw.purchasedAt) : null,
+    createdAt: new Date(raw.createdAt),
+    updatedAt: new Date(raw.updatedAt),
+    deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : null,
+    // Tags aren't returned by the create endpoint, so carry over the
+    // optimistic selection, re-pointed at the real server id.
+    groceryItemTags: tempItem.groceryItemTags.map((git) => ({
+      ...git,
+      itemId: raw.id,
+    })),
+    createdByUser: tempItem.createdByUser,
+  };
 }
 
 export function useGroceryLogic({
@@ -23,35 +117,39 @@ export function useGroceryLogic({
   userId,
 }: UseGroceryLogicOptions) {
   const revalidator = useRevalidator();
-  const [isPending, startTransition] = useTransition();
+  const toast = useToast();
+
+  // Local mirror of the loader data. Successful mutations fold their result in
+  // here directly so we don't pay a full-list refetch round-trip per tap; fresh
+  // loader data (navigation / WebSocket revalidation) replaces it wholesale.
+  const [baseItems, setBaseItems] = useState(items);
+  useEffect(() => {
+    setBaseItems(items);
+  }, [items]);
+
+  // In-flight mutations rendered as an overlay on top of `baseItems`.
   const [optimisticMutations, setOptimisticMutations] = useState<
     OptimisticMutation[]
   >([]);
   const optimisticItems = useMemo(
-    () => applyOptimisticMutations(items, optimisticMutations),
-    [items, optimisticMutations]
+    () => applyOptimisticMutations(baseItems, optimisticMutations),
+    [baseItems, optimisticMutations]
   );
+
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [datePickerItemId, setDatePickerItemId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setOptimisticMutations((currentMutations) =>
-      clearSettledMutations(currentMutations)
-    );
-  }, [items]);
+  const isPending = optimisticMutations.length > 0;
 
-  // Track isPending in a ref so the WebSocket handler always reads the
-  // current value — the onMessage closure is captured at connection time
-  // by useWebSocket's connectRef, so a plain closure would go stale.
+  // The WebSocket onMessage closure is captured at connection time, so read
+  // pending state through a ref to avoid going stale.
   const isPendingRef = useRef(false);
   useEffect(() => {
     isPendingRef.current = isPending;
   }, [isPending]);
 
-  // WebSocket for real-time updates from other household members.
-  // Skip revalidation while a transition is pending — the transition
-  // already revalidates on completion, so an extra revalidation from
-  // our own broadcast would race and briefly flash stale data.
+  // Skip revalidation while our own mutations are in flight — we reconcile
+  // those locally, and an extra revalidation would race with the overlay.
   const onMessage = useCallback(
     (data: unknown) => {
       if (
@@ -70,45 +168,127 @@ export function useGroceryLogic({
 
   useWebSocket({ onMessage, userId });
 
-  // --- Helpers ---
+  // Replay any mutations that were queued while offline once connectivity
+  // returns (browser `online` event or the service worker's background sync).
+  useEffect(() => {
+    let cancelled = false;
 
-  // Runs a fetch mutation with error handling, always revalidating afterward
-  // so optimistic state reconciles even on network failure.
-  const runMutation = useCallback(
-    async (
-      label: string,
-      request: () => Promise<Response>,
-      mutationId?: string
-    ) => {
+    async function flush() {
       try {
-        const res = await request();
-        if (!res.ok) {
-          console.error(`${label} failed: ${res.status}`);
-        }
-      } catch (error) {
-        console.error(`${label} failed: network error`, error);
-      } finally {
-        if (mutationId) {
-          setOptimisticMutations((currentMutations) =>
-            markMutationSettled(currentMutations, mutationId)
-          );
-        }
+        const { processSyncQueue } = await import(
+          "@/app/lib/offline/sync-processor"
+        );
+        const result = await processSyncQueue();
+        if (cancelled || result.processed === 0) return;
         revalidator.revalidate();
+        toast(
+          `Synced ${result.processed} offline change${
+            result.processed === 1 ? "" : "s"
+          }`,
+          { variant: "success" }
+        );
+      } catch {
+        // Leave the queue intact; we'll retry on the next online/sync event.
       }
+    }
+
+    function handleOnline() {
+      void flush();
+    }
+    function handleSwMessage(event: MessageEvent) {
+      const data = event.data as { type?: string } | null;
+      if (data?.type === "TRIGGER_SYNC") void flush();
+    }
+
+    window.addEventListener("online", handleOnline);
+    const sw =
+      typeof navigator !== "undefined" ? navigator.serviceWorker : undefined;
+    sw?.addEventListener("message", handleSwMessage);
+
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      void flush();
+    }
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+      sw?.removeEventListener("message", handleSwMessage);
+    };
+  }, [revalidator, toast]);
+
+  // --- Core mutation runner ---
+  //
+  // 1. Apply the optimistic overlay immediately (urgent update → instant paint).
+  // 2. Fire the request in the background.
+  // 3. On success: fold the change into base state and drop the overlay.
+  //    On server rejection: drop the overlay (revert) + surface a toast.
+  //    On network failure: queue for later sync (if supported) and keep the
+  //    change, otherwise revert with a toast.
+  const runAction = useCallback(
+    (
+      action: OptimisticAction,
+      label: string,
+      request: () => Promise<Response>
+    ) => {
+      const mutation = createOptimisticMutation(action);
+      setOptimisticMutations((prev) => [...prev, mutation]);
+      const dropOverlay = () =>
+        setOptimisticMutations((prev) =>
+          prev.filter((m) => m.id !== mutation.id)
+        );
+
+      void (async () => {
+        try {
+          const res = await request();
+
+          if (res.ok) {
+            if (action.type === "add") {
+              const raw = (await res.json()) as SerializedGroceryItem;
+              const realItem = buildItemFromServer(action.item, raw);
+              setBaseItems((prev) => [realItem, ...prev]);
+            } else {
+              setBaseItems((prev) => applyOptimisticAction(prev, action));
+            }
+            dropOverlay();
+            return;
+          }
+
+          dropOverlay();
+          if (res.status === 429) {
+            toast("You're doing that a bit fast — give it a second", {
+              variant: "error",
+            });
+            return;
+          }
+          const message = await readErrorMessage(res);
+          toast(message ?? `${label} failed`, { variant: "error" });
+        } catch {
+          // Network failure (likely offline). Queue supported operations so
+          // they replay on reconnect, and keep the optimistic change visible.
+          const queued = toQueuedMutation(action);
+          if (queued) {
+            try {
+              const { queueMutation } = await import(
+                "@/app/lib/offline/sync-queue"
+              );
+              await queueMutation(queued);
+              setBaseItems((prev) => applyOptimisticAction(prev, action));
+              dropOverlay();
+              toast("Saved offline — will sync when you're back online");
+              return;
+            } catch {
+              // Couldn't queue; fall through to revert.
+            }
+          }
+          dropOverlay();
+          toast(`${label} failed — check your connection`, { variant: "error" });
+        }
+      })();
     },
-    [revalidator]
+    [toast]
   );
 
-  const queueOptimisticAction = useCallback((action: OptimisticAction) => {
-    const mutation = createOptimisticMutation(action);
-    setOptimisticMutations((currentMutations) => [
-      ...currentMutations,
-      mutation,
-    ]);
-    return mutation.id;
-  }, []);
-
-  // --- Actions ---
+  // --- Item actions ---
 
   const addItem = useCallback(
     (name: string, tagIds: string[]) => {
@@ -120,193 +300,189 @@ export function useGroceryLogic({
         isPurchased: false,
         purchasedAt: null,
         householdId: "",
-        createdByUserId: null,
+        createdByUserId: userId,
         createdByUserDisplayName: null,
         transferredFromCreatedByUserId: null,
         category: null,
         deletedAt: null,
         createdAt: now,
         updatedAt: now,
-        groceryItemTags: tagIds.map((tagId) => {
+        groceryItemTags: tagIds.flatMap((tagId) => {
           const tag = allTags.find((t) => t.id === tagId);
-          return {
-            itemId: tempId,
-            tagId,
-            groceryTag: tag!,
-          } as GroceryItemWithTags["groceryItemTags"][number];
+          if (!tag) return [];
+          return [
+            {
+              itemId: tempId,
+              tagId,
+              groceryTag: tag,
+            } as GroceryItemWithTags["groceryItemTags"][number],
+          ];
         }),
         createdByUser: null,
       };
 
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({ type: "add", item: tempItem });
-        await runMutation("Add grocery item", () =>
-          fetch("/api/groceries", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, tagIds }),
-          }),
-          mutationId
-        );
-      });
+      runAction({ type: "add", item: tempItem }, "Add item", () =>
+        fetch("/api/groceries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, tagIds }),
+        })
+      );
     },
-    [allTags, queueOptimisticAction, runMutation]
+    [allTags, userId, runAction]
   );
 
   const toggleItem = useCallback(
     (id: string) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({ type: "toggle", id });
-        await runMutation("Toggle grocery item", () =>
-          fetch(`/api/groceries/${id}/toggle`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
-          }),
-          mutationId
-        );
-      });
+      runAction({ type: "toggle", id }, "Update item", () =>
+        fetch(`/api/groceries/${id}/toggle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+      );
     },
-    [queueOptimisticAction, runMutation]
+    [runAction]
   );
 
-  const toggleItemWithDate = useCallback(
-    (id: string) => {
-      setDatePickerItemId(id);
-    },
-    []
-  );
+  const toggleItemWithDate = useCallback((id: string) => {
+    setDatePickerItemId(id);
+  }, []);
 
   const confirmToggleWithDate = useCallback(
     (id: string, purchasedAt: Date) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({
-          type: "toggle_with_date",
-          id,
-          purchasedAt,
-        });
-        await runMutation("Toggle grocery item with date", () =>
-          fetch(`/api/groceries/${id}/toggle`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
-          }),
-          mutationId
-        );
-      });
+      runAction({ type: "toggle_with_date", id, purchasedAt }, "Update item", () =>
+        fetch(`/api/groceries/${id}/toggle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
+        })
+      );
       setDatePickerItemId(null);
     },
-    [queueOptimisticAction, runMutation]
+    [runAction]
   );
 
   const confirmUpdatePurchaseDate = useCallback(
     (id: string, purchasedAt: Date) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({
-          type: "update_purchase_date",
-          id,
-          purchasedAt,
-        });
-        await runMutation("Update purchase date", () =>
+      runAction(
+        { type: "update_purchase_date", id, purchasedAt },
+        "Update purchase date",
+        () =>
           fetch(`/api/groceries/${id}/purchase-date`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ purchasedAt: purchasedAt.toISOString() }),
-          }),
-          mutationId
-        );
-      });
+          })
+      );
       setDatePickerItemId(null);
     },
-    [queueOptimisticAction, runMutation]
+    [runAction]
   );
 
   const deleteItem = useCallback(
     (id: string) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({ type: "delete", id });
-        await runMutation(
-          "Delete grocery item",
-          () => fetch(`/api/groceries/${id}`, { method: "DELETE" }),
-          mutationId
-        );
-      });
+      runAction({ type: "delete", id }, "Delete item", () =>
+        fetch(`/api/groceries/${id}`, { method: "DELETE" })
+      );
     },
-    [queueOptimisticAction, runMutation]
+    [runAction]
   );
 
   const updateTags = useCallback(
     (id: string, tagIds: string[]) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({
-          type: "update_tags",
-          id,
-          tagIds,
-          allTags,
-        });
-        await runMutation("Update grocery item tags", () =>
+      runAction(
+        { type: "update_tags", id, tagIds, allTags },
+        "Update tags",
+        () =>
           fetch(`/api/groceries/${id}/tags`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tagIds }),
-          }),
-          mutationId
-        );
-      });
+          })
+      );
     },
-    [allTags, queueOptimisticAction, runMutation]
+    [allTags, runAction]
   );
 
   const editName = useCallback(
     (id: string, name: string) => {
-      startTransition(async () => {
-        const mutationId = queueOptimisticAction({ type: "edit_name", id, name });
-        await runMutation("Edit grocery item name", () =>
-          fetch(`/api/groceries/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
-          }),
-          mutationId
-        );
-      });
+      runAction({ type: "edit_name", id, name }, "Rename item", () =>
+        fetch(`/api/groceries/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        })
+      );
     },
-    [queueOptimisticAction, runMutation]
+    [runAction]
   );
+
+  // --- Tag actions (low frequency; revalidate to refresh the shared list) ---
 
   const createTag = useCallback(
     async (name: string, color: string): Promise<GroceryTag | undefined> => {
-      const res = await fetch("/api/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, color }),
-      });
-      if (!res.ok) return undefined;
-      const tag = (await res.json()) as GroceryTag;
-      revalidator.revalidate();
-      return tag;
+      try {
+        const res = await fetch("/api/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, color }),
+        });
+        if (!res.ok) {
+          toast("Couldn't create tag", { variant: "error" });
+          return undefined;
+        }
+        const tag = (await res.json()) as GroceryTag;
+        revalidator.revalidate();
+        return tag;
+      } catch {
+        toast("Couldn't create tag — check your connection", {
+          variant: "error",
+        });
+        return undefined;
+      }
     },
-    [revalidator]
+    [revalidator, toast]
   );
 
   const deleteTag = useCallback(
     async (tagId: string): Promise<void> => {
-      await fetch(`/api/tags/${tagId}`, { method: "DELETE" });
-      revalidator.revalidate();
+      try {
+        const res = await fetch(`/api/tags/${tagId}`, { method: "DELETE" });
+        if (!res.ok) {
+          toast("Couldn't delete tag", { variant: "error" });
+          return;
+        }
+        revalidator.revalidate();
+      } catch {
+        toast("Couldn't delete tag — check your connection", {
+          variant: "error",
+        });
+      }
     },
-    [revalidator]
+    [revalidator, toast]
   );
 
   const editTag = useCallback(
     async (tagId: string, name: string, color: string): Promise<void> => {
-      await fetch(`/api/tags/${tagId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, color }),
-      });
-      revalidator.revalidate();
+      try {
+        const res = await fetch(`/api/tags/${tagId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, color }),
+        });
+        if (!res.ok) {
+          toast("Couldn't update tag", { variant: "error" });
+          return;
+        }
+        revalidator.revalidate();
+      } catch {
+        toast("Couldn't update tag — check your connection", {
+          variant: "error",
+        });
+      }
     },
-    [revalidator]
+    [revalidator, toast]
   );
 
   // --- Filtering ---
@@ -319,17 +495,21 @@ export function useGroceryLogic({
 
   // --- Derived state ---
 
-  const activeItems = optimisticItems.filter((item) => !item.isPurchased);
-  const purchasedItems = optimisticItems.filter((item) => item.isPurchased);
+  const matchesFilter = useCallback(
+    (item: GroceryItemWithTags) =>
+      filterTagIds.length === 0 ||
+      item.groceryItemTags.some((git) =>
+        filterTagIds.includes(git.groceryTag.id)
+      ),
+    [filterTagIds]
+  );
 
-  const filteredActiveItems =
-    filterTagIds.length > 0
-      ? activeItems.filter((item) =>
-          item.groceryItemTags.some((git) =>
-            filterTagIds.includes(git.groceryTag.id)
-          )
-        )
-      : activeItems;
+  const activeItems = optimisticItems.filter(
+    (item) => !item.isPurchased && matchesFilter(item)
+  );
+  const purchasedItems = optimisticItems.filter(
+    (item) => item.isPurchased && matchesFilter(item)
+  );
 
   const datePickerItem = datePickerItemId
     ? optimisticItems.find((item) => item.id === datePickerItemId) ?? null
@@ -337,7 +517,7 @@ export function useGroceryLogic({
 
   return {
     optimisticItems,
-    activeItems: filteredActiveItems,
+    activeItems,
     purchasedItems,
     isPending,
     filterTagIds,

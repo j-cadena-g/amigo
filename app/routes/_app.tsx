@@ -1,5 +1,6 @@
 import { redirect, Outlet, type LoaderFunctionArgs } from "react-router";
 import { NavBar } from "@/app/components/layout/nav-bar";
+import { OfflineIndicator } from "@/app/components/offline-indicator";
 import { ConfirmProvider } from "@/app/components/confirm-provider";
 import { ToastProvider } from "@/app/components/toast-provider";
 import { PushPromptProvider } from "@/app/components/push-prompt-provider";
@@ -42,6 +43,7 @@ export default function AppLayout() {
           <PushPromptProvider>
             <div className="min-h-screen bg-background relative">
               <NavBar />
+              <OfflineIndicator />
               <div className="page-enter relative z-10">
                 <Outlet />
               </div>

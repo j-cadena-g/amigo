@@ -8,7 +8,6 @@ import { GroceryItem } from "./grocery-item";
 import { HistorySection } from "./history-section";
 import { DatePickerModal } from "./date-picker-modal";
 import { EmptyState } from "@/app/components/empty-state";
-import { OfflineIndicator } from "@/app/components/offline-indicator";
 
 interface GroceryListProps {
   items: GroceryItemWithTags[];
@@ -85,8 +84,6 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <OfflineIndicator />
-
       {/* Add item form */}
       <form onSubmit={handleSubmit} className="mb-6">
         <div className="flex gap-2">

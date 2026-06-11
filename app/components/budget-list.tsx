@@ -45,6 +45,7 @@ interface BudgetWithSpending {
 interface BudgetListProps {
   budgets: BudgetWithSpending[];
   session: { role: string };
+  homeCurrency: CurrencyCode;
 }
 
 type BudgetFormData = {
@@ -56,14 +57,16 @@ type BudgetFormData = {
   isShared: boolean;
 };
 
-const EMPTY_FORM: BudgetFormData = {
-  name: "",
-  category: "",
-  limitAmount: "",
-  currency: "CAD",
-  period: "monthly",
-  isShared: false,
-};
+function emptyBudgetForm(homeCurrency: CurrencyCode): BudgetFormData {
+  return {
+    name: "",
+    category: "",
+    limitAmount: "",
+    currency: homeCurrency,
+    period: "monthly",
+    isShared: false,
+  };
+}
 
 function getProgressColor(percent: number, remaining: number): string {
   if (remaining < 0 || percent >= 100) return "bg-red-500";
@@ -276,12 +279,16 @@ function BudgetFormDialog({
   );
 }
 
-export function BudgetList({ budgets, session: _session }: BudgetListProps) {
+export function BudgetList({
+  budgets,
+  session: _session,
+  homeCurrency,
+}: BudgetListProps) {
   const revalidator = useRevalidator();
   const [showAdd, setShowAdd] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<BudgetWithSpending | null>(null);
-  const [form, setForm] = useState<BudgetFormData>(EMPTY_FORM);
+  const [form, setForm] = useState<BudgetFormData>(() => emptyBudgetForm(homeCurrency));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -289,7 +296,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
   const personal = budgets.filter((b) => !b.isShared);
 
   function openAdd() {
-    setForm(EMPTY_FORM);
+    setForm(emptyBudgetForm(homeCurrency));
     setError(null);
     setShowAdd(true);
   }

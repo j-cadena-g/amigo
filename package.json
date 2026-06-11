@@ -24,8 +24,10 @@
     "typegen": "react-router typegen",
     "typecheck": "bun run typegen && tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.workers.config.ts",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.workers.config.ts",
+    "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {
     "@amigo/db": "workspace:*",
@@ -56,6 +58,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1",
+    "@cloudflare/vitest-pool-workers": "^0.16.14",
     "@cloudflare/workers-types": "^4",
     "@eslint/js": "^10.0.1",
     "@react-router/dev": "^7.14.0",
@@ -63,7 +66,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-v8": "^4.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.1",
     "eslint-plugin-react": "^7.37.5",
@@ -72,7 +75,7 @@
     "typescript": "^6.0",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.8",
-    "vitest": "^4.0.17",
+    "vitest": "^4.1.0",
     "workbox-core": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-window": "^7.4.1",

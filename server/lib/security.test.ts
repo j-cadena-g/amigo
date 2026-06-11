@@ -6,36 +6,34 @@ describe("security headers", () => {
     expect(createCspNonce()).toMatch(/^[A-Za-z0-9+/=]+$/);
   });
 
-  it("builds report-only CSP and transport headers for production", () => {
+  it("builds enforcing CSP with Clerk origins for production", () => {
     const headers = buildSecurityHeaders({
       appEnv: "production",
       cspNonce: "ABcd1234==",
+      clerkPublishableKey: "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk",
     });
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     if (!csp) {
-      throw new Error("Expected CSP header to be defined");
+      throw new Error("Expected enforcing CSP header in production");
     }
-    const scriptSrc = csp
-      .split("; ")
-      .find((directive) => directive.startsWith("script-src"));
-    const connectSrc = csp
-      .split("; ")
-      .find((directive) => directive.startsWith("connect-src"));
 
+    expect(headers["Content-Security-Policy-Report-Only"]).toBeUndefined();
     expect(csp).toContain("script-src 'self' 'nonce-ABcd1234=='");
-    expect(scriptSrc).toBe("script-src 'self' 'nonce-ABcd1234=='");
-    expect(connectSrc).toBe("connect-src 'self' https: wss:");
+    expect(csp).toContain("https://challenges.cloudflare.com");
+    expect(csp).toContain("https://clerk.example.dev");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(headers["Strict-Transport-Security"]).toContain("max-age=31536000");
     expect(headers["X-Frame-Options"]).toBe("DENY");
   });
 
-  it("omits HSTS in development", () => {
+  it("uses report-only CSP in development", () => {
     const headers = buildSecurityHeaders({
       appEnv: "development",
       cspNonce: "ABcd1234==",
     });
 
+    expect(headers["Content-Security-Policy"]).toBeUndefined();
+    expect(headers["Content-Security-Policy-Report-Only"]).toBeDefined();
     expect(headers["Strict-Transport-Security"]).toBeUndefined();
   });
 });

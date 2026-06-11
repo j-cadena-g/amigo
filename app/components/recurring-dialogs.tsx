@@ -453,7 +453,9 @@ export function EditRecurringDialog({
   rule,
 }: EditRecurringDialogProps) {
   const revalidator = useRevalidator();
-  const [form, setForm] = useState<RecurringFormData>(() => emptyForm("CAD"));
+  const [form, setForm] = useState<RecurringFormData>(() =>
+    emptyForm(rule?.currency ?? "CAD")
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState<string | null>(null);

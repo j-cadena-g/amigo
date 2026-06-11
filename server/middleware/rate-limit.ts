@@ -1,3 +1,4 @@
+import type { Env } from "../env";
 import { ActionError } from "../lib/errors";
 
 export interface RateLimitPreset {
@@ -76,6 +77,9 @@ export const ROUTE_RATE_LIMITS = {
     freshStart: RATE_LIMIT_PRESETS.SENSITIVE,
     cancel: RATE_LIMIT_PRESETS.SENSITIVE,
   },
+  settings: {
+    patch: RATE_LIMIT_PRESETS.MUTATION,
+  },
   sync: {
     batch: RATE_LIMIT_PRESETS.BULK,
   },
@@ -95,67 +99,42 @@ export const ROUTE_RATE_LIMITS = {
   },
 } as const;
 
-interface RateRecord {
-  count: number;
-  resetAt: number;
+import type { RateLimiterBinding } from "../env";
+
+function getRateLimiter(env: Env, preset: RateLimitPreset): RateLimiterBinding {
+  if (preset === RATE_LIMIT_PRESETS.BULK) {
+    return env.RATE_LIMIT_BULK;
+  }
+  if (preset === RATE_LIMIT_PRESETS.SENSITIVE) {
+    return env.RATE_LIMIT_SENSITIVE;
+  }
+  if (preset === RATE_LIMIT_PRESETS.READ) {
+    return env.RATE_LIMIT_READ;
+  }
+  return env.RATE_LIMIT_MUTATION;
 }
 
 export async function enforceRateLimit(
-  kv: KVNamespace,
+  env: Env,
   key: string,
   preset: RateLimitPreset
 ): Promise<void> {
-  const record = (await kv.get(`rate:${key}`, "json")) as RateRecord | null;
-  const now = Date.now();
-
-  if (!record || now > record.resetAt) {
-    await kv.put(
-      `rate:${key}`,
-      JSON.stringify({ count: 1, resetAt: now + preset.windowMs }),
-      { expirationTtl: Math.ceil(preset.windowMs / 1000) }
-    );
-    return;
-  }
-
-  if (record.count >= preset.limit) {
+  const limiter = getRateLimiter(env, preset);
+  const { success } = await limiter.limit({ key });
+  if (!success) {
     throw new ActionError("Too many requests", "RATE_LIMITED");
   }
-
-  await kv.put(
-    `rate:${key}`,
-    JSON.stringify({ count: record.count + 1, resetAt: record.resetAt }),
-    { expirationTtl: Math.ceil(preset.windowMs / 1000) }
-  );
 }
 
 /**
  * Check rate limit without throwing. Returns { allowed: true } or { allowed: false }.
  */
 export async function checkRateLimit(
-  kv: KVNamespace,
+  env: Env,
   key: string,
   preset: RateLimitPreset
 ): Promise<{ allowed: boolean }> {
-  const record = (await kv.get(`rate:${key}`, "json")) as RateRecord | null;
-  const now = Date.now();
-
-  if (!record || now > record.resetAt) {
-    await kv.put(
-      `rate:${key}`,
-      JSON.stringify({ count: 1, resetAt: now + preset.windowMs }),
-      { expirationTtl: Math.ceil(preset.windowMs / 1000) }
-    );
-    return { allowed: true };
-  }
-
-  if (record.count >= preset.limit) {
-    return { allowed: false };
-  }
-
-  await kv.put(
-    `rate:${key}`,
-    JSON.stringify({ count: record.count + 1, resetAt: record.resetAt }),
-    { expirationTtl: Math.ceil(preset.windowMs / 1000) }
-  );
-  return { allowed: true };
+  const limiter = getRateLimiter(env, preset);
+  const { success } = await limiter.limit({ key });
+  return { allowed: success };
 }

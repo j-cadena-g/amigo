@@ -1,6 +1,14 @@
+export interface RateLimiterBinding {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
+  RATE_LIMIT_MUTATION: RateLimiterBinding;
+  RATE_LIMIT_BULK: RateLimiterBinding;
+  RATE_LIMIT_SENSITIVE: RateLimiterBinding;
+  RATE_LIMIT_READ: RateLimiterBinding;
   HOUSEHOLD: DurableObjectNamespace;
   ASSETS: Fetcher;
   CLERK_SECRET_KEY: string;

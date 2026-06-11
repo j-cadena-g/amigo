@@ -4,3 +4,6 @@ import { handleSettingsRequest } from "@/server/api/settings";
 
 export const loader = (args: Route.LoaderArgs) =>
   handleApiRoute(args, { auth: "strict", handler: handleSettingsRequest });
+
+export const action = (args: Route.ActionArgs) =>
+  handleApiRoute(args, { auth: "strict", handler: handleSettingsRequest });

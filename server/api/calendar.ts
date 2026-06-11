@@ -14,6 +14,7 @@ import {
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { parseCalendarQuery } from "../lib/request-validation";
 import { visibleFinancialTransactionsCondition, visibleRecurringRulesCondition } from "../lib/financial-visibility";
+import { calculateNextRunDate } from "../lib/recurring-processor";
 import type { ApiHandler } from "./route";
 
 export interface CalendarEvent {
@@ -45,32 +46,8 @@ interface RecurringRule {
   endDate: string | null;
   nextRunDate: string;
   lastRunDate: string | null;
+  dayOfMonth: number | null;
   active: boolean;
-}
-
-function calculateNextRunDate(
-  frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
-  interval: number,
-  fromDate: Date
-) {
-  const next = new Date(fromDate);
-
-  switch (frequency) {
-    case "DAILY":
-      next.setDate(next.getDate() + interval);
-      break;
-    case "WEEKLY":
-      next.setDate(next.getDate() + interval * 7);
-      break;
-    case "MONTHLY":
-      next.setMonth(next.getMonth() + interval);
-      break;
-    case "YEARLY":
-      next.setFullYear(next.getFullYear() + interval);
-      break;
-  }
-
-  return next;
 }
 
 function getRecurringOccurrences(
@@ -84,7 +61,12 @@ function getRecurringOccurrences(
   let current = new Date(`${rule.startDate}T00:00:00Z`);
 
   while (current < monthStart) {
-    current = calculateNextRunDate(rule.frequency, rule.interval, current);
+    current = calculateNextRunDate(
+      rule.frequency,
+      rule.interval,
+      current,
+      rule.dayOfMonth
+    );
   }
 
   const nextRun = new Date(`${rule.nextRunDate}T00:00:00Z`);
@@ -112,7 +94,12 @@ function getRecurringOccurrences(
       });
     }
 
-    current = calculateNextRunDate(rule.frequency, rule.interval, current);
+    current = calculateNextRunDate(
+      rule.frequency,
+      rule.interval,
+      current,
+      rule.dayOfMonth
+    );
   }
 
   return events;
@@ -131,7 +118,7 @@ export const handleCalendarRequest: ApiHandler = async ({
   }
 
   await enforceRateLimit(
-    env.CACHE,
+      env,
     `calendar:${session!.userId}`,
     ROUTE_RATE_LIMITS.calendar.list
   );
@@ -207,6 +194,7 @@ export const handleCalendarRequest: ApiHandler = async ({
     endDate: rule.endDate,
     nextRunDate: rule.nextRunDate,
     lastRunDate: rule.lastRunDate,
+    dayOfMonth: rule.dayOfMonth,
     active: rule.active,
   }));
 

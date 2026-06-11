@@ -1,5 +1,8 @@
+import { CURRENCY_CODES } from "@amigo/db";
 import { z } from "zod";
 import { ActionError } from "./errors";
+
+export const zCurrencyCode = z.enum(CURRENCY_CODES);
 
 export const DEFAULT_TRANSACTIONS_PAGE = 1;
 export const DEFAULT_TRANSACTIONS_LIMIT = 20;

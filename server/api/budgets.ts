@@ -3,21 +3,22 @@ import {
   budgets,
   eq,
   getDb,
-  gte,
   isNull,
-  lte,
   or,
   recurringTransactions,
   scopeToHousehold,
-  sql,
-  transactions,
   visibleRecurringRulesCondition,
 } from "@amigo/db";
 import { z } from "zod";
 import { ActionError } from "../lib/errors";
 import { assertPermission, canManageSharedBudgets } from "../lib/permissions";
-import { toCents, toISODate } from "../lib/conversions";
-import { computeLimitAmountHomeCents, sqlTransactionAmountHomeCents } from "../lib/money";
+import { toCents } from "../lib/conversions";
+import { computeLimitAmountHomeCents } from "../lib/money";
+import { withAudit } from "../lib/audit";
+import { getBudgetsWithSpending } from "../lib/budget-spending";
+import { getHomeCurrency } from "../lib/household-currency";
+import { getHouseholdTimezone } from "../lib/household-timezone";
+import { zCurrencyCode } from "../lib/request-validation";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 
@@ -27,41 +28,8 @@ const budgetSchema = z.object({
   limitAmount: z.number().positive(),
   period: z.enum(["weekly", "monthly", "yearly"]),
   isShared: z.boolean(),
-  currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
+  currency: zCurrencyCode.optional(),
 });
-
-function getPeriodBounds(period: "weekly" | "monthly" | "yearly") {
-  const now = new Date();
-  let start: Date;
-  let end: Date;
-
-  switch (period) {
-    case "weekly": {
-      const dayOfWeek = now.getDay();
-      start = new Date(now);
-      start.setDate(now.getDate() - dayOfWeek);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-      break;
-    }
-    case "monthly": {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      end.setHours(23, 59, 59, 999);
-      break;
-    }
-    case "yearly": {
-      start = new Date(now.getFullYear(), 0, 1);
-      end = new Date(now.getFullYear(), 11, 31);
-      end.setHours(23, 59, 59, 999);
-      break;
-    }
-  }
-
-  return { start, end };
-}
 
 export const handleBudgetsRequest: ApiHandler = async ({
   env,
@@ -76,7 +44,7 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:list`,
       ROUTE_RATE_LIMITS.budgets.list
     );
@@ -100,7 +68,7 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && path === "match-category") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:match-category`,
       ROUTE_RATE_LIMITS.budgets.matchCategory
     );
@@ -147,77 +115,29 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && path === "with-spending") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:with-spending`,
       ROUTE_RATE_LIMITS.budgets.withSpending
     );
-
-    const userBudgets = await db.query.budgets.findMany({
-      where: and(
-        scopeToHousehold(budgets.householdId, session!.householdId),
-        or(eq(budgets.userId, session!.userId), isNull(budgets.userId)),
-        isNull(budgets.deletedAt)
-      ),
-      orderBy: (budget, { desc }) => [desc(budget.createdAt)],
-    });
 
     const legacyRemaining =
       request.headers.get("x-api-version") === "1" ||
       new URL(request.url).searchParams.get("api_version") === "1";
 
-    const txnHome = sqlTransactionAmountHomeCents();
-    const budgetsWithSpending = await Promise.all(
-      userBudgets.map(async (budget) => {
-        const { start, end } = getPeriodBounds(budget.period);
-        const isShared = budget.userId === null;
-
-        const baseConditions = [
-          eq(transactions.budgetId, budget.id),
-          scopeToHousehold(transactions.householdId, session!.householdId),
-          eq(transactions.type, "expense"),
-          isNull(transactions.deletedAt),
-          gte(transactions.date, toISODate(start)),
-          lte(transactions.date, toISODate(end)),
-        ];
-
-        if (!isShared && budget.userId) {
-          baseConditions.push(eq(transactions.userId, budget.userId));
-        }
-
-        const spendingResult = await db
-          .select({
-            total: sql<number>`COALESCE(SUM(${txnHome}), 0)`,
-          })
-          .from(transactions)
-          .where(and(...baseConditions));
-
-        const currentSpendingHomeCents = spendingResult[0]?.total ?? 0;
-        const limitHomeCents = budget.limitAmountHome;
-        const percentUsed =
-          limitHomeCents > 0 ? (currentSpendingHomeCents / limitHomeCents) * 100 : 0;
-        const remainingHomeCents = limitHomeCents - currentSpendingHomeCents;
-        const remainingAmount = legacyRemaining
-          ? Math.max(0, remainingHomeCents)
-          : remainingHomeCents;
-
-        return {
-          ...budget,
-          isShared,
-          currentSpending: currentSpendingHomeCents,
-          percentUsed,
-          remainingHomeCents,
-          /** @deprecated use remainingHomeCents — signed home cents; use X-API-Version: 1 for clamped-to-zero legacy */
-          remainingAmount,
-        };
-      })
-    );
+    const timeZone = await getHouseholdTimezone(db, session!.householdId);
+    const budgetsWithSpending = await getBudgetsWithSpending(db, {
+      householdId: session!.householdId,
+      viewerUserId: session!.userId,
+      timeZone,
+      legacyRemaining,
+    });
 
     return Response.json(budgetsWithSpending);
   }
 
   if (request.method === "POST" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:create`,
       ROUTE_RATE_LIMITS.budgets.create
     );
@@ -230,7 +150,8 @@ export const handleBudgetsRequest: ApiHandler = async ({
       );
     }
 
-    const currency = (validated.currency ?? "CAD") as import("@amigo/db").CurrencyCode;
+    const homeCurrency = await getHomeCurrency(db, session!.householdId);
+    const currency = validated.currency ?? homeCurrency;
     const limitCents = toCents(validated.limitAmount);
     const { limitAmountHome, exchangeRateLimitToHome } =
       await computeLimitAmountHomeCents(
@@ -241,28 +162,42 @@ export const handleBudgetsRequest: ApiHandler = async ({
         currency
       );
 
-    const budget = await db
-      .insert(budgets)
-      .values({
+    const budgetId = crypto.randomUUID();
+    const budget = await withAudit(
+      db,
+      {
         householdId: session!.householdId,
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        category: validated.category?.trim() || null,
-        limitAmount: limitCents,
-        limitAmountHome,
-        exchangeRateLimitToHome,
-        currency,
-        period: validated.period,
-      })
-      .returning()
-      .get();
+        tableName: "budgets",
+        recordId: budgetId,
+        operation: "INSERT",
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .insert(budgets)
+          .values({
+            id: budgetId,
+            householdId: session!.householdId,
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            category: validated.category?.trim() || null,
+            limitAmount: limitCents,
+            limitAmountHome,
+            exchangeRateLimitToHome,
+            currency,
+            period: validated.period,
+          })
+          .returning()
+          .get()
+    );
 
     return Response.json(budget, { status: 201 });
   }
 
   if (request.method === "PATCH" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:update`,
       ROUTE_RATE_LIMITS.budgets.update
     );
@@ -293,7 +228,8 @@ export const handleBudgetsRequest: ApiHandler = async ({
       );
     }
 
-    const currency = (validated.currency ?? "CAD") as import("@amigo/db").CurrencyCode;
+    const homeCurrency = await getHomeCurrency(db, session!.householdId);
+    const currency = validated.currency ?? homeCurrency;
     const limitCents = toCents(validated.limitAmount);
     const { limitAmountHome, exchangeRateLimitToHome } =
       await computeLimitAmountHomeCents(
@@ -304,27 +240,40 @@ export const handleBudgetsRequest: ApiHandler = async ({
         currency
       );
 
-    const updated = await db
-      .update(budgets)
-      .set({
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        category: validated.category?.trim() || null,
-        limitAmount: limitCents,
-        limitAmountHome,
-        exchangeRateLimitToHome,
-        currency,
-        period: validated.period,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(budgets.id, id),
-          scopeToHousehold(budgets.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const updated = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "budgets",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(budgets)
+          .set({
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            category: validated.category?.trim() || null,
+            limitAmount: limitCents,
+            limitAmountHome,
+            exchangeRateLimitToHome,
+            currency,
+            period: validated.period,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(budgets.id, id),
+              scopeToHousehold(budgets.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!updated) {
       throw new ActionError("Budget not found", "NOT_FOUND");
@@ -335,7 +284,7 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:budgets:delete`,
       ROUTE_RATE_LIMITS.budgets.delete
     );
@@ -365,17 +314,29 @@ export const handleBudgetsRequest: ApiHandler = async ({
       );
     }
 
-    const deleted = await db
-      .update(budgets)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(budgets.id, id),
-          scopeToHousehold(budgets.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const deleted = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "budgets",
+        recordId: id,
+        operation: "DELETE",
+        oldValues: existing,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(budgets)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(budgets.id, id),
+              scopeToHousehold(budgets.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     return Response.json(deleted);
   }

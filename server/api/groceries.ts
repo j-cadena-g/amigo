@@ -93,7 +93,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:list`,
       ROUTE_RATE_LIMITS.groceries.list
     );
@@ -119,7 +119,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:add`,
       ROUTE_RATE_LIMITS.groceries.add
     );
@@ -199,7 +199,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "POST" && id && action === "toggle") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:toggle`,
       ROUTE_RATE_LIMITS.groceries.toggle
     );
@@ -273,7 +273,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id && !action) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:update`,
       ROUTE_RATE_LIMITS.groceries.update
     );
@@ -331,7 +331,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "PUT" && id && action === "tags") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:tags`,
       ROUTE_RATE_LIMITS.groceries.tags
     );
@@ -382,7 +382,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id && action === "purchase-date") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:updateDate`,
       ROUTE_RATE_LIMITS.groceries.updateDate
     );
@@ -446,7 +446,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id && !action) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:delete`,
       ROUTE_RATE_LIMITS.groceries.delete
     );
@@ -498,7 +498,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   if (request.method === "POST" && path === "clear-old") {
     const { allowed } = await checkRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:groceries:clear`,
       ROUTE_RATE_LIMITS.groceries.clear
     );

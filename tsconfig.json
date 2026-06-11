@@ -15,7 +15,11 @@
     "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
-    "types": ["@cloudflare/workers-types/2023-07-01", "vite/client"],
+    "types": [
+      "@cloudflare/workers-types/2023-07-01",
+      "@cloudflare/vitest-pool-workers/types",
+      "vite/client"
+    ],
     "rootDirs": [".", ".react-router/types"],
     "paths": {
       "@/*": ["./*"],
@@ -31,6 +35,8 @@
     "worker.ts",
     "env.d.ts",
     "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.workers.config.ts",
     "react-router.config.ts",
     "packages/**/*.ts"
   ],
@@ -38,9 +44,6 @@
     "node_modules",
     "build",
     ".wrangler",
-    "packages/db/src/queries",
-    "packages/db/src/triggers.ts",
-    "packages/db/src/setup-triggers.ts",
     "packages/db/src/seed.ts",
     "apps"
   ]

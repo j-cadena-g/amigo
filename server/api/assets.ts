@@ -35,7 +35,7 @@ export const handleAssetsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:assets:list`,
       ROUTE_RATE_LIMITS.assets.list
     );
@@ -56,7 +56,7 @@ export const handleAssetsRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:assets:create`,
       ROUTE_RATE_LIMITS.assets.create
     );
@@ -96,7 +96,7 @@ export const handleAssetsRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:assets:update`,
       ROUTE_RATE_LIMITS.assets.update
     );
@@ -164,7 +164,7 @@ export const handleAssetsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:assets:delete`,
       ROUTE_RATE_LIMITS.assets.delete
     );

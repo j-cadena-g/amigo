@@ -15,6 +15,7 @@ import { toCents } from "../lib/conversions";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
+import { withAudit } from "../lib/audit";
 
 const currencySchema = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional();
 
@@ -81,7 +82,7 @@ export const handleDebtsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:debts:list`,
       ROUTE_RATE_LIMITS.debts.list
     );
@@ -102,7 +103,7 @@ export const handleDebtsRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:debts:create`,
       ROUTE_RATE_LIMITS.debts.create
     );
@@ -124,27 +125,41 @@ export const handleDebtsRequest: ApiHandler = async ({
     );
     const { balanceInitial, balanceCurrent } = debtToCents(validated);
 
-    const debt = await db
-      .insert(debts)
-      .values({
+    const debtId = crypto.randomUUID();
+    const debt = await withAudit(
+      db,
+      {
         householdId: session!.householdId,
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balanceInitial,
-        balanceCurrent,
-        currency,
-        exchangeRateToHome,
-      })
-      .returning()
-      .get();
+        tableName: "debts",
+        recordId: debtId,
+        operation: "INSERT",
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .insert(debts)
+          .values({
+            id: debtId,
+            householdId: session!.householdId,
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balanceInitial,
+            balanceCurrent,
+            currency,
+            exchangeRateToHome,
+          })
+          .returning()
+          .get()
+    );
 
     return Response.json(debt, { status: 201 });
   }
 
   if (request.method === "PATCH" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:debts:update`,
       ROUTE_RATE_LIMITS.debts.update
     );
@@ -184,27 +199,40 @@ export const handleDebtsRequest: ApiHandler = async ({
     );
     const { balanceInitial, balanceCurrent } = debtToCents(validated);
 
-    const updated = await db
-      .update(debts)
-      .set({
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balanceInitial,
-        balanceCurrent,
-        currency,
-        exchangeRateToHome,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(debts.id, id),
-          scopeToHousehold(debts.householdId, session!.householdId),
-          isNull(debts.deletedAt)
-        )
-      )
-      .returning()
-      .get();
+    const updated = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "debts",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(debts)
+          .set({
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balanceInitial,
+            balanceCurrent,
+            currency,
+            exchangeRateToHome,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(debts.id, id),
+              scopeToHousehold(debts.householdId, session!.householdId),
+              isNull(debts.deletedAt)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!updated) {
       throw new ActionError("Debt not found", "NOT_FOUND");
@@ -215,7 +243,7 @@ export const handleDebtsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:debts:delete`,
       ROUTE_RATE_LIMITS.debts.delete
     );
@@ -245,18 +273,30 @@ export const handleDebtsRequest: ApiHandler = async ({
       );
     }
 
-    const deleted = await db
-      .update(debts)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(debts.id, id),
-          scopeToHousehold(debts.householdId, session!.householdId),
-          isNull(debts.deletedAt)
-        )
-      )
-      .returning()
-      .get();
+    const deleted = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "debts",
+        recordId: id,
+        operation: "DELETE",
+        oldValues: existing,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(debts)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(debts.id, id),
+              scopeToHousehold(debts.householdId, session!.householdId),
+              isNull(debts.deletedAt)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!deleted) {
       throw new ActionError("Debt not found", "NOT_FOUND");

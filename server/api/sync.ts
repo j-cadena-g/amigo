@@ -4,6 +4,8 @@ import {
   getDb,
   groceryItems,
   groceryItemTags,
+  groceryTags,
+  inArray,
   isNull,
   scopeToHousehold,
 } from "@amigo/db";
@@ -47,7 +49,7 @@ export const handleSyncRequest: ApiHandler = async ({
   }
 
   await enforceRateLimit(
-    env.CACHE,
+      env,
     `${session!.userId}:sync`,
     ROUTE_RATE_LIMITS.sync.batch
   );
@@ -203,14 +205,28 @@ async function processMutation(
 
       if (!existing) throw new Error("Item not found");
 
+      let validTagIds: string[] = [];
+      if (tagIds.length > 0) {
+        const validTags = await db.query.groceryTags.findMany({
+          where: and(
+            inArray(groceryTags.id, tagIds),
+            scopeToHousehold(groceryTags.householdId, session.householdId)
+          ),
+        });
+        if (validTags.length !== tagIds.length) {
+          throw new Error("One or more tags are invalid for this household");
+        }
+        validTagIds = validTags.map((t) => t.id);
+      }
+
       await db.batch([
         db
           .delete(groceryItemTags)
           .where(eq(groceryItemTags.itemId, mutation.entityId)),
-        ...(tagIds.length > 0
+        ...(validTagIds.length > 0
           ? [
               db.insert(groceryItemTags).values(
-                tagIds.map((tagId) => ({ itemId: mutation.entityId, tagId }))
+                validTagIds.map((tagId) => ({ itemId: mutation.entityId, tagId }))
               ),
             ]
           : []),

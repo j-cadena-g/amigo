@@ -19,7 +19,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
   }
 
   if (status === "revoked") {
-    throw redirect("/no-access");
+    throw redirect("/restore-account");
   }
 
   if (status === "needs_setup") {

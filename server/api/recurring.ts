@@ -12,6 +12,10 @@ import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurring-processor";
+import { validateFinancialRefs } from "../lib/financial-refs";
+import { getHomeCurrency } from "../lib/household-currency";
+import { withAudit } from "../lib/audit";
+import { zCurrencyCode } from "../lib/request-validation";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
@@ -26,7 +30,7 @@ export const createRuleSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
-  currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
+  currency: zCurrencyCode.optional(),
 });
 
 const updateRuleSchema = z.object({
@@ -40,7 +44,7 @@ const updateRuleSchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
-  currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
+  currency: zCurrencyCode.optional(),
 });
 
 export const handleRecurringRequest: ApiHandler = async ({
@@ -55,7 +59,7 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:list`,
       ROUTE_RATE_LIMITS.recurring.list
     );
@@ -73,12 +77,15 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:create`,
       ROUTE_RATE_LIMITS.recurring.create
     );
 
     const validated = createRuleSchema.parse(await request.json());
+    await validateFinancialRefs(db, session!.householdId, session!.userId, {
+      budgetId: validated.budgetId,
+    });
     const interval = validated.interval ?? 1;
     const nextRunDate = getInitialNextRunDate(
       validated.startDate,
@@ -95,26 +102,42 @@ export const handleRecurringRequest: ApiHandler = async ({
       );
     }
 
-    const rule = await db
-      .insert(recurringTransactions)
-      .values({
+    const homeCurrency = await getHomeCurrency(db, session!.householdId);
+
+    const ruleId = crypto.randomUUID();
+    const rule = await withAudit(
+      db,
+      {
         householdId: session!.householdId,
-        userId: session!.userId,
-        amount: toCents(validated.amount),
-        currency: validated.currency ?? "CAD",
-        category: validated.category.trim(),
-        description: validated.description?.trim() || null,
-        type: validated.type,
-        frequency: validated.frequency,
-        interval,
-        dayOfMonth: validated.dayOfMonth ?? null,
-        startDate: toISODate(validated.startDate),
-        endDate: validated.endDate ? toISODate(validated.endDate) : null,
-        nextRunDate: toISODate(nextRunDate),
-        budgetId: validated.budgetId || null,
-      })
-      .returning()
-      .get();
+        tableName: "recurring_transactions",
+        recordId: ruleId,
+        operation: "INSERT",
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .insert(recurringTransactions)
+          .values({
+            id: ruleId,
+            householdId: session!.householdId,
+            userId: session!.userId,
+            amount: toCents(validated.amount),
+            currency: validated.currency ?? homeCurrency,
+            category: validated.category.trim(),
+            description: validated.description?.trim() || null,
+            type: validated.type,
+            frequency: validated.frequency,
+            interval,
+            dayOfMonth: validated.dayOfMonth ?? null,
+            startDate: toISODate(validated.startDate),
+            endDate: validated.endDate ? toISODate(validated.endDate) : null,
+            nextRunDate: toISODate(nextRunDate),
+            budgetId: validated.budgetId || null,
+          })
+          .returning()
+          .get()
+    );
 
     await broadcastToHousehold(env, session!.householdId, {
       type: "RECURRING_UPDATE",
@@ -126,12 +149,15 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id && !action) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:update`,
       ROUTE_RATE_LIMITS.recurring.update
     );
 
     const validated = updateRuleSchema.parse(await request.json());
+    await validateFinancialRefs(db, session!.householdId, session!.userId, {
+      budgetId: validated.budgetId,
+    });
     const existing = await db.query.recurringTransactions.findFirst({
       where: and(
         eq(recurringTransactions.id, id),
@@ -198,18 +224,31 @@ export const handleRecurringRequest: ApiHandler = async ({
       }
     }
 
-    const rule = await db
-      .update(recurringTransactions)
-      .set(updateData)
-      .where(
-        and(
-          eq(recurringTransactions.id, id),
-          scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-          eq(recurringTransactions.userId, session!.userId)
-        )
-      )
-      .returning()
-      .get();
+    const rule = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "recurring_transactions",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(recurringTransactions)
+          .set(updateData)
+          .where(
+            and(
+              eq(recurringTransactions.id, id),
+              scopeToHousehold(recurringTransactions.householdId, session!.householdId),
+              eq(recurringTransactions.userId, session!.userId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     await broadcastToHousehold(env, session!.householdId, {
       type: "RECURRING_UPDATE",
@@ -221,22 +260,46 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id && !action) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:delete`,
       ROUTE_RATE_LIMITS.recurring.delete
     );
 
-    const deleted = await db
-      .delete(recurringTransactions)
-      .where(
-        and(
-          eq(recurringTransactions.id, id),
-          scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-          eq(recurringTransactions.userId, session!.userId)
-        )
-      )
-      .returning()
-      .get();
+    const existing = await db.query.recurringTransactions.findFirst({
+      where: and(
+        eq(recurringTransactions.id, id),
+        scopeToHousehold(recurringTransactions.householdId, session!.householdId),
+        eq(recurringTransactions.userId, session!.userId)
+      ),
+    });
+
+    if (!existing) {
+      throw new ActionError("Recurring rule not found", "NOT_FOUND");
+    }
+
+    const deleted = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "recurring_transactions",
+        recordId: id,
+        operation: "DELETE",
+        oldValues: existing,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .delete(recurringTransactions)
+          .where(
+            and(
+              eq(recurringTransactions.id, id),
+              scopeToHousehold(recurringTransactions.householdId, session!.householdId),
+              eq(recurringTransactions.userId, session!.userId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!deleted) {
       throw new ActionError("Recurring rule not found", "NOT_FOUND");
@@ -252,7 +315,7 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "POST" && id && action === "toggle") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:toggle`,
       ROUTE_RATE_LIMITS.recurring.toggle
     );
@@ -284,7 +347,7 @@ export const handleRecurringRequest: ApiHandler = async ({
 
   if (request.method === "POST" && path === "process") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:recurring:process`,
       ROUTE_RATE_LIMITS.recurring.process
     );

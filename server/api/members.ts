@@ -25,6 +25,7 @@ import {
 } from "../lib/permissions";
 import { getTransferOwnershipUsers } from "../lib/member-queries";
 import { invalidateSessionCachesForHouseholdMembers } from "../lib/session-cache";
+import { assertSessionStillValid } from "../lib/session";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
@@ -45,7 +46,7 @@ export const handleMembersRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:members:list`,
       ROUTE_RATE_LIMITS.members.list
     );
@@ -75,7 +76,7 @@ export const handleMembersRequest: ApiHandler = async ({
     splatSegments.length === 2
   ) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:members:role`,
       ROUTE_RATE_LIMITS.members.role
     );
@@ -83,6 +84,7 @@ export const handleMembersRequest: ApiHandler = async ({
       canManageMembers(session!),
       "Not authorized to manage members"
     );
+    await assertSessionStillValid(db, session!);
 
     const { role } = updateRoleSchema.parse(await request.json());
     const targetUser = await db.query.users.findFirst({
@@ -127,7 +129,7 @@ export const handleMembersRequest: ApiHandler = async ({
 
   if (request.method === "POST" && path === "transfer-ownership") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:members:transfer`,
       ROUTE_RATE_LIMITS.members.transfer
     );
@@ -135,6 +137,7 @@ export const handleMembersRequest: ApiHandler = async ({
       canTransferOwnership(session!),
       "Only the owner can transfer ownership"
     );
+    await assertSessionStillValid(db, session!);
 
     const { newOwnerId } = z
       .object({ newOwnerId: z.string().uuid() })
@@ -197,7 +200,7 @@ export const handleMembersRequest: ApiHandler = async ({
     splatSegments.length === 2
   ) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:members:summary`,
       ROUTE_RATE_LIMITS.members.summary
     );
@@ -274,7 +277,7 @@ export const handleMembersRequest: ApiHandler = async ({
     splatSegments.length === 1
   ) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:members:remove`,
       ROUTE_RATE_LIMITS.members.remove
     );
@@ -282,6 +285,7 @@ export const handleMembersRequest: ApiHandler = async ({
       canManageMembers(session!),
       "Not authorized to remove members"
     );
+    await assertSessionStillValid(db, session!);
 
     if (userId === session!.userId) {
       throw new ActionError("Cannot remove yourself", "VALIDATION_ERROR");

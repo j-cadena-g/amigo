@@ -28,11 +28,7 @@ export const handleAuditRequest: ApiHandler = async ({
     });
   }
 
-  await enforceRateLimit(
-    env.CACHE,
-    `audit:${session!.userId}`,
-    ROUTE_RATE_LIMITS.audit.list
-  );
+  await enforceRateLimit(env, `audit:${session!.userId}`, ROUTE_RATE_LIMITS.audit.list);
 
   const splatSegments = getSplatSegments(params);
   if (splatSegments.length === 0) {

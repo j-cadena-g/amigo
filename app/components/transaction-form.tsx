@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Plus } from "lucide-react";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CurrencySelect } from "@/app/components/currency-select";
+import { isPositiveDecimal, sanitizeDecimalInput } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 
 export interface TransactionFormState {
@@ -112,15 +113,15 @@ export function AddTransactionForm({
 
       <div className="grid grid-cols-4 gap-2">
         <input
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           placeholder="Amount"
           aria-label="Amount"
           value={form.amount}
           onChange={(e) =>
             onChange((prev) => ({
               ...prev,
-              amount: e.target.value,
+              amount: sanitizeDecimalInput(e.target.value),
             }))
           }
           className="col-span-2 min-w-0 rounded-md border border-input bg-background px-3 py-2"
@@ -208,7 +209,7 @@ export function AddTransactionForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || !form.amount}
+          disabled={isSubmitting || !isPositiveDecimal(form.amount)}
           className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting ? "Adding..." : "Add"}
@@ -279,15 +280,15 @@ export function EditTransactionForm({
 
       <div className="grid grid-cols-4 gap-2">
         <input
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           placeholder="Amount"
           aria-label="Amount"
           value={form.amount}
           onChange={(e) =>
             onChange((prev) => ({
               ...prev,
-              amount: e.target.value,
+              amount: sanitizeDecimalInput(e.target.value),
             }))
           }
           className="col-span-2 rounded-md border border-input bg-background px-3 py-2"
@@ -363,7 +364,7 @@ export function EditTransactionForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || !form.amount}
+          disabled={isSubmitting || !isPositiveDecimal(form.amount)}
           className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting ? "Saving..." : "Save"}

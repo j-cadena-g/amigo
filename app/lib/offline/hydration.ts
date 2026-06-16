@@ -90,6 +90,23 @@ async function bulkInsertTags(tags: GroceryTag[]): Promise<void> {
   await db.groceryTags.bulkPut(offlineTags);
 }
 
+function toServerGroceryItem(item: GroceryItemWithTags): ServerGroceryItem {
+  return {
+    id: item.id,
+    householdId: item.householdId,
+    createdByUserId: item.createdByUserId,
+    createdByUserDisplayName: item.createdByUserDisplayName,
+    itemName: item.itemName,
+    category: item.category,
+    isPurchased: item.isPurchased,
+    purchasedAt: item.purchasedAt,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    deletedAt: item.deletedAt,
+    tagIds: item.tags?.map((tag) => tag.id),
+  };
+}
+
 async function incrementalSync(
   serverItems: GroceryItemWithTags[],
   serverTags: GroceryTag[]
@@ -138,11 +155,7 @@ async function incrementalSync(
       serverItem: serverItem as ServerGroceryItem,
     });
 
-    const merged = mergeItems(
-      localItem,
-      serverItem as ServerGroceryItem,
-      strategy
-    );
+    const merged = mergeItems(localItem, toServerGroceryItem(serverItem), strategy);
     await db.groceryItems.put(merged);
   }
 

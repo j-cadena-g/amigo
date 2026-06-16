@@ -12,6 +12,7 @@ export interface ServerGroceryItem {
   createdAt: number; // timestamp_ms
   updatedAt: number; // timestamp_ms
   deletedAt: number | null; // timestamp_ms
+  tagIds?: string[];
 }
 
 export type ResolutionStrategy = "server-wins" | "local-wins" | "merge";
@@ -75,6 +76,7 @@ export function mergeItems(
     return {
       ...server,
       createdByUserDisplayName: server.createdByUserDisplayName ?? null,
+      tagIds: server.tagIds ?? local.tagIds,
       _localVersion: 0,
       _serverVersion: server.updatedAt,
       _syncStatus: "synced",
@@ -105,6 +107,7 @@ export function mergeItems(
     createdAt: local.createdAt,
     updatedAt: Math.max(local.updatedAt, server.updatedAt),
     deletedAt: server.deletedAt,
+    tagIds: useServer ? (server.tagIds ?? local.tagIds) : local.tagIds,
     _localVersion: local._localVersion,
     _serverVersion: server.updatedAt,
     _syncStatus: useServer ? "synced" : "pending",

@@ -163,20 +163,22 @@ export async function getOfflineItems(
   householdId?: string
 ): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
-  const items = await db.groceryItems
+  if (!householdId) {
+    return db.groceryItems.filter((item) => item.deletedAt === null).toArray();
+  }
+  return db.groceryItems
+    .where("householdId")
+    .equals(householdId)
     .filter((item) => item.deletedAt === null)
     .toArray();
-  if (!householdId) return items;
-  return items.filter((item) => item.householdId === householdId);
 }
 
 export async function getOfflineTags(
   householdId?: string
 ): Promise<OfflineGroceryTag[]> {
   const db = getOfflineDB();
-  const tags = await db.groceryTags.toArray();
-  if (!householdId) return tags;
-  return tags.filter((tag) => tag.householdId === householdId);
+  if (!householdId) return db.groceryTags.toArray();
+  return db.groceryTags.where("householdId").equals(householdId).toArray();
 }
 
 export async function hasOfflineData(): Promise<boolean> {

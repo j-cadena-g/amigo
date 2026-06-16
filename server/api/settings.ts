@@ -45,7 +45,9 @@ export const handleSettingsRequest: ApiHandler = async ({
       throw new ActionError("Invalid timezone", "VALIDATION_ERROR");
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    const updateData: Pick<typeof households.$inferInsert, "timezone" | "updatedAt"> = {
+      updatedAt: new Date(),
+    };
     if (validated.timezone !== undefined) {
       updateData.timezone = validated.timezone;
     }

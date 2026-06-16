@@ -120,7 +120,7 @@ export async function clientLoader({
 }: {
   serverLoader: () => ReturnType<typeof loader>;
 }) {
-  if (!isOfflineSupported()) {
+  if (!(await isOfflineSupported())) {
     return serverLoader();
   }
 

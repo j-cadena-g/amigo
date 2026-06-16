@@ -10,7 +10,7 @@ export function OfflineIndicator() {
 
   useEffect(() => {
     const refreshPending = async () => {
-      if (!isOfflineSupported()) return;
+      if (!(await isOfflineSupported())) return;
       try {
         setPendingCount(await getPendingCount());
       } catch {

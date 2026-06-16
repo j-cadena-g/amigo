@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { Plus } from "lucide-react";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CurrencySelect } from "@/app/components/currency-select";
-import { isPositiveDecimal, sanitizeDecimalInput } from "@/app/lib/decimal-input";
+import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 
 export interface TransactionFormState {
@@ -121,7 +121,7 @@ export function AddTransactionForm({
           onChange={(e) =>
             onChange((prev) => ({
               ...prev,
-              amount: sanitizeDecimalInput(e.target.value),
+              amount: parseDecimalInput(e.target.value),
             }))
           }
           className="col-span-2 min-w-0 rounded-md border border-input bg-background px-3 py-2"
@@ -288,7 +288,7 @@ export function EditTransactionForm({
           onChange={(e) =>
             onChange((prev) => ({
               ...prev,
-              amount: sanitizeDecimalInput(e.target.value),
+              amount: parseDecimalInput(e.target.value),
             }))
           }
           className="col-span-2 rounded-md border border-input bg-background px-3 py-2"

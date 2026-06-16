@@ -68,11 +68,14 @@ function emptyBudgetForm(homeCurrency: CurrencyCode): BudgetFormData {
   };
 }
 
-function getProgressColor(percent: number, remaining: number): string {
-  if (remaining < 0 || percent >= 100) return "bg-red-500";
-  if (percent >= 90) return "bg-red-500";
-  if (percent >= 75) return "bg-yellow-500";
-  return "bg-green-500";
+function getProgressVariant(
+  percent: number,
+  remaining: number
+): "budget-list-progress--ok" | "budget-list-progress--warn" | "budget-list-progress--danger" {
+  if (remaining < 0 || percent >= 100) return "budget-list-progress--danger";
+  if (percent >= 90) return "budget-list-progress--danger";
+  if (percent >= 75) return "budget-list-progress--warn";
+  return "budget-list-progress--ok";
 }
 
 function BudgetCard({
@@ -144,12 +147,15 @@ function BudgetCard({
               {formatCents(budget.limitAmount, budget.currency)}
             </p>
           )}
-          <div className="h-2 w-full rounded-full bg-muted">
-            <div
-              className={`h-2 rounded-full transition-all ${getProgressColor(budget.percentUsed, budget.remainingHomeCents)}`}
-              style={{ width: `${clampedPercent}%` }}
-            />
-          </div>
+          <progress
+            className={cn(
+              "budget-list-progress",
+              getProgressVariant(budget.percentUsed, budget.remainingHomeCents)
+            )}
+            value={clampedPercent}
+            max={100}
+            aria-label={`${budget.name}: ${clampedPercent}% of budget used`}
+          />
           {isOverBudget ? (
             <p className="text-sm font-medium text-red-500">
               Over budget by{" "}
@@ -233,8 +239,11 @@ function BudgetFormDialog({
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium">Period</label>
+            <label htmlFor="budget-form-period" className="text-sm font-medium">
+              Period
+            </label>
             <select
+              id="budget-form-period"
               value={form.period}
               onChange={(e) =>
                 setForm((f) => ({ ...f, period: e.target.value }))

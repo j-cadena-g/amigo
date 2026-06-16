@@ -71,7 +71,7 @@ export function DashboardBudgetProgress({
                       {formatCents(b.limitOriginalCents, budgetCur)}
                     </p>
                   )}
-                  <div
+                  <progress
                     className={cn(
                       "budget-progress",
                       isOver || isCritical
@@ -80,16 +80,10 @@ export function DashboardBudgetProgress({
                           ? "budget-progress--warn"
                           : "budget-progress--default"
                     )}
-                    role="progressbar"
-                    aria-valuenow={Math.min(pct, 100)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className="budget-progress__fill"
-                      style={{ width: `${Math.min(pct, 100)}%` }}
-                    />
-                  </div>
+                    value={Math.min(pct, 100)}
+                    max={100}
+                    aria-label={`${b.name}: ${pct}% of budget used`}
+                  />
                   <div className="flex items-center justify-between mt-1">
                     <span
                       className={cn(

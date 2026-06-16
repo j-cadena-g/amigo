@@ -116,12 +116,13 @@ export async function loadDashboardData(
   const timeZone = await getHouseholdTimezone(db, session.householdId);
   const { start: monthStart, end: monthEnd } = monthBoundsInTz(now, timeZone);
   const todayStr = todayInTz(timeZone, now);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    .toISOString()
-    .split("T")[0]!;
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
-    .toISOString()
-    .split("T")[0]!;
+  const previousMonthInstant = new Date(
+    Date.parse(`${monthStart}T12:00:00Z`) - 24 * 60 * 60 * 1000
+  );
+  const { start: lastMonthStart, end: lastMonthEnd } = monthBoundsInTz(
+    previousMonthInstant,
+    timeZone
+  );
 
   const txnVis = visibleFinancialTransactionsCondition(session.userId);
   const expenseVisibleBase = [

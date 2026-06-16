@@ -59,10 +59,14 @@ export function TimezoneSelect({ timezone, canEdit }: TimezoneSelectProps) {
 
   return (
     <div className="space-y-3">
+      <label htmlFor="household-timezone" className="text-sm font-medium">
+        Timezone
+      </label>
       <p className="text-sm text-muted-foreground">
         Budget periods and transaction dates use your household&apos;s local calendar day.
       </p>
       <select
+        id="household-timezone"
         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
         value={value}
         onChange={(e) => setValue(e.target.value)}

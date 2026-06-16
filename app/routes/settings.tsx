@@ -73,7 +73,6 @@ export default function Settings() {
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium mb-2">Timezone</p>
               <TimezoneSelect
                 timezone={household.timezone ?? "UTC"}
                 canEdit={session.role === "owner" || session.role === "admin"}

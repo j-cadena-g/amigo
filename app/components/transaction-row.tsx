@@ -25,7 +25,7 @@ export interface TransactionDTO {
 
 export function formatTransactionDate(date: string): string {
   const dateOnly = date.split("T")[0]!;
-  const d = new Date(dateOnly + "T00:00:00");
+  const d = new Date(dateOnly + "T00:00:00Z");
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

@@ -140,7 +140,17 @@ describe("budget spending integration", () => {
     );
 
     expect(budgetsPageView).toEqual(
-      [...dashboardView].sort((a, b) => a.name.localeCompare(b.name))
+      [...direct]
+        .sort((a, b) =>
+          (a.category ?? "").localeCompare(b.category ?? "")
+        )
+        .map((budget) => ({
+          id: budget.id,
+          name: budget.name,
+          spentHomeCents: budget.currentSpendingHomeCents,
+          limitHomeCents: budget.limitAmountHome,
+          period: budget.period,
+        }))
     );
 
     for (const budget of apiBudgets) {

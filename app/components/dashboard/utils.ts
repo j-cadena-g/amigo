@@ -16,12 +16,15 @@ export function getCategoryIcon(category: string): string {
   return CATEGORY_ICONS[category.toLowerCase()] ?? "📋";
 }
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
 export function formatRelativeDate(dateStr: string): string {
+  const dateOnly = dateStr.split("T")[0]!;
+  const date = new Date(dateOnly + "T00:00:00");
   const today = new Date();
-  const date = new Date(dateStr + "T12:00:00");
-  const diffDays = Math.round(
-    (date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((date.getTime() - today.getTime()) / MS_PER_DAY);
 
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";

@@ -13,8 +13,7 @@ import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents } from "../lib/conversions";
-import { toISODateInTz } from "../lib/dates";
-import { getHouseholdTimezone } from "../lib/household-timezone";
+import { isValidIsoDateString } from "../lib/dates";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import {
   parseTransactionsListQuery,
@@ -53,12 +52,16 @@ const importDateString = z
       "date must be a valid ISO 8601 calendar day (YYYY-MM-DD, optional time suffix after 'T')",
   });
 
+const calendarDateString = z
+  .string()
+  .refine(isValidIsoDateString, { message: "date must be YYYY-MM-DD" });
+
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
   category: z.string().min(1).max(100),
   type: z.enum(["income", "expense"]),
-  date: z.coerce.date(),
+  date: calendarDateString,
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
@@ -69,7 +72,7 @@ const updateTransactionSchema = z.object({
   description: z.string().max(500).nullable().optional(),
   category: z.string().min(1).max(100).optional(),
   type: z.enum(["income", "expense"]).optional(),
-  date: z.coerce.date().optional(),
+  date: calendarDateString.optional(),
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
@@ -340,10 +343,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       budgetId: validated.budgetId,
       accountId: validated.accountId,
     });
-    const [homeCurrency, timeZone] = await Promise.all([
-      getHomeCurrency(db, session!.householdId),
-      getHouseholdTimezone(db, session!.householdId),
-    ]);
+    const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = validated.currency ?? homeCurrency;
     const exchangeRateToHome = await getExchangeRateForRecord(
       env,
@@ -375,7 +375,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             description: validated.description?.trim() || null,
             category: validated.category.trim(),
             type: validated.type,
-            date: toISODateInTz(validated.date, timeZone),
+            date: validated.date,
             budgetId: validated.budgetId || null,
             accountId: validated.accountId || null,
           })
@@ -419,8 +419,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.type = validated.type;
     }
     if (validated.date !== undefined) {
-      const timeZone = await getHouseholdTimezone(db, session!.householdId);
-      updateData.date = toISODateInTz(validated.date, timeZone);
+      updateData.date = validated.date;
     }
     if (validated.budgetId !== undefined) {
       updateData.budgetId = validated.budgetId || null;

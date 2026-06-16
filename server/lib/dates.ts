@@ -108,3 +108,67 @@ export function isValidIsoDateString(val: string): boolean {
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
+
+function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(instant);
+  const filled: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") filled[part.type] = part.value;
+  }
+  const asUtc = Date.UTC(
+    Number(filled.year),
+    Number(filled.month) - 1,
+    Number(filled.day),
+    Number(filled.hour),
+    Number(filled.minute),
+    Number(filled.second)
+  );
+  return asUtc - instant.getTime();
+}
+
+/** Wall-clock time in a timezone → UTC instant (handles DST with one refinement pass). */
+export function zonedDateTimeToUtc(
+  isoDate: string,
+  time: string,
+  timeZone: string
+): Date {
+  const { y, m, d } = parseIsoParts(isoDate);
+  const [hh, mm, ssFrac = "0"] = time.split(":");
+  const [ss, ms = "0"] = ssFrac.split(".");
+  const utcGuess = Date.UTC(
+    y,
+    m - 1,
+    d,
+    Number(hh),
+    Number(mm),
+    Number(ss),
+    Number(ms.padEnd(3, "0").slice(0, 3))
+  );
+  let instant = new Date(utcGuess);
+  let offset = getTimeZoneOffsetMs(instant, timeZone);
+  instant = new Date(utcGuess - offset);
+  const refinedOffset = getTimeZoneOffsetMs(instant, timeZone);
+  if (refinedOffset !== offset) {
+    offset = refinedOffset;
+    instant = new Date(utcGuess - offset);
+  }
+  return instant;
+}
+
+export function startOfIsoDayInTz(iso: string, timeZone: string): Date {
+  return zonedDateTimeToUtc(iso, "00:00:00", timeZone);
+}
+
+export function endOfIsoDayInTz(iso: string, timeZone: string): Date {
+  return zonedDateTimeToUtc(iso, "23:59:59.999", timeZone);
+}

@@ -75,7 +75,6 @@ export const ROUTE_RATE_LIMITS = {
     pending: RATE_LIMIT_PRESETS.READ,
     restore: RATE_LIMIT_PRESETS.SENSITIVE,
     freshStart: RATE_LIMIT_PRESETS.SENSITIVE,
-    cancel: RATE_LIMIT_PRESETS.SENSITIVE,
   },
   settings: {
     patch: RATE_LIMIT_PRESETS.MUTATION,

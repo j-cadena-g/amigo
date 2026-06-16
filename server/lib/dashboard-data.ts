@@ -35,7 +35,7 @@ import {
 } from "./financial-visibility";
 import { getExchangeRateForRecord } from "./exchange-rates";
 import { getBudgetsWithSpending } from "./budget-spending";
-import { monthBoundsInTz, todayInTz } from "./dates";
+import { monthBoundsInTz, todayInTz, startOfIsoDayInTz, endOfIsoDayInTz, toISODateInTz } from "./dates";
 import { getHouseholdTimezone } from "./household-timezone";
 import type { Env } from "../env";
 
@@ -116,6 +116,8 @@ export async function loadDashboardData(
   const now = new Date();
   const timeZone = await getHouseholdTimezone(db, session.householdId);
   const { start: monthStart, end: monthEnd } = monthBoundsInTz(now, timeZone);
+  const monthStartInstant = startOfIsoDayInTz(monthStart, timeZone);
+  const monthEndInstant = endOfIsoDayInTz(monthEnd, timeZone);
   const todayStr = todayInTz(timeZone, now);
   const monthStartYear = Number(monthStart.slice(0, 4));
   const monthStartMonth = Number(monthStart.slice(5, 7));
@@ -157,7 +159,7 @@ export async function loadDashboardData(
     categoryRows,
     lastMonthCategoryRows,
     calendarMonthTxns,
-    calendarGroceriesByDate,
+    calendarGroceriesPurchasedAt,
   ] = await Promise.all([
     db
       .select({ total: sql<number>`COALESCE(SUM(${txnHome}), 0)` })
@@ -295,10 +297,7 @@ export async function loadDashboardData(
       ),
     }),
     db
-      .select({
-        date: sql<string>`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
-        count: sql<number>`COUNT(*)`,
-      })
+      .select({ purchasedAt: groceryItems.purchasedAt })
       .from(groceryItems)
       .where(
         and(
@@ -306,18 +305,21 @@ export async function loadDashboardData(
           eq(groceryItems.isPurchased, true),
           isNotNull(groceryItems.purchasedAt),
           isNull(groceryItems.deletedAt),
-          gte(
-            sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
-            monthStart
-          ),
-          lte(
-            sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`,
-            monthEnd
-          )
+          gte(groceryItems.purchasedAt, monthStartInstant),
+          lte(groceryItems.purchasedAt, monthEndInstant)
         )
-      )
-      .groupBy(sql`DATE(${groceryItems.purchasedAt} / 1000, 'unixepoch')`),
+      ),
   ]);
+
+  const groceryCountsByDate = new Map<string, number>();
+  for (const row of calendarGroceriesPurchasedAt) {
+    if (!row.purchasedAt) continue;
+    const date = toISODateInTz(row.purchasedAt, timeZone);
+    groceryCountsByDate.set(date, (groceryCountsByDate.get(date) ?? 0) + 1);
+  }
+  const calendarGroceriesByDate = [...groceryCountsByDate.entries()].map(
+    ([date, count]) => ({ date, count })
+  );
 
   const calendarEvents: DashboardCalendarEvent[] = [];
   for (const t of calendarMonthTxns) {

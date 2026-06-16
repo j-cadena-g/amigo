@@ -8,6 +8,7 @@ import {
   groceryItems,
   households,
   isNotNull,
+  isNull,
   recurringTransactions,
   transactions,
   users,
@@ -186,7 +187,8 @@ export const handleRestoreRequest: ApiHandler = async ({
         .where(
           and(
             eq(users.householdId, match.household.id),
-            eq(users.role, "owner")
+            eq(users.role, "owner"),
+            isNull(users.deletedAt)
           )
         )
         .get();

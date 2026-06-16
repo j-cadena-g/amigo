@@ -347,6 +347,7 @@ export function TransactionList({
             <div key={transaction.id}>
               <TransactionRow
                 transaction={transaction}
+                todayStr={todayStr}
                 expanded={expandedId === transaction.id}
                 isEditing={editingId === transaction.id}
                 isSubmitting={isSubmitting}

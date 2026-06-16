@@ -5,7 +5,7 @@ import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
 import type { UpcomingRecurring } from "@/server/lib/dashboard-data";
-import { formatRelativeDate } from "./utils";
+import { formatRelativeDate } from "@/app/lib/format-dates";
 
 interface DashboardUpcomingRecurringProps {
   items: UpcomingRecurring[];

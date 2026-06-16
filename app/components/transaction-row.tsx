@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatCents } from "@/app/lib/currency";
+import { formatRelativeDate, formatTransactionDate } from "@/app/lib/format-dates";
 import type { CurrencyCode } from "@amigo/db";
 import { EditTransactionForm } from "./transaction-form";
 
@@ -23,18 +24,9 @@ export interface TransactionDTO {
   createdAt: number;
 }
 
-export function formatTransactionDate(date: string): string {
-  const dateOnly = date.split("T")[0]!;
-  const d = new Date(dateOnly + "T00:00:00Z");
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 interface TransactionRowProps {
   transaction: TransactionDTO;
+  todayStr: string;
   expanded: boolean;
   isEditing: boolean;
   isSubmitting: boolean;
@@ -69,6 +61,7 @@ interface TransactionRowProps {
 
 export function TransactionRow({
   transaction,
+  todayStr,
   expanded,
   isEditing,
   isSubmitting,
@@ -121,7 +114,7 @@ export function TransactionRow({
               {transaction.description || transaction.category}
             </p>
             <p className="text-sm text-muted-foreground truncate">
-              {transaction.category} &bull; {formatTransactionDate(transaction.date)}
+              {transaction.category} &bull; {formatRelativeDate(transaction.date, todayStr)}
             </p>
           </div>
         </div>

@@ -5,7 +5,8 @@ import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
 import type { RecentTransaction } from "@/server/lib/dashboard-data";
-import { formatRelativeDate, getCategoryIcon } from "./utils";
+import { formatRelativeDate } from "@/app/lib/format-dates";
+import { getCategoryIcon } from "./utils";
 
 interface DashboardRecentTransactionsProps {
   transactions: RecentTransaction[];

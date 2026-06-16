@@ -68,6 +68,13 @@
     {
       "idx": 9,
       "version": "6",
+      "when": 1778889500000,
+      "tag": "0009_household_timezone",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
       "when": 1778890000000,
       "tag": "0010_transactions_household_external_id_unique",
       "breakpoints": true

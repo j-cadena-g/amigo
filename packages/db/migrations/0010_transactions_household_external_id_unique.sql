@@ -1,3 +1,8 @@
+UPDATE `transactions`
+SET `external_id` = NULL
+WHERE `deleted_at` IS NOT NULL
+  AND `external_id` IS NOT NULL;
+--> statement-breakpoint
 DELETE FROM `transactions`
 WHERE `external_id` IS NOT NULL
   AND rowid NOT IN (

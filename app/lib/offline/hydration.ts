@@ -138,9 +138,11 @@ async function incrementalSync(
       continue;
     }
 
+    const serverGroceryItem = toServerGroceryItem(serverItem);
+
     const hasConflict = detectConflict({
       localItem,
-      serverItem: serverItem as ServerGroceryItem,
+      serverItem: serverGroceryItem,
     });
 
     if (!hasConflict) {
@@ -152,10 +154,10 @@ async function incrementalSync(
 
     const strategy = resolveConflict({
       localItem,
-      serverItem: serverItem as ServerGroceryItem,
+      serverItem: serverGroceryItem,
     });
 
-    const merged = mergeItems(localItem, toServerGroceryItem(serverItem), strategy);
+    const merged = mergeItems(localItem, serverGroceryItem, strategy);
     await db.groceryItems.put(merged);
   }
 

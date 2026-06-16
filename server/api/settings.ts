@@ -19,6 +19,12 @@ export const handleSettingsRequest: ApiHandler = async ({
   const db = getDb(env.DB);
 
   if (request.method === "GET") {
+    await enforceRateLimit(
+      env,
+      `${session!.userId}:settings:get`,
+      ROUTE_RATE_LIMITS.settings.get
+    );
+
     const household = await db.query.households.findFirst({
       where: eq(households.id, session!.householdId),
     });

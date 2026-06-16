@@ -51,6 +51,9 @@ describe("security headers", () => {
     }
     expect(testCsp).toContain("https://*.clerk.accounts.dev");
     expect(testCsp).toContain("frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev");
+    expect(warn).toHaveBeenCalledWith(
+      "[security] Could not derive Clerk Frontend API host; using test-instance CSP fallbacks"
+    );
 
     const liveHeaders = buildSecurityHeaders({
       appEnv: "production",
@@ -62,6 +65,32 @@ describe("security headers", () => {
       throw new Error("Expected enforcing CSP header in production");
     }
     expect(liveCsp).toContain("https://*.clerk.com");
+    expect(warn).toHaveBeenCalledWith(
+      "[security] Could not derive Clerk Frontend API host; using production CSP fallbacks"
+    );
+
+    warn.mockRestore();
+  });
+
+  it("denies extra frame-src origins for unrecognized Clerk publishable key formats", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const headers = buildSecurityHeaders({
+      appEnv: "production",
+      cspNonce: "ABcd1234==",
+      clerkPublishableKey: "pk_unknown_not-a-clerk-key",
+    });
+    const csp = headers["Content-Security-Policy"];
+    if (!csp) {
+      throw new Error("Expected enforcing CSP header in production");
+    }
+
+    expect(csp).toContain("frame-src 'self' https://challenges.cloudflare.com");
+    const frameSrc = csp.split("; ").find((part) => part.startsWith("frame-src "));
+    expect(frameSrc).toBe("frame-src 'self' https://challenges.cloudflare.com");
+    expect(warn).toHaveBeenCalledWith(
+      "[security] Unrecognized Clerk publishable key format; denying extra frame-src origins"
+    );
 
     warn.mockRestore();
   });

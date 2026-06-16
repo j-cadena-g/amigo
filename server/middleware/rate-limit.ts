@@ -77,6 +77,7 @@ export const ROUTE_RATE_LIMITS = {
     freshStart: RATE_LIMIT_PRESETS.SENSITIVE,
   },
   settings: {
+    get: RATE_LIMIT_PRESETS.READ,
     patch: RATE_LIMIT_PRESETS.MUTATION,
   },
   sync: {
@@ -129,6 +130,11 @@ export async function enforceRateLimit(
 
 /**
  * Check rate limit without throwing. Returns { allowed: true } or { allowed: false }.
+ *
+ * Unlike the old KV-based implementation, Cloudflare's native limiter always
+ * consumes a token on every call (including when `allowed` is false). Callers
+ * that soft-skip work when limited should expect repeated calls to extend the
+ * rate-limit window rather than peeking without penalty.
  */
 export async function checkRateLimit(
   env: Env,

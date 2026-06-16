@@ -38,9 +38,9 @@ function getClerkCspOrigins(publishableKey?: string): string[] {
   }
 
   console.warn(
-    "[security] Unrecognized Clerk publishable key format; allowing HTTPS frames as fallback"
+    "[security] Unrecognized Clerk publishable key format; denying extra frame-src origins"
   );
-  return ["https:"];
+  return [];
 }
 
 function buildCsp(cspNonce: string, clerkPublishableKey?: string): string {

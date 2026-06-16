@@ -118,11 +118,11 @@ export const handleRestoreRequest: ApiHandler = async ({
           email,
           name,
         })
-        .where(eq(users.id, match.user.id))
+        .where(and(eq(users.id, match.user.id), isNotNull(users.deletedAt)))
         .returning();
 
       if (!user) {
-        throw new ActionError("User not found", "NOT_FOUND");
+        throw new ActionError("Restore already completed", "NOT_FOUND");
       }
 
       await db.batch([
@@ -208,11 +208,11 @@ export const handleRestoreRequest: ApiHandler = async ({
           name,
           role: "member",
         })
-        .where(eq(users.id, match.user.id))
+        .where(and(eq(users.id, match.user.id), isNotNull(users.deletedAt)))
         .returning();
 
       if (!user) {
-        throw new ActionError("User not found", "NOT_FOUND");
+        throw new ActionError("Restore already completed", "NOT_FOUND");
       }
 
       await db.batch([

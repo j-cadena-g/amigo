@@ -34,6 +34,29 @@
     }
   ],
 
+  "ratelimits": [
+    {
+      "name": "RATE_LIMIT_MUTATION",
+      "namespace_id": "1001",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_BULK",
+      "namespace_id": "1002",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_SENSITIVE",
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_READ",
+      "namespace_id": "1004",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
+
   "durable_objects": {
     "bindings": [
       {

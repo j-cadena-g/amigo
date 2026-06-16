@@ -45,6 +45,7 @@ interface BudgetWithSpending {
 interface BudgetListProps {
   budgets: BudgetWithSpending[];
   session: { role: string };
+  homeCurrency: CurrencyCode;
 }
 
 type BudgetFormData = {
@@ -56,20 +57,25 @@ type BudgetFormData = {
   isShared: boolean;
 };
 
-const EMPTY_FORM: BudgetFormData = {
-  name: "",
-  category: "",
-  limitAmount: "",
-  currency: "CAD",
-  period: "monthly",
-  isShared: false,
-};
+function emptyBudgetForm(homeCurrency: CurrencyCode): BudgetFormData {
+  return {
+    name: "",
+    category: "",
+    limitAmount: "",
+    currency: homeCurrency,
+    period: "monthly",
+    isShared: false,
+  };
+}
 
-function getProgressColor(percent: number, remaining: number): string {
-  if (remaining < 0 || percent >= 100) return "bg-red-500";
-  if (percent >= 90) return "bg-red-500";
-  if (percent >= 75) return "bg-yellow-500";
-  return "bg-green-500";
+function getProgressVariant(
+  percent: number,
+  remaining: number
+): "budget-list-progress--ok" | "budget-list-progress--warn" | "budget-list-progress--danger" {
+  if (remaining < 0 || percent >= 100) return "budget-list-progress--danger";
+  if (percent >= 90) return "budget-list-progress--danger";
+  if (percent >= 75) return "budget-list-progress--warn";
+  return "budget-list-progress--ok";
 }
 
 function BudgetCard({
@@ -141,12 +147,15 @@ function BudgetCard({
               {formatCents(budget.limitAmount, budget.currency)}
             </p>
           )}
-          <div className="h-2 w-full rounded-full bg-muted">
-            <div
-              className={`h-2 rounded-full transition-all ${getProgressColor(budget.percentUsed, budget.remainingHomeCents)}`}
-              style={{ width: `${clampedPercent}%` }}
-            />
-          </div>
+          <progress
+            className={cn(
+              "budget-list-progress",
+              getProgressVariant(budget.percentUsed, budget.remainingHomeCents)
+            )}
+            value={clampedPercent}
+            max={100}
+            aria-label={`${budget.name}: ${clampedPercent}% of budget used`}
+          />
           {isOverBudget ? (
             <p className="text-sm font-medium text-red-500">
               Over budget by{" "}
@@ -230,8 +239,11 @@ function BudgetFormDialog({
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium">Period</label>
+            <label htmlFor="budget-form-period" className="text-sm font-medium">
+              Period
+            </label>
             <select
+              id="budget-form-period"
               value={form.period}
               onChange={(e) =>
                 setForm((f) => ({ ...f, period: e.target.value }))
@@ -276,12 +288,16 @@ function BudgetFormDialog({
   );
 }
 
-export function BudgetList({ budgets, session: _session }: BudgetListProps) {
+export function BudgetList({
+  budgets,
+  session: _session,
+  homeCurrency,
+}: BudgetListProps) {
   const revalidator = useRevalidator();
   const [showAdd, setShowAdd] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<BudgetWithSpending | null>(null);
-  const [form, setForm] = useState<BudgetFormData>(EMPTY_FORM);
+  const [form, setForm] = useState<BudgetFormData>(() => emptyBudgetForm(homeCurrency));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -289,7 +305,7 @@ export function BudgetList({ budgets, session: _session }: BudgetListProps) {
   const personal = budgets.filter((b) => !b.isShared);
 
   function openAdd() {
-    setForm(EMPTY_FORM);
+    setForm(emptyBudgetForm(homeCurrency));
     setError(null);
     setShowAdd(true);
   }

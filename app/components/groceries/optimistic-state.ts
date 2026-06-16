@@ -74,8 +74,10 @@ export function applyOptimisticAction(
           : item
       );
 
-    default:
-      return items;
+    default: {
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
   }
 }
 

@@ -4,6 +4,14 @@ import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, groceryItems, groceryTags, scopeToHousehold, and, isNull } from "@amigo/db";
 import { GroceryList } from "@/app/components/groceries/grocery-list";
 import { PushNotificationButton } from "@/app/components/push-notification-button";
+import {
+  hydrateFromServer,
+  getOfflineItems,
+  getOfflineTags,
+  getOfflineSessionContext,
+  isOfflineSupported,
+} from "@/app/lib/offline";
+import type { GroceryItemWithTags } from "@/app/components/groceries/types";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -37,11 +45,140 @@ export async function loader({ context }: LoaderFunctionArgs) {
     tags,
     userId: session.userId,
     householdId: session.householdId,
+    fromOffline: false as const,
   };
 }
 
+function mapOfflineToLoaderShape(
+  offlineItems: Awaited<ReturnType<typeof getOfflineItems>>,
+  offlineTags: Awaited<ReturnType<typeof getOfflineTags>>,
+  userId: string,
+  householdId: string
+) {
+  const tagById = new Map(offlineTags.map((t) => [t.id, t]));
+  const items: GroceryItemWithTags[] = offlineItems.map((item) => ({
+    id: item.id,
+    householdId: item.householdId,
+    createdByUserId: item.createdByUserId,
+    createdByUserDisplayName: item.createdByUserDisplayName,
+    itemName: item.itemName,
+    category: item.category,
+    isPurchased: item.isPurchased,
+    purchasedAt: item.purchasedAt ? new Date(item.purchasedAt) : null,
+    createdAt: new Date(item.createdAt),
+    updatedAt: new Date(item.updatedAt),
+    deletedAt: item.deletedAt ? new Date(item.deletedAt) : null,
+    transferredFromCreatedByUserId: null,
+    groceryItemTags: (item.tagIds ?? []).flatMap((tagId) => {
+      const tag = tagById.get(tagId);
+      if (!tag) return [];
+      return [
+        {
+          itemId: item.id,
+          tagId: tag.id,
+          groceryTag: {
+            id: tag.id,
+            householdId: tag.householdId,
+            name: tag.name,
+            color: tag.color,
+            createdAt: new Date(tag.createdAt),
+            updatedAt: new Date(tag.updatedAt),
+          },
+        },
+      ];
+    }),
+    createdByUser:
+      item.createdByUserId === userId
+        ? { id: userId, name: item.createdByUserDisplayName, email: "" }
+        : item.createdByUserId
+          ? {
+              id: item.createdByUserId,
+              name: item.createdByUserDisplayName,
+              email: "",
+            }
+          : null,
+  }));
+
+  return {
+    items,
+    tags: offlineTags.map((t) => ({
+      id: t.id,
+      householdId: t.householdId,
+      name: t.name,
+      color: t.color,
+      createdAt: new Date(t.createdAt),
+      updatedAt: new Date(t.updatedAt),
+    })),
+    userId,
+    householdId,
+    fromOffline: true as const,
+  };
+}
+
+export async function clientLoader({
+  serverLoader,
+}: {
+  serverLoader: () => ReturnType<typeof loader>;
+}) {
+  if (!(await isOfflineSupported())) {
+    return serverLoader();
+  }
+
+  try {
+    const data = await serverLoader();
+    void hydrateFromServer(
+      data.items.map((item) => ({
+        id: item.id,
+        householdId: item.householdId,
+        createdByUserId: item.createdByUserId,
+        createdByUserDisplayName: item.createdByUserDisplayName,
+        itemName: item.itemName,
+        category: item.category,
+        isPurchased: item.isPurchased,
+        purchasedAt: item.purchasedAt?.getTime() ?? null,
+        createdAt: item.createdAt.getTime(),
+        updatedAt: item.updatedAt.getTime(),
+        deletedAt: item.deletedAt?.getTime() ?? null,
+        tags: item.groceryItemTags.map((git) => ({
+          id: git.groceryTag.id,
+          name: git.groceryTag.name,
+          color: git.groceryTag.color,
+        })),
+      })),
+      data.tags.map((tag) => ({
+        id: tag.id,
+        householdId: tag.householdId,
+        name: tag.name,
+        color: tag.color,
+        createdAt: tag.createdAt.getTime(),
+        updatedAt: tag.updatedAt.getTime(),
+      })),
+      { householdId: data.householdId, userId: data.userId }
+    );
+    return data;
+  } catch {
+    const session = await getOfflineSessionContext();
+    if (!session?.householdId) {
+      throw new Error("Offline and no cached grocery data");
+    }
+    const offlineItems = await getOfflineItems(session.householdId);
+    const offlineTags = await getOfflineTags(session.householdId);
+    if (offlineItems.length === 0 && offlineTags.length === 0) {
+      throw new Error("Offline and no cached grocery data");
+    }
+    return mapOfflineToLoaderShape(
+      offlineItems,
+      offlineTags,
+      session.userId,
+      session.householdId
+    );
+  }
+}
+
+clientLoader.hydrate = true;
+
 export default function Groceries() {
-  const { items, tags, userId } = useLoaderData<typeof loader>();
+  const { items, tags, userId, fromOffline } = useLoaderData<typeof loader>();
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
@@ -53,14 +190,15 @@ export default function Groceries() {
           <p className="mt-1 text-muted-foreground">
             Your household shopping list
           </p>
+          {fromOffline && (
+            <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+              Showing offline data — changes will sync when you&apos;re back online.
+            </p>
+          )}
         </div>
         <PushNotificationButton />
       </div>
-      <GroceryList
-        items={items}
-        allTags={tags}
-        userId={userId}
-      />
+      <GroceryList items={items} allTags={tags} userId={userId} />
     </main>
   );
 }

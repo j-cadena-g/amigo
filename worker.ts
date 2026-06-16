@@ -42,6 +42,7 @@ export default {
     const securityHeaders = buildSecurityHeaders({
       appEnv: env.APP_ENV,
       cspNonce: loadContext.app.cspNonce,
+      clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY,
     });
 
     for (const [name, value] of Object.entries(securityHeaders)) {

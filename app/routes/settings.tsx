@@ -5,6 +5,7 @@ import { getDb, users, households, eq, and, isNull, scopeToHousehold } from "@am
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
+import { TimezoneSelect } from "@/app/components/settings/timezone-select";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -64,12 +65,18 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="text-lg">Household</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div>
               <p className="font-medium">{household.name}</p>
               <p className="text-sm text-muted-foreground">
                 Managed via your Clerk organization
               </p>
+            </div>
+            <div>
+              <TimezoneSelect
+                timezone={household.timezone ?? "UTC"}
+                canEdit={session.role === "owner" || session.role === "admin"}
+              />
             </div>
           </CardContent>
         </Card>

@@ -2,6 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import type { AppSession } from "../env";
 import { getDb, users, households, eq, and, isNull } from "@amigo/db";
 import { getSessionCacheKey } from "./session-cache";
+import { ActionError } from "./errors";
 
 /** Max age of a warm KV session before re-validating membership against D1. */
 const SESSION_WARM_PATH_TTL_MS = 60_000;
@@ -259,4 +260,34 @@ export async function resolveSession(
   }
 
   return { status: "authenticated", session };
+}
+
+/** Re-validates a warm cached session against D1 before sensitive mutations. */
+export async function assertSessionStillValid(
+  db: ReturnType<typeof getDb>,
+  session: AppSession
+): Promise<void> {
+  const currentUser = await db
+    .select({
+      id: users.id,
+      role: users.role,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, session.userId),
+        eq(users.householdId, session.householdId),
+        isNull(users.deletedAt)
+      )
+    )
+    .get();
+
+  if (!currentUser) {
+    throw new ActionError("Session revoked", "UNAUTHORIZED");
+  }
+
+  if (currentUser.role !== session.role) {
+    throw new ActionError("Session role changed — please refresh", "UNAUTHORIZED");
+  }
 }

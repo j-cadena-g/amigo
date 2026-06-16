@@ -1,6 +1,8 @@
 import {
   and,
   eq,
+  households,
+  inArray,
   lte,
   recurringTransactions,
   scopeToHousehold,
@@ -8,6 +10,7 @@ import {
 } from "@amigo/db";
 import type { DrizzleD1 } from "@amigo/db";
 import { toISODate } from "./conversions";
+import { todayInTz } from "./dates";
 import { getExchangeRateForRecord } from "./exchange-rates";
 import { getHomeCurrency } from "./household-currency";
 import { broadcastToHousehold } from "./realtime";
@@ -168,13 +171,12 @@ export async function processDueRecurringRules(
   db: DrizzleD1,
   scope: ProcessDueRecurringMode
 ): Promise<{ processed: number }> {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const todayStr = toISODate(today);
+  const now = new Date();
+  const farthestToday = todayInTz("Pacific/Kiritimati", now);
 
   const conditions = [
     eq(recurringTransactions.active, true),
-    lte(recurringTransactions.nextRunDate, todayStr),
+    lte(recurringTransactions.nextRunDate, farthestToday),
   ];
 
   if (scope.mode === "household_user") {
@@ -184,8 +186,26 @@ export async function processDueRecurringRules(
     );
   }
 
-  const dueRules = await db.query.recurringTransactions.findMany({
+  const candidateRules = await db.query.recurringTransactions.findMany({
     where: and(...conditions),
+  });
+
+  const householdIds = [...new Set(candidateRules.map((r) => r.householdId))];
+  const timezoneByHousehold = new Map<string, string>();
+  if (householdIds.length > 0) {
+    const rows = await db
+      .select({ id: households.id, timezone: households.timezone })
+      .from(households)
+      .where(inArray(households.id, householdIds));
+    for (const row of rows) {
+      timezoneByHousehold.set(row.id, row.timezone ?? "UTC");
+    }
+  }
+
+  const dueRules = candidateRules.filter((rule) => {
+    const tz = timezoneByHousehold.get(rule.householdId) ?? "UTC";
+    const localToday = todayInTz(tz, now);
+    return rule.nextRunDate <= localToday;
   });
 
   if (dueRules.length === 0) {

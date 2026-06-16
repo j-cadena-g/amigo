@@ -1,28 +1,34 @@
 import {
   and,
-  budgets,
   eq,
-  financialAccounts,
   getDb,
-  inArray,
   isNull,
   scopeToHousehold,
   transactions,
   visibleFinancialTransactionsCondition,
 } from "@amigo/db";
-import type { CurrencyCode, DrizzleD1 } from "@amigo/db";
+import { count } from "drizzle-orm";
+import type { CurrencyCode } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
-import { toCents, toISODate } from "../lib/conversions";
+import { toCents } from "../lib/conversions";
+import { isValidIsoDateString } from "../lib/dates";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
-import { parseTransactionsListQuery } from "../lib/request-validation";
+import {
+  parseTransactionsListQuery,
+  zCurrencyCode,
+} from "../lib/request-validation";
 import { withAudit } from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
+import {
+  validateFinancialRefs,
+  validateImportBudgetAndAccountIds,
+} from "../lib/financial-refs";
 
-const currencyEnum = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]);
+const currencyEnum = zCurrencyCode;
 
 function isValidImportDateString(val: string): boolean {
   const head = val.includes("T") ? (val.split("T")[0] ?? "") : val;
@@ -46,67 +52,16 @@ const importDateString = z
       "date must be a valid ISO 8601 calendar day (YYYY-MM-DD, optional time suffix after 'T')",
   });
 
-async function validateImportBudgetAndAccountIds(
-  db: DrizzleD1,
-  householdId: string,
-  rows: { budgetId?: string | null; accountId?: string | null }[]
-) {
-  const budgetIds = [
-    ...new Set(rows.map((r) => r.budgetId).filter((id): id is string => Boolean(id))),
-  ];
-  const accountIds = [
-    ...new Set(rows.map((r) => r.accountId).filter((id): id is string => Boolean(id))),
-  ];
-
-  if (budgetIds.length > 0) {
-    const found = await db
-      .select({ id: budgets.id })
-      .from(budgets)
-      .where(
-        and(
-          scopeToHousehold(budgets.householdId, householdId),
-          inArray(budgets.id, budgetIds),
-          isNull(budgets.deletedAt)
-        )
-      );
-    const ok = new Set(found.map((r) => r.id));
-    const missing = budgetIds.filter((id) => !ok.has(id));
-    if (missing.length > 0) {
-      throw new ActionError(
-        `Unknown or inaccessible budget(s): ${missing.join(", ")}`,
-        "VALIDATION_ERROR"
-      );
-    }
-  }
-
-  if (accountIds.length > 0) {
-    const found = await db
-      .select({ id: financialAccounts.id })
-      .from(financialAccounts)
-      .where(
-        and(
-          scopeToHousehold(financialAccounts.householdId, householdId),
-          inArray(financialAccounts.id, accountIds),
-          isNull(financialAccounts.deletedAt)
-        )
-      );
-    const ok = new Set(found.map((r) => r.id));
-    const missing = accountIds.filter((id) => !ok.has(id));
-    if (missing.length > 0) {
-      throw new ActionError(
-        `Unknown or inaccessible account(s): ${missing.join(", ")}`,
-        "VALIDATION_ERROR"
-      );
-    }
-  }
-}
+const calendarDateString = z
+  .string()
+  .refine(isValidIsoDateString, { message: "date must be YYYY-MM-DD" });
 
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
   category: z.string().min(1).max(100),
   type: z.enum(["income", "expense"]),
-  date: z.coerce.date(),
+  date: calendarDateString,
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
@@ -117,7 +72,7 @@ const updateTransactionSchema = z.object({
   description: z.string().max(500).nullable().optional(),
   category: z.string().min(1).max(100).optional(),
   type: z.enum(["income", "expense"]).optional(),
-  date: z.coerce.date().optional(),
+  date: calendarDateString.optional(),
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
@@ -160,7 +115,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && id === "export") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:export`,
       ROUTE_RATE_LIMITS.transactions.export
     );
@@ -222,7 +177,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:list`,
       ROUTE_RATE_LIMITS.transactions.list
     );
@@ -266,13 +221,18 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
   if (request.method === "POST" && id === "import") {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:import`,
       ROUTE_RATE_LIMITS.transactions.import
     );
 
     const parsed = importBodySchema.parse(await request.json());
-    await validateImportBudgetAndAccountIds(db, session!.householdId, parsed.rows);
+    await validateImportBudgetAndAccountIds(
+      db,
+      session!.householdId,
+      session!.userId,
+      parsed.rows
+    );
     const batchId = crypto.randomUUID();
 
     if (parsed.dryRun) {
@@ -287,16 +247,25 @@ export const handleTransactionsRequest: ApiHandler = async ({
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
 
     const distinctCurrencies = [
-      ...new Set(parsed.rows.map((row) => row.currency ?? "CAD")),
+      ...new Set(parsed.rows.map((row) => row.currency ?? homeCurrency)),
     ] as CurrencyCode[];
     const rateByCurrency = new Map<CurrencyCode, number | null>();
     for (const c of distinctCurrencies) {
       rateByCurrency.set(c, await getExchangeRateForRecord(env, c, homeCurrency));
     }
 
-    const values = parsed.rows.map((row) => {
-      const currency = (row.currency ?? "CAD") as CurrencyCode;
-      return {
+    const seenInBatch = new Set<string>();
+    const values = [];
+    for (const row of parsed.rows) {
+      const externalId = row.externalId?.trim() || null;
+      if (externalId) {
+        if (seenInBatch.has(externalId)) {
+          continue;
+        }
+        seenInBatch.add(externalId);
+      }
+      const currency = (row.currency ?? homeCurrency) as CurrencyCode;
+      values.push({
         id: crypto.randomUUID(),
         householdId: session!.householdId,
         userId: session!.userId,
@@ -310,15 +279,37 @@ export const handleTransactionsRequest: ApiHandler = async ({
         budgetId: row.budgetId ?? null,
         accountId: row.accountId ?? null,
         importBatchId: batchId,
-        externalId: row.externalId?.trim() || null,
-      };
-    });
+        externalId,
+      });
+    }
 
-    await db.transaction(async (tx) => {
-      await tx.insert(transactions).values(values);
-    });
+    const IMPORT_CHUNK_SIZE = 7;
+    if (values.length > 0) {
+      const statements = [];
+      for (let i = 0; i < values.length; i += IMPORT_CHUNK_SIZE) {
+        statements.push(
+          db
+            .insert(transactions)
+            .values(values.slice(i, i + IMPORT_CHUNK_SIZE))
+            .onConflictDoNothing({
+              target: [transactions.householdId, transactions.externalId],
+            })
+        );
+      }
+      await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
+    }
 
-    const inserted = values.length;
+    const insertCount = await db
+      .select({ inserted: count() })
+      .from(transactions)
+      .where(
+        and(
+          scopeToHousehold(transactions.householdId, session!.householdId),
+          eq(transactions.importBatchId, batchId)
+        )
+      );
+    const inserted = insertCount[0]?.inserted ?? 0;
+    const skipped = parsed.rows.length - inserted;
 
     await broadcastToHousehold(env, session!.householdId, {
       type: "TRANSACTION_UPDATE",
@@ -326,19 +317,23 @@ export const handleTransactionsRequest: ApiHandler = async ({
       count: inserted,
     });
 
-    return Response.json({ ok: true, inserted, batchId }, { status: 201 });
+    return Response.json({ ok: true, inserted, skipped, batchId }, { status: 201 });
   }
 
   if (request.method === "POST" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:add`,
       ROUTE_RATE_LIMITS.transactions.create
     );
 
     const validated = addTransactionSchema.parse(await request.json());
-    const currency = validated.currency ?? "CAD";
+    await validateFinancialRefs(db, session!.householdId, session!.userId, {
+      budgetId: validated.budgetId,
+      accountId: validated.accountId,
+    });
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
+    const currency = validated.currency ?? homeCurrency;
     const exchangeRateToHome = await getExchangeRateForRecord(
       env,
       currency,
@@ -369,7 +364,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             description: validated.description?.trim() || null,
             category: validated.category.trim(),
             type: validated.type,
-            date: toISODate(validated.date),
+            date: validated.date,
             budgetId: validated.budgetId || null,
             accountId: validated.accountId || null,
           })
@@ -388,12 +383,16 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id && !RESERVED_TXN_SPLATS.has(id)) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:update`,
       ROUTE_RATE_LIMITS.transactions.update
     );
 
     const validated = updateTransactionSchema.parse(await request.json());
+    await validateFinancialRefs(db, session!.householdId, session!.userId, {
+      budgetId: validated.budgetId,
+      accountId: validated.accountId,
+    });
     const updateData: Record<string, unknown> = {};
 
     if (validated.amount !== undefined) {
@@ -409,7 +408,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.type = validated.type;
     }
     if (validated.date !== undefined) {
-      updateData.date = toISODate(validated.date);
+      updateData.date = validated.date;
     }
     if (validated.budgetId !== undefined) {
       updateData.budgetId = validated.budgetId || null;
@@ -484,7 +483,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id && !RESERVED_TXN_SPLATS.has(id)) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:transactions:delete`,
       ROUTE_RATE_LIMITS.transactions.delete
     );
@@ -517,7 +516,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       async () =>
         db
           .update(transactions)
-          .set({ deletedAt: new Date() })
+          .set({ deletedAt: new Date(), externalId: null })
           .where(
             and(
               eq(transactions.id, id),

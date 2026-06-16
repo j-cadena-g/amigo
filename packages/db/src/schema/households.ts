@@ -10,6 +10,7 @@ export const households = sqliteTable("households", {
   homeCurrency: text("home_currency", { enum: CURRENCY_CODES })
     .notNull()
     .default("CAD"),
+  timezone: text("timezone").notNull().default("UTC"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

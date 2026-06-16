@@ -18,6 +18,7 @@ import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
+import { withAudit } from "../lib/audit";
 
 const zCurrencyCode = z.enum(
   CURRENCY_CODES as unknown as [CurrencyCode, ...CurrencyCode[]]
@@ -58,7 +59,7 @@ export const handleAccountsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:accounts:list`,
       ROUTE_RATE_LIMITS.accounts.list
     );
@@ -80,7 +81,7 @@ export const handleAccountsRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:accounts:create`,
       ROUTE_RATE_LIMITS.accounts.create
     );
@@ -93,30 +94,44 @@ export const handleAccountsRequest: ApiHandler = async ({
       );
     }
 
-    const currency = (validated.currency ?? "CAD") as CurrencyCode;
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
+    const currency = (validated.currency ?? homeCurrency) as CurrencyCode;
     const exchangeRateToHome = await getExchangeRateForRecord(env, currency, homeCurrency);
 
-    const row = await db
-      .insert(financialAccounts)
-      .values({
+    const accountId = crypto.randomUUID();
+    const row = await withAudit(
+      db,
+      {
         householdId: session!.householdId,
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balance: toCents(validated.balance),
-        currency,
-        exchangeRateToHome,
-      })
-      .returning()
-      .get();
+        tableName: "financial_accounts",
+        recordId: accountId,
+        operation: "INSERT",
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .insert(financialAccounts)
+          .values({
+            id: accountId,
+            householdId: session!.householdId,
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balance: toCents(validated.balance),
+            currency,
+            exchangeRateToHome,
+          })
+          .returning()
+          .get()
+    );
 
     return Response.json(row, { status: 201 });
   }
 
   if (request.method === "PATCH" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:accounts:update`,
       ROUTE_RATE_LIMITS.accounts.update
     );
@@ -147,35 +162,48 @@ export const handleAccountsRequest: ApiHandler = async ({
       );
     }
 
-    const currency = (validated.currency ?? "CAD") as CurrencyCode;
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
+    const currency = (validated.currency ?? homeCurrency) as CurrencyCode;
     const exchangeRateToHome = await getExchangeRateForRecord(env, currency, homeCurrency);
 
-    const updated = await db
-      .update(financialAccounts)
-      .set({
-        userId:
-          validated.isShared === undefined
-            ? existing.userId
-            : validated.isShared
-              ? null
-              : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balance: toCents(validated.balance),
-        currency,
-        exchangeRateToHome,
-        ...(validated.archived !== undefined ? { archived: validated.archived } : {}),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(financialAccounts.id, id),
-          scopeToHousehold(financialAccounts.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const updated = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "financial_accounts",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(financialAccounts)
+          .set({
+            userId:
+              validated.isShared === undefined
+                ? existing.userId
+                : validated.isShared
+                  ? null
+                  : session!.userId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balance: toCents(validated.balance),
+            currency,
+            exchangeRateToHome,
+            ...(validated.archived !== undefined ? { archived: validated.archived } : {}),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(financialAccounts.id, id),
+              scopeToHousehold(financialAccounts.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!updated) {
       throw new ActionError("Account not found", "NOT_FOUND");
@@ -186,7 +214,7 @@ export const handleAccountsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:accounts:delete`,
       ROUTE_RATE_LIMITS.accounts.delete
     );
@@ -216,17 +244,29 @@ export const handleAccountsRequest: ApiHandler = async ({
       );
     }
 
-    const deleted = await db
-      .update(financialAccounts)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(financialAccounts.id, id),
-          scopeToHousehold(financialAccounts.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const deleted = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "financial_accounts",
+        recordId: id,
+        operation: "DELETE",
+        oldValues: existing,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(financialAccounts)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(financialAccounts.id, id),
+              scopeToHousehold(financialAccounts.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!deleted) {
       throw new ActionError("Account not found", "NOT_FOUND");

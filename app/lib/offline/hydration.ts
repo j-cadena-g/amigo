@@ -1,5 +1,5 @@
 import { getOfflineDB, type OfflineGroceryItem, type OfflineGroceryTag } from "./db";
-import { setLastSyncTimestamp } from "./sync-queue";
+import { setLastSyncTimestamp, setOfflineSessionContext } from "./sync-queue";
 import {
   detectConflict,
   resolveConflict,
@@ -33,8 +33,12 @@ export interface GroceryTag {
 
 export async function hydrateFromServer(
   items: GroceryItemWithTags[],
-  tags: GroceryTag[]
+  tags: GroceryTag[],
+  session?: { householdId: string; userId: string }
 ): Promise<void> {
+  if (session) {
+    await setOfflineSessionContext(session.householdId, session.userId);
+  }
   const db = getOfflineDB();
   const existingCount = await db.groceryItems.count();
 
@@ -62,6 +66,7 @@ async function bulkInsertItems(items: GroceryItemWithTags[]): Promise<void> {
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     deletedAt: item.deletedAt,
+    tagIds: item.tags?.map((tag) => tag.id),
     _localVersion: 0,
     _serverVersion: item.updatedAt,
     _syncStatus: "synced",
@@ -85,6 +90,23 @@ async function bulkInsertTags(tags: GroceryTag[]): Promise<void> {
   await db.groceryTags.bulkPut(offlineTags);
 }
 
+function toServerGroceryItem(item: GroceryItemWithTags): ServerGroceryItem {
+  return {
+    id: item.id,
+    householdId: item.householdId,
+    createdByUserId: item.createdByUserId,
+    createdByUserDisplayName: item.createdByUserDisplayName,
+    itemName: item.itemName,
+    category: item.category,
+    isPurchased: item.isPurchased,
+    purchasedAt: item.purchasedAt,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    deletedAt: item.deletedAt,
+    tagIds: item.tags?.map((tag) => tag.id),
+  };
+}
+
 async function incrementalSync(
   serverItems: GroceryItemWithTags[],
   serverTags: GroceryTag[]
@@ -98,6 +120,7 @@ async function incrementalSync(
       await db.groceryItems.add({
         ...serverItem,
         createdByUserDisplayName: serverItem.createdByUserDisplayName ?? null,
+        tagIds: serverItem.tags?.map((tag) => tag.id),
         _localVersion: 0,
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
@@ -108,15 +131,18 @@ async function incrementalSync(
     if (localItem._syncStatus === "synced") {
       await db.groceryItems.update(serverItem.id, {
         ...serverItem,
+        tagIds: serverItem.tags?.map((tag) => tag.id),
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
       });
       continue;
     }
 
+    const serverGroceryItem = toServerGroceryItem(serverItem);
+
     const hasConflict = detectConflict({
       localItem,
-      serverItem: serverItem as ServerGroceryItem,
+      serverItem: serverGroceryItem,
     });
 
     if (!hasConflict) {
@@ -128,14 +154,10 @@ async function incrementalSync(
 
     const strategy = resolveConflict({
       localItem,
-      serverItem: serverItem as ServerGroceryItem,
+      serverItem: serverGroceryItem,
     });
 
-    const merged = mergeItems(
-      localItem,
-      serverItem as ServerGroceryItem,
-      strategy
-    );
+    const merged = mergeItems(localItem, serverGroceryItem, strategy);
     await db.groceryItems.put(merged);
   }
 
@@ -152,16 +174,26 @@ async function incrementalSync(
   await setLastSyncTimestamp(Date.now());
 }
 
-export async function getOfflineItems(): Promise<OfflineGroceryItem[]> {
+export async function getOfflineItems(
+  householdId?: string
+): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
+  if (!householdId) {
+    return db.groceryItems.filter((item) => item.deletedAt === null).toArray();
+  }
   return db.groceryItems
+    .where("householdId")
+    .equals(householdId)
     .filter((item) => item.deletedAt === null)
     .toArray();
 }
 
-export async function getOfflineTags(): Promise<OfflineGroceryTag[]> {
+export async function getOfflineTags(
+  householdId?: string
+): Promise<OfflineGroceryTag[]> {
   const db = getOfflineDB();
-  return db.groceryTags.toArray();
+  if (!householdId) return db.groceryTags.toArray();
+  return db.groceryTags.where("householdId").equals(householdId).toArray();
 }
 
 export async function hasOfflineData(): Promise<boolean> {

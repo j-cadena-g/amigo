@@ -6,86 +6,123 @@ import {
   eq,
   getDb,
   groceryItems,
+  households,
+  isNotNull,
+  isNull,
   recurringTransactions,
   transactions,
   users,
 } from "@amigo/db";
+import { getClerkIdentity } from "../lib/clerk";
 import { ActionError, logSecurityEvent, logServerError } from "../lib/errors";
+import { invalidateSessionCache } from "../lib/session-cache";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, type ApiHandler } from "./route";
 
-type RestoreData = {
-  userId: string;
-  householdId: string;
-  email: string;
-  name: string | null;
-};
+async function findSoftDeletedUser(
+  db: ReturnType<typeof getDb>,
+  authId: string,
+  orgId: string
+) {
+  const household = await db
+    .select({ id: households.id, name: households.name })
+    .from(households)
+    .where(eq(households.clerkOrgId, orgId))
+    .get();
 
-const RESTORE_TOKEN_PREFIX = "restore:";
+  if (!household) {
+    return null;
+  }
+
+  const user = await db
+    .select({
+      id: users.id,
+      householdId: users.householdId,
+      email: users.email,
+      name: users.name,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.authId, authId),
+        eq(users.householdId, household.id),
+        isNotNull(users.deletedAt)
+      )
+    )
+    .get();
+
+  if (!user) {
+    return null;
+  }
+
+  return { user, household };
+}
 
 export const handleRestoreRequest: ApiHandler = async ({
   env,
   params,
   request,
+  auth,
 }) => {
   const path = getSplatPath(params);
+  const identity = getClerkIdentity(auth);
+  if (!identity?.userId || !identity.orgId) {
+    throw new ActionError("Unauthorized", "UNAUTHORIZED");
+  }
+
+  const rateLimitKey = identity.userId;
 
   if (request.method === "GET" && path === "pending") {
     await enforceRateLimit(
-      env.CACHE,
-      `pending:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+      env,
+      `${rateLimitKey}:restore:pending`,
       ROUTE_RATE_LIMITS.restore.pending
     );
 
-    const token = new URL(request.url).searchParams.get("token");
-    if (!token) {
+    const db = getDb(env.DB);
+    const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+
+    if (!match) {
       return Response.json({ pending: false });
     }
 
-    const data = await env.CACHE.get(`${RESTORE_TOKEN_PREFIX}${token}`, "json");
-    if (!data) {
-      return Response.json({ pending: false });
-    }
-
-    return Response.json({ pending: true, data });
+    return Response.json({
+      pending: true,
+      householdName: match.household.name,
+    });
   }
 
   if (request.method === "POST" && path === "restore") {
     await enforceRateLimit(
-      env.CACHE,
-      `restore:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+      env,
+      `${rateLimitKey}:restore:restore`,
       ROUTE_RATE_LIMITS.restore.restore
     );
 
-    const body = (await request.json()) as { token?: string };
-    if (!body.token) {
-      throw new ActionError("Token required", "VALIDATION_ERROR");
-    }
-
-    const restoreData = (await env.CACHE.get(
-      `${RESTORE_TOKEN_PREFIX}${body.token}`,
-      "json"
-    )) as RestoreData | null;
-
-    if (!restoreData) {
-      throw new ActionError("Restore session expired", "NOT_FOUND");
-    }
-
     try {
       const db = getDb(env.DB);
+      const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+
+      if (!match) {
+        throw new ActionError("No pending restore found", "NOT_FOUND");
+      }
+
+      const email = identity.email ?? match.user.email;
+      const name = identity.name ?? match.user.name;
 
       const [user] = await db
         .update(users)
         .set({
           deletedAt: null,
-          email: restoreData.email,
-          name: restoreData.name,
+          email,
+          name,
         })
-        .where(eq(users.id, restoreData.userId))
+        .where(and(eq(users.id, match.user.id), isNotNull(users.deletedAt)))
         .returning();
 
       if (!user) {
-        throw new ActionError("User not found", "NOT_FOUND");
+        throw new ActionError("Restore already completed", "NOT_FOUND");
       }
 
       await db.batch([
@@ -111,7 +148,7 @@ export const handleRestoreRequest: ApiHandler = async ({
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
+      await invalidateSessionCache(env.CACHE, identity.userId, identity.orgId);
 
       logSecurityEvent("account_restored", {
         userId: user.id,
@@ -123,7 +160,7 @@ export const handleRestoreRequest: ApiHandler = async ({
     } catch (error) {
       if (error instanceof ActionError) throw error;
       logServerError("restore-account", error, {
-        userId: restoreData.userId,
+        authId: identity.userId,
       });
       throw new ActionError("Failed to restore account", "INTERNAL_ERROR");
     }
@@ -131,35 +168,27 @@ export const handleRestoreRequest: ApiHandler = async ({
 
   if (request.method === "POST" && path === "fresh-start") {
     await enforceRateLimit(
-      env.CACHE,
-      `fresh-start:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+      env,
+      `${rateLimitKey}:restore:fresh-start`,
       ROUTE_RATE_LIMITS.restore.freshStart
     );
 
-    const body = (await request.json()) as { token?: string };
-    if (!body.token) {
-      throw new ActionError("Token required", "VALIDATION_ERROR");
-    }
-
-    const restoreData = (await env.CACHE.get(
-      `${RESTORE_TOKEN_PREFIX}${body.token}`,
-      "json"
-    )) as RestoreData | null;
-
-    if (!restoreData) {
-      throw new ActionError("Restore session expired", "NOT_FOUND");
-    }
-
     try {
       const db = getDb(env.DB);
+      const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+
+      if (!match) {
+        throw new ActionError("No pending restore found", "NOT_FOUND");
+      }
 
       const owner = await db
         .select()
         .from(users)
         .where(
           and(
-            eq(users.householdId, restoreData.householdId),
-            eq(users.role, "owner")
+            eq(users.householdId, match.household.id),
+            eq(users.role, "owner"),
+            isNull(users.deletedAt)
           )
         )
         .get();
@@ -168,19 +197,22 @@ export const handleRestoreRequest: ApiHandler = async ({
         throw new ActionError("Household owner not found", "NOT_FOUND");
       }
 
+      const email = identity.email ?? match.user.email;
+      const name = identity.name ?? match.user.name;
+
       const [user] = await db
         .update(users)
         .set({
           deletedAt: null,
-          email: restoreData.email,
-          name: restoreData.name,
+          email,
+          name,
           role: "member",
         })
-        .where(eq(users.id, restoreData.userId))
+        .where(and(eq(users.id, match.user.id), isNotNull(users.deletedAt)))
         .returning();
 
       if (!user) {
-        throw new ActionError("User not found", "NOT_FOUND");
+        throw new ActionError("Restore already completed", "NOT_FOUND");
       }
 
       await db.batch([
@@ -213,7 +245,7 @@ export const handleRestoreRequest: ApiHandler = async ({
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
+      await invalidateSessionCache(env.CACHE, identity.userId, identity.orgId);
 
       logSecurityEvent("account_fresh_start", {
         userId: user.id,
@@ -226,32 +258,14 @@ export const handleRestoreRequest: ApiHandler = async ({
     } catch (error) {
       if (error instanceof ActionError) throw error;
       logServerError("fresh-start-account", error, {
-        userId: restoreData.userId,
+        authId: identity.userId,
       });
       throw new ActionError("Failed to start fresh", "INTERNAL_ERROR");
     }
   }
 
-  if (request.method === "POST" && path === "cancel") {
-    await enforceRateLimit(
-      env.CACHE,
-      `cancel:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
-      ROUTE_RATE_LIMITS.restore.cancel
-    );
-
-    const body = (await request.json()) as { token?: string };
-    if (body.token) {
-      await env.CACHE.delete(`${RESTORE_TOKEN_PREFIX}${body.token}`);
-    }
-    return Response.json({ success: true });
-  }
-
   const allowedMethods =
-    path === "pending"
-      ? "GET"
-      : path === "restore" || path === "fresh-start" || path === "cancel"
-        ? "POST"
-        : null;
+    path === "pending" ? "GET" : path === "restore" || path === "fresh-start" ? "POST" : null;
 
   if (!allowedMethods) {
     return new Response(null, { status: 404 });

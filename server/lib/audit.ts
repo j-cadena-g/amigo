@@ -1,7 +1,14 @@
 import type { DrizzleD1 } from "@amigo/db";
 import { and, auditLogs, eq } from "@amigo/db";
 
-export const AUDIT_TABLES = ["grocery_items", "transactions"] as const;
+export const AUDIT_TABLES = [
+  "grocery_items",
+  "transactions",
+  "budgets",
+  "financial_accounts",
+  "debts",
+  "recurring_transactions",
+] as const;
 export type AuditTableName = (typeof AUDIT_TABLES)[number];
 
 export function buildAuditHistoryFilter(

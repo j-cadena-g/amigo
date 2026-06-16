@@ -62,7 +62,7 @@ export const handleTagsRequest: ApiHandler = async ({
 
   if (request.method === "GET" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:tags:list`,
       ROUTE_RATE_LIMITS.tags.list
     );
@@ -77,7 +77,7 @@ export const handleTagsRequest: ApiHandler = async ({
 
   if (request.method === "POST" && !id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:tags:create`,
       ROUTE_RATE_LIMITS.tags.create
     );
@@ -113,7 +113,7 @@ export const handleTagsRequest: ApiHandler = async ({
 
   if (request.method === "PATCH" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:tags:update`,
       ROUTE_RATE_LIMITS.tags.update
     );
@@ -166,7 +166,7 @@ export const handleTagsRequest: ApiHandler = async ({
 
   if (request.method === "DELETE" && id) {
     await enforceRateLimit(
-      env.CACHE,
+      env,
       `${session!.userId}:tags:delete`,
       ROUTE_RATE_LIMITS.tags.delete
     );

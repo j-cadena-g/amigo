@@ -64,6 +64,13 @@
       "when": 1778889001456,
       "tag": "0008_transactions_account_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1778890000000,
+      "tag": "0010_transactions_household_external_id_unique",
+      "breakpoints": true
     }
   ]
 }

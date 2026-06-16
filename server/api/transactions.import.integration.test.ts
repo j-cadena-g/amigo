@@ -154,4 +154,64 @@ describe("transactions import integration", () => {
 
     vi.restoreAllMocks();
   });
+
+  it("dedupes concurrent imports with the same externalId", async () => {
+    const env = getIntegrationEnv();
+    const session = testSession({ userId: ownerId, householdId });
+    const today = todayInTz("UTC");
+    const row = {
+      date: today,
+      type: "expense" as const,
+      category: "groceries",
+      amount: 12.34,
+      externalId: "ext-concurrent",
+    };
+
+    const importRequest = () =>
+      handleTransactionsRequest({
+        env,
+        params: { "*": "import" },
+        request: new Request("http://localhost/api/transactions/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: [row], dryRun: false }),
+        }),
+        session,
+        sessionStatus: "authenticated",
+        loadContext: {} as never,
+      });
+
+    const [firstResponse, secondResponse] = await Promise.all([
+      importRequest(),
+      importRequest(),
+    ]);
+
+    expect(firstResponse.status).toBe(201);
+    expect(secondResponse.status).toBe(201);
+
+    const firstBody = (await firstResponse.json()) as {
+      inserted: number;
+      skipped: number;
+    };
+    const secondBody = (await secondResponse.json()) as {
+      inserted: number;
+      skipped: number;
+    };
+
+    expect(firstBody.inserted + secondBody.inserted).toBe(1);
+    expect(firstBody.skipped + secondBody.skipped).toBe(1);
+
+    const db = getDb(env.DB);
+    const stored = await db
+      .select({ externalId: transactions.externalId })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          eq(transactions.externalId, "ext-concurrent"),
+          isNull(transactions.deletedAt)
+        )
+      );
+    expect(stored).toHaveLength(1);
+  });
 });

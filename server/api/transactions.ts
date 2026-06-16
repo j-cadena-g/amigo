@@ -2,12 +2,12 @@ import {
   and,
   eq,
   getDb,
-  inArray,
   isNull,
   scopeToHousehold,
   transactions,
   visibleFinancialTransactionsCondition,
 } from "@amigo/db";
+import { count } from "drizzle-orm";
 import type { CurrencyCode } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
@@ -254,38 +254,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
       rateByCurrency.set(c, await getExchangeRateForRecord(env, c, homeCurrency));
     }
 
-    const existingExternalIds = new Set<string>();
-    const incomingExternalIds = [
-      ...new Set(
-        parsed.rows
-          .map((row) => row.externalId?.trim())
-          .filter((id): id is string => Boolean(id))
-      ),
-    ];
-    if (incomingExternalIds.length > 0) {
-      const existing = await db
-        .select({ externalId: transactions.externalId })
-        .from(transactions)
-        .where(
-          and(
-            scopeToHousehold(transactions.householdId, session!.householdId),
-            inArray(transactions.externalId, incomingExternalIds),
-            isNull(transactions.deletedAt)
-          )
-        );
-      for (const row of existing) {
-        if (row.externalId) existingExternalIds.add(row.externalId);
-      }
-    }
-
     const seenInBatch = new Set<string>();
-    let skipped = 0;
     const values = [];
     for (const row of parsed.rows) {
       const externalId = row.externalId?.trim() || null;
       if (externalId) {
-        if (existingExternalIds.has(externalId) || seenInBatch.has(externalId)) {
-          skipped++;
+        if (seenInBatch.has(externalId)) {
           continue;
         }
         seenInBatch.add(externalId);
@@ -314,13 +288,28 @@ export const handleTransactionsRequest: ApiHandler = async ({
       const statements = [];
       for (let i = 0; i < values.length; i += IMPORT_CHUNK_SIZE) {
         statements.push(
-          db.insert(transactions).values(values.slice(i, i + IMPORT_CHUNK_SIZE))
+          db
+            .insert(transactions)
+            .values(values.slice(i, i + IMPORT_CHUNK_SIZE))
+            .onConflictDoNothing({
+              target: [transactions.householdId, transactions.externalId],
+            })
         );
       }
       await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
     }
 
-    const inserted = values.length;
+    const insertCount = await db
+      .select({ inserted: count() })
+      .from(transactions)
+      .where(
+        and(
+          scopeToHousehold(transactions.householdId, session!.householdId),
+          eq(transactions.importBatchId, batchId)
+        )
+      );
+    const inserted = insertCount[0]?.inserted ?? 0;
+    const skipped = parsed.rows.length - inserted;
 
     await broadcastToHousehold(env, session!.householdId, {
       type: "TRANSACTION_UPDATE",
@@ -527,7 +516,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       async () =>
         db
           .update(transactions)
-          .set({ deletedAt: new Date() })
+          .set({ deletedAt: new Date(), externalId: null })
           .where(
             and(
               eq(transactions.id, id),

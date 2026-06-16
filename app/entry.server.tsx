@@ -14,7 +14,7 @@ export default async function handleRequest(
   const userAgent = request.headers.get("user-agent");
   const cspNonce = getCspNonce(loadContext);
   const body = await renderToReadableStream(
-    <ServerRouter context={routerContext} url={request.url} />,
+    <ServerRouter context={routerContext} url={request.url} nonce={cspNonce} />,
     {
       nonce: cspNonce,
       signal: request.signal,

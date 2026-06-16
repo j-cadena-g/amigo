@@ -18,29 +18,51 @@ function getClerkFrontendApiHost(publishableKey?: string): string | null {
   }
 }
 
+/** CSP origins for Clerk scripts, frames, and API calls. */
+function getClerkCspOrigins(publishableKey?: string): string[] {
+  const host = getClerkFrontendApiHost(publishableKey);
+  if (host) return [`https://${host}`];
+  if (!publishableKey) return [];
+
+  if (publishableKey.startsWith("pk_test_")) {
+    console.warn(
+      "[security] Could not derive Clerk Frontend API host; using test-instance CSP fallbacks"
+    );
+    return ["https://*.clerk.accounts.dev"];
+  }
+  if (publishableKey.startsWith("pk_live_")) {
+    console.warn(
+      "[security] Could not derive Clerk Frontend API host; using production CSP fallbacks"
+    );
+    return ["https://*.clerk.com"];
+  }
+
+  console.warn(
+    "[security] Unrecognized Clerk publishable key format; allowing HTTPS frames as fallback"
+  );
+  return ["https:"];
+}
+
 function buildCsp(cspNonce: string, clerkPublishableKey?: string): string {
-  const clerkHost = getClerkFrontendApiHost(clerkPublishableKey);
-  const clerkOrigin = clerkHost ? `https://${clerkHost}` : null;
+  const clerkOrigins = getClerkCspOrigins(clerkPublishableKey);
 
   const scriptSrc = [
     "'self'",
     `'nonce-${cspNonce}'`,
     "https://challenges.cloudflare.com",
-    ...(clerkOrigin ? [clerkOrigin] : []),
+    ...clerkOrigins,
   ].join(" ");
 
   const connectSrc = [
     "'self'",
     "https:",
     "wss:",
-    ...(clerkOrigin ? [clerkOrigin] : []),
+    ...clerkOrigins,
   ].join(" ");
 
-  const frameSrc = [
-    "'self'",
-    "https://challenges.cloudflare.com",
-    ...(clerkOrigin ? [clerkOrigin] : []),
-  ].join(" ");
+  const frameSrc = ["'self'", "https://challenges.cloudflare.com", ...clerkOrigins].join(
+    " "
+  );
 
   return [
     "default-src 'self'",

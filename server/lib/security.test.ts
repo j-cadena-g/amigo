@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildSecurityHeaders, createCspNonce } from "./security";
 
 describe("security headers", () => {
@@ -35,5 +35,34 @@ describe("security headers", () => {
     expect(headers["Content-Security-Policy"]).toBeUndefined();
     expect(headers["Content-Security-Policy-Report-Only"]).toBeDefined();
     expect(headers["Strict-Transport-Security"]).toBeUndefined();
+  });
+
+  it("falls back to Clerk wildcard origins when the publishable key host cannot be parsed", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const testHeaders = buildSecurityHeaders({
+      appEnv: "production",
+      cspNonce: "ABcd1234==",
+      clerkPublishableKey: "pk_test_not-valid-base64!!!",
+    });
+    const testCsp = testHeaders["Content-Security-Policy"];
+    if (!testCsp) {
+      throw new Error("Expected enforcing CSP header in production");
+    }
+    expect(testCsp).toContain("https://*.clerk.accounts.dev");
+    expect(testCsp).toContain("frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev");
+
+    const liveHeaders = buildSecurityHeaders({
+      appEnv: "production",
+      cspNonce: "ABcd1234==",
+      clerkPublishableKey: "pk_live_not-valid-base64!!!",
+    });
+    const liveCsp = liveHeaders["Content-Security-Policy"];
+    if (!liveCsp) {
+      throw new Error("Expected enforcing CSP header in production");
+    }
+    expect(liveCsp).toContain("https://*.clerk.com");
+
+    warn.mockRestore();
   });
 });

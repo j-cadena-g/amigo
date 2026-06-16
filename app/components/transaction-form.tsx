@@ -53,8 +53,7 @@ export function AddTransactionForm({
           );
           if (!res.ok) return;
           const data = (await res.json()) as { budgetId: string | null };
-          if (!data.budgetId) return;
-          onChange((p) => ({ ...p, budgetId: data.budgetId }));
+          onChange((p) => ({ ...p, budgetId: data.budgetId ?? null }));
         } catch {
           /* aborted */
         }

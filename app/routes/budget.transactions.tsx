@@ -13,6 +13,8 @@ import {
   parseHomeCurrency,
 } from "@amigo/db";
 import { visibleFinancialTransactionsCondition } from "@/server/lib/financial-visibility";
+import { todayInTz } from "@/server/lib/dates";
+import { getHouseholdTimezone } from "@/server/lib/household-timezone";
 import { TransactionList } from "@/app/components/transaction-list";
 
 export async function loader({ context, request }: LoaderFunctionArgs) {
@@ -32,9 +34,13 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     conditions.push(eq(transactions.type, typeFilter));
   }
 
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, session.householdId),
-  });
+  const [household, timeZone] = await Promise.all([
+    db.query.households.findFirst({
+      where: eq(households.id, session.householdId),
+    }),
+    getHouseholdTimezone(db, session.householdId),
+  ]);
+  const todayStr = todayInTz(timeZone);
 
   const items = await db.query.transactions.findMany({
     where: and(...conditions),
@@ -52,12 +58,18 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     userId: session.userId,
     typeFilter: typeFilter === "income" || typeFilter === "expense" ? typeFilter : null,
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
+    todayStr,
   };
 }
 
 export default function Transactions() {
-  const { transactions: initialTransactions, userId, typeFilter, homeCurrency } =
-    useLoaderData<typeof loader>();
+  const {
+    transactions: initialTransactions,
+    userId,
+    typeFilter,
+    homeCurrency,
+    todayStr,
+  } = useLoaderData<typeof loader>();
 
   return (
     <TransactionList
@@ -65,6 +77,7 @@ export default function Transactions() {
       currentUserId={userId}
       typeFilter={typeFilter}
       homeCurrency={homeCurrency}
+      todayStr={todayStr}
     />
   );
 }

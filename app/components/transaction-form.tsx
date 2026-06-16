@@ -110,11 +110,12 @@ export function AddTransactionForm({
         </button>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <input
           type="number"
           step="0.01"
           placeholder="Amount"
+          aria-label="Amount"
           value={form.amount}
           onChange={(e) =>
             onChange((prev) => ({
@@ -122,7 +123,7 @@ export function AddTransactionForm({
               amount: e.target.value,
             }))
           }
-          className="min-w-0 rounded-md border border-input bg-background px-3 py-2"
+          className="col-span-2 min-w-0 rounded-md border border-input bg-background px-3 py-2"
           required
         />
         <CurrencySelect
@@ -131,6 +132,19 @@ export function AddTransactionForm({
           onChange={(v) =>
             onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
           }
+        />
+        <input
+          type="date"
+          aria-label="Date"
+          value={form.date}
+          onChange={(e) =>
+            onChange((prev) => ({
+              ...prev,
+              date: e.target.value,
+            }))
+          }
+          className="rounded-md border border-input bg-background px-3 py-2"
+          required
         />
       </div>
 

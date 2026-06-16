@@ -24,6 +24,7 @@ interface TransactionListProps {
   currentUserId: string;
   typeFilter?: "income" | "expense" | null;
   homeCurrency: CurrencyCode;
+  todayStr: string;
 }
 
 export function TransactionList({
@@ -31,6 +32,7 @@ export function TransactionList({
   currentUserId: _currentUserId,
   typeFilter,
   homeCurrency,
+  todayStr,
 }: TransactionListProps) {
   const revalidator = useRevalidator();
   const confirm = useConfirm();
@@ -115,7 +117,11 @@ export function TransactionList({
   const handleOpenAddForm = () => {
     lastExpenseBudgetIdRef.current = null;
     setAllowBudgetSuggest(true);
-    setNewTransaction((prev) => ({ ...prev, currency: homeCurrency }));
+    setNewTransaction((prev) => ({
+      ...prev,
+      currency: homeCurrency,
+      date: todayStr,
+    }));
     setShowAddForm(true);
   };
 
@@ -158,7 +164,7 @@ export function TransactionList({
           description: "",
           category: "",
           type: "expense",
-          date: "",
+          date: todayStr,
           budgetId: null,
           currency: homeCurrency,
         });

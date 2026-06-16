@@ -12,6 +12,7 @@ export interface OfflineGroceryItem {
   createdAt: number; // timestamp_ms
   updatedAt: number; // timestamp_ms
   deletedAt: number | null; // timestamp_ms
+  tagIds?: string[];
   _localVersion: number;
   _serverVersion: number;
   _syncStatus: "synced" | "pending" | "conflict";

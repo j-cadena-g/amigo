@@ -105,6 +105,7 @@ export interface DashboardData {
     | undefined;
   calendarEvents: DashboardCalendarEvent[];
   calendarMonth: string;
+  todayStr: string;
 }
 
 export async function loadDashboardData(
@@ -116,8 +117,10 @@ export async function loadDashboardData(
   const timeZone = await getHouseholdTimezone(db, session.householdId);
   const { start: monthStart, end: monthEnd } = monthBoundsInTz(now, timeZone);
   const todayStr = todayInTz(timeZone, now);
+  const monthStartYear = Number(monthStart.slice(0, 4));
+  const monthStartMonth = Number(monthStart.slice(5, 7));
   const previousMonthInstant = new Date(
-    Date.parse(`${monthStart}T12:00:00Z`) - 24 * 60 * 60 * 1000
+    Date.UTC(monthStartYear, monthStartMonth - 2, 15, 12)
   );
   const { start: lastMonthStart, end: lastMonthEnd } = monthBoundsInTz(
     previousMonthInstant,
@@ -343,14 +346,18 @@ export async function loadDashboardData(
       },
     });
   }
-  const calendarMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const calendarMonth = monthStart.slice(0, 7);
+  const dashboardYear = Number(monthStart.slice(0, 4));
+  const dashboardMonthIndex = Number(monthStart.slice(5, 7)) - 1;
 
   const spendingCents = spendingResult[0]?.total ?? 0;
   const incomeCents = incomeResult[0]?.total ?? 0;
   const groceryCount = groceryCountResult[0]?.count ?? 0;
   const netCents = incomeCents - spendingCents;
   const currency = parseHomeCurrency(household?.homeCurrency);
-  const monthName = now.toLocaleString("default", { month: "long" });
+  const monthName = new Intl.DateTimeFormat(undefined, { month: "long" }).format(
+    new Date(Date.UTC(dashboardYear, dashboardMonthIndex, 15))
+  );
   const assetsCents =
     (totalAssets[0]?.total ?? 0) + (totalAccounts[0]?.total ?? 0);
   const debtsCents = totalDebts[0]?.total ?? 0;
@@ -394,14 +401,15 @@ export async function loadDashboardData(
     const rateByCurrency = new Map<string, number>();
     await Promise.all(
       distinctCurrencies.map(async (c) => {
-        const rt = await getExchangeRateForRecord(env, c, currency);
-        if (rt === null) {
+        try {
+          const rt = await getExchangeRateForRecord(env, c, currency);
+          if (rt == null) return;
+          rateByCurrency.set(c, rt);
+        } catch {
           console.warn(
-            `[dashboard] missing exchange rate ${c} -> ${currency}; skipping recurring rules in ${c}`
+            `[dashboard] exchange rate lookup failed ${c} -> ${currency}; skipping recurring rules in ${c}`
           );
-          return;
         }
-        rateByCurrency.set(c, rt);
       })
     );
     for (const r of rules) {
@@ -424,7 +432,7 @@ export async function loadDashboardData(
     groceryCount,
     currency,
     monthName,
-    year: now.getFullYear(),
+    year: dashboardYear,
     recentTransactions: recentTxns.map((t) => ({
       id: t.id,
       description: t.description,
@@ -461,5 +469,6 @@ export async function loadDashboardData(
     monthlyComparison: monthlyComparison.length > 0 ? monthlyComparison : undefined,
     calendarEvents,
     calendarMonth,
+    todayStr,
   };
 }

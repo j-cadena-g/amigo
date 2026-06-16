@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/toast-provider";
@@ -29,6 +29,10 @@ export function TimezoneSelect({ timezone, canEdit }: TimezoneSelectProps) {
   const toast = useToast();
   const [value, setValue] = useState(timezone);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(timezone);
+  }, [timezone]);
 
   const options = COMMON_TIMEZONES.includes(value)
     ? COMMON_TIMEZONES

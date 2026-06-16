@@ -9,10 +9,12 @@ import { formatRelativeDate, getCategoryIcon } from "./utils";
 
 interface DashboardRecentTransactionsProps {
   transactions: RecentTransaction[];
+  todayStr: string;
 }
 
 export function DashboardRecentTransactions({
   transactions,
+  todayStr,
 }: DashboardRecentTransactionsProps) {
   return (
     <Card className="lg:col-span-3">
@@ -49,7 +51,7 @@ export function DashboardRecentTransactions({
                     {t.description || t.category}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatRelativeDate(t.date)}
+                    {formatRelativeDate(t.date, todayStr)}
                     {t.description ? ` · ${t.category}` : ""}
                   </p>
                 </div>

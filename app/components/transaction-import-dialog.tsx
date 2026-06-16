@@ -25,9 +25,12 @@ export function TransactionImportDialog({
   const [importBusy, setImportBusy] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const importCloseTimeoutRef = useRef<number | null>(null);
+  const importAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
+      importAbortRef.current?.abort();
+      importAbortRef.current = null;
       if (importCloseTimeoutRef.current != null) {
         clearTimeout(importCloseTimeoutRef.current);
         importCloseTimeoutRef.current = null;
@@ -44,6 +47,8 @@ export function TransactionImportDialog({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      importAbortRef.current?.abort();
+      importAbortRef.current = null;
       if (importCloseTimeoutRef.current != null) {
         clearTimeout(importCloseTimeoutRef.current);
         importCloseTimeoutRef.current = null;
@@ -57,6 +62,9 @@ export function TransactionImportDialog({
     e.preventDefault();
     setImportBusy(true);
     setImportFeedback(null);
+    importAbortRef.current?.abort();
+    const controller = new AbortController();
+    importAbortRef.current = controller;
     try {
       let parsed: unknown;
       try {
@@ -78,6 +86,7 @@ export function TransactionImportDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows, dryRun: importDryRun }),
+        signal: controller.signal,
       });
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean;
@@ -103,7 +112,15 @@ export function TransactionImportDialog({
         importCloseTimeoutRef.current = null;
         handleOpenChange(false);
       }, 1800);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+      setImportFeedback("Import failed — check your connection.");
     } finally {
+      if (importAbortRef.current === controller) {
+        importAbortRef.current = null;
+      }
       setImportBusy(false);
     }
   };

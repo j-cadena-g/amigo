@@ -100,3 +100,26 @@ export async function setLastSyncTimestamp(timestamp: number): Promise<void> {
     value: timestamp,
   });
 }
+
+export async function setOfflineSessionContext(
+  householdId: string,
+  userId: string
+): Promise<void> {
+  const db = getOfflineDB();
+  await db.syncMetadata.put({ key: "householdId", value: householdId });
+  await db.syncMetadata.put({ key: "userId", value: userId });
+}
+
+export async function getOfflineSessionContext(): Promise<{
+  householdId: string;
+  userId: string;
+} | null> {
+  const db = getOfflineDB();
+  const household = await db.syncMetadata.get("householdId");
+  const user = await db.syncMetadata.get("userId");
+  if (household?.value == null || user?.value == null) return null;
+  return {
+    householdId: String(household.value),
+    userId: String(user.value),
+  };
+}

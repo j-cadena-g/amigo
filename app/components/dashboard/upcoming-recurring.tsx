@@ -9,10 +9,12 @@ import { formatRelativeDate } from "./utils";
 
 interface DashboardUpcomingRecurringProps {
   items: UpcomingRecurring[];
+  todayStr: string;
 }
 
 export function DashboardUpcomingRecurring({
   items,
+  todayStr,
 }: DashboardUpcomingRecurringProps) {
   return (
     <Card className="lg:col-span-3">
@@ -56,7 +58,7 @@ export function DashboardUpcomingRecurring({
                     {r.description || r.category}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatRelativeDate(r.nextRunDate)} ·{" "}
+                    {formatRelativeDate(r.nextRunDate, todayStr)} ·{" "}
                     <span className="capitalize">{r.frequency.toLowerCase()}</span>
                   </p>
                 </div>

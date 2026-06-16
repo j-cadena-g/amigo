@@ -8,6 +8,7 @@ import {
   hydrateFromServer,
   getOfflineItems,
   getOfflineTags,
+  getOfflineSessionContext,
   isOfflineSupported,
 } from "@/app/lib/offline";
 import type { GroceryItemWithTags } from "@/app/components/groceries/types";
@@ -68,7 +69,24 @@ function mapOfflineToLoaderShape(
     updatedAt: new Date(item.updatedAt),
     deletedAt: item.deletedAt ? new Date(item.deletedAt) : null,
     transferredFromCreatedByUserId: null,
-    groceryItemTags: [],
+    groceryItemTags: (item.tagIds ?? []).flatMap((tagId) => {
+      const tag = tagById.get(tagId);
+      if (!tag) return [];
+      return [
+        {
+          itemId: item.id,
+          tagId: tag.id,
+          groceryTag: {
+            id: tag.id,
+            householdId: tag.householdId,
+            name: tag.name,
+            color: tag.color,
+            createdAt: new Date(tag.createdAt),
+            updatedAt: new Date(tag.updatedAt),
+          },
+        },
+      ];
+    }),
     createdByUser:
       item.createdByUserId === userId
         ? { id: userId, name: item.createdByUserDisplayName, email: "" }
@@ -80,8 +98,6 @@ function mapOfflineToLoaderShape(
             }
           : null,
   }));
-
-  void tagById;
 
   return {
     items,
@@ -136,20 +152,25 @@ export async function clientLoader({
         color: tag.color,
         createdAt: tag.createdAt.getTime(),
         updatedAt: tag.updatedAt.getTime(),
-      }))
+      })),
+      { householdId: data.householdId, userId: data.userId }
     );
     return data;
   } catch {
-    const offlineItems = await getOfflineItems();
-    const offlineTags = await getOfflineTags();
+    const session = await getOfflineSessionContext();
+    if (!session?.householdId) {
+      throw new Error("Offline and no cached grocery data");
+    }
+    const offlineItems = await getOfflineItems(session.householdId);
+    const offlineTags = await getOfflineTags(session.householdId);
     if (offlineItems.length === 0 && offlineTags.length === 0) {
       throw new Error("Offline and no cached grocery data");
     }
     return mapOfflineToLoaderShape(
       offlineItems,
       offlineTags,
-      "",
-      offlineItems[0]?.householdId ?? ""
+      session.userId,
+      session.householdId
     );
   }
 }

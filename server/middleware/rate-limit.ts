@@ -101,6 +101,8 @@ export const ROUTE_RATE_LIMITS = {
 
 import type { RateLimiterBinding } from "../env";
 
+// Preset matching uses reference equality; callers must pass constants from
+// RATE_LIMIT_PRESETS (via ROUTE_RATE_LIMITS). Unknown objects fall back to mutation.
 function getRateLimiter(env: Env, preset: RateLimitPreset): RateLimiterBinding {
   if (preset === RATE_LIMIT_PRESETS.BULK) {
     return env.RATE_LIMIT_BULK;

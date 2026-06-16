@@ -37,6 +37,7 @@ export default function Dashboard() {
     monthlyComparison,
     calendarEvents,
     calendarMonth,
+    todayStr,
   } = useLoaderData<typeof loader>();
 
   return (
@@ -68,7 +69,10 @@ export default function Dashboard() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-5 animate-stagger-in">
-        <DashboardRecentTransactions transactions={recentTransactions} />
+        <DashboardRecentTransactions
+          transactions={recentTransactions}
+          todayStr={todayStr}
+        />
         <DashboardBudgetProgress
           budgets={budgetsWithSpending}
           currency={currency}
@@ -76,7 +80,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5 mt-4 animate-stagger-in">
-        <DashboardUpcomingRecurring items={upcomingRecurring} />
+        <DashboardUpcomingRecurring items={upcomingRecurring} todayStr={todayStr} />
         <DashboardNetWorth
           netWorthCents={netWorthCents}
           assetsCents={assetsCents}

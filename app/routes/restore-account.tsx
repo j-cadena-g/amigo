@@ -35,6 +35,9 @@ export default function RestoreAccount() {
     void (async () => {
       try {
         const res = await fetch("/api/restore/pending");
+        if (!res.ok) {
+          throw new Error(`pending-check failed: ${res.status}`);
+        }
         const data = (await res.json()) as {
           pending?: boolean;
           householdName?: string;

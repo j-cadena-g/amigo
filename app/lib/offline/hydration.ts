@@ -1,5 +1,5 @@
 import { getOfflineDB, type OfflineGroceryItem, type OfflineGroceryTag } from "./db";
-import { setLastSyncTimestamp } from "./sync-queue";
+import { setLastSyncTimestamp, setOfflineSessionContext } from "./sync-queue";
 import {
   detectConflict,
   resolveConflict,
@@ -33,8 +33,12 @@ export interface GroceryTag {
 
 export async function hydrateFromServer(
   items: GroceryItemWithTags[],
-  tags: GroceryTag[]
+  tags: GroceryTag[],
+  session?: { householdId: string; userId: string }
 ): Promise<void> {
+  if (session) {
+    await setOfflineSessionContext(session.householdId, session.userId);
+  }
   const db = getOfflineDB();
   const existingCount = await db.groceryItems.count();
 
@@ -62,6 +66,7 @@ async function bulkInsertItems(items: GroceryItemWithTags[]): Promise<void> {
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     deletedAt: item.deletedAt,
+    tagIds: item.tags?.map((tag) => tag.id),
     _localVersion: 0,
     _serverVersion: item.updatedAt,
     _syncStatus: "synced",
@@ -98,6 +103,7 @@ async function incrementalSync(
       await db.groceryItems.add({
         ...serverItem,
         createdByUserDisplayName: serverItem.createdByUserDisplayName ?? null,
+        tagIds: serverItem.tags?.map((tag) => tag.id),
         _localVersion: 0,
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
@@ -108,6 +114,7 @@ async function incrementalSync(
     if (localItem._syncStatus === "synced") {
       await db.groceryItems.update(serverItem.id, {
         ...serverItem,
+        tagIds: serverItem.tags?.map((tag) => tag.id),
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
       });
@@ -152,16 +159,24 @@ async function incrementalSync(
   await setLastSyncTimestamp(Date.now());
 }
 
-export async function getOfflineItems(): Promise<OfflineGroceryItem[]> {
+export async function getOfflineItems(
+  householdId?: string
+): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
-  return db.groceryItems
+  const items = await db.groceryItems
     .filter((item) => item.deletedAt === null)
     .toArray();
+  if (!householdId) return items;
+  return items.filter((item) => item.householdId === householdId);
 }
 
-export async function getOfflineTags(): Promise<OfflineGroceryTag[]> {
+export async function getOfflineTags(
+  householdId?: string
+): Promise<OfflineGroceryTag[]> {
   const db = getOfflineDB();
-  return db.groceryTags.toArray();
+  const tags = await db.groceryTags.toArray();
+  if (!householdId) return tags;
+  return tags.filter((tag) => tag.householdId === householdId);
 }
 
 export async function hasOfflineData(): Promise<boolean> {

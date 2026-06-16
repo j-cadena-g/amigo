@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { handleBudgetsRequest } from "../api/budgets";
 import { getBudgetsWithSpending } from "./budget-spending";
 import { getHouseholdTimezone } from "./household-timezone";
+import { todayInTz } from "./dates";
 import {
   createTestDb,
   seedExpenseTransaction,
@@ -37,6 +38,7 @@ describe("budget spending integration", () => {
     diningBudgetId = `budget-dining-${suffix}`;
 
     const db = createTestDb(getIntegrationEnv().DB);
+    const testDate = todayInTz("UTC");
     await seedHouseholdWithOwner(db, {
       householdId,
       clerkOrgId: `org_budget_${suffix}`,
@@ -67,6 +69,7 @@ describe("budget spending integration", () => {
       budgetId: groceriesBudgetId,
       amount: 4599,
       category: "groceries",
+      date: testDate,
     });
     await seedExpenseTransaction(db, {
       id: `tx-budget-groceries-2-${suffix}`,
@@ -75,6 +78,7 @@ describe("budget spending integration", () => {
       budgetId: groceriesBudgetId,
       amount: 1200,
       category: "groceries",
+      date: testDate,
     });
     await seedExpenseTransaction(db, {
       id: `tx-budget-dining-1-${suffix}`,
@@ -83,6 +87,7 @@ describe("budget spending integration", () => {
       budgetId: diningBudgetId,
       amount: 2150,
       category: "dining",
+      date: testDate,
     });
   });
 

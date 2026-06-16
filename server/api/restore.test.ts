@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getClerkIdentity } from "../lib/clerk";
 
 describe("restore identity", () => {
-  it("requires clerk userId and orgId for restore handlers", () => {
+  it("normalizes Clerk identity payloads (orgId remains optional at parse time)", () => {
     expect(getClerkIdentity(null)).toBeNull();
     expect(
       getClerkIdentity({ userId: "user_1", orgId: undefined })

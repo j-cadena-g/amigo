@@ -6,7 +6,6 @@ import {
   users,
   type DrizzleD1,
 } from "@amigo/db";
-import { todayInTz } from "../lib/dates";
 
 const nowMs = () => Date.now();
 
@@ -114,7 +113,7 @@ export async function seedExpenseTransaction(
   }
 ) {
   const ts = nowMs();
-  const timeZone = "UTC";
+  const defaultTestDate = "2026-01-15";
   await db.insert(transactions).values({
     id: options.id,
     householdId: options.householdId,
@@ -125,7 +124,7 @@ export async function seedExpenseTransaction(
     category: options.category,
     description: options.category,
     type: "expense",
-    date: options.date ?? todayInTz(timeZone),
+    date: options.date ?? defaultTestDate,
     externalId: options.externalId ?? null,
     userDisplayName: options.userDisplayName ?? null,
     createdAt: new Date(ts),

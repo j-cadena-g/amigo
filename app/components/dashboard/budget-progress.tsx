@@ -44,7 +44,9 @@ export function DashboardBudgetProgress({
                       100,
                       Math.round((b.spentHomeCents / b.limitHomeCents) * 100)
                     )
-                  : 0;
+                  : b.spentHomeCents > 0
+                    ? 100
+                    : 0;
               const isOver = b.spentHomeCents > b.limitHomeCents;
               const isCritical = !isOver && pct >= 90;
               const isWarn = !isOver && pct >= 75 && pct < 90;
@@ -82,7 +84,11 @@ export function DashboardBudgetProgress({
                     )}
                     value={Math.min(pct, 100)}
                     max={100}
-                    aria-label={`${b.name}: ${pct}% of budget used`}
+                    aria-label={
+                      isOver
+                        ? `${b.name}: over budget`
+                        : `${b.name}: ${pct}% of budget used`
+                    }
                   />
                   <div className="flex items-center justify-between mt-1">
                     <span

@@ -38,6 +38,10 @@ const requiredValues = {
     description:
       "Clerk publishable key (pk_test_/pk_live_ + URL-safe base64 FAPI URL)",
   },
+  APP_ORIGIN: {
+    pattern: /^https?:\/\/[^/\s?#]+$/i,
+    description: "application origin including protocol, without path",
+  },
 };
 
 const replacements = [
@@ -66,6 +70,11 @@ const replacements = [
     label: "APP_ENV",
     pattern: /("APP_ENV"\s*:\s*")([^"]*)(")/,
     envName: "APP_ENV",
+  },
+  {
+    label: "APP_ORIGIN",
+    pattern: /("APP_ORIGIN"\s*:\s*")([^"]*)(")/,
+    envName: "APP_ORIGIN",
   },
   {
     label: "CLERK_PUBLISHABLE_KEY",
@@ -112,6 +121,7 @@ async function main() {
     CLOUDFLARE_KV_NAMESPACE_ID: getRequiredValue("CLOUDFLARE_KV_NAMESPACE_ID"),
     CLOUDFLARE_CUSTOM_DOMAIN: getRequiredValue("CLOUDFLARE_CUSTOM_DOMAIN"),
     CLERK_PUBLISHABLE_KEY: getRequiredValue("CLERK_PUBLISHABLE_KEY"),
+    APP_ORIGIN: getRequiredValue("APP_ORIGIN"),
     APP_ENV:
       globalThis.process.env.APP_ENV?.trim() ||
       (outputPath.endsWith(".wrangler.dev.jsonc") ? "development" : "production"),

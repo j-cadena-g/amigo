@@ -6,6 +6,7 @@ export const AUDIT_TABLES = [
   "transactions",
   "budgets",
   "financial_accounts",
+  "assets",
   "debts",
   "recurring_transactions",
 ] as const;

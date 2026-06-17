@@ -8,9 +8,13 @@ import {
   scopeToHousehold,
 } from "@amigo/db";
 import { z } from "zod";
-import { ActionError } from "../lib/errors";
+import { ActionError, logSecurityEvent } from "../lib/errors";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import { assertPermission, canManageSharedItems } from "../lib/permissions";
+import {
+  isExplicitAdminTakeover,
+  resolveFinancialObjectUserId,
+} from "../lib/financial-object-permissions";
 import { toCents } from "../lib/conversions";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
@@ -19,14 +23,38 @@ import { withAudit } from "../lib/audit";
 
 const currencySchema = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional();
 
+const loanShape = {
+  type: z.literal("LOAN"),
+  name: z.string().trim().min(1),
+  loanAmount: z.number().positive(),
+  totalPaid: z.number().min(0),
+  currency: currencySchema,
+  adminTakeover: z.boolean().optional(),
+};
+
+const creditCardShape = {
+  type: z.literal("CREDIT_CARD"),
+  name: z.string().trim().min(1),
+  creditLimit: z.number().positive(),
+  availableCredit: z.number().min(0),
+  currency: currencySchema,
+  adminTakeover: z.boolean().optional(),
+};
+
 const loanSchema = z
   .object({
-    type: z.literal("LOAN"),
-    name: z.string().trim().min(1),
-    loanAmount: z.number().positive(),
-    totalPaid: z.number().min(0),
-    currency: currencySchema,
+    ...loanShape,
     isShared: z.boolean().optional().default(false),
+  })
+  .refine((data) => data.totalPaid <= data.loanAmount, {
+    message: "Total paid cannot exceed loan amount",
+    path: ["totalPaid"],
+  });
+
+const updateLoanSchema = z
+  .object({
+    ...loanShape,
+    isShared: z.boolean().optional(),
   })
   .refine((data) => data.totalPaid <= data.loanAmount, {
     message: "Total paid cannot exceed loan amount",
@@ -35,12 +63,18 @@ const loanSchema = z
 
 const creditCardSchema = z
   .object({
-    type: z.literal("CREDIT_CARD"),
-    name: z.string().trim().min(1),
-    creditLimit: z.number().positive(),
-    availableCredit: z.number().min(0),
-    currency: currencySchema,
+    ...creditCardShape,
     isShared: z.boolean().optional().default(false),
+  })
+  .refine((data) => data.availableCredit <= data.creditLimit, {
+    message: "Available credit cannot exceed credit limit",
+    path: ["availableCredit"],
+  });
+
+const updateCreditCardSchema = z
+  .object({
+    ...creditCardShape,
+    isShared: z.boolean().optional(),
   })
   .refine((data) => data.availableCredit <= data.creditLimit, {
     message: "Available credit cannot exceed credit limit",
@@ -51,8 +85,14 @@ const addDebtSchema = z.discriminatedUnion("type", [
   loanSchema,
   creditCardSchema,
 ]);
+const updateDebtSchema = z.discriminatedUnion("type", [
+  updateLoanSchema,
+  updateCreditCardSchema,
+]);
 
-function debtToCents(validated: z.infer<typeof addDebtSchema>) {
+function debtToCents(
+  validated: z.infer<typeof addDebtSchema> | z.infer<typeof updateDebtSchema>
+) {
   if (validated.type === "LOAN") {
     return {
       balanceInitial: toCents(validated.loanAmount),
@@ -164,7 +204,7 @@ export const handleDebtsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.debts.update
     );
 
-    const validated = addDebtSchema.parse(await request.json());
+    const validated = updateDebtSchema.parse(await request.json());
     const existing = await db.query.debts.findFirst({
       where: and(
         eq(debts.id, id),
@@ -177,18 +217,20 @@ export const handleDebtsRequest: ApiHandler = async ({
       throw new ActionError("Debt not found", "NOT_FOUND");
     }
 
-    const isCurrentlyShared = existing.userId === null;
-    if (isCurrentlyShared || validated.isShared) {
-      assertPermission(
-        canManageSharedItems(session!),
-        "Only owners and admins can modify shared debts"
-      );
-    } else if (existing.userId !== session!.userId) {
-      throw new ActionError(
-        "Cannot modify another user's personal debt",
-        "PERMISSION_DENIED"
-      );
-    }
+    const nextUserId = resolveFinancialObjectUserId({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+      canManageShared: canManageSharedItems(session!),
+      objectName: "debt",
+    });
+    const adminTakeover = isExplicitAdminTakeover({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+    });
 
     const currency = validated.currency ?? "CAD";
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
@@ -214,7 +256,7 @@ export const handleDebtsRequest: ApiHandler = async ({
         db
           .update(debts)
           .set({
-            userId: validated.isShared ? null : session!.userId,
+            userId: nextUserId,
             name: validated.name.trim(),
             type: validated.type,
             balanceInitial,
@@ -236,6 +278,16 @@ export const handleDebtsRequest: ApiHandler = async ({
 
     if (!updated) {
       throw new ActionError("Debt not found", "NOT_FOUND");
+    }
+
+    if (adminTakeover) {
+      logSecurityEvent("personal_financial_object_takeover", {
+        tableName: "debts",
+        recordId: id,
+        previousUserId: existing.userId,
+        changedBy: session!.userId,
+        householdId: session!.householdId,
+      });
     }
 
     return Response.json(updated);

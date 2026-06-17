@@ -19,6 +19,19 @@ import { zCurrencyCode } from "../lib/request-validation";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
+const MIN_RECURRING_START_DATE = new Date(Date.UTC(2000, 0, 1));
+const MAX_RECURRING_START_DATE = new Date(Date.UTC(2100, 11, 31));
+
+const recurringStartDateSchema = z.coerce.date().refine(
+  (date) =>
+    Number.isFinite(date.getTime()) &&
+    date >= MIN_RECURRING_START_DATE &&
+    date <= MAX_RECURRING_START_DATE,
+  {
+    message: "startDate must be between 2000-01-01 and 2100-12-31",
+  }
+);
+
 export const createRuleSchema = z.object({
   amount: z.number().positive(),
   category: z.string().min(1).max(100),
@@ -27,7 +40,7 @@ export const createRuleSchema = z.object({
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
   interval: z.number().int().positive().optional(),
   dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
-  startDate: z.coerce.date(),
+  startDate: recurringStartDateSchema,
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
   currency: zCurrencyCode.optional(),
@@ -41,7 +54,7 @@ const updateRuleSchema = z.object({
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
   interval: z.number().int().positive().optional(),
   dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
-  startDate: z.coerce.date().optional(),
+  startDate: recurringStartDateSchema.optional(),
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
   currency: zCurrencyCode.optional(),

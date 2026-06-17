@@ -13,6 +13,7 @@ export interface Env {
   ASSETS: Fetcher;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
+  APP_ORIGIN: string;
   APP_ENV: string;
   /** mailto: or https: URI for Web Push VAPID */
   VAPID_SUBJECT?: string;

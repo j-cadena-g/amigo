@@ -8,20 +8,30 @@ import {
   scopeToHousehold,
 } from "@amigo/db";
 import { z } from "zod";
-import { ActionError } from "../lib/errors";
+import { ActionError, logSecurityEvent } from "../lib/errors";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import { assertPermission, canManageSharedItems } from "../lib/permissions";
+import {
+  isExplicitAdminTakeover,
+  resolveFinancialObjectUserId,
+} from "../lib/financial-object-permissions";
 import { toCents } from "../lib/conversions";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
+import { withAudit } from "../lib/audit";
 
-const assetSchema = z.object({
+const createAssetSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["BANK", "INVESTMENT", "CASH", "PROPERTY"]),
   balance: z.number(),
   currency: z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional(),
   isShared: z.boolean().optional().default(false),
+  adminTakeover: z.boolean().optional(),
+});
+
+const updateAssetSchema = createAssetSchema.extend({
+  isShared: z.boolean().optional(),
 });
 
 export const handleAssetsRequest: ApiHandler = async ({
@@ -61,7 +71,7 @@ export const handleAssetsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.assets.create
     );
 
-    const validated = assetSchema.parse(await request.json());
+    const validated = createAssetSchema.parse(await request.json());
     if (validated.isShared) {
       assertPermission(
         canManageSharedItems(session!),
@@ -77,19 +87,33 @@ export const handleAssetsRequest: ApiHandler = async ({
       homeCurrency
     );
 
-    const asset = await db
-      .insert(assets)
-      .values({
+    const assetId = crypto.randomUUID();
+    const asset = await withAudit(
+      db,
+      {
         householdId: session!.householdId,
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balance: toCents(validated.balance),
-        currency,
-        exchangeRateToHome,
-      })
-      .returning()
-      .get();
+        tableName: "assets",
+        recordId: assetId,
+        operation: "INSERT",
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .insert(assets)
+          .values({
+            id: assetId,
+            householdId: session!.householdId,
+            userId: validated.isShared ? null : session!.userId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balance: toCents(validated.balance),
+            currency,
+            exchangeRateToHome,
+          })
+          .returning()
+          .get()
+    );
 
     return Response.json(asset, { status: 201 });
   }
@@ -101,7 +125,7 @@ export const handleAssetsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.assets.update
     );
 
-    const validated = assetSchema.parse(await request.json());
+    const validated = updateAssetSchema.parse(await request.json());
     const existing = await db.query.assets.findFirst({
       where: and(
         eq(assets.id, id),
@@ -114,18 +138,20 @@ export const handleAssetsRequest: ApiHandler = async ({
       throw new ActionError("Asset not found", "NOT_FOUND");
     }
 
-    const isCurrentlyShared = existing.userId === null;
-    if (isCurrentlyShared || validated.isShared) {
-      assertPermission(
-        canManageSharedItems(session!),
-        "Only owners and admins can modify shared assets"
-      );
-    } else if (existing.userId !== session!.userId) {
-      throw new ActionError(
-        "Cannot modify another user's personal asset",
-        "PERMISSION_DENIED"
-      );
-    }
+    const nextUserId = resolveFinancialObjectUserId({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+      canManageShared: canManageSharedItems(session!),
+      objectName: "asset",
+    });
+    const adminTakeover = isExplicitAdminTakeover({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+    });
 
     const currency = validated.currency ?? "CAD";
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
@@ -135,28 +161,51 @@ export const handleAssetsRequest: ApiHandler = async ({
       homeCurrency
     );
 
-    const updated = await db
-      .update(assets)
-      .set({
-        userId: validated.isShared ? null : session!.userId,
-        name: validated.name.trim(),
-        type: validated.type,
-        balance: toCents(validated.balance),
-        currency,
-        exchangeRateToHome,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(assets.id, id),
-          scopeToHousehold(assets.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const updated = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "assets",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(assets)
+          .set({
+            userId: nextUserId,
+            name: validated.name.trim(),
+            type: validated.type,
+            balance: toCents(validated.balance),
+            currency,
+            exchangeRateToHome,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(assets.id, id),
+              scopeToHousehold(assets.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!updated) {
       throw new ActionError("Asset not found", "NOT_FOUND");
+    }
+
+    if (adminTakeover) {
+      logSecurityEvent("personal_financial_object_takeover", {
+        tableName: "assets",
+        recordId: id,
+        previousUserId: existing.userId,
+        changedBy: session!.userId,
+        householdId: session!.householdId,
+      });
     }
 
     return Response.json(updated);
@@ -194,17 +243,29 @@ export const handleAssetsRequest: ApiHandler = async ({
       );
     }
 
-    const deleted = await db
-      .update(assets)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(assets.id, id),
-          scopeToHousehold(assets.householdId, session!.householdId)
-        )
-      )
-      .returning()
-      .get();
+    const deleted = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "assets",
+        recordId: id,
+        operation: "DELETE",
+        oldValues: existing,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(assets)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(assets.id, id),
+              scopeToHousehold(assets.householdId, session!.householdId)
+            )
+          )
+          .returning()
+          .get()
+    );
 
     if (!deleted) {
       throw new ActionError("Asset not found", "NOT_FOUND");

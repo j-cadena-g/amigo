@@ -1,5 +1,6 @@
 import {
   and,
+  budgets,
   eq,
   getDb,
   isNull,
@@ -8,10 +9,11 @@ import {
   visibleFinancialTransactionsCondition,
 } from "@amigo/db";
 import { count } from "drizzle-orm";
-import type { CurrencyCode } from "@amigo/db";
+import type { CurrencyCode, DrizzleD1, Transaction } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
+import type { AppSession } from "../env";
 import { toCents } from "../lib/conversions";
 import { isValidIsoDateString } from "../lib/dates";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
@@ -96,9 +98,53 @@ const importBodySchema = z.object({
 });
 
 function csvEscape(value: string | number | boolean | null | undefined): string {
-  const s = value === null || value === undefined ? "" : String(value);
+  const raw = value === null || value === undefined ? "" : String(value);
+  const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
+}
+
+async function canReadTransactionThroughSharedBudget(
+  db: DrizzleD1,
+  householdId: string,
+  budgetId: string | null
+): Promise<boolean> {
+  if (!budgetId) return false;
+  const sharedBudget = await db.query.budgets.findFirst({
+    where: and(
+      eq(budgets.id, budgetId),
+      scopeToHousehold(budgets.householdId, householdId),
+      isNull(budgets.userId),
+      isNull(budgets.deletedAt)
+    ),
+  });
+  return Boolean(sharedBudget);
+}
+
+async function assertCanWriteTransaction(
+  db: DrizzleD1,
+  session: AppSession,
+  transaction: Transaction,
+  action: "modify" | "delete"
+) {
+  if (transaction.userId === session.userId) {
+    return;
+  }
+
+  if (
+    await canReadTransactionThroughSharedBudget(
+      db,
+      session.householdId,
+      transaction.budgetId
+    )
+  ) {
+    throw new ActionError(
+      `Cannot ${action} another user's transaction`,
+      "PERMISSION_DENIED"
+    );
+  }
+
+  throw new ActionError("Transaction not found", "NOT_FOUND");
 }
 
 const RESERVED_TXN_SPLATS = new Set(["export", "import"]);
@@ -426,20 +472,18 @@ export const handleTransactionsRequest: ApiHandler = async ({
       );
     }
 
-    const visibilityCondition = visibleFinancialTransactionsCondition(session!.userId);
-
     const existing = await db.query.transactions.findFirst({
       where: and(
         eq(transactions.id, id),
         scopeToHousehold(transactions.householdId, session!.householdId),
-        isNull(transactions.deletedAt),
-        visibilityCondition
+        isNull(transactions.deletedAt)
       ),
     });
 
     if (!existing) {
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
+    await assertCanWriteTransaction(db, session!, existing, "modify");
 
     const updated = await withAudit(
       db,
@@ -460,8 +504,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             and(
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
-              isNull(transactions.deletedAt),
-              visibilityCondition
+              isNull(transactions.deletedAt)
             )
           )
           .returning()
@@ -488,20 +531,18 @@ export const handleTransactionsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.transactions.delete
     );
 
-    const visibilityCondition = visibleFinancialTransactionsCondition(session!.userId);
-
     const existing = await db.query.transactions.findFirst({
       where: and(
         eq(transactions.id, id),
         scopeToHousehold(transactions.householdId, session!.householdId),
-        isNull(transactions.deletedAt),
-        visibilityCondition
+        isNull(transactions.deletedAt)
       ),
     });
 
     if (!existing) {
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
+    await assertCanWriteTransaction(db, session!, existing, "delete");
 
     const deleted = await withAudit(
       db,
@@ -521,8 +562,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             and(
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
-              isNull(transactions.deletedAt),
-              visibilityCondition
+              isNull(transactions.deletedAt)
             )
           )
           .returning()

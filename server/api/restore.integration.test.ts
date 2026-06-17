@@ -40,6 +40,7 @@ describe("restore integration", () => {
       userId: deletedUserId,
       authId: deletedAuthId,
       householdId,
+      restoreAllowedUntil: new Date(Date.now() + 15 * 60 * 1000),
     });
     await seedExpenseTransaction(db, {
       id: deletedTxnId,
@@ -68,6 +69,33 @@ describe("restore integration", () => {
     await expect(response.json()).resolves.toEqual({
       pending: true,
       householdName: "Test Household",
+    });
+  });
+
+  it("does not report pending restore for an admin-removed member without explicit restore eligibility", async () => {
+    const env = getIntegrationEnv();
+    const adminRemovedAuthId = `clerk_restore_admin_removed_${crypto.randomUUID()}`;
+    await seedSoftDeletedMember(createTestDb(env.DB), {
+      userId: `user-restore-admin-removed-${crypto.randomUUID()}`,
+      authId: adminRemovedAuthId,
+      householdId,
+      restoreAllowedUntil: null,
+    });
+
+    const response = await handleRestoreRequest({
+      env,
+      params: { "*": "pending" },
+      request: new Request("http://localhost/api/restore/pending", {
+        method: "GET",
+      }),
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+      auth: clerkAuth({ userId: adminRemovedAuthId, orgId: clerkOrgId }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      pending: false,
     });
   });
 

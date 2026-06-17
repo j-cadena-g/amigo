@@ -50,7 +50,9 @@ interface RecurringRule {
   active: boolean;
 }
 
-function getRecurringOccurrences(
+const MAX_RECURRING_CALENDAR_STEPS = 500;
+
+export function getRecurringOccurrences(
   rule: RecurringRule,
   monthStart: Date,
   monthEnd: Date
@@ -58,9 +60,15 @@ function getRecurringOccurrences(
   const events: CalendarEvent[] = [];
   if (!rule.active) return events;
 
-  let current = new Date(`${rule.startDate}T00:00:00Z`);
+  const startDate = new Date(`${rule.startDate}T00:00:00Z`);
+  const nextRun = new Date(`${rule.nextRunDate}T00:00:00Z`);
+  let current = nextRun > startDate ? nextRun : startDate;
+  let steps = 0;
 
   while (current < monthStart) {
+    if (steps++ >= MAX_RECURRING_CALENDAR_STEPS) {
+      return events;
+    }
     current = calculateNextRunDate(
       rule.frequency,
       rule.interval,
@@ -69,9 +77,10 @@ function getRecurringOccurrences(
     );
   }
 
-  const nextRun = new Date(`${rule.nextRunDate}T00:00:00Z`);
-
   while (current <= monthEnd) {
+    if (steps++ >= MAX_RECURRING_CALENDAR_STEPS) {
+      break;
+    }
     if (rule.endDate && current > new Date(`${rule.endDate}T00:00:00Z`)) {
       break;
     }

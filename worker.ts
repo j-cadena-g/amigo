@@ -11,6 +11,7 @@ import { getClerkIdentity } from "./server/lib/clerk";
 import { getRequestHandlerMode } from "./server/lib/request-handler-mode";
 import { buildSecurityHeaders } from "./server/lib/security";
 import { resolveSession } from "./server/lib/session";
+import { requestMatchesAllowedOrigin } from "./server/lib/request-origin";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -100,12 +101,17 @@ export default {
 export { HouseholdDO };
 
 async function handleWebSocketUpgrade(request: Request, env: Env) {
+  if (!requestMatchesAllowedOrigin(request, env.APP_ORIGIN)) {
+    return Response.json({ error: "Invalid request origin" }, { status: 403 });
+  }
+
   const clerk = createClerkClient({
     secretKey: env.CLERK_SECRET_KEY,
     publishableKey: env.CLERK_PUBLISHABLE_KEY,
   });
   const authState = await clerk.authenticateRequest(request, {
     acceptsToken: "any",
+    authorizedParties: [env.APP_ORIGIN],
   });
   const identity = getClerkIdentity(authState.toAuth());
 

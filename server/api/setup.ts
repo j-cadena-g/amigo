@@ -25,6 +25,13 @@ export const handleSetupRequest: ApiHandler = async ({
     throw new ActionError("Unauthorized", "UNAUTHORIZED");
   }
 
+  if (!auth.has({ role: "org:admin" })) {
+    throw new ActionError(
+      "Only Clerk organization admins can set up a household",
+      "PERMISSION_DENIED"
+    );
+  }
+
   const db = getDb(env.DB);
 
   const existing = await db

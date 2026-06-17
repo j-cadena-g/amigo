@@ -1,4 +1,5 @@
 import { getAuth } from "@clerk/react-router/server";
+import { getDb } from "@amigo/db";
 import type {
   ActionFunctionArgs,
   AppLoadContext,
@@ -8,6 +9,8 @@ import type {
 import { ZodError } from "zod";
 import type { AppSession, Env, SessionStatus } from "../env";
 import { ActionError } from "../lib/errors";
+import { isUnsafeHttpMethod, requestMatchesAllowedOrigin } from "../lib/request-origin";
+import { assertSessionStillValid } from "../lib/session";
 
 type ApiRouteArgs = LoaderFunctionArgs | ActionFunctionArgs;
 type ApiAuthMode = "none" | "strict" | "clerk";
@@ -34,6 +37,7 @@ export async function handleApiRoute(
   }
 ) {
   try {
+    const requestIsUnsafe = isUnsafeHttpMethod(args.request.method);
     const baseArgs: ApiHandlerArgs = {
       request: args.request,
       params: args.params,
@@ -43,6 +47,17 @@ export async function handleApiRoute(
       loadContext: args.context,
     };
 
+    if (
+      options.auth !== "none" &&
+      requestIsUnsafe &&
+      !requestMatchesAllowedOrigin(args.request, baseArgs.env.APP_ORIGIN)
+    ) {
+      return Response.json(
+        { error: "Invalid request origin", code: "PERMISSION_DENIED" },
+        { status: 403 }
+      );
+    }
+
     if (options.auth === "strict") {
       const authError = getSessionErrorResponse(
         baseArgs.sessionStatus,
@@ -50,6 +65,9 @@ export async function handleApiRoute(
       );
       if (authError) {
         return authError;
+      }
+      if (requestIsUnsafe) {
+        await assertSessionStillValid(getDb(baseArgs.env.DB), baseArgs.session!);
       }
     }
 

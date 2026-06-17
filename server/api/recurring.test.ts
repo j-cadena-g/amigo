@@ -40,4 +40,13 @@ describe("createRuleSchema", () => {
       dayOfMonth: null,
     });
   });
+
+  it("rejects ancient start dates", () => {
+    expect(() =>
+      createRuleSchema.parse({
+        ...base,
+        startDate: "1999-12-31",
+      })
+    ).toThrow(/startDate must be between 2000-01-01 and 2100-12-31/);
+  });
 });

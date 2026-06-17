@@ -10,8 +10,12 @@ import {
   visibleRecurringRulesCondition,
 } from "@amigo/db";
 import { z } from "zod";
-import { ActionError } from "../lib/errors";
+import { ActionError, logSecurityEvent } from "../lib/errors";
 import { assertPermission, canManageSharedBudgets } from "../lib/permissions";
+import {
+  isExplicitAdminTakeover,
+  resolveFinancialObjectUserId,
+} from "../lib/financial-object-permissions";
 import { toCents } from "../lib/conversions";
 import { computeLimitAmountHomeCents } from "../lib/money";
 import { withAudit } from "../lib/audit";
@@ -28,6 +32,7 @@ const budgetSchema = z.object({
   limitAmount: z.number().positive(),
   period: z.enum(["weekly", "monthly", "yearly"]),
   isShared: z.boolean(),
+  adminTakeover: z.boolean().optional(),
   currency: zCurrencyCode.optional(),
 });
 
@@ -215,18 +220,20 @@ export const handleBudgetsRequest: ApiHandler = async ({
       throw new ActionError("Budget not found", "NOT_FOUND");
     }
 
-    const isCurrentlyShared = existing.userId === null;
-    if (isCurrentlyShared || validated.isShared) {
-      assertPermission(
-        canManageSharedBudgets(session!),
-        "Only owners and admins can modify shared budgets"
-      );
-    } else if (existing.userId !== session!.userId) {
-      throw new ActionError(
-        "Cannot modify another user's personal budget",
-        "PERMISSION_DENIED"
-      );
-    }
+    const nextUserId = resolveFinancialObjectUserId({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+      canManageShared: canManageSharedBudgets(session!),
+      objectName: "budget",
+    });
+    const adminTakeover = isExplicitAdminTakeover({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+    });
 
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = validated.currency ?? homeCurrency;
@@ -255,7 +262,7 @@ export const handleBudgetsRequest: ApiHandler = async ({
         db
           .update(budgets)
           .set({
-            userId: validated.isShared ? null : session!.userId,
+            userId: nextUserId,
             name: validated.name.trim(),
             category: validated.category?.trim() || null,
             limitAmount: limitCents,
@@ -277,6 +284,16 @@ export const handleBudgetsRequest: ApiHandler = async ({
 
     if (!updated) {
       throw new ActionError("Budget not found", "NOT_FOUND");
+    }
+
+    if (adminTakeover) {
+      logSecurityEvent("personal_financial_object_takeover", {
+        tableName: "budgets",
+        recordId: id,
+        previousUserId: existing.userId,
+        changedBy: session!.userId,
+        householdId: session!.householdId,
+      });
     }
 
     return Response.json(updated);

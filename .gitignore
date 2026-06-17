@@ -18,6 +18,9 @@ build/
 .env.local
 .env.*.local
 
+# AI Agents
+AGENTS.md
+
 # IDE
 .idea/
 .vscode/

@@ -83,21 +83,20 @@ if [ "$#" -eq 0 ]; then
 fi
 
 ensure_op_cli() {
-  if command -v op >/dev/null 2>&1; then
-    return 0
-  fi
-
   export OP_BIN_DIR="${ROOT_DIR}/.bin"
-  bash "${ROOT_DIR}/scripts/install-op.sh"
-  export PATH="${OP_BIN_DIR}:${PATH}"
 
-  if ! command -v op >/dev/null 2>&1; then
-    echo "error: 1Password CLI (op) is required but could not be installed." >&2
+  if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+    if [ ! -x "${OP_BIN_DIR}/op" ]; then
+      bash "${ROOT_DIR}/scripts/install-op.sh"
+    fi
+    export PATH="${OP_BIN_DIR}:${PATH}"
+  elif ! command -v op >/dev/null 2>&1; then
+    echo "error: 1Password CLI (op) is required. Install op and sign in, or set OP_SERVICE_ACCOUNT_TOKEN for non-interactive use (Workers Builds, Cursor Cloud Agents)." >&2
     exit 1
   fi
 
-  if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
-    echo "error: set OP_SERVICE_ACCOUNT_TOKEN for non-interactive op run (e.g. Workers Builds)." >&2
+  if ! command -v op >/dev/null 2>&1; then
+    echo "error: 1Password CLI (op) is required but could not be installed." >&2
     exit 1
   fi
 }

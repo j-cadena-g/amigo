@@ -23,7 +23,7 @@ function assertRequiredKeys() {
 
   if (missing.length > 0) {
     console.error(
-      `error: missing local secrets: ${missing.join(", ")}. Set OP_ENVIRONMENT_ID in .op/refs.env and run via bun run dev (op run).`,
+      `error: missing local secrets: ${missing.join(", ")}. Set OP_ENVIRONMENT_ID (and OP_SERVICE_ACCOUNT_TOKEN on cloud agents) and run via bun run dev (op run).`,
     );
     process.exit(1);
   }

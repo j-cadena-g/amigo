@@ -127,6 +127,24 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
 - `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
+## Cursor Cloud Agents
+
+Cursor cloud agents should **not** copy individual app secrets into the Cursor dashboard. Use the same bootstrap pattern as Cloudflare Workers Builds:
+
+1. Create a read-only 1Password service account scoped to **`amigo (dev)`** only (separate from the prod Workers Builds token).
+2. In Cursor → Cloud Agents → your amigo environment → Secrets, add only:
+
+| Secret | Cursor type | Value |
+| --- | --- | --- |
+| `OP_SERVICE_ACCOUNT_TOKEN` | Runtime Secret | Read-only service account with access to **amigo (dev)** only |
+| `OP_ENVIRONMENT_ID` | Environment Variable | UUID of the **amigo (dev)** Environment |
+
+Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `.dev.vars.example` to Cursor. Commands like `bun run dev` and `bun run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `.op/refs.env`).
+
+For the cloud environment **install/update** command, use `bun install && bun run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `bun run dev:verify` to confirm the Environment is complete (names only).
+
+Before opening a PR from a cloud agent: `bun run dev:verify`, `bun run typecheck`, `bun run test:unit`, and relevant `bun run test:integration` when touching Workers/D1/DO code.
+
 ## Environment and Config
 
 | File / Source | Purpose |
@@ -135,7 +153,7 @@ Open the local Vite/Workers dev URL printed by `bun run dev`.
 | `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
 | `.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
 | `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
-| `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally, prod in Workers Builds) |
+| `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally / cloud agents, prod in Workers Builds) |
 | `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
 | `.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
 

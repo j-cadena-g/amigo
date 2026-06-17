@@ -16,7 +16,6 @@ describe("restore integration", () => {
   let ownerAuthId: string;
   let deletedUserId: string;
   let deletedAuthId: string;
-  let clerkOrgId: string;
   let deletedTxnId: string;
 
   beforeEach(async () => {
@@ -26,13 +25,11 @@ describe("restore integration", () => {
     ownerAuthId = `clerk_restore_owner_${suffix}`;
     deletedUserId = `user-restore-deleted-${suffix}`;
     deletedAuthId = `clerk_restore_deleted_${suffix}`;
-    clerkOrgId = `org_restore_${suffix}`;
     deletedTxnId = `tx-restore-deleted-${suffix}`;
 
     const db = createTestDb(getIntegrationEnv().DB);
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId,
       ownerId,
       ownerAuthId,
     });
@@ -62,7 +59,7 @@ describe("restore integration", () => {
       }),
       sessionStatus: "authenticated",
       loadContext: {} as never,
-      auth: clerkAuth({ userId: deletedAuthId, orgId: clerkOrgId }),
+      auth: clerkAuth({ userId: deletedAuthId }),
     });
 
     expect(response.status).toBe(200);
@@ -90,7 +87,7 @@ describe("restore integration", () => {
       }),
       sessionStatus: "authenticated",
       loadContext: {} as never,
-      auth: clerkAuth({ userId: adminRemovedAuthId, orgId: clerkOrgId }),
+      auth: clerkAuth({ userId: adminRemovedAuthId }),
     });
 
     expect(response.status).toBe(200);
@@ -111,7 +108,6 @@ describe("restore integration", () => {
       loadContext: {} as never,
       auth: clerkAuth({
         userId: deletedAuthId,
-        orgId: clerkOrgId,
         email: "restored@example.com",
         name: "Restored User",
       }),
@@ -158,7 +154,6 @@ describe("restore integration", () => {
       loadContext: {} as never,
       auth: clerkAuth({
         userId: deletedAuthId,
-        orgId: clerkOrgId,
         email: "fresh@example.com",
         name: "Fresh User",
       }),

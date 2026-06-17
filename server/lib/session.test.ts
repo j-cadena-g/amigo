@@ -3,10 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createClerkClient: vi.fn(),
   getDb: vi.fn(),
+  setClerkHouseholdMetadata: vi.fn(),
 }));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: mocks.createClerkClient,
+}));
+
+vi.mock("./clerk-household-metadata", () => ({
+  parseClerkHouseholdMetadata: vi.fn((metadata: unknown) => metadata ?? {}),
+  setClerkHouseholdMetadata: mocks.setClerkHouseholdMetadata,
 }));
 
 vi.mock("@amigo/db", () => ({
@@ -21,38 +27,41 @@ vi.mock("@amigo/db", () => ({
     authId: { name: "auth_id" },
   },
   households: {
-    clerkOrgId: { name: "clerk_org_id" },
+    id: { name: "id" },
+    name: { name: "name" },
   },
   eq: (...args: unknown[]) => ({ type: "eq", args }),
   and: (...args: unknown[]) => ({ type: "and", args }),
   isNull: (arg: unknown) => ({ type: "isNull", arg }),
 }));
 
+import { parseClerkHouseholdMetadata } from "./clerk-household-metadata";
 import { resolveSession } from "./session";
 
-function createFakeDb(selectResults: unknown[]) {
+function createFakeDb(selectResults: unknown[], insertResult?: unknown) {
   const getMock = vi.fn();
   for (const result of selectResults) {
     getMock.mockResolvedValueOnce(result);
   }
-  const whereMock = vi.fn(() => ({
-    get: getMock,
-  }));
+  const insertGetMock = vi.fn().mockResolvedValue(insertResult);
 
   return {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: whereMock,
+        where: vi.fn(() => ({
+          get: getMock,
+        })),
       })),
     })),
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
         returning: vi.fn(() => ({
-          get: vi.fn(),
+          get: insertGetMock,
         })),
       })),
     })),
-    whereMock,
+    getMock,
+    insertGetMock,
   };
 }
 
@@ -62,10 +71,34 @@ describe("resolveSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(Date, "now").mockReturnValue(fixedNow);
+    mocks.setClerkHouseholdMetadata.mockResolvedValue(undefined);
+    mocks.createClerkClient.mockReturnValue({
+      users: {
+        getUser: vi.fn().mockResolvedValue({
+          emailAddresses: [{ id: "email-1", emailAddress: "user@example.com" }],
+          primaryEmailAddressId: "email-1",
+          firstName: "Test",
+          lastName: "User",
+          publicMetadata: {},
+        }),
+      },
+    });
+    vi.mocked(parseClerkHouseholdMetadata).mockReturnValue({});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("returns unauthenticated when no Clerk user id is provided", async () => {
+    const result = await resolveSession(
+      null,
+      {} as D1Database,
+      {} as KVNamespace,
+      "clerk-secret"
+    );
+
+    expect(result).toEqual({ status: "unauthenticated" });
   });
 
   it("skips the warm-path D1 round-trip when the KV session was refreshed recently", async () => {
@@ -76,22 +109,20 @@ describe("resolveSession", () => {
       get: vi.fn().mockResolvedValue({
         userId: "user-1",
         householdId: "house-1",
-        orgId: "org-1",
         role: "owner",
         email: "cached@example.com",
         name: "Cached User",
         refreshedAt: fixedNow - 30_000,
       }),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn(),
+      delete: vi.fn(),
     } as unknown as KVNamespace;
 
     const result = await resolveSession(
       "clerk-user-1",
       {} as D1Database,
       kv,
-      "clerk-secret",
-      { orgId: "org-1" }
+      "clerk-secret"
     );
 
     expect(result).toEqual({
@@ -99,281 +130,16 @@ describe("resolveSession", () => {
       session: {
         userId: "user-1",
         householdId: "house-1",
-        orgId: "org-1",
         role: "owner",
         email: "cached@example.com",
         name: "Cached User",
       },
     });
     expect(db.select).not.toHaveBeenCalled();
-    expect(kv.put).not.toHaveBeenCalled();
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
   });
 
-  it("refreshes cached sessions from the latest database role", async () => {
+  it("returns revoked for soft-deleted users", async () => {
     const db = createFakeDb([
-      {
-        id: "user-1",
-        householdId: "house-1",
-        role: "member",
-        email: "fresh@example.com",
-        name: "Fresh User",
-      },
-    ]);
-    mocks.getDb.mockReturnValue(db);
-
-    const kv = {
-      get: vi.fn().mockResolvedValue({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "owner",
-        email: "stale@example.com",
-        name: "Stale User",
-        refreshedAt: fixedNow - 61_000,
-      }),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as unknown as KVNamespace;
-
-    const result = await resolveSession(
-      "clerk-user-1",
-      {} as D1Database,
-      kv,
-      "clerk-secret",
-      { orgId: "org-1" }
-    );
-
-    expect(result).toEqual({
-      status: "authenticated",
-      session: {
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "member",
-        email: "fresh@example.com",
-        name: "Fresh User",
-      },
-    });
-    expect(kv.put).toHaveBeenCalledWith(
-      "session:clerk-user-1:org-1",
-      JSON.stringify({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "member",
-        email: "fresh@example.com",
-        name: "Fresh User",
-        refreshedAt: fixedNow,
-      }),
-      { expirationTtl: 86400 }
-    );
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
-  });
-
-  it("still authenticates when KV refresh write fails", async () => {
-    const db = createFakeDb([
-      {
-        id: "user-1",
-        householdId: "house-1",
-        role: "member",
-        email: "fresh@example.com",
-        name: "Fresh User",
-      },
-    ]);
-    mocks.getDb.mockReturnValue(db);
-
-    const kvError = new Error("KV unavailable");
-    const kv = {
-      get: vi.fn().mockResolvedValue({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "owner",
-        email: "stale@example.com",
-        name: "Stale User",
-        refreshedAt: fixedNow - 61_000,
-      }),
-      put: vi.fn().mockRejectedValue(kvError),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as unknown as KVNamespace;
-
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const result = await resolveSession(
-      "clerk-user-1",
-      {} as D1Database,
-      kv,
-      "clerk-secret",
-      { orgId: "org-1" }
-    );
-
-    expect(result).toEqual({
-      status: "authenticated",
-      session: {
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "member",
-        email: "fresh@example.com",
-        name: "Fresh User",
-      },
-    });
-    expect(kv.put).toHaveBeenCalled();
-    expect(consoleError).toHaveBeenCalledWith("Session cache refresh failed", {
-      error: kvError,
-      cacheKey: "session:clerk-user-1:org-1",
-      clerkUserId: "clerk-user-1",
-      orgId: "org-1",
-    });
-
-    consoleError.mockRestore();
-  });
-
-  it("still authenticates when cold-path session cache write fails", async () => {
-    const db = createFakeDb([
-      {
-        id: "house-1",
-      },
-      {
-        id: "user-1",
-        householdId: "house-1",
-        role: "member",
-        email: "user@example.com",
-        name: "Existing User",
-        deletedAt: null,
-      },
-    ]);
-    mocks.getDb.mockReturnValue(db);
-
-    const kvError = new Error("KV unavailable");
-    const kv = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockRejectedValue(kvError),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as unknown as KVNamespace;
-
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const result = await resolveSession(
-      "clerk-user-1",
-      {} as D1Database,
-      kv,
-      "clerk-secret",
-      { orgId: "org-1" }
-    );
-
-    expect(result).toEqual({
-      status: "authenticated",
-      session: {
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "member",
-        email: "user@example.com",
-        name: "Existing User",
-      },
-    });
-    expect(kv.put).toHaveBeenCalled();
-    expect(consoleError).toHaveBeenCalledWith("Session cache write failed", {
-      error: kvError,
-      cacheKey: "session:clerk-user-1:org-1",
-      clerkUserId: "clerk-user-1",
-      orgId: "org-1",
-    });
-
-    consoleError.mockRestore();
-  });
-
-  it("still revokes when stale cache eviction fails", async () => {
-    const db = createFakeDb([
-      null,
-      {
-        id: "house-1",
-      },
-      {
-        deletedAt: new Date("2026-04-11T00:00:00.000Z"),
-      },
-    ]);
-    mocks.getDb.mockReturnValue(db);
-
-    const kvError = new Error("KV unavailable");
-    const kv = {
-      get: vi.fn().mockResolvedValue({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "owner",
-        email: "stale@example.com",
-        name: "Stale User",
-        refreshedAt: fixedNow - 61_000,
-      }),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockRejectedValue(kvError),
-    } as unknown as KVNamespace;
-
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const result = await resolveSession(
-      "clerk-user-1",
-      {} as D1Database,
-      kv,
-      "clerk-secret",
-      { orgId: "org-1" }
-    );
-
-    expect(result).toEqual({ status: "revoked" });
-    expect(kv.delete).toHaveBeenCalled();
-    expect(consoleError).toHaveBeenCalledWith("Session cache eviction failed", {
-      error: kvError,
-      cacheKey: "session:clerk-user-1:org-1",
-      clerkUserId: "clerk-user-1",
-      orgId: "org-1",
-    });
-
-    consoleError.mockRestore();
-  });
-
-  it("returns revoked on stale warm cache without the cold-path user re-query", async () => {
-    const db = createFakeDb([
-      null,
-      { id: "house-1" },
-      { deletedAt: new Date("2026-04-11T00:00:00.000Z") },
-    ]);
-    mocks.getDb.mockReturnValue(db);
-
-    const kv = {
-      get: vi.fn().mockResolvedValue({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "owner",
-        email: "stale@example.com",
-        name: "Stale User",
-        refreshedAt: fixedNow - 61_000,
-      }),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as unknown as KVNamespace;
-
-    const result = await resolveSession(
-      "clerk-user-1",
-      {} as D1Database,
-      kv,
-      "clerk-secret",
-      { orgId: "org-1" }
-    );
-
-    expect(result).toEqual({ status: "revoked" });
-    expect(kv.delete).toHaveBeenCalledWith("session:clerk-user-1:org-1");
-    expect(db.whereMock).toHaveBeenCalledTimes(3);
-  });
-
-  it("fails closed for soft-deleted users instead of auto-creating them", async () => {
-    const db = createFakeDb([
-      {
-        id: "house-1",
-      },
       {
         id: "user-1",
         householdId: "house-1",
@@ -387,115 +153,69 @@ describe("resolveSession", () => {
 
     const kv = {
       get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn(),
+      delete: vi.fn(),
     } as unknown as KVNamespace;
 
     const result = await resolveSession(
       "clerk-user-1",
       {} as D1Database,
       kv,
-      "clerk-secret",
-      { orgId: "org-1" }
+      "clerk-secret"
     );
 
     expect(result).toEqual({ status: "revoked" });
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
-    expect(kv.put).not.toHaveBeenCalled();
   });
 
-  it("ignores revoked users from other households when resolving a session", async () => {
-    const db = createFakeDb([
-      {
-        id: "house-2",
-      },
-      {
-        id: "user-2",
-        householdId: "house-2",
-        role: "member",
-        email: "active@example.com",
-        name: "Active User",
-      },
-    ]);
+  it("returns needs_setup when the user has no household membership or metadata", async () => {
+    const db = createFakeDb([null]);
     mocks.getDb.mockReturnValue(db);
 
     const kv = {
       get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn(),
+      delete: vi.fn(),
     } as unknown as KVNamespace;
 
     const result = await resolveSession(
       "clerk-user-1",
       {} as D1Database,
       kv,
-      "clerk-secret",
-      { orgId: "org-2" }
+      "clerk-secret"
     );
 
-    expect(result).toEqual({
-      status: "authenticated",
-      session: {
-        userId: "user-2",
-        householdId: "house-2",
-        orgId: "org-2",
-        role: "member",
-        email: "active@example.com",
-        name: "Active User",
-      },
-    });
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
-    expect(kv.put).toHaveBeenCalledWith(
-      "session:clerk-user-1:org-2",
-      JSON.stringify({
-        userId: "user-2",
-        householdId: "house-2",
-        orgId: "org-2",
-        role: "member",
-        email: "active@example.com",
-        name: "Active User",
-        refreshedAt: fixedNow,
-      }),
-      { expirationTtl: 86400 }
-    );
-    expect(db.whereMock).toHaveBeenNthCalledWith(2, {
-      type: "and",
-      args: [
-        { type: "eq", args: [{ name: "auth_id" }, "clerk-user-1"] },
-        { type: "eq", args: [{ name: "household_id" }, "house-2"] },
-      ],
-    });
-    expect(db.whereMock).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ status: "needs_setup" });
   });
 
-  it("reuses the cold-path household user without a redundant second lookup", async () => {
-    const db = createFakeDb([
-      {
-        id: "house-1",
-      },
+  it("auto-creates a member when Clerk metadata points at an existing household", async () => {
+    vi.mocked(parseClerkHouseholdMetadata).mockReturnValue({
+      householdId: "house-1",
+      householdName: "Tagged Household",
+    });
+
+    const db = createFakeDb(
+      [null, { id: "house-1", name: "Tagged Household" }],
       {
         id: "user-1",
         householdId: "house-1",
         role: "member",
         email: "user@example.com",
-        name: "Existing User",
-        deletedAt: null,
-      },
-    ]);
+        name: "Test User",
+      }
+    );
     mocks.getDb.mockReturnValue(db);
 
     const kv = {
       get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn(),
+      delete: vi.fn(),
     } as unknown as KVNamespace;
 
     const result = await resolveSession(
       "clerk-user-1",
       {} as D1Database,
       kv,
-      "clerk-secret",
-      { orgId: "org-1" }
+      "clerk-secret"
     );
 
     expect(result).toEqual({
@@ -503,26 +223,11 @@ describe("resolveSession", () => {
       session: {
         userId: "user-1",
         householdId: "house-1",
-        orgId: "org-1",
         role: "member",
         email: "user@example.com",
-        name: "Existing User",
+        name: "Test User",
       },
     });
-    expect(db.whereMock).toHaveBeenCalledTimes(2);
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
-    expect(kv.put).toHaveBeenCalledWith(
-      "session:clerk-user-1:org-1",
-      JSON.stringify({
-        userId: "user-1",
-        householdId: "house-1",
-        orgId: "org-1",
-        role: "member",
-        email: "user@example.com",
-        name: "Existing User",
-        refreshedAt: fixedNow,
-      }),
-      { expirationTtl: 86400 }
-    );
+    expect(db.insert).toHaveBeenCalled();
   });
 });

@@ -2,7 +2,6 @@ type ClerkAuthLike = unknown;
 
 export interface ClerkIdentity {
   userId: string;
-  orgId?: string;
   email?: string;
   name?: string;
 }
@@ -24,7 +23,7 @@ export function getClerkIdentity(auth: ClerkAuthLike): ClerkIdentity | null {
     return null;
   }
 
-  const { userId, orgId, sessionClaims } = auth as Record<string, unknown>;
+  const { userId, sessionClaims } = auth as Record<string, unknown>;
 
   if (typeof userId !== "string" || userId.length === 0) {
     return null;
@@ -32,10 +31,6 @@ export function getClerkIdentity(auth: ClerkAuthLike): ClerkIdentity | null {
 
   return {
     userId,
-    orgId:
-      typeof orgId === "string" && orgId.length > 0
-        ? orgId
-        : undefined,
     email: getStringClaim(sessionClaims, "email"),
     name: getStringClaim(sessionClaims, "name"),
   };

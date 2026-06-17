@@ -78,6 +78,20 @@
       "when": 1778890000000,
       "tag": "0010_transactions_household_external_id_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1778890500000,
+      "tag": "0011_users_restore_allowed_until",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1778891000000,
+      "tag": "0012_drop_households_clerk_org_id",
+      "breakpoints": true
     }
   ]
 }

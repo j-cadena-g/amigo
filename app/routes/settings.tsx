@@ -31,7 +31,6 @@ export async function loader({ context }: LoaderFunctionArgs) {
     session: {
       userId: session.userId,
       role: session.role,
-      orgId: session.orgId,
     },
   };
 }

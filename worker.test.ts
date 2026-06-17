@@ -54,7 +54,6 @@ describe("worker WebSocket security", () => {
       session: {
         userId: "user-1",
         householdId: "household-1",
-        orgId: "org-1",
         role: "member",
         email: "user@example.com",
         name: null,
@@ -63,7 +62,6 @@ describe("worker WebSocket security", () => {
     mocks.authenticateRequest.mockResolvedValue({
       toAuth: () => ({
         userId: "clerk-user-1",
-        orgId: "org-1",
         sessionClaims: { email: "user@example.com" },
       }),
     });

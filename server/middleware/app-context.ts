@@ -32,7 +32,6 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
       {
         email: identity.email,
         name: identity.name,
-        orgId: identity.orgId,
       }
     );
 

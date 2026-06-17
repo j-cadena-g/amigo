@@ -130,7 +130,6 @@ describe("handleApiRoute", () => {
           session: {
             userId: "user-1",
             householdId: "household-1",
-            orgId: "org-1",
             role: "member",
             email: "user@example.com",
             name: null,
@@ -167,7 +166,6 @@ describe("handleApiRoute", () => {
           session: {
             userId: "user-1",
             householdId: "household-1",
-            orgId: "org-1",
             role: "member",
             email: "user@example.com",
             name: null,
@@ -194,7 +192,6 @@ describe("handleApiRoute", () => {
     const session = {
       userId: "user-1",
       householdId: "household-1",
-      orgId: "org-1",
       role: "admin" as const,
       email: "user@example.com",
       name: "User",

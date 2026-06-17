@@ -16,8 +16,11 @@ export async function loader({ context }: LoaderFunctionArgs) {
   if (status === "authenticated") {
     throw redirect("/dashboard");
   }
+  if (status === "needs_setup") {
+    throw redirect("/setup");
+  }
   if (status !== "revoked") {
-    throw redirect("/no-access");
+    throw redirect("/setup");
   }
   return null;
 }
@@ -44,7 +47,7 @@ export default function RestoreAccount() {
         };
         if (cancelled) return;
         if (!data.pending) {
-          navigate("/no-access", { replace: true });
+          navigate("/setup", { replace: true });
           return;
         }
         setHouseholdName(data.householdName ?? null);

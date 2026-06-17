@@ -7,7 +7,6 @@ describe("getClerkIdentity", () => {
     expect(
       getClerkIdentity({
         userId: null,
-        orgId: "org_123",
         sessionClaims: { email: "james@example.com" },
       })
     ).toBeNull();
@@ -17,7 +16,6 @@ describe("getClerkIdentity", () => {
     expect(
       getClerkIdentity({
         userId: "",
-        orgId: "org_123",
         sessionClaims: { email: "james@example.com" },
       })
     ).toBeNull();
@@ -27,7 +25,6 @@ describe("getClerkIdentity", () => {
     expect(
       getClerkIdentity({
         userId: "user_123",
-        orgId: "org_123",
         sessionClaims: {
           email: "james@example.com",
           name: 42,
@@ -35,7 +32,6 @@ describe("getClerkIdentity", () => {
       })
     ).toEqual({
       userId: "user_123",
-      orgId: "org_123",
       email: "james@example.com",
       name: undefined,
     });
@@ -45,11 +41,9 @@ describe("getClerkIdentity", () => {
     expect(
       getClerkIdentity({
         userId: "user_123",
-        orgId: "org_123",
       })
     ).toEqual({
       userId: "user_123",
-      orgId: "org_123",
       email: undefined,
       name: undefined,
     });

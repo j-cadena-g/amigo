@@ -17,18 +17,17 @@ export async function seedHouseholdWithOwner(
   db: DrizzleD1,
   options: {
     householdId: string;
-    clerkOrgId: string;
     ownerId: string;
     ownerAuthId: string;
     timezone?: string;
     homeCurrency?: "CAD" | "USD";
+    householdName?: string;
   }
 ) {
   const ts = nowMs();
   await db.insert(households).values({
     id: options.householdId,
-    clerkOrgId: options.clerkOrgId,
-    name: "Test Household",
+    name: options.householdName ?? "Test Household",
     homeCurrency: options.homeCurrency ?? "CAD",
     timezone: options.timezone ?? "UTC",
     createdAt: new Date(ts),
@@ -137,13 +136,12 @@ export async function seedExpenseTransaction(
 export function testSession(options: {
   userId: string;
   householdId: string;
-  orgId?: string;
+  role?: "owner" | "admin" | "member";
 }) {
   return {
     userId: options.userId,
     householdId: options.householdId,
-    orgId: options.orgId ?? "org_test",
-    role: "owner" as const,
+    role: options.role ?? "owner",
     email: "owner@example.com",
     name: "Owner",
   };
@@ -151,13 +149,11 @@ export function testSession(options: {
 
 export function clerkAuth(options: {
   userId: string;
-  orgId: string;
   email?: string;
   name?: string;
 }) {
   return {
     userId: options.userId,
-    orgId: options.orgId,
     sessionClaims: {
       email: options.email ?? "deleted@example.com",
       name: options.name ?? "Deleted Member",

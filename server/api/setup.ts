@@ -1,6 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
-import { CURRENCY_CODES, eq, getDb, households, users } from "@amigo/db";
+import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
 import { z } from "zod";
+import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { ActionError } from "../lib/errors";
 import type { ApiHandler } from "./route";
 
@@ -21,45 +22,28 @@ export const handleSetupRequest: ApiHandler = async ({
     });
   }
 
-  if (!auth?.userId || !auth.orgId) {
+  if (!auth?.userId) {
     throw new ActionError("Unauthorized", "UNAUTHORIZED");
-  }
-
-  if (!auth.has({ role: "org:admin" })) {
-    throw new ActionError(
-      "Only Clerk organization admins can set up a household",
-      "PERMISSION_DENIED"
-    );
   }
 
   const db = getDb(env.DB);
 
-  const existing = await db
-    .select({ id: households.id })
-    .from(households)
-    .where(eq(households.clerkOrgId, auth.orgId))
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.authId, auth.userId), isNull(users.deletedAt)))
     .get();
 
-  if (existing) {
-    return Response.json(
-      { error: "Household already exists for this organization" },
-      { status: 409 }
+  if (existingUser) {
+    throw new ActionError(
+      "You already belong to a household",
+      "PERMISSION_DENIED"
     );
   }
 
   const { householdName, homeCurrency } = setupSchema.parse(
     await request.json()
   );
-
-  const household = await db
-    .insert(households)
-    .values({
-      clerkOrgId: auth.orgId,
-      name: householdName,
-      homeCurrency,
-    })
-    .returning()
-    .get();
 
   const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
   const clerkUser = await clerk.users.getUser(auth.userId);
@@ -70,12 +54,26 @@ export const handleSetupRequest: ApiHandler = async ({
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
 
+  const household = await db
+    .insert(households)
+    .values({
+      name: householdName,
+      homeCurrency,
+    })
+    .returning()
+    .get();
+
   await db.insert(users).values({
     authId: auth.userId,
     email,
     name,
     householdId: household.id,
     role: "owner",
+  });
+
+  await setClerkHouseholdMetadata(clerk, auth.userId, {
+    householdId: household.id,
+    householdName: household.name,
   });
 
   return Response.json(

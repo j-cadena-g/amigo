@@ -102,13 +102,6 @@ function getSessionErrorResponse(
     return null;
   }
 
-  if (status === "no_org") {
-    return Response.json(
-      { error: "Organization membership required" },
-      { status: 403 }
-    );
-  }
-
   if (status === "needs_setup") {
     return Response.json(
       { error: "Household setup required" },

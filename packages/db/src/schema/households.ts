@@ -5,7 +5,6 @@ export const households = sqliteTable("households", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  clerkOrgId: text("clerk_org_id").notNull().unique(),
   name: text("name").notNull(),
   homeCurrency: text("home_currency", { enum: CURRENCY_CODES })
     .notNull()

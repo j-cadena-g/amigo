@@ -5,6 +5,7 @@ import { getIntegrationEnv } from "../test/integration-env";
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
+  updateUserMetadata: vi.fn(),
   createClerkClient: vi.fn(),
 }));
 
@@ -12,31 +13,52 @@ vi.mock("@clerk/backend", () => ({
   createClerkClient: mocks.createClerkClient,
 }));
 
-function setupAuth(options: { userId: string; orgId: string; isOrgAdmin: boolean }) {
+function setupAuth(userId: string) {
   return {
-    userId: options.userId,
-    orgId: options.orgId,
-    has: vi.fn(({ role }: { role: string }) => role === "org:admin" && options.isOrgAdmin),
+    userId,
   } as never;
 }
 
 describe("setup integration", () => {
   beforeEach(() => {
     mocks.getUser.mockReset();
+    mocks.updateUserMetadata.mockReset();
     mocks.getUser.mockResolvedValue({
       emailAddresses: [{ id: "email-1", emailAddress: "owner@example.com" }],
       primaryEmailAddressId: "email-1",
-      firstName: "Org",
-      lastName: "Admin",
+      firstName: "Household",
+      lastName: "Owner",
+      publicMetadata: {},
     });
+    mocks.updateUserMetadata.mockResolvedValue({});
     mocks.createClerkClient.mockReset();
     mocks.createClerkClient.mockReturnValue({
-      users: { getUser: mocks.getUser },
+      users: {
+        getUser: mocks.getUser,
+        updateUserMetadata: mocks.updateUserMetadata,
+      },
     });
   });
 
-  it("rejects initial setup when the Clerk org member is not an org admin", async () => {
+  it("rejects setup when the user already belongs to a household", async () => {
     const suffix = crypto.randomUUID();
+    const authId = `clerk_setup_existing_${suffix}`;
+    const householdId = `hh_setup_existing_${suffix}`;
+    const db = getDb(getIntegrationEnv().DB);
+
+    await db.insert(households).values({
+      id: householdId,
+      name: "Existing Household",
+      homeCurrency: "CAD",
+    });
+    await db.insert(users).values({
+      id: `user_setup_existing_${suffix}`,
+      authId,
+      email: "existing@example.com",
+      householdId,
+      role: "owner",
+    });
+
     await expect(
       handleSetupRequest({
         env: getIntegrationEnv(),
@@ -51,24 +73,17 @@ describe("setup integration", () => {
         }),
         sessionStatus: "needs_setup",
         loadContext: {} as never,
-        auth: setupAuth({
-          userId: `clerk_setup_non_admin_${suffix}`,
-          orgId: `org_setup_non_admin_${suffix}`,
-          isOrgAdmin: false,
-        }),
+        auth: setupAuth(authId),
       })
     ).rejects.toMatchObject({
       code: "PERMISSION_DENIED",
-      message: "Only Clerk organization admins can set up a household",
+      message: "You already belong to a household",
     });
-
-    expect(mocks.createClerkClient).not.toHaveBeenCalled();
   });
 
-  it("allows a Clerk org admin to claim the initial app owner", async () => {
+  it("creates a household, owner user, and Clerk household metadata", async () => {
     const suffix = crypto.randomUUID();
-    const authId = `clerk_setup_admin_${suffix}`;
-    const orgId = `org_setup_admin_${suffix}`;
+    const authId = `clerk_setup_new_${suffix}`;
     const response = await handleSetupRequest({
       env: getIntegrationEnv(),
       params: {},
@@ -82,7 +97,7 @@ describe("setup integration", () => {
       }),
       sessionStatus: "needs_setup",
       loadContext: {} as never,
-      auth: setupAuth({ userId: authId, orgId, isOrgAdmin: true }),
+      auth: setupAuth(authId),
     });
 
     expect(response.status).toBe(201);
@@ -100,7 +115,13 @@ describe("setup integration", () => {
       .where(eq(users.authId, authId))
       .get();
 
-    expect(household?.clerkOrgId).toBe(orgId);
+    expect(household?.name).toBe("Allowed Household");
     expect(owner?.role).toBe("owner");
+    expect(mocks.updateUserMetadata).toHaveBeenCalledWith(authId, {
+      publicMetadata: {
+        householdId: body.householdId,
+        householdName: "Allowed Household",
+      },
+    });
   });
 });

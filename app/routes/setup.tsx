@@ -1,24 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { useOrganization } from "@clerk/react-router";
 import { CURRENCY_CODES } from "@amigo/db";
 
 export default function Setup() {
-  const { organization, isLoaded } = useOrganization();
   const navigate = useNavigate();
+  const [householdName, setHouseholdName] = useState("My Household");
   const [currency, setCurrency] = useState("CAD");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isLoaded) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </main>
-    );
-  }
-
-  const orgName = organization?.name ?? "My Household";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +18,7 @@ export default function Setup() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        householdName: orgName,
+        householdName: householdName.trim(),
         homeCurrency: currency,
       }),
     });
@@ -55,12 +44,20 @@ export default function Setup() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-1">Household</label>
-            <div className="px-3 py-2 rounded-md border bg-muted text-sm">
-              {orgName}
-            </div>
+            <label htmlFor="householdName" className="block text-sm font-medium mb-1">
+              Household name
+            </label>
+            <input
+              id="householdName"
+              type="text"
+              value={householdName}
+              onChange={(e) => setHouseholdName(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+              required
+              maxLength={100}
+            />
             <p className="text-xs text-muted-foreground mt-1">
-              Managed through your Clerk organization.
+              This name is stored in the app and tagged on your Clerk profile.
             </p>
           </div>
 
@@ -80,21 +77,18 @@ export default function Setup() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Your primary currency for budgets and reports.
-            </p>
           </div>
 
           {error && (
-            <p className="text-sm text-red-500">{error}</p>
+            <p className="text-sm text-destructive">{error}</p>
           )}
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full py-2 px-4 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50"
+            disabled={submitting || householdName.trim().length === 0}
+            className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? "Setting up..." : "Get Started"}
+            {submitting ? "Creating..." : "Create household"}
           </button>
         </form>
       </div>

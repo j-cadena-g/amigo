@@ -1,6 +1,10 @@
 import { createClerkClient } from "@clerk/backend";
 import type { AppSession } from "../env";
 import { getDb, users, households, eq, and, isNull } from "@amigo/db";
+import {
+  parseClerkHouseholdMetadata,
+  setClerkHouseholdMetadata,
+} from "./clerk-household-metadata";
 import { getSessionCacheKey } from "./session-cache";
 import { ActionError } from "./errors";
 
@@ -12,27 +16,67 @@ type CachedSessionPayload = AppSession & { refreshedAt?: number };
 interface ClerkClaims {
   email?: string;
   name?: string;
-  orgId?: string;
 }
 
 /**
  * Session resolution result. The `status` field indicates whether the user
- * is fully authenticated, needs onboarding, or lacks org membership.
+ * is fully authenticated, needs onboarding, or was removed from a household.
  */
 export type SessionResult =
   | { status: "authenticated"; session: AppSession }
-  | { status: "no_org" }
-  | { status: "needs_setup"; clerkOrgId: string }
+  | { status: "needs_setup" }
   | { status: "revoked" }
   | { status: "unauthenticated" };
+
+function buildSession(user: {
+  id: string;
+  householdId: string;
+  role: string;
+  email: string;
+  name: string | null;
+}): AppSession {
+  return {
+    userId: user.id,
+    householdId: user.householdId,
+    role: user.role as AppSession["role"],
+    email: user.email,
+    name: user.name,
+  };
+}
+
+async function fetchClerkProfile(
+  clerkSecretKey: string,
+  clerkUserId: string,
+  claims?: ClerkClaims
+) {
+  const clerk = createClerkClient({ secretKey: clerkSecretKey });
+  const clerkUser = await clerk.users.getUser(clerkUserId);
+  const email =
+    clerkUser.emailAddresses.find(
+      (entry) => entry.id === clerkUser.primaryEmailAddressId
+    )?.emailAddress ??
+    claims?.email ??
+    "unknown@example.com";
+  const name =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+    claims?.name ||
+    null;
+
+  return {
+    clerk,
+    clerkUser,
+    email,
+    name,
+    metadata: parseClerkHouseholdMetadata(clerkUser.publicMetadata),
+  };
+}
 
 /**
  * Resolves a Clerk user into an app-level session.
  *
- * - Requires an active Clerk Organization (`orgId` in claims).
- * - Looks up the household by `clerkOrgId`.
- * - If no household exists, returns `needs_setup` (setup wizard required).
- * - If household exists but user has no record, auto-creates the user.
+ * - Looks up the user by Clerk auth id in D1.
+ * - If no active user exists, checks Clerk public metadata for a household tag
+ *   and auto-creates a member when the household exists.
  * - Uses KV caching with 24h TTL.
  */
 export async function resolveSession(
@@ -43,14 +87,11 @@ export async function resolveSession(
   claims?: ClerkClaims
 ): Promise<SessionResult> {
   if (!clerkUserId) return { status: "unauthenticated" };
-  if (!claims?.orgId) return { status: "no_org" };
 
-  const orgId = claims.orgId;
   const db = getDb(d1);
-
-  // Check KV cache first (keyed by user + org to handle org switching)
-  const cacheKey = getSessionCacheKey(clerkUserId, orgId);
+  const cacheKey = getSessionCacheKey(clerkUserId);
   const cached = await kv.get(cacheKey, "json");
+
   if (cached) {
     const payload = cached as CachedSessionPayload;
     const refreshedAt = payload.refreshedAt ?? 0;
@@ -58,21 +99,18 @@ export async function resolveSession(
       refreshedAt > 0 &&
       Date.now() - refreshedAt < SESSION_WARM_PATH_TTL_MS
     ) {
-      const session: AppSession = {
-        userId: payload.userId,
-        householdId: payload.householdId,
-        orgId,
-        role: payload.role,
-        email: payload.email,
-        name: payload.name,
+      return {
+        status: "authenticated",
+        session: {
+          userId: payload.userId,
+          householdId: payload.householdId,
+          role: payload.role as AppSession["role"],
+          email: payload.email,
+          name: payload.name,
+        },
       };
-      return { status: "authenticated", session };
     }
 
-    const session = payload;
-
-    // Re-hydrate the session from the current user row so role changes
-    // and member removals take effect immediately even if KV is warm.
     const currentUser = await db
       .select({
         id: users.id,
@@ -80,26 +118,14 @@ export async function resolveSession(
         role: users.role,
         email: users.email,
         name: users.name,
+        deletedAt: users.deletedAt,
       })
       .from(users)
-      .where(
-        and(
-          eq(users.authId, clerkUserId),
-          eq(users.householdId, session.householdId),
-          isNull(users.deletedAt)
-        )
-      )
+      .where(eq(users.authId, clerkUserId))
       .get();
 
-    if (currentUser) {
-      const refreshedSession: AppSession = {
-        userId: currentUser.id,
-        householdId: currentUser.householdId,
-        orgId,
-        role: currentUser.role as AppSession["role"],
-        email: currentUser.email,
-        name: currentUser.name,
-      };
+    if (currentUser && !currentUser.deletedAt) {
+      const refreshedSession = buildSession(currentUser);
       const cachePayload: CachedSessionPayload = {
         ...refreshedSession,
         refreshedAt: Date.now(),
@@ -114,49 +140,25 @@ export async function resolveSession(
           error,
           cacheKey,
           clerkUserId,
-          orgId,
         });
       }
 
       return { status: "authenticated", session: refreshedSession };
     }
 
-    // Warm cache is stale: resolve household once, then check revocation before
-    // evicting KV so we avoid an extra cold-path round-trip for removed members.
-    const householdForStale = await db
-      .select({ id: households.id })
-      .from(households)
-      .where(eq(households.clerkOrgId, orgId))
-      .get();
-
-    if (householdForStale) {
-      const removedUser = await db
-        .select({ deletedAt: users.deletedAt })
-        .from(users)
-        .where(
-          and(
-            eq(users.authId, clerkUserId),
-            eq(users.householdId, householdForStale.id)
-          )
-        )
-        .get();
-
-      if (removedUser?.deletedAt) {
-        try {
-          await kv.delete(cacheKey);
-        } catch (error) {
-          console.error("Session cache eviction failed", {
-            error,
-            cacheKey,
-            clerkUserId,
-            orgId,
-          });
-        }
-        return { status: "revoked" };
+    if (currentUser?.deletedAt) {
+      try {
+        await kv.delete(cacheKey);
+      } catch (error) {
+        console.error("Session cache eviction failed", {
+          error,
+          cacheKey,
+          clerkUserId,
+        });
       }
+      return { status: "revoked" };
     }
 
-    // Stale session — evict from KV
     try {
       await kv.delete(cacheKey);
     } catch (error) {
@@ -164,21 +166,8 @@ export async function resolveSession(
         error,
         cacheKey,
         clerkUserId,
-        orgId,
       });
     }
-  }
-
-  // Look up household by Clerk org ID
-  const household = await db
-    .select()
-    .from(households)
-    .where(eq(households.clerkOrgId, orgId))
-    .get();
-
-  if (!household) {
-    // Household doesn't exist yet — setup wizard needed
-    return { status: "needs_setup", clerkOrgId: orgId };
   }
 
   const existingUser = await db
@@ -191,63 +180,74 @@ export async function resolveSession(
       deletedAt: users.deletedAt,
     })
     .from(users)
-    .where(and(eq(users.authId, clerkUserId), eq(users.householdId, household.id)))
+    .where(eq(users.authId, clerkUserId))
     .get();
 
   if (existingUser?.deletedAt) {
     return { status: "revoked" };
   }
 
-  // Reuse the cold-path household user when present to avoid a second identical lookup.
-  let user = existingUser
-    ? {
-        id: existingUser.id,
-        householdId: existingUser.householdId,
-        role: existingUser.role,
-        email: existingUser.email,
-        name: existingUser.name,
-      }
-    : null;
-
-  if (!user) {
-    // Fetch user details from Clerk Backend API (JWT claims don't include email/name by default)
-    const clerk = createClerkClient({ secretKey: clerkSecretKey });
-    const clerkUser = await clerk.users.getUser(clerkUserId);
-    const email = clerkUser.emailAddresses.find(
-      (e) => e.id === clerkUser.primaryEmailAddressId
-    )?.emailAddress ?? claims.email ?? "unknown@example.com";
-    const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || claims.name || null;
-
-    // User exists in Clerk org but not in D1 — auto-create as member
-    user = await db
-      .insert(users)
-      .values({
-        authId: clerkUserId,
-        email,
-        name,
-        householdId: household.id,
-        role: "member",
-      })
-      .returning()
-      .get();
+  if (existingUser) {
+    const session = buildSession(existingUser);
+    await writeSessionCache(kv, cacheKey, session, clerkUserId);
+    return { status: "authenticated", session };
   }
 
-  const session: AppSession = {
-    userId: user.id,
-    householdId: user.householdId,
-    orgId,
-    role: user.role as AppSession["role"],
-    email: user.email,
-    name: user.name,
-  };
-  const coldCachePayload: CachedSessionPayload = {
+  const { clerk, email, name, metadata } = await fetchClerkProfile(
+    clerkSecretKey,
+    clerkUserId,
+    claims
+  );
+
+  if (metadata.householdId) {
+    const household = await db
+      .select({ id: households.id, name: households.name })
+      .from(households)
+      .where(eq(households.id, metadata.householdId))
+      .get();
+
+    if (household) {
+      const user = await db
+        .insert(users)
+        .values({
+          authId: clerkUserId,
+          email,
+          name,
+          householdId: household.id,
+          role: "member",
+        })
+        .returning()
+        .get();
+
+      if (!metadata.householdName || metadata.householdName !== household.name) {
+        await setClerkHouseholdMetadata(clerk, clerkUserId, {
+          householdId: household.id,
+          householdName: household.name,
+        });
+      }
+
+      const session = buildSession(user);
+      await writeSessionCache(kv, cacheKey, session, clerkUserId);
+      return { status: "authenticated", session };
+    }
+  }
+
+  return { status: "needs_setup" };
+}
+
+async function writeSessionCache(
+  kv: KVNamespace,
+  cacheKey: string,
+  session: AppSession,
+  clerkUserId: string
+) {
+  const cachePayload: CachedSessionPayload = {
     ...session,
     refreshedAt: Date.now(),
   };
 
-  // Cache in KV (24h TTL)
   try {
-    await kv.put(cacheKey, JSON.stringify(coldCachePayload), {
+    await kv.put(cacheKey, JSON.stringify(cachePayload), {
       expirationTtl: 86400,
     });
   } catch (error) {
@@ -255,11 +255,8 @@ export async function resolveSession(
       error,
       cacheKey,
       clerkUserId,
-      orgId,
     });
   }
-
-  return { status: "authenticated", session };
 }
 
 /** Re-validates a warm cached session against D1 before sensitive mutations. */

@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - `CONTRIBUTING.md` and `SECURITY.md`
-- README badges (CI, license, Bun, TypeScript, Cloudflare Workers, CodeRabbit)
+- README badges (CI, license, Bun, TypeScript, Cloudflare Workers)
 
 ### Changed
 
@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
+- CodeRabbit pull request review badge and agent references
 - `docs/` directory (unused images and index)
 - `ARCHITECTURE.md` (content folded into README)
 - `scripts/migrate-to-d1.ts` (one-time PostgreSQL → D1 migration; platform migration complete)

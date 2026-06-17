@@ -5,7 +5,6 @@
 [![Bun](https://img.shields.io/badge/Bun-1.3.10-000?logo=bun&logoColor=fff)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=fff)](https://developers.cloudflare.com/workers/)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?utm_source=oss&utm_medium=github&utm_campaign=j-cadena-g%2Famigo&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 ![amigo](public/icon-192.png)
 

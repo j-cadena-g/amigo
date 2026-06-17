@@ -54,6 +54,7 @@ export async function seedSoftDeletedMember(
     householdId: string;
     email?: string;
     name?: string;
+    restoreAllowedUntil?: Date | null;
   }
 ) {
   const ts = nowMs();
@@ -65,6 +66,7 @@ export async function seedSoftDeletedMember(
     householdId: options.householdId,
     role: "member",
     deletedAt: new Date(ts),
+    restoreAllowedUntil: options.restoreAllowedUntil ?? null,
     createdAt: new Date(ts),
     updatedAt: new Date(ts),
   });

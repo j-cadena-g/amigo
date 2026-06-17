@@ -102,6 +102,7 @@
 
   "vars": {
     "APP_ENV": "development",
+    "APP_ORIGIN": "http://localhost:5173",
     "CLERK_PUBLISHABLE_KEY": "pk_test_replace_me"
   }
 }

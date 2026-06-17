@@ -1,5 +1,5 @@
 import { eq, isNull, or, sql } from "drizzle-orm";
-import { budgets, recurringTransactions, transactions } from "./schema";
+import { budgets, financialAccounts, recurringTransactions, transactions } from "./schema";
 
 /**
  * Transactions visible to a household member: their own rows, plus any row
@@ -16,6 +16,11 @@ export function visibleFinancialTransactionsCondition(viewerUserId: string) {
 /** Budget rows the member can see: personal (theirs) or household-shared. */
 export function visibleBudgetsCondition(viewerUserId: string) {
   return or(eq(budgets.userId, viewerUserId), isNull(budgets.userId));
+}
+
+/** Account rows the member can reference: personal (theirs) or household-shared. */
+export function visibleFinancialAccountsCondition(viewerUserId: string) {
+  return or(eq(financialAccounts.userId, viewerUserId), isNull(financialAccounts.userId));
 }
 
 /**

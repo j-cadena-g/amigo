@@ -1,3 +1,4 @@
+import { createClerkClient } from "@clerk/backend";
 import {
   and,
   assets,
@@ -16,7 +17,7 @@ import {
 } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold, invalidateUserSession } from "../lib/realtime";
-import { ActionError, logSecurityEvent } from "../lib/errors";
+import { ActionError, logSecurityEvent, logServerError } from "../lib/errors";
 import {
   assertPermission,
   canChangeRole,
@@ -32,6 +33,20 @@ import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
 });
+
+function isClerkMembershipAlreadyRemovedError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    code?: unknown;
+  };
+  return (
+    candidate.status === 404 ||
+    candidate.statusCode === 404 ||
+    candidate.code === "resource_not_found"
+  );
+}
 
 export const handleMembersRequest: ApiHandler = async ({
   env,
@@ -102,6 +117,13 @@ export const handleMembersRequest: ApiHandler = async ({
     if (targetUser.role === "owner") {
       throw new ActionError(
         "Cannot change owner's role directly. Use ownership transfer instead.",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    if (session!.role === "admin" && targetUser.role === "admin") {
+      throw new ActionError(
+        "Admins cannot change another admin's role",
         "PERMISSION_DENIED"
       );
     }
@@ -315,6 +337,32 @@ export const handleMembersRequest: ApiHandler = async ({
     }
 
     const displayName = targetUser.name ?? targetUser.email;
+    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+
+    try {
+      await clerk.organizations.deleteOrganizationMembership({
+        organizationId: session!.orgId,
+        userId: targetUser.authId,
+      });
+    } catch (error) {
+      if (isClerkMembershipAlreadyRemovedError(error)) {
+        logSecurityEvent("member_clerk_membership_already_removed", {
+          householdId: session!.householdId,
+          removedUserId: userId,
+          removedBy: session!.userId,
+        });
+      } else {
+        logServerError("remove-member-clerk-membership", error, {
+          householdId: session!.householdId,
+          removedUserId: userId,
+          removedBy: session!.userId,
+        });
+        throw new ActionError(
+          "Failed to remove member from Clerk organization",
+          "INTERNAL_ERROR"
+        );
+      }
+    }
 
     await db.batch([
       db
@@ -338,7 +386,10 @@ export const handleMembersRequest: ApiHandler = async ({
         .set({ createdByUserDisplayName: displayName })
         .where(eq(groceryItems.createdByUserId, userId)),
       db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)),
-      db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, userId)),
+      db
+        .update(users)
+        .set({ deletedAt: new Date(), restoreAllowedUntil: null })
+        .where(eq(users.id, userId)),
     ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [

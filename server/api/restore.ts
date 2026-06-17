@@ -5,6 +5,7 @@ import {
   debts,
   eq,
   getDb,
+  gt,
   groceryItems,
   households,
   isNotNull,
@@ -41,13 +42,15 @@ async function findSoftDeletedUser(
       email: users.email,
       name: users.name,
       deletedAt: users.deletedAt,
+      restoreAllowedUntil: users.restoreAllowedUntil,
     })
     .from(users)
     .where(
       and(
         eq(users.authId, authId),
         eq(users.householdId, household.id),
-        isNotNull(users.deletedAt)
+        isNotNull(users.deletedAt),
+        gt(users.restoreAllowedUntil, new Date())
       )
     )
     .get();
@@ -115,6 +118,7 @@ export const handleRestoreRequest: ApiHandler = async ({
         .update(users)
         .set({
           deletedAt: null,
+          restoreAllowedUntil: null,
           email,
           name,
         })
@@ -204,6 +208,7 @@ export const handleRestoreRequest: ApiHandler = async ({
         .update(users)
         .set({
           deletedAt: null,
+          restoreAllowedUntil: null,
           email,
           name,
           role: "member",

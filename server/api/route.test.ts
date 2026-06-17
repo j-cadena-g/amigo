@@ -1,23 +1,51 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { z } from "zod";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionError } from "../lib/errors";
 import { handleApiRoute } from "./route";
 
+const mocks = vi.hoisted(() => ({
+  assertSessionStillValid: vi.fn(),
+  getDb: vi.fn(),
+}));
+
+vi.mock("../lib/session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/session")>()),
+  assertSessionStillValid: mocks.assertSessionStillValid,
+}));
+
+vi.mock("@amigo/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@amigo/db")>()),
+  getDb: mocks.getDb,
+}));
+
 function makeRouteArgs(
-  request = new Request("http://localhost/api/test")
+  request = new Request("http://localhost/api/test"),
+  app: LoaderFunctionArgs["context"]["app"] = {
+    cspNonce: "test-nonce",
+    sessionStatus: "authenticated",
+    session: undefined,
+  },
+  env: Record<string, unknown> = {}
 ): LoaderFunctionArgs {
   return {
     request,
     params: {},
     context: {
-      cloudflare: { env: {} },
-      app: { sessionStatus: "authenticated", session: undefined },
+      cloudflare: { env },
+      app,
     },
   } as unknown as LoaderFunctionArgs;
 }
 
 describe("handleApiRoute", () => {
+  beforeEach(() => {
+    mocks.assertSessionStillValid.mockReset();
+    mocks.assertSessionStillValid.mockResolvedValue(undefined);
+    mocks.getDb.mockReset();
+    mocks.getDb.mockReturnValue({ current: "db" });
+  });
+
   it("maps SyntaxError failures to a 400 validation response", async () => {
     const response = await handleApiRoute(
       makeRouteArgs(
@@ -86,5 +114,80 @@ describe("handleApiRoute", () => {
       details: expect.any(Array),
     });
     expect(body.details).toHaveLength(1);
+  });
+
+  it("rejects strict unsafe requests from the wrong origin before the handler runs", async () => {
+    const handler = vi.fn(async () => new Response(null, { status: 204 }));
+    const response = await handleApiRoute(
+      makeRouteArgs(
+        new Request("https://app.example.test/api/test", {
+          method: "POST",
+          headers: { Origin: "https://evil.example" },
+        }),
+        {
+          cspNonce: "test-nonce",
+          sessionStatus: "authenticated",
+          session: {
+            userId: "user-1",
+            householdId: "household-1",
+            orgId: "org-1",
+            role: "member",
+            email: "user@example.com",
+            name: null,
+          },
+        },
+        { APP_ORIGIN: "https://app.example.test" }
+      ),
+      {
+        auth: "strict",
+        handler,
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid request origin",
+      code: "PERMISSION_DENIED",
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(mocks.assertSessionStillValid).not.toHaveBeenCalled();
+  });
+
+  it("revalidates strict sessions before same-origin unsafe handlers run", async () => {
+    const session = {
+      userId: "user-1",
+      householdId: "household-1",
+      orgId: "org-1",
+      role: "admin" as const,
+      email: "user@example.com",
+      name: "User",
+    };
+    const handler = vi.fn(async () => new Response(null, { status: 204 }));
+
+    const response = await handleApiRoute(
+      makeRouteArgs(
+        new Request("https://app.example.test/api/test", {
+          method: "PATCH",
+          headers: { Origin: "https://app.example.test" },
+        }),
+        { cspNonce: "test-nonce", sessionStatus: "authenticated", session },
+        {
+          APP_ORIGIN: "https://app.example.test",
+          DB: "d1-binding",
+        }
+      ),
+      {
+        auth: "strict",
+        handler,
+      }
+    );
+
+    expect(response.status).toBe(204);
+    expect(mocks.getDb).toHaveBeenCalledWith("d1-binding");
+    expect(mocks.assertSessionStillValid).toHaveBeenCalledWith(
+      { current: "db" },
+      session
+    );
+    expect(handler).toHaveBeenCalledOnce();
   });
 });

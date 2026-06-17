@@ -11,8 +11,12 @@ import {
 } from "@amigo/db";
 import type { CurrencyCode } from "@amigo/db";
 import { z } from "zod";
-import { ActionError } from "../lib/errors";
+import { ActionError, logSecurityEvent } from "../lib/errors";
 import { assertPermission, canManageSharedItems } from "../lib/permissions";
+import {
+  isExplicitAdminTakeover,
+  resolveFinancialObjectUserId,
+} from "../lib/financial-object-permissions";
 import { toCents } from "../lib/conversions";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
@@ -45,6 +49,7 @@ const updateAccountSchema = z.object({
   balance: z.number(),
   currency: zCurrencyCode.optional(),
   isShared: z.boolean().optional(),
+  adminTakeover: z.boolean().optional(),
   archived: z.boolean().optional(),
 });
 
@@ -149,18 +154,20 @@ export const handleAccountsRequest: ApiHandler = async ({
       throw new ActionError("Account not found", "NOT_FOUND");
     }
 
-    const isCurrentlyShared = existing.userId === null;
-    if (isCurrentlyShared || validated.isShared === true) {
-      assertPermission(
-        canManageSharedItems(session!),
-        "Only owners and admins can modify shared accounts"
-      );
-    } else if (existing.userId !== session!.userId) {
-      throw new ActionError(
-        "Cannot modify another user's personal account",
-        "PERMISSION_DENIED"
-      );
-    }
+    const nextUserId = resolveFinancialObjectUserId({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+      canManageShared: canManageSharedItems(session!),
+      objectName: "account",
+    });
+    const adminTakeover = isExplicitAdminTakeover({
+      session: session!,
+      existingUserId: existing.userId,
+      requestedIsShared: validated.isShared,
+      adminTakeover: validated.adminTakeover,
+    });
 
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = (validated.currency ?? homeCurrency) as CurrencyCode;
@@ -181,12 +188,7 @@ export const handleAccountsRequest: ApiHandler = async ({
         db
           .update(financialAccounts)
           .set({
-            userId:
-              validated.isShared === undefined
-                ? existing.userId
-                : validated.isShared
-                  ? null
-                  : session!.userId,
+            userId: nextUserId,
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
@@ -207,6 +209,16 @@ export const handleAccountsRequest: ApiHandler = async ({
 
     if (!updated) {
       throw new ActionError("Account not found", "NOT_FOUND");
+    }
+
+    if (adminTakeover) {
+      logSecurityEvent("personal_financial_object_takeover", {
+        tableName: "financial_accounts",
+        recordId: id,
+        previousUserId: existing.userId,
+        changedBy: session!.userId,
+        householdId: session!.householdId,
+      });
     }
 
     return Response.json(updated);

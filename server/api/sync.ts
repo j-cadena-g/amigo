@@ -138,8 +138,17 @@ async function processMutation(
       if (!item) throw new Error("Insert returned empty result");
 
       if (tagIds && tagIds.length > 0) {
+        const validTags = await db.query.groceryTags.findMany({
+          where: and(
+            inArray(groceryTags.id, tagIds),
+            scopeToHousehold(groceryTags.householdId, session.householdId)
+          ),
+        });
+        if (validTags.length !== tagIds.length) {
+          throw new Error("One or more tags are invalid for this household");
+        }
         await db.insert(groceryItemTags).values(
-          tagIds.map((tagId) => ({ itemId: item.id, tagId }))
+          validTags.map((tag) => ({ itemId: item.id, tagId: tag.id }))
         );
       }
 

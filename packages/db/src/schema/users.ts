@@ -22,6 +22,7 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date())
     .$onUpdate(() => new Date()),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  restoreAllowedUntil: integer("restore_allowed_until", { mode: "timestamp_ms" }),
 });
 
 export type User = typeof users.$inferSelect;

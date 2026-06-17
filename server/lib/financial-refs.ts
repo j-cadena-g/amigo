@@ -6,6 +6,7 @@ import {
   inArray,
   isNull,
   scopeToHousehold,
+  visibleFinancialAccountsCondition,
   visibleBudgetsCondition,
   type DrizzleD1,
 } from "@amigo/db";
@@ -45,7 +46,8 @@ export async function validateFinancialRefs(
       where: and(
         eq(financialAccounts.id, accountId),
         scopeToHousehold(financialAccounts.householdId, householdId),
-        isNull(financialAccounts.deletedAt)
+        isNull(financialAccounts.deletedAt),
+        visibleFinancialAccountsCondition(viewerUserId)
       ),
     });
     if (!account) {
@@ -100,7 +102,8 @@ export async function validateImportBudgetAndAccountIds(
         and(
           scopeToHousehold(financialAccounts.householdId, householdId),
           inArray(financialAccounts.id, accountIds),
-          isNull(financialAccounts.deletedAt)
+          isNull(financialAccounts.deletedAt),
+          visibleFinancialAccountsCondition(viewerUserId)
         )
       );
     const ok = new Set(found.map((r) => r.id));

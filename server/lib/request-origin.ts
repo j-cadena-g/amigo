@@ -26,13 +26,5 @@ export function requestMatchesAllowedOrigin(
   if (origin) {
     return origin === allowedOrigin;
   }
-
-  const referer = request.headers.get("Referer");
-  if (!referer) return false;
-
-  try {
-    return new URL(referer).origin === allowedOrigin;
-  } catch {
-    return false;
-  }
+  return false;
 }

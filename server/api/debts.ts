@@ -204,7 +204,7 @@ export const handleDebtsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.debts.update
     );
 
-    const validated = addDebtSchema.parse(await request.json());
+    const validated = updateDebtSchema.parse(await request.json());
     const existing = await db.query.debts.findFirst({
       where: and(
         eq(debts.id, id),

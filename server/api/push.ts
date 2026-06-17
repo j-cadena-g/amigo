@@ -51,7 +51,9 @@ function isUnsafeIPv6(host: string): boolean {
   const ipv4Tail = normalized.match(/(?:^|:)(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
   if (ipv4Tail && isUnsafeIPv4(ipv4Tail)) return true;
 
-  return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(normalized.replace(/^0+/, ""));
+  return /^(fc|fd|fe8|fe9|fea|feb|fec|fed|fee|fef|ff)/.test(
+    normalized.replace(/^0+/, "")
+  );
 }
 
 function assertSafePushEndpoint(endpoint: string) {

@@ -153,6 +153,43 @@ describe("handleApiRoute", () => {
     expect(mocks.assertSessionStillValid).not.toHaveBeenCalled();
   });
 
+  it("rejects strict unsafe requests without Origin even when Referer matches", async () => {
+    const handler = vi.fn(async () => new Response(null, { status: 204 }));
+    const response = await handleApiRoute(
+      makeRouteArgs(
+        new Request("https://app.example.test/api/test", {
+          method: "POST",
+          headers: { Referer: "https://app.example.test/settings" },
+        }),
+        {
+          cspNonce: "test-nonce",
+          sessionStatus: "authenticated",
+          session: {
+            userId: "user-1",
+            householdId: "household-1",
+            orgId: "org-1",
+            role: "member",
+            email: "user@example.com",
+            name: null,
+          },
+        },
+        { APP_ORIGIN: "https://app.example.test" }
+      ),
+      {
+        auth: "strict",
+        handler,
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid request origin",
+      code: "PERMISSION_DENIED",
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(mocks.assertSessionStillValid).not.toHaveBeenCalled();
+  });
+
   it("revalidates strict sessions before same-origin unsafe handlers run", async () => {
     const session = {
       userId: "user-1",

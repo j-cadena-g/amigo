@@ -127,7 +127,7 @@ async function assertCanWriteTransaction(
   transaction: Transaction,
   action: "modify" | "delete"
 ) {
-  if (transaction.userId === session.userId || session.role !== "member") {
+  if (transaction.userId === session.userId) {
     return;
   }
 

@@ -6,7 +6,6 @@ import {
   debts,
   eq,
   financialAccounts,
-  getDb,
   groceryItemTags,
   groceryTags,
   isNull,
@@ -300,6 +299,95 @@ describe("security object authorization integration", () => {
       code: "PERMISSION_DENIED",
       message: "Cannot delete another user's transaction",
     });
+  });
+
+  it("denies admin writes to another member's private transaction", async () => {
+    const transactionId = crypto.randomUUID();
+    await db.insert(transactions).values({
+      id: transactionId,
+      householdId,
+      userId: memberTwoId,
+      amount: 1200,
+      currency: "CAD",
+      category: "private",
+      description: "private",
+      type: "expense",
+      date: "2026-06-17",
+    });
+
+    await expect(
+      handleTransactionsRequest({
+        env: getIntegrationEnv(),
+        params: { "*": transactionId },
+        request: new Request(`http://localhost/api/transactions/${transactionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: "admin tampered" }),
+        }),
+        sessionStatus: "authenticated",
+        session: sessionFor({ userId: adminId, householdId, role: "admin" }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Transaction not found",
+    });
+
+    await expect(
+      handleTransactionsRequest({
+        env: getIntegrationEnv(),
+        params: { "*": transactionId },
+        request: new Request(`http://localhost/api/transactions/${transactionId}`, {
+          method: "DELETE",
+        }),
+        sessionStatus: "authenticated",
+        session: sessionFor({ userId: adminId, householdId, role: "admin" }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Transaction not found",
+    });
+  });
+
+  it("preserves shared ownership when PATCHing a shared debt without isShared", async () => {
+    const debtId = crypto.randomUUID();
+    await db.insert(debts).values({
+      id: debtId,
+      householdId,
+      userId: null,
+      name: "Shared debt",
+      type: "LOAN",
+      balanceInitial: 100000,
+      balanceCurrent: 1000,
+      currency: "CAD",
+    });
+
+    const response = await handleDebtsRequest({
+      env: getIntegrationEnv(),
+      params: { "*": debtId },
+      request: new Request(`http://localhost/api/debts/${debtId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Shared debt updated",
+          type: "LOAN",
+          loanAmount: 1000,
+          totalPaid: 10,
+        }),
+      }),
+      sessionStatus: "authenticated",
+      session: sessionFor({ userId: adminId, householdId, role: "admin" }),
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    const updated = await db
+      .select({ userId: debts.userId })
+      .from(debts)
+      .where(eq(debts.id, debtId))
+      .get();
+    expect(updated?.userId).toBeNull();
   });
 
   it.each([

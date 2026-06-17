@@ -25,6 +25,7 @@ describe("push subscription security", () => {
     "http://updates.push.services.mozilla.com/wpush/v2/test",
     "https://127.0.0.1:8787/push",
     "https://[::1]/push",
+    "https://[fec0::1]/push",
     "https://localhost/push",
     "https://user:pass@updates.push.services.mozilla.com/wpush/v2/test",
   ])("rejects unsafe push endpoint %s", async (endpoint) => {

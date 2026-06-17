@@ -40,6 +40,8 @@ bun run dev
 
 If `bun run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 
+For **Cursor Cloud Agents**, do not copy app secrets into Cursor. Set only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID` on the cloud environment — see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents).
+
 To reset local D1 state: `bun run dev:reset`.
 
 ## Making changes

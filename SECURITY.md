@@ -48,6 +48,7 @@ We appreciate responsible disclosure. Reporters acting in good faith, following 
 Operators and contributors should:
 
 - Never commit secrets (API keys, Clerk secrets, or a local `.dev.vars` file). Store values in 1Password Environments only; the repo lists variable names in `*.example` manifests. Local dev and deploy inject secrets via `op run`; deploy uploads with `wrangler deploy --secrets-file`. Do not author secrets with `wrangler secret put` or the Cloudflare dashboard.
+- Cursor Cloud Agents should use the same bootstrap as Workers Builds: only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID` in Cursor environment secrets (dev Environment), not copies of individual app keys.
 - Never commit live Cloudflare account IDs, D1 database IDs, KV namespace IDs, or production route/domain bindings. Keep production deploy config in the ignored `.wrangler.deploy.jsonc` generated from environment variables.
 - Keep Clerk, Cloudflare, and dependency versions reasonably current (Dependabot is enabled for this repo).
 - Review household-scoped access in server handlers and route loaders when changing API or WebSocket behavior.

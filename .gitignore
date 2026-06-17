@@ -29,6 +29,7 @@ AGENTS.md
 .playwright-cli/
 .claude/
 .codex/
+
 .cursor/
 .gemini/
 

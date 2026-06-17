@@ -32,7 +32,7 @@ if (present.length > 0) {
 if (missing.length > 0) {
   console.error(`FAIL: missing or empty: ${missing.join(", ")}`);
   console.error(
-    "hint: set OP_ENVIRONMENT_ID in .op/refs.env, sign in with op, and run via bun run dev:verify",
+    "hint: local dev — set OP_ENVIRONMENT_ID in .op/refs.env and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (amigo dev) in Cursor environment secrets",
   );
   process.exit(1);
 }

@@ -52,6 +52,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body className="font-sans antialiased">
         <script
           nonce={cspNonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
           }}

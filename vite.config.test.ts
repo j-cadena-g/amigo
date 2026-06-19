@@ -22,7 +22,26 @@ describe("vite dev config", () => {
       "@clerk/react-router"
     );
     expect(config.environments?.amigo?.optimizeDeps?.include).toEqual(
-      expect.arrayContaining(["@clerk/react-router > cookie"])
+      expect.arrayContaining([
+        "@clerk/react-router",
+        "@clerk/react-router > cookie",
+        "@radix-ui/react-alert-dialog",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-slot",
+        "@radix-ui/react-switch",
+        "@radix-ui/react-tabs",
+        "class-variance-authority",
+        "clsx",
+        "dexie",
+        "isbot",
+        "lucide-react",
+        "react",
+        "react-dom/server",
+        "react/jsx-dev-runtime",
+        "recharts",
+        "tailwind-merge",
+      ])
     );
   });
 });

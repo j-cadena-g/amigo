@@ -9,6 +9,26 @@ const optimizeDepsExcludes = [
   "@clerk/react-router/server",
   "drizzle-orm",
 ];
+const workerSsrOptimizeDepsIncludes = [
+  "@clerk/react-router",
+  "@clerk/react-router > cookie",
+  "@radix-ui/react-alert-dialog",
+  "@radix-ui/react-dialog",
+  "@radix-ui/react-dropdown-menu",
+  "@radix-ui/react-slot",
+  "@radix-ui/react-switch",
+  "@radix-ui/react-tabs",
+  "class-variance-authority",
+  "clsx",
+  "dexie",
+  "isbot",
+  "lucide-react",
+  "react",
+  "react-dom/server",
+  "react/jsx-dev-runtime",
+  "recharts",
+  "tailwind-merge",
+];
 const workerSsrOptimizeDepsExcludes = ["@clerk/react-router/server", "drizzle-orm"];
 
 export default defineConfig(({ command }) => {
@@ -30,7 +50,7 @@ export default defineConfig(({ command }) => {
     environments: {
       amigo: {
         optimizeDeps: {
-          include: ["@clerk/react-router > cookie"],
+          include: workerSsrOptimizeDepsIncludes,
           exclude: workerSsrOptimizeDepsExcludes,
         },
       },

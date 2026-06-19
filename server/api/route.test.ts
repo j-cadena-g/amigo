@@ -6,7 +6,12 @@ import { handleApiRoute } from "./route";
 
 const mocks = vi.hoisted(() => ({
   assertSessionStillValid: vi.fn(),
+  getAuth: vi.fn(),
   getDb: vi.fn(),
+}));
+
+vi.mock("@clerk/react-router/server", () => ({
+  getAuth: mocks.getAuth,
 }));
 
 vi.mock("../lib/session", async (importOriginal) => ({
@@ -42,6 +47,8 @@ describe("handleApiRoute", () => {
   beforeEach(() => {
     mocks.assertSessionStillValid.mockReset();
     mocks.assertSessionStillValid.mockResolvedValue(undefined);
+    mocks.getAuth.mockReset();
+    mocks.getAuth.mockResolvedValue({ userId: "clerk-user-1" });
     mocks.getDb.mockReset();
     mocks.getDb.mockReturnValue({ current: "db" });
   });
@@ -223,5 +230,45 @@ describe("handleApiRoute", () => {
       session
     );
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("accepts bearer tokens for Clerk-authenticated API routes", async () => {
+    const handler = vi.fn(async () => new Response(null, { status: 204 }));
+    const args = makeRouteArgs(
+      new Request("http://localhost:5173/api/setup", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer token",
+          Origin: "http://localhost:5173",
+        },
+      }),
+      undefined,
+      { APP_ORIGIN: "http://localhost:5173" }
+    );
+
+    const response = await handleApiRoute(args, {
+      auth: "clerk",
+      handler,
+    });
+
+    expect(response.status).toBe(204);
+    expect(mocks.getAuth).toHaveBeenCalledWith(args, { acceptsToken: "any" });
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { userId: "clerk-user-1" },
+      })
+    );
+  });
+
+  it("rejects Clerk-authenticated API routes without a user id", async () => {
+    mocks.getAuth.mockResolvedValueOnce({ userId: null });
+
+    const response = await handleApiRoute(makeRouteArgs(), {
+      auth: "clerk",
+      handler: async () => new Response(null, { status: 204 }),
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 });

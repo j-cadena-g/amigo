@@ -72,11 +72,14 @@ export async function handleApiRoute(
     }
 
     if (options.auth === "clerk") {
-      const auth = await getAuth(args as Parameters<typeof getAuth>[0]);
-      if (!auth.userId) {
+      const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
+        acceptsToken: "any",
+      });
+      const userId = "userId" in auth ? auth.userId : null;
+      if (!userId) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
-      baseArgs.auth = auth;
+      baseArgs.auth = auth as NonNullable<ApiHandlerArgs["auth"]>;
     }
 
     return await options.handler(baseArgs);

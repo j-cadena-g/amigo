@@ -1,5 +1,5 @@
 import { SignIn, useUser } from "@clerk/react-router";
-import { redirect, type LoaderFunctionArgs } from "react-router";
+import { Navigate, redirect, type LoaderFunctionArgs } from "react-router";
 import { getSessionStatus } from "@/app/lib/session.server";
 
 export function loader({ context }: LoaderFunctionArgs) {
@@ -34,7 +34,7 @@ export default function Index() {
   }
 
   if (isSignedIn) {
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

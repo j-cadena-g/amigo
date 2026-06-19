@@ -3,9 +3,7 @@ import { WifiOff } from "lucide-react";
 import { getPendingCount, isOfflineSupported } from "@/app/lib/offline";
 
 export function OfflineIndicator() {
-  const [isOnline, setIsOnline] = useState(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -27,6 +25,7 @@ export function OfflineIndicator() {
       void refreshPending();
     };
 
+    setIsOnline(navigator.onLine);
     void refreshPending();
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);

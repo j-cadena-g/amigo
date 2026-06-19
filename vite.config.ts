@@ -26,6 +26,13 @@ export default defineConfig(({ command }) => {
     optimizeDeps: {
       exclude: workerSsrOptimizeDepsExcludes,
     },
+    environments: {
+      amigo: {
+        optimizeDeps: {
+          exclude: workerSsrOptimizeDepsExcludes,
+        },
+      },
+    },
     build: {
       rollupOptions: {
         onwarn(warning, defaultHandler) {

@@ -15,5 +15,12 @@ describe("vite dev config", () => {
         "drizzle-orm",
       ])
     );
+    expect(config.environments?.amigo?.optimizeDeps?.exclude).toEqual(
+      expect.arrayContaining([
+        "@clerk/react-router",
+        "@clerk/react-router/server",
+        "drizzle-orm",
+      ])
+    );
   });
 });

@@ -4,6 +4,12 @@ import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+const workerSsrOptimizeDepsExcludes = [
+  "@clerk/react-router",
+  "@clerk/react-router/server",
+  "drizzle-orm",
+];
+
 export default defineConfig(({ command }) => {
   const isVitest = process.env.VITEST === "true";
 
@@ -16,6 +22,9 @@ export default defineConfig(({ command }) => {
         : undefined,
     resolve: {
       tsconfigPaths: true,
+    },
+    optimizeDeps: {
+      exclude: workerSsrOptimizeDepsExcludes,
     },
     build: {
       rollupOptions: {

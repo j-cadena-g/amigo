@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import viteConfig from "./vite.config";
 
 describe("vite dev config", () => {
-  it("excludes Workers SSR dependencies that break Vite pre-bundling", async () => {
+  it("excludes only worker-unsafe SSR dependencies from the Workers environment", async () => {
     const config =
       typeof viteConfig === "function"
         ? await viteConfig({ command: "serve", mode: "development" })
@@ -16,11 +16,13 @@ describe("vite dev config", () => {
       ])
     );
     expect(config.environments?.amigo?.optimizeDeps?.exclude).toEqual(
-      expect.arrayContaining([
-        "@clerk/react-router",
-        "@clerk/react-router/server",
-        "drizzle-orm",
-      ])
+      expect.arrayContaining(["@clerk/react-router/server", "drizzle-orm"])
+    );
+    expect(config.environments?.amigo?.optimizeDeps?.exclude).not.toContain(
+      "@clerk/react-router"
+    );
+    expect(config.environments?.amigo?.optimizeDeps?.include).toEqual(
+      expect.arrayContaining(["cookie"])
     );
   });
 });

@@ -4,11 +4,12 @@ import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const workerSsrOptimizeDepsExcludes = [
+const optimizeDepsExcludes = [
   "@clerk/react-router",
   "@clerk/react-router/server",
   "drizzle-orm",
 ];
+const workerSsrOptimizeDepsExcludes = ["@clerk/react-router/server", "drizzle-orm"];
 
 export default defineConfig(({ command }) => {
   const isVitest = process.env.VITEST === "true";
@@ -24,11 +25,12 @@ export default defineConfig(({ command }) => {
       tsconfigPaths: true,
     },
     optimizeDeps: {
-      exclude: workerSsrOptimizeDepsExcludes,
+      exclude: optimizeDepsExcludes,
     },
     environments: {
       amigo: {
         optimizeDeps: {
+          include: ["cookie"],
           exclude: workerSsrOptimizeDepsExcludes,
         },
       },

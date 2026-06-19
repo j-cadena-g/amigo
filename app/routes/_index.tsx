@@ -1,5 +1,24 @@
 import { SignIn, useUser } from "@clerk/react-router";
-import { Navigate } from "react-router";
+import { redirect, type LoaderFunctionArgs } from "react-router";
+import { getSessionStatus } from "@/app/lib/session.server";
+
+export function loader({ context }: LoaderFunctionArgs) {
+  const status = getSessionStatus(context);
+
+  if (status === "authenticated") {
+    throw redirect("/dashboard");
+  }
+
+  if (status === "needs_setup") {
+    throw redirect("/setup");
+  }
+
+  if (status === "revoked") {
+    throw redirect("/restore-account");
+  }
+
+  return null;
+}
 
 export default function Index() {
   const { isSignedIn, isLoaded } = useUser();
@@ -15,7 +34,7 @@ export default function Index() {
   }
 
   if (isSignedIn) {
-    return <Navigate to="/dashboard" />;
+    return null;
   }
 
   return (

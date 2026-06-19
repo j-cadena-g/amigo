@@ -8,6 +8,24 @@ describe("vite dev config", () => {
         ? await viteConfig({ command: "serve", mode: "development" })
         : viteConfig;
 
+    expect(config.optimizeDeps?.include).toEqual(
+      expect.arrayContaining([
+        "@radix-ui/react-alert-dialog",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-slot",
+        "@radix-ui/react-switch",
+        "@radix-ui/react-tabs",
+        "class-variance-authority",
+        "clsx",
+        "dexie",
+        "lucide-react",
+        "recharts",
+        "tailwind-merge",
+        "workbox-precaching",
+        "workbox-window",
+      ])
+    );
     expect(config.optimizeDeps?.exclude).toEqual(
       expect.arrayContaining([
         "@clerk/react-router",

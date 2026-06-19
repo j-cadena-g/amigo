@@ -9,6 +9,22 @@ const optimizeDepsExcludes = [
   "@clerk/react-router/server",
   "drizzle-orm",
 ];
+const clientOptimizeDepsIncludes = [
+  "@radix-ui/react-alert-dialog",
+  "@radix-ui/react-dialog",
+  "@radix-ui/react-dropdown-menu",
+  "@radix-ui/react-slot",
+  "@radix-ui/react-switch",
+  "@radix-ui/react-tabs",
+  "class-variance-authority",
+  "clsx",
+  "dexie",
+  "lucide-react",
+  "recharts",
+  "tailwind-merge",
+  "workbox-precaching",
+  "workbox-window",
+];
 const workerSsrOptimizeDepsIncludes = [
   "@clerk/react-router",
   "@clerk/react-router > cookie",
@@ -45,6 +61,7 @@ export default defineConfig(({ command }) => {
       tsconfigPaths: true,
     },
     optimizeDeps: {
+      include: clientOptimizeDepsIncludes,
       exclude: optimizeDepsExcludes,
     },
     environments: {

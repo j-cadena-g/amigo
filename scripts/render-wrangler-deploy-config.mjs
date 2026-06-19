@@ -127,8 +127,17 @@ async function main() {
       (outputPath.endsWith(".wrangler.dev.jsonc") ? "development" : "production"),
   };
 
+  const isDevConfig = outputPath.endsWith(".wrangler.dev.jsonc");
   let rendered = template;
   for (const replacement of replacements) {
+    if (
+      isDevConfig &&
+      ["account_id", "database_id", "kv namespace id", "route pattern"].includes(
+        replacement.label,
+      )
+    ) {
+      continue;
+    }
     rendered = replaceConfigValue(
       rendered,
       replacement,
@@ -136,7 +145,7 @@ async function main() {
     );
   }
 
-  if (outputPath.endsWith(".wrangler.dev.jsonc")) {
+  if (isDevConfig) {
     rendered = rendered.replace(/\n\s*"account_id"\s*:\s*"[^"]*",/, "\n");
     rendered = rendered.replace(/"workers_dev"\s*:\s*false/, '"workers_dev": true');
     rendered = rendered.replace(/"routes"\s*:\s*\[[\s\S]*?\],/, '"routes": [],');

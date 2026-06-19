@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { SignIn, useUser } from "@clerk/react-router";
-import { Navigate, redirect, type LoaderFunctionArgs } from "react-router";
+import { redirect, type LoaderFunctionArgs } from "react-router";
 import { getSessionStatus } from "@/app/lib/session.server";
 
 export function loader({ context }: LoaderFunctionArgs) {
@@ -20,21 +21,31 @@ export function loader({ context }: LoaderFunctionArgs) {
   return null;
 }
 
+function FullPageLoading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-background">
+      <div className="animate-pulse-soft font-display text-lg text-muted-foreground">
+        Loading...
+      </div>
+    </main>
+  );
+}
+
 export default function Index() {
   const { isSignedIn, isLoaded } = useUser();
 
+  useEffect(() => {
+    if (isSignedIn) {
+      window.location.replace("/dashboard");
+    }
+  }, [isSignedIn]);
+
   if (!isLoaded) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse-soft font-display text-lg text-muted-foreground">
-          Loading...
-        </div>
-      </main>
-    );
+    return <FullPageLoading />;
   }
 
   if (isSignedIn) {
-    return <Navigate to="/dashboard" replace />;
+    return <FullPageLoading />;
   }
 
   return (

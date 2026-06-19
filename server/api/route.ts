@@ -74,6 +74,7 @@ export async function handleApiRoute(
     if (options.auth === "clerk") {
       const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
         acceptsToken: "any",
+        treatPendingAsSignedOut: false,
       });
       const userId = "userId" in auth ? auth.userId : null;
       if (!userId) {

@@ -252,7 +252,10 @@ describe("handleApiRoute", () => {
     });
 
     expect(response.status).toBe(204);
-    expect(mocks.getAuth).toHaveBeenCalledWith(args, { acceptsToken: "any" });
+    expect(mocks.getAuth).toHaveBeenCalledWith(args, {
+      acceptsToken: "any",
+      treatPendingAsSignedOut: false,
+    });
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: { userId: "clerk-user-1" },

@@ -22,7 +22,7 @@ describe("vite dev config", () => {
       "@clerk/react-router"
     );
     expect(config.environments?.amigo?.optimizeDeps?.include).toEqual(
-      expect.arrayContaining(["cookie"])
+      expect.arrayContaining(["@clerk/react-router > cookie"])
     );
   });
 });

@@ -30,7 +30,7 @@ export default defineConfig(({ command }) => {
     environments: {
       amigo: {
         optimizeDeps: {
-          include: ["cookie"],
+          include: ["@clerk/react-router > cookie"],
           exclude: workerSsrOptimizeDepsExcludes,
         },
       },

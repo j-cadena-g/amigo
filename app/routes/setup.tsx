@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useAuth } from "@clerk/react-router";
 import { useNavigate } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
 
 export default function Setup() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const [householdName, setHouseholdName] = useState("My Household");
   const [currency, setCurrency] = useState("CAD");
   const [submitting, setSubmitting] = useState(false);
@@ -14,9 +16,13 @@ export default function Setup() {
     setSubmitting(true);
     setError(null);
 
+    const token = await getToken();
     const res = await fetch("/api/setup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         householdName: householdName.trim(),
         homeCurrency: currency,

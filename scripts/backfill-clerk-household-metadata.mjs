@@ -75,6 +75,7 @@ function queryD1(sql) {
   const output = execFileSync("bunx", wranglerArgs, {
     cwd: rootDir,
     encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
   });
 
   let parsed;
@@ -106,7 +107,7 @@ async function loadMemberships() {
   }
 
   return queryD1(
-    "SELECT u.auth_id AS authId, u.email AS email, u.role AS role, h.id AS householdId, h.name AS householdName, h.clerk_org_id AS clerkOrgId FROM users u INNER JOIN households h ON u.household_id = h.id WHERE u.deleted_at IS NULL ORDER BY h.name, u.role, u.email;"
+    "SELECT u.auth_id AS authId, u.email AS email, u.role AS role, h.id AS householdId, h.name AS householdName FROM users u INNER JOIN households h ON u.household_id = h.id WHERE u.deleted_at IS NULL ORDER BY h.name, u.role, u.email;"
   );
 }
 
@@ -197,9 +198,7 @@ async function main() {
     console.log(
       `${apply ? "SYNC" : "PLAN"} ${membership.email} (${membership.role}) ${membership.authId}`
     );
-    console.log(
-      `     D1: ${expected.householdId} / ${expected.householdName} (legacy clerk_org_id=${membership.clerkOrgId})`
-    );
+    console.log(`     D1: ${expected.householdId} / ${expected.householdName}`);
     console.log(
       `     Clerk: ${current.householdId ?? "<missing>"} / ${current.householdName ?? "<missing>"}`
     );

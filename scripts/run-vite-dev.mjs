@@ -8,8 +8,10 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { AMIGO_DEV_PORT } from "./lib/dev-origin.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +31,37 @@ function assertRequiredKeys() {
   }
 }
 
+async function assertDevPortAvailable(port) {
+  await new Promise((resolve, reject) => {
+    const probe = net.createServer();
+
+    probe.once("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${port} is already in use (likely a stale "bun run dev"). Stop it with: lsof -ti :${port} -sTCP:LISTEN | xargs kill`,
+          ),
+        );
+        return;
+      }
+
+      reject(error);
+    });
+
+    probe.once("listening", () => {
+      probe.close((closeError) => {
+        if (closeError) {
+          reject(closeError);
+          return;
+        }
+        resolve();
+      });
+    });
+
+    probe.listen(port, "127.0.0.1");
+  });
+}
+
 const [command, ...args] = process.argv.slice(2);
 
 if (!command) {
@@ -37,6 +70,15 @@ if (!command) {
 }
 
 assertRequiredKeys();
+
+if (command === "vite") {
+  try {
+    await assertDevPortAvailable(AMIGO_DEV_PORT);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
 
 const devWranglerConfig = path.join(rootDir, ".wrangler.dev.jsonc");
 process.env.WRANGLER_RENDER_OUTPUT = devWranglerConfig;

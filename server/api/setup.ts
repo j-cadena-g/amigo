@@ -1,6 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
 import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
 import { z } from "zod";
+import { isValidTimeZone } from "../lib/dates";
 import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { ActionError } from "../lib/errors";
 import type { ApiHandler } from "./route";
@@ -8,6 +9,7 @@ import type { ApiHandler } from "./route";
 const setupSchema = z.object({
   householdName: z.string().min(1).max(100),
   homeCurrency: z.enum(CURRENCY_CODES),
+  timezone: z.string().min(1).max(64),
 });
 
 export const handleSetupRequest: ApiHandler = async ({
@@ -41,9 +43,13 @@ export const handleSetupRequest: ApiHandler = async ({
     );
   }
 
-  const { householdName, homeCurrency } = setupSchema.parse(
+  const { householdName, homeCurrency, timezone } = setupSchema.parse(
     await request.json()
   );
+
+  if (!isValidTimeZone(timezone)) {
+    throw new ActionError("Invalid timezone", "VALIDATION_ERROR");
+  }
 
   const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
   const clerkUser = await clerk.users.getUser(auth.userId);
@@ -67,6 +73,7 @@ export const handleSetupRequest: ApiHandler = async ({
       id: householdId,
       name: householdName,
       homeCurrency,
+      timezone,
     })
     .returning()
     .get();

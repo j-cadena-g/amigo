@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { AMIGO_DEV_PORT } from "./server/lib/dev-origin";
 
 const optimizeDepsExcludes = [
   "@clerk/react-router",
@@ -55,7 +56,11 @@ export default defineConfig(({ command }) => {
     // run; the leading dot allows any *.trycloudflare.com hostname in dev.
     server:
       command === "serve" && !isVitest
-        ? { allowedHosts: [".trycloudflare.com"] }
+        ? {
+            port: AMIGO_DEV_PORT,
+            strictPort: true,
+            allowedHosts: [".trycloudflare.com"],
+          }
         : undefined,
     resolve: {
       tsconfigPaths: true,

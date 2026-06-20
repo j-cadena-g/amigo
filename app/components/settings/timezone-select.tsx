@@ -2,22 +2,7 @@ import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/toast-provider";
-
-const COMMON_TIMEZONES = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Toronto",
-  "America/Vancouver",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Australia/Sydney",
-  "Pacific/Auckland",
-];
+import { buildTimezoneOptions } from "@/app/lib/timezones";
 
 interface TimezoneSelectProps {
   timezone: string;
@@ -34,9 +19,7 @@ export function TimezoneSelect({ timezone, canEdit }: TimezoneSelectProps) {
     setValue(timezone);
   }, [timezone]);
 
-  const options = COMMON_TIMEZONES.includes(value)
-    ? COMMON_TIMEZONES
-    : [value, ...COMMON_TIMEZONES];
+  const options = buildTimezoneOptions(value);
 
   async function handleSave() {
     setSaving(true);

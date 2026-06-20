@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { AMIGO_DEV_ORIGIN } from "../server/lib/dev-origin";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, "..");
@@ -13,7 +14,7 @@ function createDevEnv(outputPath: string, overrides: Record<string, string | und
     ...process.env,
     WRANGLER_RENDER_OUTPUT: outputPath,
     APP_ENV: "development",
-    APP_ORIGIN: "http://localhost:5173",
+    APP_ORIGIN: AMIGO_DEV_ORIGIN,
     CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk",
     CLOUDFLARE_ACCOUNT_ID: undefined,
     CLOUDFLARE_D1_DATABASE_ID: undefined,
@@ -49,7 +50,7 @@ describe("render-wrangler-deploy-config", () => {
       );
       expect(rendered).toContain('"id": "00000000000000000000000000000000"');
       expect(rendered).toContain('"routes": []');
-      expect(rendered).toContain('"APP_ORIGIN": "http://localhost:5173"');
+      expect(rendered).toContain(`"APP_ORIGIN": "${AMIGO_DEV_ORIGIN}"`);
       expect(rendered).toContain(
         '"CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk"'
       );

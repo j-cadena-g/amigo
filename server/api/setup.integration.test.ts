@@ -69,6 +69,7 @@ describe("setup integration", () => {
           body: JSON.stringify({
             householdName: "Blocked Household",
             homeCurrency: "CAD",
+            timezone: "America/Toronto",
           }),
         }),
         sessionStatus: "needs_setup",
@@ -93,6 +94,7 @@ describe("setup integration", () => {
         body: JSON.stringify({
           householdName: "Allowed Household",
           homeCurrency: "CAD",
+          timezone: "America/Toronto",
         }),
       }),
       sessionStatus: "needs_setup",
@@ -116,6 +118,7 @@ describe("setup integration", () => {
       .get();
 
     expect(household?.name).toBe("Allowed Household");
+    expect(household?.timezone).toBe("America/Toronto");
     expect(owner?.role).toBe("owner");
     expect(mocks.updateUserMetadata).toHaveBeenCalledWith(authId, {
       publicMetadata: {
@@ -142,6 +145,7 @@ describe("setup integration", () => {
           body: JSON.stringify({
             householdName: "Test Household",
             homeCurrency: "CAD",
+            timezone: "UTC",
           }),
         }),
         sessionStatus: "needs_setup",
@@ -161,5 +165,32 @@ describe("setup integration", () => {
     expect(
       householdCount.some((household) => household.name === "Test Household")
     ).toBe(false);
+  });
+
+  it("rejects invalid timezones during setup", async () => {
+    const suffix = crypto.randomUUID();
+    const authId = `clerk_setup_invalid_tz_${suffix}`;
+
+    await expect(
+      handleSetupRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            householdName: "Timezone Test Household",
+            homeCurrency: "CAD",
+            timezone: "Not/A/Timezone",
+          }),
+        }),
+        sessionStatus: "needs_setup",
+        loadContext: {} as never,
+        auth: setupAuth(authId),
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Invalid timezone",
+    });
   });
 });

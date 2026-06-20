@@ -1,13 +1,37 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
-import { useNavigate } from "react-router";
+import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import {
+  buildTimezoneOptions,
+  getBrowserTimezone,
+} from "@/app/lib/timezones";
+import { getSessionStatus } from "@/app/lib/session.server";
+
+export function loader({ context }: LoaderFunctionArgs) {
+  const status = getSessionStatus(context);
+
+  if (status === "unauthenticated") {
+    throw redirect("/");
+  }
+
+  if (status === "authenticated") {
+    throw redirect("/dashboard");
+  }
+
+  if (status === "revoked") {
+    throw redirect("/restore-account");
+  }
+
+  return null;
+}
 
 export default function Setup() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [householdName, setHouseholdName] = useState("My Household");
   const [currency, setCurrency] = useState("CAD");
+  const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +50,7 @@ export default function Setup() {
       body: JSON.stringify({
         householdName: householdName.trim(),
         homeCurrency: currency,
+        timezone,
       }),
     });
 
@@ -83,6 +108,27 @@ export default function Setup() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="timezone" className="block text-sm font-medium mb-1">
+              Timezone
+            </label>
+            <select
+              id="timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+            >
+              {buildTimezoneOptions(timezone).map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Budget periods and transaction dates use your household&apos;s local calendar day.
+            </p>
           </div>
 
           {error && (

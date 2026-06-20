@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionError } from "../lib/errors";
+import { AMIGO_DEV_ORIGIN } from "../lib/dev-origin";
 import { handleApiRoute } from "./route";
 
 const mocks = vi.hoisted(() => ({
@@ -235,15 +236,15 @@ describe("handleApiRoute", () => {
   it("accepts bearer tokens for Clerk-authenticated API routes", async () => {
     const handler = vi.fn(async () => new Response(null, { status: 204 }));
     const args = makeRouteArgs(
-      new Request("http://localhost:5173/api/setup", {
+      new Request(`${AMIGO_DEV_ORIGIN}/api/setup`, {
         method: "POST",
         headers: {
           Authorization: "Bearer token",
-          Origin: "http://localhost:5173",
+          Origin: AMIGO_DEV_ORIGIN,
         },
       }),
       undefined,
-      { APP_ORIGIN: "http://localhost:5173" }
+      { APP_ORIGIN: AMIGO_DEV_ORIGIN }
     );
 
     const response = await handleApiRoute(args, {

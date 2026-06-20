@@ -40,25 +40,31 @@ export default function Setup() {
     setSubmitting(true);
     setError(null);
 
-    const token = await getToken();
-    const res = await fetch("/api/setup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        householdName: householdName.trim(),
-        homeCurrency: currency,
-        timezone,
-      }),
-    });
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          householdName: householdName.trim(),
+          homeCurrency: currency,
+          timezone,
+        }),
+      });
 
-    if (res.ok) {
-      navigate("/dashboard");
-    } else {
-      const data = await res.json() as { error?: string };
-      setError(data.error ?? "Something went wrong");
+      if (res.ok) {
+        navigate("/dashboard");
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error ?? "Something went wrong");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }

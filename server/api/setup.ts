@@ -12,6 +12,15 @@ const setupSchema = z.object({
   timezone: z.string().min(1).max(64),
 });
 
+function isAuthIdUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /(?:UNIQUE constraint failed: users\.auth_id|UNIQUE constraint failed: users\.authId)/i.test(
+      error.message
+    )
+  );
+}
+
 export const handleSetupRequest: ApiHandler = async ({
   auth,
   env,
@@ -67,27 +76,35 @@ export const handleSetupRequest: ApiHandler = async ({
     householdName,
   });
 
-  const household = await db
-    .insert(households)
-    .values({
-      id: householdId,
-      name: householdName,
-      homeCurrency,
-      timezone,
-    })
-    .returning()
-    .get();
+  try {
+    await db.batch([
+      db.insert(households).values({
+        id: householdId,
+        name: householdName,
+        homeCurrency,
+        timezone,
+      }),
+      db.insert(users).values({
+        authId: auth.userId,
+        email,
+        name,
+        householdId,
+        role: "owner",
+      }),
+    ]);
+  } catch (error) {
+    if (isAuthIdUniqueConstraintError(error)) {
+      throw new ActionError(
+        "You already belong to a household",
+        "PERMISSION_DENIED"
+      );
+    }
 
-  await db.insert(users).values({
-    authId: auth.userId,
-    email,
-    name,
-    householdId: household.id,
-    role: "owner",
-  });
+    throw error;
+  }
 
   return Response.json(
-    { success: true, householdId: household.id },
+    { success: true, householdId },
     { status: 201 }
   );
 };

@@ -138,7 +138,9 @@ export default function Setup() {
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
           )}
 
           <button

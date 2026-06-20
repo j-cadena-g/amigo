@@ -167,6 +167,64 @@ describe("setup integration", () => {
     ).toBe(false);
   });
 
+  it("repairs Clerk metadata when a concurrent setup request loses the auth_id race", async () => {
+    const suffix = crypto.randomUUID();
+    const authId = `clerk_setup_race_${suffix}`;
+
+    const makeRequest = (householdName: string) =>
+      handleSetupRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            householdName,
+            homeCurrency: "CAD",
+            timezone: "America/Toronto",
+          }),
+        }),
+        sessionStatus: "needs_setup",
+        loadContext: {} as never,
+        auth: setupAuth(authId),
+      });
+
+    const results = await Promise.allSettled([
+      makeRequest("Race Household A"),
+      makeRequest("Race Household B"),
+    ]);
+
+    const successes = results.filter(
+      (result): result is PromiseFulfilledResult<Response> =>
+        result.status === "fulfilled"
+    );
+    const failures = results.filter((result) => result.status === "rejected");
+
+    expect(successes).toHaveLength(1);
+    expect(failures).toHaveLength(1);
+
+    const db = getDb(getIntegrationEnv().DB);
+    const owner = await db
+      .select()
+      .from(users)
+      .where(eq(users.authId, authId))
+      .get();
+    const household = await db
+      .select()
+      .from(households)
+      .where(eq(households.id, owner!.householdId))
+      .get();
+
+    expect(owner).toBeDefined();
+    expect(household).toBeDefined();
+    expect(mocks.updateUserMetadata).toHaveBeenLastCalledWith(authId, {
+      publicMetadata: {
+        householdId: household!.id,
+        householdName: household!.name,
+      },
+    });
+  });
+
   it("rejects invalid timezones during setup", async () => {
     const suffix = crypto.randomUUID();
     const authId = `clerk_setup_invalid_tz_${suffix}`;

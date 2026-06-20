@@ -2,7 +2,10 @@ import { createClerkClient } from "@clerk/backend";
 import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
 import { z } from "zod";
 import { isValidTimeZone } from "../lib/dates";
-import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
+import {
+  clearClerkHouseholdMetadata,
+  setClerkHouseholdMetadata,
+} from "../lib/clerk-household-metadata";
 import { ActionError } from "../lib/errors";
 import type { ApiHandler } from "./route";
 
@@ -19,6 +22,32 @@ function isAuthIdUniqueConstraintError(error: unknown) {
       error.message
     )
   );
+}
+
+async function syncClerkMetadataToExistingHousehold(
+  db: ReturnType<typeof getDb>,
+  clerk: ReturnType<typeof createClerkClient>,
+  authUserId: string
+) {
+  const membership = await db
+    .select({
+      householdId: users.householdId,
+      householdName: households.name,
+    })
+    .from(users)
+    .innerJoin(households, eq(users.householdId, households.id))
+    .where(and(eq(users.authId, authUserId), isNull(users.deletedAt)))
+    .get();
+
+  if (!membership) {
+    await clearClerkHouseholdMetadata(clerk, authUserId);
+    return;
+  }
+
+  await setClerkHouseholdMetadata(clerk, authUserId, {
+    householdId: membership.householdId,
+    householdName: membership.householdName,
+  });
 }
 
 export const handleSetupRequest: ApiHandler = async ({
@@ -94,10 +123,21 @@ export const handleSetupRequest: ApiHandler = async ({
     ]);
   } catch (error) {
     if (isAuthIdUniqueConstraintError(error)) {
+      await syncClerkMetadataToExistingHousehold(db, clerk, auth.userId);
       throw new ActionError(
         "You already belong to a household",
         "PERMISSION_DENIED"
       );
+    }
+
+    try {
+      await clearClerkHouseholdMetadata(clerk, auth.userId);
+    } catch (clearError) {
+      console.error("Failed to clear Clerk setup metadata after D1 batch failure", {
+        error: clearError,
+        authUserId: auth.userId,
+        householdId,
+      });
     }
 
     throw error;

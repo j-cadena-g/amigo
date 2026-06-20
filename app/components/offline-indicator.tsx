@@ -1,10 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { WifiOff } from "lucide-react";
 import { getPendingCount, isOfflineSupported } from "@/app/lib/offline";
 
+function subscribeOnlineStatus(onStoreChange: () => void) {
+  window.addEventListener("online", onStoreChange);
+  window.addEventListener("offline", onStoreChange);
+
+  return () => {
+    window.removeEventListener("online", onStoreChange);
+    window.removeEventListener("offline", onStoreChange);
+  };
+}
+
+function getOnlineSnapshot() {
+  return navigator.onLine;
+}
+
+function getServerOnlineSnapshot() {
+  return true;
+}
+
 export function OfflineIndicator() {
-  const [isOnline, setIsOnline] = useState(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true
+  const isOnline = useSyncExternalStore(
+    subscribeOnlineStatus,
+    getOnlineSnapshot,
+    getServerOnlineSnapshot
   );
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -18,23 +38,18 @@ export function OfflineIndicator() {
       }
     };
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      void refreshPending();
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
+    const handleOnlineStatusChange = () => {
       void refreshPending();
     };
 
     void refreshPending();
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnlineStatusChange);
+    window.addEventListener("offline", handleOnlineStatusChange);
     const interval = window.setInterval(() => void refreshPending(), 5000);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnlineStatusChange);
+      window.removeEventListener("offline", handleOnlineStatusChange);
       window.clearInterval(interval);
     };
   }, []);

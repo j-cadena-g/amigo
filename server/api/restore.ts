@@ -22,19 +22,8 @@ import { getSplatPath, type ApiHandler } from "./route";
 
 async function findSoftDeletedUser(
   db: ReturnType<typeof getDb>,
-  authId: string,
-  orgId: string
+  authId: string
 ) {
-  const household = await db
-    .select({ id: households.id, name: households.name })
-    .from(households)
-    .where(eq(households.clerkOrgId, orgId))
-    .get();
-
-  if (!household) {
-    return null;
-  }
-
   const user = await db
     .select({
       id: users.id,
@@ -48,7 +37,6 @@ async function findSoftDeletedUser(
     .where(
       and(
         eq(users.authId, authId),
-        eq(users.householdId, household.id),
         isNotNull(users.deletedAt),
         gt(users.restoreAllowedUntil, new Date())
       )
@@ -56,6 +44,16 @@ async function findSoftDeletedUser(
     .get();
 
   if (!user) {
+    return null;
+  }
+
+  const household = await db
+    .select({ id: households.id, name: households.name })
+    .from(households)
+    .where(eq(households.id, user.householdId))
+    .get();
+
+  if (!household) {
     return null;
   }
 
@@ -70,7 +68,7 @@ export const handleRestoreRequest: ApiHandler = async ({
 }) => {
   const path = getSplatPath(params);
   const identity = getClerkIdentity(auth);
-  if (!identity?.userId || !identity.orgId) {
+  if (!identity?.userId) {
     throw new ActionError("Unauthorized", "UNAUTHORIZED");
   }
 
@@ -84,7 +82,7 @@ export const handleRestoreRequest: ApiHandler = async ({
     );
 
     const db = getDb(env.DB);
-    const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+    const match = await findSoftDeletedUser(db, identity.userId);
 
     if (!match) {
       return Response.json({ pending: false });
@@ -105,7 +103,7 @@ export const handleRestoreRequest: ApiHandler = async ({
 
     try {
       const db = getDb(env.DB);
-      const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+      const match = await findSoftDeletedUser(db, identity.userId);
 
       if (!match) {
         throw new ActionError("No pending restore found", "NOT_FOUND");
@@ -152,7 +150,7 @@ export const handleRestoreRequest: ApiHandler = async ({
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      await invalidateSessionCache(env.CACHE, identity.userId, identity.orgId);
+      await invalidateSessionCache(env.CACHE, identity.userId);
 
       logSecurityEvent("account_restored", {
         userId: user.id,
@@ -179,7 +177,7 @@ export const handleRestoreRequest: ApiHandler = async ({
 
     try {
       const db = getDb(env.DB);
-      const match = await findSoftDeletedUser(db, identity.userId, identity.orgId);
+      const match = await findSoftDeletedUser(db, identity.userId);
 
       if (!match) {
         throw new ActionError("No pending restore found", "NOT_FOUND");
@@ -250,7 +248,7 @@ export const handleRestoreRequest: ApiHandler = async ({
           .where(eq(groceryItems.createdByUserId, user.id)),
       ]);
 
-      await invalidateSessionCache(env.CACHE, identity.userId, identity.orgId);
+      await invalidateSessionCache(env.CACHE, identity.userId);
 
       logSecurityEvent("account_fresh_start", {
         userId: user.id,

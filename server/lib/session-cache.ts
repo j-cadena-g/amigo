@@ -1,55 +1,36 @@
-import type { Env } from "../env";
-import { logSecurityEvent } from "./errors";
-
 const SESSION_CACHE_PREFIX = "session";
 
-export function getSessionCacheKey(authId: string, orgId: string): string {
-  return `${SESSION_CACHE_PREFIX}:${authId}:${orgId}`;
+export function getSessionCacheKey(authId: string): string {
+  return `${SESSION_CACHE_PREFIX}:${authId}`;
 }
 
-async function deleteWithRetry(
+async function deleteWithLogging(
   kv: KVNamespace,
-  cacheKey: string,
-  authId: string,
-  orgId: string
+  key: string,
+  authId: string
 ): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await kv.delete(cacheKey);
-      return;
-    } catch (err) {
-      lastError = err;
-    }
+  try {
+    await kv.delete(key);
+  } catch (error) {
+    console.error("Session cache delete failed", { error, key, authId });
   }
-
-  console.error("Session cache invalidation failed after retry", {
-    error: lastError,
-    cacheKey,
-    authId,
-    orgId,
-  });
-  logSecurityEvent("session_cache_invalidation_failed", {
-    authId,
-    orgId,
-    cacheKey,
-  });
 }
 
 export async function invalidateSessionCache(
   kv: KVNamespace,
-  authId: string | null | undefined,
-  orgId: string | null | undefined
+  authId: string | null | undefined
 ): Promise<void> {
-  if (!authId || !orgId) return;
-  await deleteWithRetry(kv, getSessionCacheKey(authId, orgId), authId, orgId);
+  if (!authId) return;
+  await deleteWithLogging(kv, getSessionCacheKey(authId), authId);
 }
 
 export async function invalidateSessionCachesForHouseholdMembers(
-  env: Env,
-  members: Array<{ authId: string | null; orgId: string | null }>
+  env: { CACHE: KVNamespace },
+  members: Array<{ authId: string | null }>
 ): Promise<void> {
   await Promise.all(
-    members.map((member) => invalidateSessionCache(env.CACHE, member.authId, member.orgId))
+    members.map((member) =>
+      invalidateSessionCache(env.CACHE, member.authId)
+    )
   );
 }

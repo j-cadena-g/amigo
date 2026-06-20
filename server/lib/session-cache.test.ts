@@ -6,17 +6,14 @@ import {
 } from "./session-cache";
 
 describe("session cache helpers", () => {
-  it("builds cache keys with auth and org identifiers", () => {
-    expect(getSessionCacheKey("user_123", "org_456")).toBe(
-      "session:user_123:org_456"
-    );
+  it("builds cache keys with auth identifiers", () => {
+    expect(getSessionCacheKey("user_123")).toBe("session:user_123");
   });
 
-  it("skips invalidation when auth or org identifiers are missing", async () => {
+  it("skips invalidation when auth identifiers are missing", async () => {
     const kv = { delete: vi.fn() } as unknown as KVNamespace;
 
-    await invalidateSessionCache(kv, "user_123", null);
-    await invalidateSessionCache(kv, null, "org_456");
+    await invalidateSessionCache(kv, null);
 
     expect(kv.delete).not.toHaveBeenCalled();
   });
@@ -31,15 +28,11 @@ describe("session cache helpers", () => {
 
     await invalidateSessionCachesForHouseholdMembers(
       env as never,
-      [
-        { authId: "user_1", orgId: "org_1" },
-        { authId: "user_2", orgId: "org_1" },
-        { authId: null, orgId: "org_1" },
-      ]
+      [{ authId: "user_1" }, { authId: "user_2" }, { authId: null }]
     );
 
     expect(deleteFn).toHaveBeenCalledTimes(2);
-    expect(deleteFn).toHaveBeenNthCalledWith(1, "session:user_1:org_1");
-    expect(deleteFn).toHaveBeenNthCalledWith(2, "session:user_2:org_1");
+    expect(deleteFn).toHaveBeenNthCalledWith(1, "session:user_1");
+    expect(deleteFn).toHaveBeenNthCalledWith(2, "session:user_2");
   });
 });

@@ -16,6 +16,7 @@ import {
   users,
 } from "@amigo/db";
 import { z } from "zod";
+import { clearClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { broadcastToHousehold, invalidateUserSession } from "../lib/realtime";
 import { ActionError, logSecurityEvent, logServerError } from "../lib/errors";
 import {
@@ -33,20 +34,6 @@ import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
 });
-
-function isClerkMembershipAlreadyRemovedError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const candidate = error as {
-    status?: unknown;
-    statusCode?: unknown;
-    code?: unknown;
-  };
-  return (
-    candidate.status === 404 ||
-    candidate.statusCode === 404 ||
-    candidate.code === "resource_not_found"
-  );
-}
 
 export const handleMembersRequest: ApiHandler = async ({
   env,
@@ -136,7 +123,7 @@ export const handleMembersRequest: ApiHandler = async ({
     await db.update(users).set({ role }).where(eq(users.id, userId));
 
     await invalidateSessionCachesForHouseholdMembers(env, [
-      { authId: targetUser.authId, orgId: session!.orgId },
+      { authId: targetUser.authId },
     ]);
     await invalidateUserSession(env, session!.householdId, userId);
 
@@ -193,8 +180,8 @@ export const handleMembersRequest: ApiHandler = async ({
     ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [
-      { authId: currentUser.authId, orgId: session!.orgId },
-      { authId: newOwner.authId, orgId: session!.orgId },
+      { authId: currentUser.authId },
+      { authId: newOwner.authId },
     ]);
     await Promise.all([
       invalidateUserSession(env, session!.householdId, session!.userId),
@@ -340,28 +327,17 @@ export const handleMembersRequest: ApiHandler = async ({
     const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
     try {
-      await clerk.organizations.deleteOrganizationMembership({
-        organizationId: session!.orgId,
-        userId: targetUser.authId,
-      });
+      await clearClerkHouseholdMetadata(clerk, targetUser.authId);
     } catch (error) {
-      if (isClerkMembershipAlreadyRemovedError(error)) {
-        logSecurityEvent("member_clerk_membership_already_removed", {
-          householdId: session!.householdId,
-          removedUserId: userId,
-          removedBy: session!.userId,
-        });
-      } else {
-        logServerError("remove-member-clerk-membership", error, {
-          householdId: session!.householdId,
-          removedUserId: userId,
-          removedBy: session!.userId,
-        });
-        throw new ActionError(
-          "Failed to remove member from Clerk organization",
-          "INTERNAL_ERROR"
-        );
-      }
+      logServerError("remove-member-clerk-metadata", error, {
+        householdId: session!.householdId,
+        removedUserId: userId,
+        removedBy: session!.userId,
+      });
+      throw new ActionError(
+        "Failed to clear household metadata from Clerk user",
+        "INTERNAL_ERROR"
+      );
     }
 
     await db.batch([
@@ -393,7 +369,7 @@ export const handleMembersRequest: ApiHandler = async ({
     ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [
-      { authId: targetUser.authId, orgId: session!.orgId },
+      { authId: targetUser.authId },
     ]);
     await invalidateUserSession(env, session!.householdId, userId);
 

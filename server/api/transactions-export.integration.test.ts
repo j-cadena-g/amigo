@@ -20,7 +20,6 @@ describe("transactions export integration", () => {
     const db = createTestDb(getIntegrationEnv().DB);
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId: `org_export_${suffix}`,
       ownerId,
       ownerAuthId: `clerk_export_owner_${suffix}`,
     });

@@ -2,11 +2,17 @@ import type { LoaderFunctionArgs } from "react-router";
 import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionError } from "../lib/errors";
+import { AMIGO_DEV_ORIGIN } from "../lib/dev-origin";
 import { handleApiRoute } from "./route";
 
 const mocks = vi.hoisted(() => ({
   assertSessionStillValid: vi.fn(),
+  getAuth: vi.fn(),
   getDb: vi.fn(),
+}));
+
+vi.mock("@clerk/react-router/server", () => ({
+  getAuth: mocks.getAuth,
 }));
 
 vi.mock("../lib/session", async (importOriginal) => ({
@@ -42,6 +48,8 @@ describe("handleApiRoute", () => {
   beforeEach(() => {
     mocks.assertSessionStillValid.mockReset();
     mocks.assertSessionStillValid.mockResolvedValue(undefined);
+    mocks.getAuth.mockReset();
+    mocks.getAuth.mockResolvedValue({ userId: "clerk-user-1" });
     mocks.getDb.mockReset();
     mocks.getDb.mockReturnValue({ current: "db" });
   });
@@ -130,7 +138,6 @@ describe("handleApiRoute", () => {
           session: {
             userId: "user-1",
             householdId: "household-1",
-            orgId: "org-1",
             role: "member",
             email: "user@example.com",
             name: null,
@@ -167,7 +174,6 @@ describe("handleApiRoute", () => {
           session: {
             userId: "user-1",
             householdId: "household-1",
-            orgId: "org-1",
             role: "member",
             email: "user@example.com",
             name: null,
@@ -194,7 +200,6 @@ describe("handleApiRoute", () => {
     const session = {
       userId: "user-1",
       householdId: "household-1",
-      orgId: "org-1",
       role: "admin" as const,
       email: "user@example.com",
       name: "User",
@@ -226,5 +231,48 @@ describe("handleApiRoute", () => {
       session
     );
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("accepts bearer tokens for Clerk-authenticated API routes", async () => {
+    const handler = vi.fn(async () => new Response(null, { status: 204 }));
+    const args = makeRouteArgs(
+      new Request(`${AMIGO_DEV_ORIGIN}/api/setup`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer token",
+          Origin: AMIGO_DEV_ORIGIN,
+        },
+      }),
+      undefined,
+      { APP_ORIGIN: AMIGO_DEV_ORIGIN }
+    );
+
+    const response = await handleApiRoute(args, {
+      auth: "clerk",
+      handler,
+    });
+
+    expect(response.status).toBe(204);
+    expect(mocks.getAuth).toHaveBeenCalledWith(args, {
+      acceptsToken: "any",
+      treatPendingAsSignedOut: false,
+    });
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { userId: "clerk-user-1" },
+      })
+    );
+  });
+
+  it("rejects Clerk-authenticated API routes without a user id", async () => {
+    mocks.getAuth.mockResolvedValueOnce({ userId: null });
+
+    const response = await handleApiRoute(makeRouteArgs(), {
+      auth: "clerk",
+      handler: async () => new Response(null, { status: 204 }),
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 });

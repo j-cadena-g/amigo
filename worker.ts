@@ -127,16 +127,8 @@ async function handleWebSocketUpgrade(request: Request, env: Env) {
     {
       email: identity.email,
       name: identity.name,
-      orgId: identity.orgId,
     }
   );
-
-  if (result.status === "no_org") {
-    return Response.json(
-      { error: "Organization membership required" },
-      { status: 403 }
-    );
-  }
 
   if (result.status === "needs_setup") {
     return Response.json(

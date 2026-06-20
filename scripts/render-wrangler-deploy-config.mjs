@@ -115,20 +115,36 @@ function replaceConfigValue(source, { label, pattern }, value) {
 
 async function main() {
   const template = await readFile(templatePath, "utf8");
+  const isDevConfig = outputPath.endsWith(".wrangler.dev.jsonc");
   const deployValues = {
-    CLOUDFLARE_ACCOUNT_ID: getRequiredValue("CLOUDFLARE_ACCOUNT_ID"),
-    CLOUDFLARE_D1_DATABASE_ID: getRequiredValue("CLOUDFLARE_D1_DATABASE_ID"),
-    CLOUDFLARE_KV_NAMESPACE_ID: getRequiredValue("CLOUDFLARE_KV_NAMESPACE_ID"),
-    CLOUDFLARE_CUSTOM_DOMAIN: getRequiredValue("CLOUDFLARE_CUSTOM_DOMAIN"),
+    CLOUDFLARE_ACCOUNT_ID: isDevConfig
+      ? "00000000000000000000000000000000"
+      : getRequiredValue("CLOUDFLARE_ACCOUNT_ID"),
+    CLOUDFLARE_D1_DATABASE_ID: isDevConfig
+      ? "00000000-0000-0000-0000-000000000000"
+      : getRequiredValue("CLOUDFLARE_D1_DATABASE_ID"),
+    CLOUDFLARE_KV_NAMESPACE_ID: isDevConfig
+      ? "00000000000000000000000000000000"
+      : getRequiredValue("CLOUDFLARE_KV_NAMESPACE_ID"),
+    CLOUDFLARE_CUSTOM_DOMAIN: isDevConfig
+      ? "localhost"
+      : getRequiredValue("CLOUDFLARE_CUSTOM_DOMAIN"),
     CLERK_PUBLISHABLE_KEY: getRequiredValue("CLERK_PUBLISHABLE_KEY"),
     APP_ORIGIN: getRequiredValue("APP_ORIGIN"),
     APP_ENV:
       globalThis.process.env.APP_ENV?.trim() ||
-      (outputPath.endsWith(".wrangler.dev.jsonc") ? "development" : "production"),
+      (isDevConfig ? "development" : "production"),
   };
-
   let rendered = template;
   for (const replacement of replacements) {
+    if (
+      isDevConfig &&
+      ["account_id", "database_id", "kv namespace id", "route pattern"].includes(
+        replacement.label,
+      )
+    ) {
+      continue;
+    }
     rendered = replaceConfigValue(
       rendered,
       replacement,
@@ -136,7 +152,7 @@ async function main() {
     );
   }
 
-  if (outputPath.endsWith(".wrangler.dev.jsonc")) {
+  if (isDevConfig) {
     rendered = rendered.replace(/\n\s*"account_id"\s*:\s*"[^"]*",/, "\n");
     rendered = rendered.replace(/"workers_dev"\s*:\s*false/, '"workers_dev": true');
     rendered = rendered.replace(/"routes"\s*:\s*\[[\s\S]*?\],/, '"routes": [],');

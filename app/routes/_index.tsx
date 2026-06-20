@@ -1,21 +1,65 @@
 import { SignIn, useUser } from "@clerk/react-router";
-import { Navigate } from "react-router";
+import { redirect, type LoaderFunctionArgs } from "react-router";
+import { getSessionStatus } from "@/app/lib/session.server";
+
+export function loader({ context }: LoaderFunctionArgs) {
+  const status = getSessionStatus(context);
+
+  if (status === "authenticated") {
+    throw redirect("/dashboard");
+  }
+
+  if (status === "needs_setup") {
+    throw redirect("/setup");
+  }
+
+  if (status === "revoked") {
+    throw redirect("/restore-account");
+  }
+
+  return null;
+}
+
+function FullPageLoading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-background">
+      <div className="animate-pulse-soft font-display text-lg text-muted-foreground">
+        Loading...
+      </div>
+    </main>
+  );
+}
 
 export default function Index() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
 
   if (!isLoaded) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse-soft font-display text-lg text-muted-foreground">
-          Loading...
-        </div>
-      </main>
-    );
+    return <FullPageLoading />;
   }
 
   if (isSignedIn) {
-    return <Navigate to="/dashboard" />;
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-full max-w-md mx-auto p-6 text-center">
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            Welcome back
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {user?.primaryEmailAddress?.emailAddress ?? "Your account"} is signed in.
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            The local server has not attached this Clerk session to an amigo household yet.
+            Continue by setting up a household.
+          </p>
+          <a
+            href="/setup"
+            className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Set up household
+          </a>
+        </div>
+      </main>
+    );
   }
 
   return (

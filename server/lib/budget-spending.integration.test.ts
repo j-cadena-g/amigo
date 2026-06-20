@@ -41,7 +41,6 @@ describe("budget spending integration", () => {
     const testDate = todayInTz("UTC");
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId: `org_budget_${suffix}`,
       ownerId,
       ownerAuthId: `clerk_budget_owner_${suffix}`,
       timezone: "UTC",

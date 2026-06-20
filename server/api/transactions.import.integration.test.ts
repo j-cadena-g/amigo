@@ -23,7 +23,6 @@ describe("transactions import integration", () => {
     const db = createTestDb(env.DB);
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId: `org_import_${suffix}`,
       ownerId,
       ownerAuthId: `clerk_import_owner_${suffix}`,
     });

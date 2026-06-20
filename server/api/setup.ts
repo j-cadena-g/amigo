@@ -1,13 +1,54 @@
 import { createClerkClient } from "@clerk/backend";
-import { CURRENCY_CODES, eq, getDb, households, users } from "@amigo/db";
+import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
 import { z } from "zod";
+import { isValidTimeZone } from "../lib/dates";
+import {
+  clearClerkHouseholdMetadata,
+  setClerkHouseholdMetadata,
+} from "../lib/clerk-household-metadata";
 import { ActionError } from "../lib/errors";
 import type { ApiHandler } from "./route";
 
 const setupSchema = z.object({
   householdName: z.string().min(1).max(100),
   homeCurrency: z.enum(CURRENCY_CODES),
+  timezone: z.string().min(1).max(64),
 });
+
+function isAuthIdUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /(?:UNIQUE constraint failed: users\.auth_id|UNIQUE constraint failed: users\.authId)/i.test(
+      error.message
+    )
+  );
+}
+
+async function syncClerkMetadataToExistingHousehold(
+  db: ReturnType<typeof getDb>,
+  clerk: ReturnType<typeof createClerkClient>,
+  authUserId: string
+) {
+  const membership = await db
+    .select({
+      householdId: users.householdId,
+      householdName: households.name,
+    })
+    .from(users)
+    .innerJoin(households, eq(users.householdId, households.id))
+    .where(and(eq(users.authId, authUserId), isNull(users.deletedAt)))
+    .get();
+
+  if (!membership) {
+    await clearClerkHouseholdMetadata(clerk, authUserId);
+    return;
+  }
+
+  await setClerkHouseholdMetadata(clerk, authUserId, {
+    householdId: membership.householdId,
+    householdName: membership.householdName,
+  });
+}
 
 export const handleSetupRequest: ApiHandler = async ({
   auth,
@@ -21,45 +62,32 @@ export const handleSetupRequest: ApiHandler = async ({
     });
   }
 
-  if (!auth?.userId || !auth.orgId) {
+  if (!auth?.userId) {
     throw new ActionError("Unauthorized", "UNAUTHORIZED");
-  }
-
-  if (!auth.has({ role: "org:admin" })) {
-    throw new ActionError(
-      "Only Clerk organization admins can set up a household",
-      "PERMISSION_DENIED"
-    );
   }
 
   const db = getDb(env.DB);
 
-  const existing = await db
-    .select({ id: households.id })
-    .from(households)
-    .where(eq(households.clerkOrgId, auth.orgId))
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.authId, auth.userId), isNull(users.deletedAt)))
     .get();
 
-  if (existing) {
-    return Response.json(
-      { error: "Household already exists for this organization" },
-      { status: 409 }
+  if (existingUser) {
+    throw new ActionError(
+      "You already belong to a household",
+      "PERMISSION_DENIED"
     );
   }
 
-  const { householdName, homeCurrency } = setupSchema.parse(
+  const { householdName, homeCurrency, timezone } = setupSchema.parse(
     await request.json()
   );
 
-  const household = await db
-    .insert(households)
-    .values({
-      clerkOrgId: auth.orgId,
-      name: householdName,
-      homeCurrency,
-    })
-    .returning()
-    .get();
+  if (!isValidTimeZone(timezone)) {
+    throw new ActionError("Invalid timezone", "VALIDATION_ERROR");
+  }
 
   const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
   const clerkUser = await clerk.users.getUser(auth.userId);
@@ -70,16 +98,60 @@ export const handleSetupRequest: ApiHandler = async ({
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
 
-  await db.insert(users).values({
-    authId: auth.userId,
-    email,
-    name,
-    householdId: household.id,
-    role: "owner",
+  const householdId = crypto.randomUUID();
+
+  await setClerkHouseholdMetadata(clerk, auth.userId, {
+    householdId,
+    householdName,
   });
 
+  try {
+    await db.batch([
+      db.insert(households).values({
+        id: householdId,
+        name: householdName,
+        homeCurrency,
+        timezone,
+      }),
+      db.insert(users).values({
+        authId: auth.userId,
+        email,
+        name,
+        householdId,
+        role: "owner",
+      }),
+    ]);
+  } catch (error) {
+    if (isAuthIdUniqueConstraintError(error)) {
+      try {
+        await syncClerkMetadataToExistingHousehold(db, clerk, auth.userId);
+      } catch (syncError) {
+        console.error("Failed to sync Clerk metadata after auth_id race", {
+          error: syncError,
+          authUserId: auth.userId,
+        });
+      }
+      throw new ActionError(
+        "You already belong to a household",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    try {
+      await clearClerkHouseholdMetadata(clerk, auth.userId);
+    } catch (clearError) {
+      console.error("Failed to clear Clerk setup metadata after D1 batch failure", {
+        error: clearError,
+        authUserId: auth.userId,
+        householdId,
+      });
+    }
+
+    throw error;
+  }
+
   return Response.json(
-    { success: true, householdId: household.id },
+    { success: true, householdId },
     { status: 201 }
   );
 };

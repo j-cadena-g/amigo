@@ -1,44 +1,70 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
-import { useOrganization } from "@clerk/react-router";
+import { useAuth } from "@clerk/react-router";
+import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import {
+  buildTimezoneOptions,
+  getBrowserTimezone,
+} from "@/app/lib/timezones";
+import { getSessionStatus } from "@/app/lib/session.server";
 
-export default function Setup() {
-  const { organization, isLoaded } = useOrganization();
-  const navigate = useNavigate();
-  const [currency, setCurrency] = useState("CAD");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function loader({ context }: LoaderFunctionArgs) {
+  const status = getSessionStatus(context);
 
-  if (!isLoaded) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </main>
-    );
+  if (status === "unauthenticated") {
+    throw redirect("/");
   }
 
-  const orgName = organization?.name ?? "My Household";
+  if (status === "authenticated") {
+    throw redirect("/dashboard");
+  }
+
+  if (status === "revoked") {
+    throw redirect("/restore-account");
+  }
+
+  return null;
+}
+
+export default function Setup() {
+  const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const [householdName, setHouseholdName] = useState("My Household");
+  const [currency, setCurrency] = useState("CAD");
+  const [timezone, setTimezone] = useState(getBrowserTimezone);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
-    const res = await fetch("/api/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        householdName: orgName,
-        homeCurrency: currency,
-      }),
-    });
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          householdName: householdName.trim(),
+          homeCurrency: currency,
+          timezone,
+        }),
+      });
 
-    if (res.ok) {
-      navigate("/dashboard");
-    } else {
-      const data = await res.json() as { error?: string };
-      setError(data.error ?? "Something went wrong");
+      if (res.ok) {
+        navigate("/dashboard");
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error ?? "Something went wrong");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -55,12 +81,20 @@ export default function Setup() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-1">Household</label>
-            <div className="px-3 py-2 rounded-md border bg-muted text-sm">
-              {orgName}
-            </div>
+            <label htmlFor="householdName" className="block text-sm font-medium mb-1">
+              Household name
+            </label>
+            <input
+              id="householdName"
+              type="text"
+              value={householdName}
+              onChange={(e) => setHouseholdName(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+              required
+              maxLength={100}
+            />
             <p className="text-xs text-muted-foreground mt-1">
-              Managed through your Clerk organization.
+              This name is stored in the app and tagged on your Clerk profile.
             </p>
           </div>
 
@@ -80,21 +114,41 @@ export default function Setup() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="timezone" className="block text-sm font-medium mb-1">
+              Timezone
+            </label>
+            <select
+              id="timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+            >
+              {buildTimezoneOptions(timezone).map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-muted-foreground mt-1">
-              Your primary currency for budgets and reports.
+              Budget periods and transaction dates use your household&apos;s local calendar day.
             </p>
           </div>
 
           {error && (
-            <p className="text-sm text-red-500">{error}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
           )}
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full py-2 px-4 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50"
+            disabled={submitting || householdName.trim().length === 0}
+            className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? "Setting up..." : "Get Started"}
+            {submitting ? "Creating..." : "Create household"}
           </button>
         </form>
       </div>

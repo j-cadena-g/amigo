@@ -72,11 +72,15 @@ export async function handleApiRoute(
     }
 
     if (options.auth === "clerk") {
-      const auth = await getAuth(args as Parameters<typeof getAuth>[0]);
-      if (!auth.userId) {
+      const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
+        acceptsToken: "any",
+        treatPendingAsSignedOut: false,
+      });
+      const userId = "userId" in auth ? auth.userId : null;
+      if (!userId) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
-      baseArgs.auth = auth;
+      baseArgs.auth = auth as NonNullable<ApiHandlerArgs["auth"]>;
     }
 
     return await options.handler(baseArgs);
@@ -100,13 +104,6 @@ function getSessionErrorResponse(
 ): Response | null {
   if (session) {
     return null;
-  }
-
-  if (status === "no_org") {
-    return Response.json(
-      { error: "Organization membership required" },
-      { status: 403 }
-    );
   }
 
   if (status === "needs_setup") {

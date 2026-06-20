@@ -14,10 +14,6 @@ export async function loader({ context }: LoaderFunctionArgs) {
     throw redirect("/");
   }
 
-  if (status === "no_org") {
-    throw redirect("/no-access");
-  }
-
   if (status === "revoked") {
     throw redirect("/restore-account");
   }
@@ -31,7 +27,6 @@ export async function loader({ context }: LoaderFunctionArgs) {
     userId: session.userId,
     role: session.role,
     householdId: session.householdId,
-    orgId: session.orgId,
   };
 }
 

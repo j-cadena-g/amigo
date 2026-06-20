@@ -31,7 +31,6 @@ export async function loader({ context }: LoaderFunctionArgs) {
     session: {
       userId: session.userId,
       role: session.role,
-      orgId: session.orgId,
     },
   };
 }
@@ -68,9 +67,6 @@ export default function Settings() {
           <CardContent className="space-y-6">
             <div>
               <p className="font-medium">{household.name}</p>
-              <p className="text-sm text-muted-foreground">
-                Managed via your Clerk organization
-              </p>
             </div>
             <div>
               <TimezoneSelect

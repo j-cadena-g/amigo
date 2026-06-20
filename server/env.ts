@@ -24,7 +24,6 @@ export interface Env {
 export interface AppSession {
   userId: string;
   householdId: string;
-  orgId: string;
   role: "owner" | "admin" | "member";
   email: string;
   name: string | null;
@@ -36,7 +35,6 @@ export interface AppSession {
  */
 export type SessionStatus =
   | "authenticated"
-  | "no_org"
   | "needs_setup"
   | "revoked"
   | "unauthenticated";

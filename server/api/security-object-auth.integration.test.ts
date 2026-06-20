@@ -29,12 +29,10 @@ function sessionFor(options: {
   userId: string;
   householdId: string;
   role?: AppSession["role"];
-  orgId?: string;
 }): AppSession {
   return {
     userId: options.userId,
     householdId: options.householdId,
-    orgId: options.orgId ?? "org-security-object-auth",
     role: options.role ?? "member",
     email: `${options.userId}@example.com`,
     name: options.userId,
@@ -61,7 +59,6 @@ async function seedMember(
 
 describe("security object authorization integration", () => {
   let householdId: string;
-  let orgId: string;
   let ownerId: string;
   let adminId: string;
   let memberOneId: string;
@@ -72,7 +69,6 @@ describe("security object authorization integration", () => {
   beforeEach(async () => {
     const suffix = crypto.randomUUID();
     householdId = `hh-object-${suffix}`;
-    orgId = `org_object_${suffix}`;
     ownerId = `user-object-owner-${suffix}`;
     adminId = `user-object-admin-${suffix}`;
     memberOneId = `user-object-member-one-${suffix}`;
@@ -82,7 +78,6 @@ describe("security object authorization integration", () => {
     db = createTestDb(getIntegrationEnv().DB);
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId: orgId,
       ownerId,
       ownerAuthId: `clerk_object_owner_${suffix}`,
     });
@@ -104,7 +99,6 @@ describe("security object authorization integration", () => {
     });
     await seedHouseholdWithOwner(db, {
       householdId: otherHouseholdId,
-      clerkOrgId: `org_object_other_${suffix}`,
       ownerId: `user-object-other-owner-${suffix}`,
       ownerAuthId: `clerk_object_other_owner_${suffix}`,
     });

@@ -15,7 +15,6 @@ describe("push subscription security", () => {
     const db = createTestDb(getIntegrationEnv().DB);
     await seedHouseholdWithOwner(db, {
       householdId,
-      clerkOrgId: `org_push_${suffix}`,
       ownerId,
       ownerAuthId: `clerk_push_owner_${suffix}`,
     });

@@ -20,7 +20,9 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
   app.sessionStatus = "unauthenticated";
   delete app.session;
 
-  const auth = await getAuth(args as Parameters<typeof getAuth>[0]);
+  const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
+    treatPendingAsSignedOut: false,
+  });
   const identity = getClerkIdentity(auth);
 
   if (identity) {
@@ -32,7 +34,6 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
       {
         email: identity.email,
         name: identity.name,
-        orgId: identity.orgId,
       }
     );
 

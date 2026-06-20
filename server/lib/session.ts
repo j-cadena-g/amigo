@@ -44,6 +44,15 @@ function buildSession(user: {
   };
 }
 
+function isAuthIdUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /(?:UNIQUE constraint failed: users\.auth_id|UNIQUE constraint failed: users\.authId)/i.test(
+      error.message
+    )
+  );
+}
+
 async function fetchClerkProfile(
   clerkSecretKey: string,
   clerkUserId: string,
@@ -207,23 +216,65 @@ export async function resolveSession(
       .get();
 
     if (household) {
-      const user = await db
-        .insert(users)
-        .values({
-          authId: clerkUserId,
-          email,
-          name,
-          householdId: household.id,
-          role: "member",
-        })
-        .returning()
-        .get();
+      let user:
+        | {
+            id: string;
+            householdId: string;
+            role: string;
+            email: string;
+            name: string | null;
+          }
+        | undefined;
+
+      try {
+        user = await db
+          .insert(users)
+          .values({
+            authId: clerkUserId,
+            email,
+            name,
+            householdId: household.id,
+            role: "member",
+          })
+          .returning()
+          .get();
+      } catch (error) {
+        if (isAuthIdUniqueConstraintError(error)) {
+          const concurrentUser = await db
+            .select({
+              id: users.id,
+              householdId: users.householdId,
+              role: users.role,
+              email: users.email,
+              name: users.name,
+            })
+            .from(users)
+            .where(eq(users.authId, clerkUserId))
+            .get();
+
+          if (concurrentUser) {
+            const session = buildSession(concurrentUser);
+            await writeSessionCache(kv, cacheKey, session, clerkUserId);
+            return { status: "authenticated", session };
+          }
+        }
+
+        throw error;
+      }
 
       if (!metadata.householdName || metadata.householdName !== household.name) {
-        await setClerkHouseholdMetadata(clerk, clerkUserId, {
-          householdId: household.id,
-          householdName: household.name,
-        });
+        try {
+          await setClerkHouseholdMetadata(clerk, clerkUserId, {
+            householdId: household.id,
+            householdName: household.name,
+          });
+        } catch (error) {
+          console.error("Failed to sync Clerk household metadata", {
+            error,
+            clerkUserId,
+            householdId: household.id,
+          });
+        }
       }
 
       const session = buildSession(user);

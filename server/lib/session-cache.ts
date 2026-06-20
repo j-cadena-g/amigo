@@ -4,7 +4,7 @@ export function getSessionCacheKey(authId: string): string {
   return `${SESSION_CACHE_PREFIX}:${authId}`;
 }
 
-async function deleteWithRetry(
+async function deleteWithLogging(
   kv: KVNamespace,
   key: string,
   authId: string
@@ -21,7 +21,7 @@ export async function invalidateSessionCache(
   authId: string | null | undefined
 ): Promise<void> {
   if (!authId) return;
-  await deleteWithRetry(kv, getSessionCacheKey(authId), authId);
+  await deleteWithLogging(kv, getSessionCacheKey(authId), authId);
 }
 
 export async function invalidateSessionCachesForHouseholdMembers(

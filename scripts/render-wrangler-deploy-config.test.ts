@@ -6,6 +6,30 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
+const repoRoot = path.resolve(import.meta.dirname, "..");
+
+function createDevEnv(outputPath: string, overrides: Record<string, string | undefined> = {}) {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    WRANGLER_RENDER_OUTPUT: outputPath,
+    APP_ENV: "development",
+    APP_ORIGIN: "http://localhost:5173",
+    CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk",
+    CLOUDFLARE_ACCOUNT_ID: undefined,
+    CLOUDFLARE_D1_DATABASE_ID: undefined,
+    CLOUDFLARE_KV_NAMESPACE_ID: undefined,
+    CLOUDFLARE_CUSTOM_DOMAIN: undefined,
+    ...overrides,
+  };
+
+  for (const key of Object.keys(env)) {
+    if (env[key] === undefined) {
+      delete env[key];
+    }
+  }
+
+  return env;
+}
 
 describe("render-wrangler-deploy-config", () => {
   it("keeps local dev binding ids on the public placeholders", async () => {
@@ -14,18 +38,8 @@ describe("render-wrangler-deploy-config", () => {
 
     try {
       await execFileAsync("node", ["scripts/render-wrangler-deploy-config.mjs"], {
-        cwd: path.resolve(import.meta.dirname, ".."),
-        env: {
-          ...process.env,
-          WRANGLER_RENDER_OUTPUT: outputPath,
-          CLOUDFLARE_ACCOUNT_ID: "11111111111111111111111111111111",
-          CLOUDFLARE_D1_DATABASE_ID: "22222222-2222-4222-8222-222222222222",
-          CLOUDFLARE_KV_NAMESPACE_ID: "33333333333333333333333333333333",
-          CLOUDFLARE_CUSTOM_DOMAIN: "app.example.test",
-          APP_ENV: "development",
-          APP_ORIGIN: "http://localhost:5173",
-          CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk",
-        },
+        cwd: repoRoot,
+        env: createDevEnv(outputPath),
       });
 
       const rendered = await readFile(outputPath, "utf8");
@@ -39,6 +53,22 @@ describe("render-wrangler-deploy-config", () => {
       expect(rendered).toContain(
         '"CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk"'
       );
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not require Cloudflare binding env vars for dev config output", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "amigo-wrangler-"));
+    const outputPath = path.join(tmpDir, ".wrangler.dev.jsonc");
+
+    try {
+      await expect(
+        execFileAsync("node", ["scripts/render-wrangler-deploy-config.mjs"], {
+          cwd: repoRoot,
+          env: createDevEnv(outputPath),
+        })
+      ).resolves.toBeDefined();
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

@@ -10,10 +10,13 @@ vi.mock("@clerk/backend", () => ({
   createClerkClient: mocks.createClerkClient,
 }));
 
-vi.mock("./clerk-household-metadata", () => ({
-  parseClerkHouseholdMetadata: vi.fn((metadata: unknown) => metadata ?? {}),
-  setClerkHouseholdMetadata: mocks.setClerkHouseholdMetadata,
-}));
+vi.mock("./clerk-household-metadata", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./clerk-household-metadata")>();
+  return {
+    ...actual,
+    setClerkHouseholdMetadata: mocks.setClerkHouseholdMetadata,
+  };
+});
 
 vi.mock("@amigo/db", () => ({
   getDb: mocks.getDb,
@@ -35,7 +38,6 @@ vi.mock("@amigo/db", () => ({
   isNull: (arg: unknown) => ({ type: "isNull", arg }),
 }));
 
-import { parseClerkHouseholdMetadata } from "./clerk-household-metadata";
 import { resolveSession } from "./session";
 
 function createFakeDb(selectResults: unknown[], insertResult?: unknown) {
@@ -67,23 +69,24 @@ function createFakeDb(selectResults: unknown[], insertResult?: unknown) {
 
 describe("resolveSession", () => {
   const fixedNow = 1_700_000_000_000;
+  let getUserMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(Date, "now").mockReturnValue(fixedNow);
     mocks.setClerkHouseholdMetadata.mockResolvedValue(undefined);
+    getUserMock = vi.fn().mockResolvedValue({
+      emailAddresses: [{ id: "email-1", emailAddress: "user@example.com" }],
+      primaryEmailAddressId: "email-1",
+      firstName: "Test",
+      lastName: "User",
+      publicMetadata: {},
+    });
     mocks.createClerkClient.mockReturnValue({
       users: {
-        getUser: vi.fn().mockResolvedValue({
-          emailAddresses: [{ id: "email-1", emailAddress: "user@example.com" }],
-          primaryEmailAddressId: "email-1",
-          firstName: "Test",
-          lastName: "User",
-          publicMetadata: {},
-        }),
+        getUser: getUserMock,
       },
     });
-    vi.mocked(parseClerkHouseholdMetadata).mockReturnValue({});
   });
 
   afterEach(() => {
@@ -188,9 +191,15 @@ describe("resolveSession", () => {
   });
 
   it("auto-creates a member when Clerk metadata points at an existing household", async () => {
-    vi.mocked(parseClerkHouseholdMetadata).mockReturnValue({
-      householdId: "house-1",
-      householdName: "Tagged Household",
+    getUserMock.mockResolvedValue({
+      emailAddresses: [{ id: "email-1", emailAddress: "user@example.com" }],
+      primaryEmailAddressId: "email-1",
+      firstName: "Test",
+      lastName: "User",
+      publicMetadata: {
+        householdId: "house-1",
+        householdName: "Tagged Household",
+      },
     });
 
     const db = createFakeDb(

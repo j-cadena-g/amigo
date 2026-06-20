@@ -124,4 +124,42 @@ describe("setup integration", () => {
       },
     });
   });
+
+  it("does not persist household data when Clerk metadata update fails", async () => {
+    const suffix = crypto.randomUUID();
+    const authId = `clerk_setup_metadata_fail_${suffix}`;
+    const db = getDb(getIntegrationEnv().DB);
+
+    mocks.updateUserMetadata.mockRejectedValue(new Error("Clerk API error"));
+
+    await expect(
+      handleSetupRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            householdName: "Test Household",
+            homeCurrency: "CAD",
+          }),
+        }),
+        sessionStatus: "needs_setup",
+        loadContext: {} as never,
+        auth: setupAuth(authId),
+      })
+    ).rejects.toThrow("Clerk API error");
+
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.authId, authId))
+      .get();
+    const householdCount = await db.select().from(households).all();
+
+    expect(user).toBeUndefined();
+    expect(
+      householdCount.some((household) => household.name === "Test Household")
+    ).toBe(false);
+  });
 });

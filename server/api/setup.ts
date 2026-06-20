@@ -54,9 +54,17 @@ export const handleSetupRequest: ApiHandler = async ({
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
 
+  const householdId = crypto.randomUUID();
+
+  await setClerkHouseholdMetadata(clerk, auth.userId, {
+    householdId,
+    householdName,
+  });
+
   const household = await db
     .insert(households)
     .values({
+      id: householdId,
       name: householdName,
       homeCurrency,
     })
@@ -69,11 +77,6 @@ export const handleSetupRequest: ApiHandler = async ({
     name,
     householdId: household.id,
     role: "owner",
-  });
-
-  await setClerkHouseholdMetadata(clerk, auth.userId, {
-    householdId: household.id,
-    householdName: household.name,
   });
 
   return Response.json(

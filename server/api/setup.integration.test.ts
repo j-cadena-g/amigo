@@ -202,6 +202,13 @@ describe("setup integration", () => {
 
     expect(successes).toHaveLength(1);
     expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      status: "rejected",
+      reason: expect.objectContaining({
+        code: "PERMISSION_DENIED",
+        message: "You already belong to a household",
+      }),
+    });
 
     const db = getDb(getIntegrationEnv().DB);
     const owner = await db
@@ -209,13 +216,16 @@ describe("setup integration", () => {
       .from(users)
       .where(eq(users.authId, authId))
       .get();
-    const household = await db
-      .select()
-      .from(households)
-      .where(eq(households.id, owner!.householdId))
-      .get();
 
     expect(owner).toBeDefined();
+    const household = owner
+      ? await db
+          .select()
+          .from(households)
+          .where(eq(households.id, owner.householdId))
+          .get()
+      : undefined;
+
     expect(household).toBeDefined();
     expect(mocks.updateUserMetadata).toHaveBeenLastCalledWith(authId, {
       publicMetadata: {

@@ -123,7 +123,14 @@ export const handleSetupRequest: ApiHandler = async ({
     ]);
   } catch (error) {
     if (isAuthIdUniqueConstraintError(error)) {
-      await syncClerkMetadataToExistingHousehold(db, clerk, auth.userId);
+      try {
+        await syncClerkMetadataToExistingHousehold(db, clerk, auth.userId);
+      } catch (syncError) {
+        console.error("Failed to sync Clerk metadata after auth_id race", {
+          error: syncError,
+          authUserId: auth.userId,
+        });
+      }
       throw new ActionError(
         "You already belong to a household",
         "PERMISSION_DENIED"

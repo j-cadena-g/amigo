@@ -2,7 +2,10 @@ import { Link, Outlet, useLocation } from "react-router";
 import { cn } from "@/app/lib/utils";
 
 const tabs = [
-  { href: "/financial", label: "Accounts" },
+  { href: "/financial", label: "Transactions", exact: true },
+  { href: "/financial/recurring", label: "Recurring" },
+  { href: "/financial/budgets", label: "Budgets" },
+  { href: "/financial/accounts", label: "Accounts" },
   { href: "/financial/debts", label: "Debts" },
 ];
 
@@ -16,15 +19,15 @@ export default function FinancialLayout() {
           Financial
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Accounts and debts for your household net worth
+          Transactions, budgets, accounts, and debts for your household
         </p>
       </div>
 
       <div className="flex gap-1 mb-6 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {
           const active =
-            tab.href === "/financial"
-              ? location.pathname === "/financial"
+            "exact" in tab && tab.exact
+              ? location.pathname === tab.href
               : location.pathname.startsWith(tab.href);
           return (
             <Link

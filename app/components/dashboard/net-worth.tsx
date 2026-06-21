@@ -39,7 +39,7 @@ export function DashboardNetWorth({
 
         <div className="space-y-2.5">
           <Link
-            to="/financial"
+            to="/financial/accounts"
             className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50 group"
           >
             <div className="flex items-center gap-2.5">

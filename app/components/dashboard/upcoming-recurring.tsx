@@ -22,7 +22,7 @@ export function DashboardUpcomingRecurring({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Upcoming Recurring</CardTitle>
           <Link
-            to="/budget/recurring"
+            to="/financial/recurring"
             className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
           >
             View all

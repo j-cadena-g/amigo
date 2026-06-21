@@ -203,8 +203,7 @@ Notable route groups:
 
 - `/dashboard`
 - `/groceries`
-- `/budget`, `/budget/budgets`, `/budget/recurring`
-- `/financial` — accounts and holdings (checking, savings, cash, investments, property, credit cards; legacy `/accounts` → `/financial`, `/assets` → `/financial`)
+- `/financial` — transactions, recurring rules, budgets, accounts, and debts (legacy `/budget` → `/financial`, `/accounts` → `/financial/accounts`, `/assets` → `/financial/accounts`)
 - `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
 - `/calendar` — redirects to `/dashboard`
 - `/settings`

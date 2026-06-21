@@ -51,7 +51,7 @@ export async function listFinancialCategories(
     return {
       ...row,
       hasChildren,
-      selectable: !hasChildren,
+      selectable: !row.archived,
     };
   });
 }
@@ -86,22 +86,6 @@ export async function assertSelectableFinancialCategory(
   if (expectedType && category.type !== expectedType) {
     throw new ActionError(
       `Category type must be ${expectedType}`,
-      "VALIDATION_ERROR"
-    );
-  }
-
-  const child = await db.query.financialCategories.findFirst({
-    where: and(
-      eq(financialCategories.parentId, category.id),
-      scopeToHousehold(financialCategories.householdId, householdId),
-      isNull(financialCategories.deletedAt),
-      eq(financialCategories.archived, false)
-    ),
-  });
-
-  if (child) {
-    throw new ActionError(
-      "Choose a subcategory instead of a parent category",
       "VALIDATION_ERROR"
     );
   }
@@ -206,21 +190,7 @@ export async function resolveCategoryIdByName(
     return subcategories[0] ?? null;
   }
 
-  for (const candidate of matches) {
-    const child = await db.query.financialCategories.findFirst({
-      where: and(
-        eq(financialCategories.parentId, candidate.id),
-        scopeToHousehold(financialCategories.householdId, householdId),
-        isNull(financialCategories.deletedAt),
-        eq(financialCategories.archived, false)
-      ),
-    });
-    if (!child) {
-      return candidate;
-    }
-  }
-
-  return null;
+  return matches[0] ?? null;
 }
 
 export async function findDuplicateCategoryName(

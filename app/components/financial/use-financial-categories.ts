@@ -55,9 +55,14 @@ export function groupCategoriesForSelect(
   const groups: { label: string | null; options: FinancialCategoryItem[] }[] = [];
 
   for (const parent of parents) {
-    const children = (childrenByParent.get(parent.id) ?? []).filter((c) => c.selectable);
+    const children = (childrenByParent.get(parent.id) ?? [])
+      .filter((c) => c.selectable)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
     if (children.length > 0) {
-      groups.push({ label: parent.name, options: children });
+      groups.push({
+        label: parent.name,
+        options: parent.selectable ? [parent, ...children] : children,
+      });
     } else if (parent.selectable) {
       groups.push({ label: null, options: [parent] });
     }

@@ -494,15 +494,23 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.category = category.name;
     }
     if (validated.type !== undefined) {
-      updateData.type = validated.type;
-      if (validated.categoryId === undefined && existing.categoryId) {
-        await assertSelectableFinancialCategory(
-          db,
-          session!.householdId,
-          existing.categoryId,
-          validated.type
-        );
+      if (validated.type !== existing.type) {
+        if (validated.categoryId === undefined) {
+          if (!existing.categoryId) {
+            throw new ActionError(
+              "categoryId is required when changing transaction type",
+              "VALIDATION_ERROR"
+            );
+          }
+          await assertSelectableFinancialCategory(
+            db,
+            session!.householdId,
+            existing.categoryId,
+            validated.type
+          );
+        }
       }
+      updateData.type = validated.type;
     }
     if (validated.date !== undefined) {
       updateData.date = validated.date;

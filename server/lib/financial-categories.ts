@@ -388,7 +388,13 @@ export async function resolveOrCreateImportCategory(
 
   const trimmed = name.trim();
   const duplicate = await findDuplicateCategoryName(db, householdId, trimmed, null);
-  if (duplicate) return duplicate;
+  if (duplicate) {
+    if (duplicate.type === type) return duplicate;
+    throw new ActionError(
+      "Category name exists with a different type",
+      "VALIDATION_ERROR"
+    );
+  }
 
   try {
     return await db

@@ -206,15 +206,23 @@ export const handleRecurringRequest: ApiHandler = async ({
     }
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
     if (validated.type !== undefined) {
-      updateData.type = validated.type;
-      if (validated.categoryId === undefined && existing.categoryId) {
-        await assertSelectableFinancialCategory(
-          db,
-          session!.householdId,
-          existing.categoryId,
-          validated.type
-        );
+      if (validated.type !== existing.type) {
+        if (validated.categoryId === undefined) {
+          if (!existing.categoryId) {
+            throw new ActionError(
+              "categoryId is required when changing recurring type",
+              "VALIDATION_ERROR"
+            );
+          }
+          await assertSelectableFinancialCategory(
+            db,
+            session!.householdId,
+            existing.categoryId,
+            validated.type
+          );
+        }
       }
+      updateData.type = validated.type;
     }
     if (validated.frequency !== undefined) updateData.frequency = validated.frequency;
     if (validated.interval !== undefined) updateData.interval = validated.interval;

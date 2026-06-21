@@ -121,7 +121,6 @@ export const handleSetupRequest: ApiHandler = async ({
         role: "owner",
       }),
     ]);
-    await seedStarterFinancialCategories(db, householdId);
   } catch (error) {
     if (isAuthIdUniqueConstraintError(error)) {
       try {
@@ -149,6 +148,16 @@ export const handleSetupRequest: ApiHandler = async ({
     }
 
     throw error;
+  }
+
+  try {
+    await seedStarterFinancialCategories(db, householdId);
+  } catch (seedError) {
+    console.error("Failed to seed starter financial categories", {
+      error: seedError,
+      authUserId: auth.userId,
+      householdId,
+    });
   }
 
   return Response.json(

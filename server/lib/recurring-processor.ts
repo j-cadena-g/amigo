@@ -234,6 +234,7 @@ export async function processDueRecurringRules(
         amount: rule.amount,
         currency: rule.currency,
         exchangeRateToHome,
+        categoryId: rule.categoryId,
         category: rule.category,
         description: rule.description,
         type: rule.type,

@@ -92,6 +92,20 @@
       "when": 1778891000000,
       "tag": "0012_drop_households_clerk_org_id",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1778891500000,
+      "tag": "0013_financial_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1778891600000,
+      "tag": "0014_financial_categories_backfill",
+      "breakpoints": true
     }
   ]
 }

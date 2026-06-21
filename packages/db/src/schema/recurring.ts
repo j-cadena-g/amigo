@@ -3,6 +3,7 @@ import { households } from "./households";
 import { users } from "./users";
 import { TRANSACTION_TYPES } from "./transactions";
 import { budgets } from "./budgets";
+import { financialCategories } from "./financial-categories";
 import { CURRENCY_CODES } from "./currencies";
 
 export const RECURRING_FREQUENCIES = [
@@ -36,6 +37,9 @@ export const recurringTransactions = sqliteTable(
     // Transaction Template Fields
     amount: integer("amount").notNull(), // Stored as integer cents
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
+    categoryId: text("category_id").references(() => financialCategories.id, {
+      onDelete: "set null",
+    }),
     category: text("category").notNull(),
     description: text("description"),
     type: text("type", { enum: TRANSACTION_TYPES }).notNull(),

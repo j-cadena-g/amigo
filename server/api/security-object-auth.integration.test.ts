@@ -21,7 +21,7 @@ import { handleBudgetsRequest } from "./budgets";
 import { handleDebtsRequest } from "./debts";
 import { handleSyncRequest } from "./sync";
 import { handleTransactionsRequest } from "./transactions";
-import { createTestDb, seedHouseholdWithOwner } from "../test/fixtures";
+import { createTestDb, seedFinancialCategory, seedHouseholdWithOwner } from "../test/fixtures";
 import { getIntegrationEnv } from "../test/integration-env";
 import type { AppSession } from "../env";
 
@@ -64,6 +64,7 @@ describe("security object authorization integration", () => {
   let memberOneId: string;
   let memberTwoId: string;
   let otherHouseholdId: string;
+  let groceriesCategoryId: string;
   let db: DrizzleD1;
 
   beforeEach(async () => {
@@ -101,6 +102,12 @@ describe("security object authorization integration", () => {
       householdId: otherHouseholdId,
       ownerId: `user-object-other-owner-${suffix}`,
       ownerAuthId: `clerk_object_other_owner_${suffix}`,
+    });
+    groceriesCategoryId = crypto.randomUUID();
+    await seedFinancialCategory(db, {
+      id: groceriesCategoryId,
+      householdId,
+      name: "groceries",
     });
   });
 
@@ -176,7 +183,7 @@ describe("security object authorization integration", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: 12.34,
-            category: "groceries",
+            categoryId: groceriesCategoryId,
             type: "expense",
             date: "2026-06-17",
             accountId,
@@ -503,7 +510,6 @@ describe("security object authorization integration", () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: "Taken budget",
-              category: "private",
               limitAmount: 1000,
               period: "monthly",
               isShared: true,

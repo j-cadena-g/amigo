@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
-import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
+import { CURRENCY_CODES, eq, getDb, households, users, and, isNull, seedStarterFinancialCategories } from "@amigo/db";
 import { z } from "zod";
 import { isValidTimeZone } from "../lib/dates";
 import {
@@ -148,6 +148,16 @@ export const handleSetupRequest: ApiHandler = async ({
     }
 
     throw error;
+  }
+
+  try {
+    await seedStarterFinancialCategories(db, householdId);
+  } catch (seedError) {
+    console.error("Failed to seed starter financial categories", {
+      error: seedError,
+      authUserId: auth.userId,
+      householdId,
+    });
   }
 
   return Response.json(

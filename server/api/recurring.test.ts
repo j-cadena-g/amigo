@@ -4,7 +4,7 @@ import { createRuleSchema } from "./recurring";
 describe("createRuleSchema", () => {
   const base = {
     amount: 2009,
-    category: "Rent",
+    categoryId: "00000000-0000-4000-8000-000000000001",
     type: "expense" as const,
     frequency: "MONTHLY" as const,
     startDate: "2026-05-20",

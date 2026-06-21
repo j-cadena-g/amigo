@@ -1,5 +1,6 @@
 import {
   budgets,
+  financialCategories,
   getDb,
   households,
   transactions,
@@ -40,6 +41,28 @@ export async function seedHouseholdWithOwner(
     name: "Owner",
     householdId: options.householdId,
     role: "owner",
+    createdAt: new Date(ts),
+    updatedAt: new Date(ts),
+  });
+}
+
+export async function seedFinancialCategory(
+  db: DrizzleD1,
+  options: {
+    id: string;
+    householdId: string;
+    name: string;
+    type?: "income" | "expense";
+    parentId?: string | null;
+  }
+) {
+  const ts = nowMs();
+  await db.insert(financialCategories).values({
+    id: options.id,
+    householdId: options.householdId,
+    parentId: options.parentId ?? null,
+    name: options.name,
+    type: options.type ?? "expense",
     createdAt: new Date(ts),
     updatedAt: new Date(ts),
   });
@@ -108,6 +131,7 @@ export async function seedExpenseTransaction(
     budgetId?: string | null;
     amount: number;
     category: string;
+    categoryId?: string | null;
     date?: string;
     externalId?: string | null;
     userDisplayName?: string | null;
@@ -122,6 +146,7 @@ export async function seedExpenseTransaction(
     budgetId: options.budgetId ?? null,
     amount: options.amount,
     currency: "CAD",
+    categoryId: options.categoryId ?? null,
     category: options.category,
     description: options.category,
     type: "expense",

@@ -10,6 +10,8 @@ import {
 } from "@/app/components/ui/dialog";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { BudgetSelect } from "@/app/components/budget-select";
+import { CategorySelect } from "@/app/components/financial/category-select";
+import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import type { CurrencyCode } from "@amigo/db";
 
 type SchedulePreset =
@@ -27,7 +29,7 @@ interface RecurringFormData {
   type: "income" | "expense";
   amount: string;
   currency: string;
-  category: string;
+  categoryId: string;
   description: string;
   schedulePreset: SchedulePreset;
   customFrequency: "DAILY" | "WEEKLY" | "MONTHLY";
@@ -42,6 +44,7 @@ interface RecurringRule {
   id: string;
   amount: number;
   currency: CurrencyCode;
+  categoryId: string | null;
   category: string;
   description: string | null;
   type: "income" | "expense";
@@ -63,7 +66,7 @@ function emptyForm(currency: CurrencyCode): RecurringFormData {
     type: "expense",
     amount: "",
     currency,
-    category: "",
+    categoryId: "",
     description: "",
     schedulePreset: "monthly-1",
     customFrequency: "MONTHLY",
@@ -121,7 +124,8 @@ function RecurringForm({
   submitting: boolean;
   submitLabel: string;
 }) {
-  const canSubmit = form.amount && form.category && form.startDate && !submitting;
+  const { categories } = useFinancialCategories();
+  const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
   return (
     <div className="space-y-4">
@@ -129,7 +133,7 @@ function RecurringForm({
       <div className="flex rounded-md border">
         <button
           type="button"
-          onClick={() => setForm((f) => ({ ...f, type: "expense", budgetId: f.budgetId }))}
+          onClick={() => setForm((f) => ({ ...f, type: "expense", categoryId: "", budgetId: f.budgetId }))}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
             form.type === "expense"
               ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
@@ -140,7 +144,7 @@ function RecurringForm({
         </button>
         <button
           type="button"
-          onClick={() => setForm((f) => ({ ...f, type: "income", budgetId: null }))}
+          onClick={() => setForm((f) => ({ ...f, type: "income", categoryId: "", budgetId: null }))}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-md transition-colors ${
             form.type === "income"
               ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -177,10 +181,11 @@ function RecurringForm({
       {/* Category + Description */}
       <div>
         <label className="text-sm font-medium">Category</label>
-        <Input
-          value={form.category}
-          onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-          placeholder="e.g. Rent, Salary"
+        <CategorySelect
+          value={form.categoryId}
+          onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
+          type={form.type}
+          categories={categories}
         />
       </div>
       <div>
@@ -349,7 +354,7 @@ export function AddRecurringDialog({
           // API expects dollars; server applies toCents() (same contract as transactions).
           amount: parseFloat(form.amount),
           currency: form.currency,
-          category: form.category,
+          categoryId: form.categoryId,
           description: form.description || null,
           frequency: schedule.frequency,
           interval: schedule.interval,
@@ -435,7 +440,7 @@ function ruleToForm(rule: RecurringRule): RecurringFormData {
     type: rule.type,
     amount: (rule.amount / 100).toFixed(2),
     currency: rule.currency,
-    category: rule.category,
+    categoryId: rule.categoryId ?? "",
     description: rule.description ?? "",
     schedulePreset: preset,
     customFrequency: rule.frequency === "YEARLY" ? "MONTHLY" : (rule.frequency as "DAILY" | "WEEKLY" | "MONTHLY"),
@@ -483,7 +488,7 @@ export function EditRecurringDialog({
           // API expects dollars; server applies toCents() (same contract as transactions).
           amount: parseFloat(form.amount),
           currency: form.currency,
-          category: form.category,
+          categoryId: form.categoryId,
           description: form.description || null,
           frequency: schedule.frequency,
           interval: schedule.interval,

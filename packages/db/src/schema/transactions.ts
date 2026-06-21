@@ -3,6 +3,7 @@ import { households } from "./households";
 import { users } from "./users";
 import { budgets } from "./budgets";
 import { financialAccounts } from "./financial-accounts";
+import { financialCategories } from "./financial-categories";
 import { CURRENCY_CODES } from "./currencies";
 
 export const TRANSACTION_TYPES = ["income", "expense"] as const;
@@ -39,6 +40,10 @@ export const transactions = sqliteTable(
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
     // Exchange rate to home currency at time of creation (null if same as home currency)
     exchangeRateToHome: real("exchange_rate_to_home"),
+    categoryId: text("category_id").references(() => financialCategories.id, {
+      onDelete: "set null",
+    }),
+    /** Denormalized display name; kept in sync when categoryId is set. */
     category: text("category").notNull(),
     description: text("description"),
     type: text("type", { enum: TRANSACTION_TYPES }).notNull(),

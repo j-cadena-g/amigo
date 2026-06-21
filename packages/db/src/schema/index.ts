@@ -8,6 +8,7 @@ export * from "./budgets";
 export * from "./debts";
 export * from "./assets";
 export * from "./financial-accounts";
+export * from "./financial-categories";
 export * from "./audit-logs";
 export * from "./recurring";
 export * from "./push-subscriptions";

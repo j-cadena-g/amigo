@@ -1,7 +1,9 @@
-import { useEffect, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
+import { useEffect, useId, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
 import { Link } from "react-router";
 import { Plus } from "lucide-react";
 import { BudgetSelect } from "@/app/components/budget-select";
+import { CategorySelect } from "@/app/components/financial/category-select";
+import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
@@ -9,7 +11,7 @@ import type { CurrencyCode } from "@amigo/db";
 export interface TransactionFormState {
   amount: string;
   description: string;
-  category: string;
+  categoryId: string;
   type: "income" | "expense";
   date: string;
   budgetId: string | null;
@@ -39,16 +41,19 @@ export function AddTransactionForm({
   onCancel,
   onSubmit,
 }: AddTransactionFormProps) {
+  const categoryFieldId = useId();
+  const { categories } = useFinancialCategories();
+
   useEffect(() => {
-    if (form.type !== "expense" || !allowBudgetSuggest) return;
-    const cat = form.category.trim();
-    if (cat.length < 2) return;
+    if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
     const ac = new AbortController();
     const timer = setTimeout(() => {
       void (async () => {
         try {
           const res = await fetch(
-            `/api/budgets/match-category?${new URLSearchParams({ category: cat })}`,
+            `/api/budgets/match-category?${new URLSearchParams({
+              categoryId: form.categoryId,
+            })}`,
             { signal: ac.signal }
           );
           if (!res.ok) return;
@@ -58,12 +63,12 @@ export function AddTransactionForm({
           /* aborted */
         }
       })();
-    }, 400);
+    }, 200);
     return () => {
       ac.abort();
       clearTimeout(timer);
     };
-  }, [form.category, form.type, allowBudgetSuggest, onChange]);
+  }, [form.categoryId, form.type, allowBudgetSuggest, onChange]);
 
   return (
     <form
@@ -77,6 +82,7 @@ export function AddTransactionForm({
             onChange((prev) => ({
               ...prev,
               type: "expense",
+              categoryId: "",
               budgetId:
                 prev.type === "income"
                   ? lastExpenseBudgetIdRef.current
@@ -97,6 +103,7 @@ export function AddTransactionForm({
             onChange((prev) => ({
               ...prev,
               type: "income",
+              categoryId: "",
               budgetId: null,
             }))
           }
@@ -161,18 +168,21 @@ export function AddTransactionForm({
         className="w-full rounded-md border border-input bg-background px-3 py-2"
       />
 
-      <input
-        type="text"
-        placeholder="Category"
-        value={form.category}
-        onChange={(e) =>
-          onChange((prev) => ({
-            ...prev,
-            category: e.target.value,
-          }))
-        }
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
-      />
+      <div>
+        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
+          Category
+        </label>
+        <CategorySelect
+          id={categoryFieldId}
+          value={form.categoryId}
+          onChange={(categoryId) => {
+            onAllowBudgetSuggestChange(true);
+            onChange((prev) => ({ ...prev, categoryId }));
+          }}
+          type={form.type}
+          categories={categories}
+        />
+      </div>
 
       {form.type === "expense" && (
         <div>
@@ -208,7 +218,9 @@ export function AddTransactionForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || !isPositiveDecimal(form.amount)}
+          disabled={
+            isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+          }
           className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting ? "Adding..." : "Add"}
@@ -235,6 +247,9 @@ export function EditTransactionForm({
   onCancel,
   onSubmit,
 }: EditTransactionFormProps) {
+  const categoryFieldId = useId();
+  const { categories } = useFinancialCategories();
+
   return (
     <form onSubmit={onSubmit} className="p-4 space-y-3">
       <div className="flex gap-2">
@@ -244,6 +259,7 @@ export function EditTransactionForm({
             onChange((prev) => ({
               ...prev,
               type: "expense",
+              categoryId: "",
               budgetId:
                 prev.type === "income"
                   ? lastExpenseBudgetIdRef.current
@@ -264,6 +280,7 @@ export function EditTransactionForm({
             onChange((prev) => ({
               ...prev,
               type: "income",
+              categoryId: "",
               budgetId: null,
             }))
           }
@@ -327,19 +344,18 @@ export function EditTransactionForm({
         className="w-full rounded-md border border-input bg-background px-3 py-2"
       />
 
-      <input
-        type="text"
-        placeholder="Category"
-        value={form.category}
-        onChange={(e) =>
-          onChange((prev) => ({
-            ...prev,
-            category: e.target.value,
-          }))
-        }
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
-        required
-      />
+      <div>
+        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
+          Category
+        </label>
+        <CategorySelect
+          id={categoryFieldId}
+          value={form.categoryId}
+          onChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
+          type={form.type}
+          categories={categories}
+        />
+      </div>
 
       {form.type === "expense" && (
         <div>
@@ -363,7 +379,9 @@ export function EditTransactionForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || !isPositiveDecimal(form.amount)}
+          disabled={
+            isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+          }
           className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting ? "Saving..." : "Save"}

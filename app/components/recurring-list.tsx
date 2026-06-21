@@ -27,6 +27,7 @@ interface RecurringRule {
   userId: string | null;
   amount: number;
   currency: CurrencyCode;
+  categoryId: string | null;
   category: string;
   description: string | null;
   type: "income" | "expense";

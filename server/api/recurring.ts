@@ -13,6 +13,7 @@ import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurring-processor";
 import { validateFinancialRefs } from "../lib/financial-refs";
+import { assertSelectableFinancialCategory } from "../lib/financial-categories";
 import { getHomeCurrency } from "../lib/household-currency";
 import { withAudit } from "../lib/audit";
 import { zCurrencyCode } from "../lib/request-validation";
@@ -34,7 +35,7 @@ const recurringStartDateSchema = z.coerce.date().refine(
 
 export const createRuleSchema = z.object({
   amount: z.number().positive(),
-  category: z.string().min(1).max(100),
+  categoryId: z.string().uuid(),
   description: z.string().max(500).nullable().optional(),
   type: z.enum(["income", "expense"]),
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
@@ -48,7 +49,7 @@ export const createRuleSchema = z.object({
 
 const updateRuleSchema = z.object({
   amount: z.number().positive().optional(),
-  category: z.string().min(1).max(100).optional(),
+  categoryId: z.string().uuid().optional(),
   description: z.string().max(500).nullable().optional(),
   type: z.enum(["income", "expense"]).optional(),
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
@@ -96,6 +97,12 @@ export const handleRecurringRequest: ApiHandler = async ({
     );
 
     const validated = createRuleSchema.parse(await request.json());
+    const category = await assertSelectableFinancialCategory(
+      db,
+      session!.householdId,
+      validated.categoryId,
+      validated.type
+    );
     await validateFinancialRefs(db, session!.householdId, session!.userId, {
       budgetId: validated.budgetId,
     });
@@ -137,7 +144,8 @@ export const handleRecurringRequest: ApiHandler = async ({
             userId: session!.userId,
             amount: toCents(validated.amount),
             currency: validated.currency ?? homeCurrency,
-            category: validated.category.trim(),
+            categoryId: category.id,
+            category: category.name,
             description: validated.description?.trim() || null,
             type: validated.type,
             frequency: validated.frequency,
@@ -186,9 +194,36 @@ export const handleRecurringRequest: ApiHandler = async ({
     const updateData: Record<string, unknown> = {};
 
     if (validated.amount !== undefined) updateData.amount = toCents(validated.amount);
-    if (validated.category !== undefined) updateData.category = validated.category.trim();
+    if (validated.categoryId !== undefined) {
+      const category = await assertSelectableFinancialCategory(
+        db,
+        session!.householdId,
+        validated.categoryId,
+        validated.type ?? existing.type
+      );
+      updateData.categoryId = category.id;
+      updateData.category = category.name;
+    }
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
-    if (validated.type !== undefined) updateData.type = validated.type;
+    if (validated.type !== undefined) {
+      if (validated.type !== existing.type) {
+        if (validated.categoryId === undefined) {
+          if (!existing.categoryId) {
+            throw new ActionError(
+              "categoryId is required when changing recurring type",
+              "VALIDATION_ERROR"
+            );
+          }
+          await assertSelectableFinancialCategory(
+            db,
+            session!.householdId,
+            existing.categoryId,
+            validated.type
+          );
+        }
+      }
+      updateData.type = validated.type;
+    }
     if (validated.frequency !== undefined) updateData.frequency = validated.frequency;
     if (validated.interval !== undefined) updateData.interval = validated.interval;
     if (validated.dayOfMonth !== undefined) updateData.dayOfMonth = validated.dayOfMonth;

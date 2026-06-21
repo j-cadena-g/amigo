@@ -29,6 +29,10 @@ import {
   validateFinancialRefs,
   validateImportBudgetAndAccountIds,
 } from "../lib/financial-refs";
+import {
+  assertSelectableFinancialCategory,
+  resolveOrCreateImportCategory,
+} from "../lib/financial-categories";
 
 const currencyEnum = zCurrencyCode;
 
@@ -61,7 +65,7 @@ const calendarDateString = z
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
-  category: z.string().min(1).max(100),
+  categoryId: z.string().uuid(),
   type: z.enum(["income", "expense"]),
   date: calendarDateString,
   budgetId: z.string().uuid().nullable().optional(),
@@ -72,7 +76,7 @@ const addTransactionSchema = z.object({
 const updateTransactionSchema = z.object({
   amount: z.number().positive().optional(),
   description: z.string().max(500).nullable().optional(),
-  category: z.string().min(1).max(100).optional(),
+  categoryId: z.string().uuid().optional(),
   type: z.enum(["income", "expense"]).optional(),
   date: calendarDateString.optional(),
   budgetId: z.string().uuid().nullable().optional(),
@@ -311,6 +315,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
         seenInBatch.add(externalId);
       }
       const currency = (row.currency ?? homeCurrency) as CurrencyCode;
+      const category = await resolveOrCreateImportCategory(
+        db,
+        session!.householdId,
+        row.category,
+        row.type
+      );
       values.push({
         id: crypto.randomUUID(),
         householdId: session!.householdId,
@@ -319,7 +329,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
         currency,
         exchangeRateToHome: rateByCurrency.get(currency) ?? null,
         description: row.description?.trim() || null,
-        category: row.category.trim(),
+        categoryId: category.id,
+        category: category.name,
         type: row.type,
         date: row.date.split("T")[0]!,
         budgetId: row.budgetId ?? null,
@@ -374,6 +385,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     const validated = addTransactionSchema.parse(await request.json());
+    const category = await assertSelectableFinancialCategory(
+      db,
+      session!.householdId,
+      validated.categoryId,
+      validated.type
+    );
     await validateFinancialRefs(db, session!.householdId, session!.userId, {
       budgetId: validated.budgetId,
       accountId: validated.accountId,
@@ -408,7 +425,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
             currency,
             exchangeRateToHome,
             description: validated.description?.trim() || null,
-            category: validated.category.trim(),
+            categoryId: category.id,
+            category: category.name,
             type: validated.type,
             date: validated.date,
             budgetId: validated.budgetId || null,
@@ -435,6 +453,18 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     const validated = updateTransactionSchema.parse(await request.json());
+    const existing = await db.query.transactions.findFirst({
+      where: and(
+        eq(transactions.id, id),
+        scopeToHousehold(transactions.householdId, session!.householdId),
+        isNull(transactions.deletedAt)
+      ),
+    });
+
+    if (!existing) {
+      throw new ActionError("Transaction not found", "NOT_FOUND");
+    }
+
     await validateFinancialRefs(db, session!.householdId, session!.userId, {
       budgetId: validated.budgetId,
       accountId: validated.accountId,
@@ -447,8 +477,15 @@ export const handleTransactionsRequest: ApiHandler = async ({
     if (validated.description !== undefined) {
       updateData.description = validated.description?.trim() || null;
     }
-    if (validated.category !== undefined) {
-      updateData.category = validated.category.trim();
+    if (validated.categoryId !== undefined) {
+      const category = await assertSelectableFinancialCategory(
+        db,
+        session!.householdId,
+        validated.categoryId,
+        validated.type ?? existing.type
+      );
+      updateData.categoryId = category.id;
+      updateData.category = category.name;
     }
     if (validated.type !== undefined) {
       updateData.type = validated.type;
@@ -472,17 +509,6 @@ export const handleTransactionsRequest: ApiHandler = async ({
       );
     }
 
-    const existing = await db.query.transactions.findFirst({
-      where: and(
-        eq(transactions.id, id),
-        scopeToHousehold(transactions.householdId, session!.householdId),
-        isNull(transactions.deletedAt)
-      ),
-    });
-
-    if (!existing) {
-      throw new ActionError("Transaction not found", "NOT_FOUND");
-    }
     await assertCanWriteTransaction(db, session!, existing, "modify");
 
     const updated = await withAudit(

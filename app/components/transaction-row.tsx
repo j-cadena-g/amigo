@@ -16,6 +16,7 @@ export interface TransactionDTO {
   userId: string | null;
   amount: number;
   currency: CurrencyCode;
+  categoryId: string | null;
   category: string;
   description: string | null;
   type: "income" | "expense";
@@ -40,7 +41,7 @@ interface TransactionRowProps {
   editForm: {
     amount: string;
     description: string;
-    category: string;
+    categoryId: string;
     type: "income" | "expense";
     date: string;
     budgetId: string | null;
@@ -50,7 +51,7 @@ interface TransactionRowProps {
     SetStateAction<{
       amount: string;
       description: string;
-      category: string;
+      categoryId: string;
       type: "income" | "expense";
       date: string;
       budgetId: string | null;

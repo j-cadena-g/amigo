@@ -3,6 +3,8 @@ import { useRevalidator } from "react-router";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
+import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
+import { CategoryBudgetMappingPanel } from "@/app/components/financial/category-budget-mapping-panel";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -28,7 +30,6 @@ import type { CurrencyCode } from "@amigo/db";
 interface BudgetWithSpending {
   id: string;
   name: string;
-  category: string | null;
   limitAmount: number;
   limitAmountHome: number;
   currency: CurrencyCode;
@@ -50,7 +51,6 @@ interface BudgetListProps {
 
 type BudgetFormData = {
   name: string;
-  category: string;
   limitAmount: string;
   currency: string;
   period: string;
@@ -60,7 +60,6 @@ type BudgetFormData = {
 function emptyBudgetForm(homeCurrency: CurrencyCode): BudgetFormData {
   return {
     name: "",
-    category: "",
     limitAmount: "",
     currency: homeCurrency,
     period: "monthly",
@@ -126,9 +125,6 @@ function BudgetCard({
             </Button>
           </div>
         </div>
-        {budget.category && (
-          <p className="text-sm text-muted-foreground">{budget.category}</p>
-        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -204,16 +200,6 @@ function BudgetFormDialog({
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Groceries"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Category</label>
-            <Input
-              value={form.category}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, category: e.target.value }))
-              }
-              placeholder="Optional category filter"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -313,7 +299,6 @@ export function BudgetList({
   function openEdit(budget: BudgetWithSpending) {
     setForm({
       name: budget.name,
-      category: budget.category ?? "",
       limitAmount: (budget.limitAmount / 100).toFixed(2),
       currency: budget.currency,
       period: budget.period,
@@ -332,7 +317,6 @@ export function BudgetList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
-          category: form.category || null,
           limitAmount: parseFloat(form.limitAmount),
           currency: form.currency,
           period: form.period,
@@ -361,7 +345,6 @@ export function BudgetList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
-          category: form.category || null,
           limitAmount: parseFloat(form.limitAmount),
           currency: form.currency,
           period: form.period,
@@ -444,6 +427,13 @@ export function BudgetList({
           No budgets yet. Create one to start tracking your spending.
         </p>
       )}
+
+      <FinancialCollapsiblePanel
+        title="Category → budget linking"
+        description="Choose which budget auto-selects when you log expenses in each category."
+      >
+        <CategoryBudgetMappingPanel />
+      </FinancialCollapsiblePanel>
 
       {/* Add dialog */}
       <BudgetFormDialog

@@ -89,6 +89,14 @@ export const ROUTE_RATE_LIMITS = {
     update: RATE_LIMIT_PRESETS.MUTATION,
     delete: RATE_LIMIT_PRESETS.MUTATION,
   },
+  categories: {
+    list: RATE_LIMIT_PRESETS.READ,
+    create: RATE_LIMIT_PRESETS.MUTATION,
+    update: RATE_LIMIT_PRESETS.MUTATION,
+    delete: RATE_LIMIT_PRESETS.MUTATION,
+    mappingsList: RATE_LIMIT_PRESETS.READ,
+    mappingsUpdate: RATE_LIMIT_PRESETS.MUTATION,
+  },
   transactions: {
     list: RATE_LIMIT_PRESETS.READ,
     export: RATE_LIMIT_PRESETS.READ,

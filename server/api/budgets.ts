@@ -22,13 +22,13 @@ import { withAudit } from "../lib/audit";
 import { getBudgetsWithSpending } from "../lib/budget-spending";
 import { getHomeCurrency } from "../lib/household-currency";
 import { getHouseholdTimezone } from "../lib/household-timezone";
+import { findBudgetIdForCategory } from "../lib/financial-categories";
 import { zCurrencyCode } from "../lib/request-validation";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 
 const budgetSchema = z.object({
   name: z.string().min(1),
-  category: z.string().nullable().optional(),
   limitAmount: z.number().positive(),
   period: z.enum(["weekly", "monthly", "yearly"]),
   isShared: z.boolean(),
@@ -79,6 +79,7 @@ export const handleBudgetsRequest: ApiHandler = async ({
     );
 
     const url = new URL(request.url);
+    const categoryId = url.searchParams.get("categoryId")?.trim() ?? "";
     const category = url.searchParams.get("category")?.trim() ?? "";
     const recurringRuleId = url.searchParams.get("recurringRuleId")?.trim();
 
@@ -93,6 +94,16 @@ export const handleBudgetsRequest: ApiHandler = async ({
       if (rule?.budgetId) {
         return Response.json({ budgetId: rule.budgetId, matchSource: "recurring" });
       }
+    }
+
+    if (categoryId) {
+      const match = await findBudgetIdForCategory(
+        db,
+        session!.householdId,
+        session!.userId,
+        categoryId
+      );
+      return Response.json(match);
     }
 
     if (!category) {
@@ -186,7 +197,6 @@ export const handleBudgetsRequest: ApiHandler = async ({
             householdId: session!.householdId,
             userId: validated.isShared ? null : session!.userId,
             name: validated.name.trim(),
-            category: validated.category?.trim() || null,
             limitAmount: limitCents,
             limitAmountHome,
             exchangeRateLimitToHome,
@@ -264,7 +274,6 @@ export const handleBudgetsRequest: ApiHandler = async ({
           .set({
             userId: nextUserId,
             name: validated.name.trim(),
-            category: validated.category?.trim() || null,
             limitAmount: limitCents,
             limitAmountHome,
             exchangeRateLimitToHome,

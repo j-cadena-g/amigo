@@ -12,6 +12,8 @@ import {
   type TransactionFormState,
 } from "@/app/components/transaction-form";
 import { TransactionImportDialog } from "@/app/components/transaction-import-dialog";
+import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
+import { CategoryManagementPanel } from "@/app/components/financial/category-management-panel";
 import {
   TransactionRow,
   type TransactionDTO,
@@ -57,7 +59,7 @@ export function TransactionList({
   const [newTransaction, setNewTransaction] = useState<TransactionFormState>({
     amount: "",
     description: "",
-    category: "",
+    categoryId: "",
     type: "expense",
     date: "",
     budgetId: null,
@@ -68,7 +70,7 @@ export function TransactionList({
   const [editForm, setEditForm] = useState<TransactionFormState>({
     amount: "",
     description: "",
-    category: "",
+    categoryId: "",
     type: "expense",
     date: "",
     budgetId: null,
@@ -150,7 +152,7 @@ export function TransactionList({
         body: JSON.stringify({
           amount: parseFloat(newTransaction.amount),
           description: newTransaction.description || undefined,
-          category: newTransaction.category || "Uncategorized",
+          categoryId: newTransaction.categoryId,
           type: newTransaction.type,
           date: newTransaction.date,
           budgetId: newTransaction.budgetId,
@@ -162,7 +164,7 @@ export function TransactionList({
         setNewTransaction({
           amount: "",
           description: "",
-          category: "",
+          categoryId: "",
           type: "expense",
           date: todayStr,
           budgetId: null,
@@ -215,7 +217,7 @@ export function TransactionList({
     setEditForm({
       amount: String(t.amount / 100),
       description: t.description || "",
-      category: t.category,
+      categoryId: t.categoryId ?? "",
       type: t.type,
       date: t.date.split("T")[0] ?? t.date,
       budgetId: t.budgetId,
@@ -258,7 +260,7 @@ export function TransactionList({
         body: JSON.stringify({
           amount: parseFloat(editForm.amount),
           description: editForm.description || null,
-          category: editForm.category,
+          categoryId: editForm.categoryId,
           type: editForm.type,
           date: editForm.date,
           budgetId: editForm.budgetId,
@@ -281,6 +283,13 @@ export function TransactionList({
 
   return (
     <div className="space-y-4">
+      <FinancialCollapsiblePanel
+        title="Manage categories"
+        description="Add, archive, and organize income and expense categories."
+      >
+        <CategoryManagementPanel />
+      </FinancialCollapsiblePanel>
+
       {typeFilter && (
         <div className="flex items-center justify-between rounded-lg bg-secondary/50 px-4 py-2">
           <span className="text-sm text-muted-foreground">

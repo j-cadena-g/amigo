@@ -12,6 +12,8 @@ import {
   parseHomeCurrency,
 } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
+import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
+import { CategoryManagementPanel } from "@/app/components/financial/category-management-panel";
 
 function dayOfWeekFromStartDate(startDate: string): number {
   return new Date(startDate + "T00:00:00").getDay();
@@ -60,6 +62,14 @@ export default function Recurring() {
           Set up scheduled income or expenses that post automatically.
         </p>
       </div>
+
+      <FinancialCollapsiblePanel
+        title="Manage categories"
+        description="Add, archive, and organize income and expense categories."
+      >
+        <CategoryManagementPanel />
+      </FinancialCollapsiblePanel>
+
       <RecurringList rules={rules} homeCurrency={homeCurrency} />
     </div>
   );

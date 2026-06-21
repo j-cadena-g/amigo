@@ -11,6 +11,10 @@ export default [
   }),
   route("api/tags", "routes/api.tags.ts", { id: "api-tags" }),
   route("api/tags/*", "routes/api.tags.ts", { id: "api-tags-splat" }),
+  route("api/categories", "routes/api.categories.ts", { id: "api-categories" }),
+  route("api/categories/*", "routes/api.categories.ts", {
+    id: "api-categories-splat",
+  }),
   route("api/transactions", "routes/api.transactions.ts", {
     id: "api-transactions",
   }),

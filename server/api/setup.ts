@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
-import { CURRENCY_CODES, eq, getDb, households, users, and, isNull } from "@amigo/db";
+import { CURRENCY_CODES, eq, getDb, households, users, and, isNull, seedStarterFinancialCategories } from "@amigo/db";
 import { z } from "zod";
 import { isValidTimeZone } from "../lib/dates";
 import {
@@ -121,6 +121,7 @@ export const handleSetupRequest: ApiHandler = async ({
         role: "owner",
       }),
     ]);
+    await seedStarterFinancialCategories(db, householdId);
   } catch (error) {
     if (isAuthIdUniqueConstraintError(error)) {
       try {

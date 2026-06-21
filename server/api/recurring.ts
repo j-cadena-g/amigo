@@ -205,7 +205,17 @@ export const handleRecurringRequest: ApiHandler = async ({
       updateData.category = category.name;
     }
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
-    if (validated.type !== undefined) updateData.type = validated.type;
+    if (validated.type !== undefined) {
+      updateData.type = validated.type;
+      if (validated.categoryId === undefined && existing.categoryId) {
+        await assertSelectableFinancialCategory(
+          db,
+          session!.householdId,
+          existing.categoryId,
+          validated.type
+        );
+      }
+    }
     if (validated.frequency !== undefined) updateData.frequency = validated.frequency;
     if (validated.interval !== undefined) updateData.interval = validated.interval;
     if (validated.dayOfMonth !== undefined) updateData.dayOfMonth = validated.dayOfMonth;

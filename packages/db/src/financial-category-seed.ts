@@ -44,5 +44,11 @@ export async function seedStarterFinancialCategories(
   }));
 
   await db.insert(financialCategories).values(rows);
-  return rows as FinancialCategory[];
+  return db.query.financialCategories.findMany({
+    where: and(
+      eq(financialCategories.householdId, householdId),
+      isNull(financialCategories.deletedAt)
+    ),
+    orderBy: (category, { asc }) => [asc(category.sortOrder), asc(category.name)],
+  });
 }

@@ -55,9 +55,9 @@ export function groupCategoriesForSelect(
   const groups: { label: string | null; options: FinancialCategoryItem[] }[] = [];
 
   for (const parent of parents) {
-    const children = childrenByParent.get(parent.id) ?? [];
+    const children = (childrenByParent.get(parent.id) ?? []).filter((c) => c.selectable);
     if (children.length > 0) {
-      groups.push({ label: parent.name, options: children.filter((c) => c.selectable) });
+      groups.push({ label: parent.name, options: children });
     } else if (parent.selectable) {
       groups.push({ label: null, options: [parent] });
     }

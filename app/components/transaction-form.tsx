@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
+import { useEffect, useId, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
 import { Link } from "react-router";
 import { Plus } from "lucide-react";
 import { BudgetSelect } from "@/app/components/budget-select";
@@ -41,6 +41,7 @@ export function AddTransactionForm({
   onCancel,
   onSubmit,
 }: AddTransactionFormProps) {
+  const categoryFieldId = useId();
   const { categories } = useFinancialCategories();
 
   useEffect(() => {
@@ -168,8 +169,11 @@ export function AddTransactionForm({
       />
 
       <div>
-        <label className="text-sm text-muted-foreground mb-1 block">Category</label>
+        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
+          Category
+        </label>
         <CategorySelect
+          id={categoryFieldId}
           value={form.categoryId}
           onChange={(categoryId) => {
             onAllowBudgetSuggestChange(true);
@@ -243,6 +247,7 @@ export function EditTransactionForm({
   onCancel,
   onSubmit,
 }: EditTransactionFormProps) {
+  const categoryFieldId = useId();
   const { categories } = useFinancialCategories();
 
   return (
@@ -340,8 +345,11 @@ export function EditTransactionForm({
       />
 
       <div>
-        <label className="text-sm text-muted-foreground mb-1 block">Category</label>
+        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
+          Category
+        </label>
         <CategorySelect
+          id={categoryFieldId}
           value={form.categoryId}
           onChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
           type={form.type}

@@ -56,7 +56,12 @@ export const handleCategoriesRequest: ApiHandler = async ({
   request,
   session,
 }) => {
-  const [path] = getSplatSegments(params);
+  const splatSegments = getSplatSegments(params);
+  if (splatSegments.length > 1) {
+    throw new ActionError("Category not found", "NOT_FOUND");
+  }
+
+  const [path] = splatSegments;
   const id =
     path && path !== "mappings" ? path : undefined;
   const db = getDb(env.DB);

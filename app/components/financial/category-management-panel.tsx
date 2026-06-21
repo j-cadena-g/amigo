@@ -1,19 +1,23 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import {
   buildCategoryTree,
   useFinancialCategories,
 } from "@/app/components/financial/use-financial-categories";
+import { parseApiError } from "@/app/lib/parse-api-error";
 import type { FinancialCategoryType } from "@/app/lib/financial-category-types";
 
 export function CategoryManagementPanel() {
+  const nameId = useId();
+  const typeId = useId();
+  const parentId = useId();
   const { categories, loading, error, reload } = useFinancialCategories({
     includeArchived: true,
   });
   const [name, setName] = useState("");
   const [type, setType] = useState<FinancialCategoryType>("expense");
-  const [parentId, setParentId] = useState<string>("");
+  const [parentCategoryId, setParentCategoryId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -32,17 +36,22 @@ export function CategoryManagementPanel() {
         body: JSON.stringify({
           name: name.trim(),
           type,
-          parentId: parentId || null,
+          parentId: parentCategoryId || null,
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { message?: string } | null;
-        setFeedback(body?.message ?? "Failed to create category");
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setFeedback(parseApiError(body, "Failed to create category"));
         return;
       }
       setName("");
-      setParentId("");
+      setParentCategoryId("");
       await reload();
+    } catch {
+      setFeedback("Network error — could not create category");
     } finally {
       setSubmitting(false);
     }
@@ -50,28 +59,42 @@ export function CategoryManagementPanel() {
 
   async function handleArchive(categoryId: string) {
     setFeedback(null);
-    const res = await fetch(`/api/categories/${categoryId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ archived: true }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { message?: string } | null;
-      setFeedback(body?.message ?? "Failed to archive category");
-      return;
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setFeedback(parseApiError(body, "Failed to archive category"));
+        return;
+      }
+      await reload();
+    } catch {
+      setFeedback("Network error — could not archive category");
     }
-    await reload();
   }
 
   async function handleDelete(categoryId: string) {
     setFeedback(null);
-    const res = await fetch(`/api/categories/${categoryId}`, { method: "DELETE" });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { message?: string } | null;
-      setFeedback(body?.message ?? "Failed to remove category");
-      return;
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setFeedback(parseApiError(body, "Failed to remove category"));
+        return;
+      }
+      await reload();
+    } catch {
+      setFeedback("Network error — could not remove category");
     }
-    await reload();
   }
 
   return (
@@ -79,20 +102,26 @@ export function CategoryManagementPanel() {
       <form onSubmit={handleCreate} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium">Name</label>
+            <label htmlFor={nameId} className="text-sm font-medium">
+              Name
+            </label>
             <Input
+              id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Streaming"
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Type</label>
+            <label htmlFor={typeId} className="text-sm font-medium">
+              Type
+            </label>
             <select
+              id={typeId}
               value={type}
               onChange={(e) => {
                 setType(e.target.value as FinancialCategoryType);
-                setParentId("");
+                setParentCategoryId("");
               }}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
@@ -101,12 +130,15 @@ export function CategoryManagementPanel() {
             </select>
           </div>
         </div>
-        {type === "expense" && parentOptions.length > 0 ? (
+        {parentOptions.length > 0 ? (
           <div>
-            <label className="text-sm font-medium">Parent category (optional)</label>
+            <label htmlFor={parentId} className="text-sm font-medium">
+              Parent category (optional)
+            </label>
             <select
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
+              id={parentId}
+              value={parentCategoryId}
+              onChange={(e) => setParentCategoryId(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               <option value="">Top-level category</option>

@@ -305,6 +305,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     }
 
     const seenInBatch = new Set<string>();
+    const categoryCache = new Map<string, Awaited<ReturnType<typeof resolveOrCreateImportCategory>>>();
     const values = [];
     for (const row of parsed.rows) {
       const externalId = row.externalId?.trim() || null;
@@ -315,12 +316,17 @@ export const handleTransactionsRequest: ApiHandler = async ({
         seenInBatch.add(externalId);
       }
       const currency = (row.currency ?? homeCurrency) as CurrencyCode;
-      const category = await resolveOrCreateImportCategory(
-        db,
-        session!.householdId,
-        row.category,
-        row.type
-      );
+      const cacheKey = `${row.type}:${row.category.trim().toLowerCase()}`;
+      let category = categoryCache.get(cacheKey);
+      if (!category) {
+        category = await resolveOrCreateImportCategory(
+          db,
+          session!.householdId,
+          row.category,
+          row.type
+        );
+        categoryCache.set(cacheKey, category);
+      }
       values.push({
         id: crypto.randomUUID(),
         householdId: session!.householdId,
@@ -489,6 +495,14 @@ export const handleTransactionsRequest: ApiHandler = async ({
     }
     if (validated.type !== undefined) {
       updateData.type = validated.type;
+      if (validated.categoryId === undefined && existing.categoryId) {
+        await assertSelectableFinancialCategory(
+          db,
+          session!.householdId,
+          existing.categoryId,
+          validated.type
+        );
+      }
     }
     if (validated.date !== undefined) {
       updateData.date = validated.date;

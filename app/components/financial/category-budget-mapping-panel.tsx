@@ -5,6 +5,7 @@ import {
   useFinancialCategories,
 } from "@/app/components/financial/use-financial-categories";
 import type { CategoryBudgetMappingRow } from "@/app/lib/financial-category-types";
+import { parseApiError } from "@/app/lib/parse-api-error";
 
 interface BudgetOption {
   id: string;
@@ -81,11 +82,16 @@ export function CategoryBudgetMappingPanel() {
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { message?: string } | null;
-        setFeedback(body?.message ?? "Failed to save mappings");
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setFeedback(parseApiError(body, "Failed to save mappings"));
         return;
       }
       setFeedback("Mappings saved.");
+    } catch {
+      setFeedback("Network error — could not save mappings");
     } finally {
       setSubmitting(false);
     }
@@ -166,13 +172,18 @@ function MappingRow({
   nested?: boolean;
   hint?: string;
 }) {
+  const selectId = `budget-mapping-${categoryId}`;
+
   return (
     <div className={`grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] ${nested ? "ml-4" : ""}`}>
       <div>
-        <p className="text-sm font-medium">{label}</p>
+        <label htmlFor={selectId} className="text-sm font-medium">
+          {label}
+        </label>
         {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       </div>
       <select
+        id={selectId}
         value={budgetId ?? ""}
         onChange={(e) => onChange(categoryId, e.target.value || null)}
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

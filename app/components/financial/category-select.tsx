@@ -5,26 +5,32 @@ import type {
 } from "@/app/lib/financial-category-types";
 
 interface CategorySelectProps {
+  id?: string;
   value: string;
   onChange: (categoryId: string) => void;
   type: FinancialCategoryType;
   categories: FinancialCategoryItem[];
   disabled?: boolean;
   placeholder?: string;
+  "aria-label"?: string;
 }
 
 export function CategorySelect({
+  id,
   value,
   onChange,
   type,
   categories,
   disabled,
   placeholder = "Select category",
+  "aria-label": ariaLabel,
 }: CategorySelectProps) {
   const groups = groupCategoriesForSelect(categories, type);
 
   return (
     <select
+      id={id}
+      aria-label={ariaLabel}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}

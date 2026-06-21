@@ -6,7 +6,6 @@ import {
   financialCategories,
   inArray,
   isNull,
-  or,
   recurringTransactions,
   scopeToHousehold,
   sql,
@@ -42,7 +41,7 @@ export async function listFinancialCategories(
 
   const childCounts = new Map<string, number>();
   for (const row of rows) {
-    if (row.parentId) {
+    if (row.parentId && !row.archived) {
       childCounts.set(row.parentId, (childCounts.get(row.parentId) ?? 0) + 1);
     }
   }
@@ -202,14 +201,26 @@ export async function resolveCategoryIdByName(
 
   if (matches.length === 0) return null;
 
-  const childParentIds = new Set(
-    matches.filter((row) => row.parentId).map((row) => row.parentId!)
-  );
-  const leaves = matches.filter(
-    (row) => row.parentId !== null || !childParentIds.has(row.id)
-  );
+  const subcategories = matches.filter((row) => row.parentId !== null);
+  if (subcategories.length > 0) {
+    return subcategories[0] ?? null;
+  }
 
-  return leaves[0] ?? matches[0] ?? null;
+  for (const candidate of matches) {
+    const child = await db.query.financialCategories.findFirst({
+      where: and(
+        eq(financialCategories.parentId, candidate.id),
+        scopeToHousehold(financialCategories.householdId, householdId),
+        isNull(financialCategories.deletedAt),
+        eq(financialCategories.archived, false)
+      ),
+    });
+    if (!child) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 export async function findDuplicateCategoryName(
@@ -336,7 +347,11 @@ export async function upsertCategoryBudgetMappings(
     }
   }
 
-  await db
+  const toInsert = rows.filter(
+    (row): row is { categoryId: string; budgetId: string } => Boolean(row.budgetId)
+  );
+
+  const deleteMappings = db
     .delete(budgetCategoryMappings)
     .where(
       and(
@@ -345,19 +360,21 @@ export async function upsertCategoryBudgetMappings(
       )
     );
 
-  const toInsert = rows.filter(
-    (row): row is { categoryId: string; budgetId: string } => Boolean(row.budgetId)
-  );
+  if (toInsert.length === 0) {
+    await deleteMappings;
+    return;
+  }
 
-  if (toInsert.length === 0) return;
-
-  await db.insert(budgetCategoryMappings).values(
-    toInsert.map((row) => ({
-      householdId,
-      categoryId: row.categoryId,
-      budgetId: row.budgetId,
-    }))
-  );
+  await db.batch([
+    deleteMappings,
+    db.insert(budgetCategoryMappings).values(
+      toInsert.map((row) => ({
+        householdId,
+        categoryId: row.categoryId,
+        budgetId: row.budgetId,
+      }))
+    ),
+  ] as unknown as Parameters<typeof db.batch>[0]);
 }
 
 export async function resolveOrCreateImportCategory(
@@ -370,14 +387,23 @@ export async function resolveOrCreateImportCategory(
   if (existing) return existing;
 
   const trimmed = name.trim();
-  return db
-    .insert(financialCategories)
-    .values({
-      householdId,
-      parentId: null,
-      name: trimmed,
-      type,
-    })
-    .returning()
-    .get();
+  const duplicate = await findDuplicateCategoryName(db, householdId, trimmed, null);
+  if (duplicate) return duplicate;
+
+  try {
+    return await db
+      .insert(financialCategories)
+      .values({
+        householdId,
+        parentId: null,
+        name: trimmed,
+        type,
+      })
+      .returning()
+      .get();
+  } catch {
+    const raced = await resolveCategoryIdByName(db, householdId, name, type);
+    if (raced) return raced;
+    throw new ActionError("Failed to resolve import category", "VALIDATION_ERROR");
+  }
 }

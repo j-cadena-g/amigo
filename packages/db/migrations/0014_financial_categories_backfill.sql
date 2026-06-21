@@ -96,26 +96,33 @@ SELECT
   substr('89ab', abs(random()) % 4 + 1, 1) ||
   substr(lower(hex(randomblob(2))), 2) || '-' ||
   lower(hex(randomblob(6))),
-  b.household_id,
-  b.id,
-  fc.id,
+  picks.household_id,
+  picks.budget_id,
+  picks.category_id,
   CAST(unixepoch() * 1000 AS INTEGER),
   CAST(unixepoch() * 1000 AS INTEGER)
-FROM budgets b
-INNER JOIN financial_categories fc
-  ON fc.household_id = b.household_id
-  AND fc.deleted_at IS NULL
-  AND fc.parent_id IS NULL
-  AND fc.type = 'expense'
-  AND lower(fc.name) = lower(trim(b.category))
-WHERE b.deleted_at IS NULL
-  AND b.category IS NOT NULL
-  AND trim(b.category) != ''
-  AND NOT EXISTS (
-    SELECT 1
-    FROM budget_category_mappings m
-    WHERE m.category_id = fc.id
-  );
+FROM (
+  SELECT
+    b.household_id,
+    MIN(b.id) AS budget_id,
+    fc.id AS category_id
+  FROM budgets b
+  INNER JOIN financial_categories fc
+    ON fc.household_id = b.household_id
+    AND fc.deleted_at IS NULL
+    AND fc.parent_id IS NULL
+    AND fc.type = 'expense'
+    AND lower(fc.name) = lower(trim(b.category))
+  WHERE b.deleted_at IS NULL
+    AND b.category IS NOT NULL
+    AND trim(b.category) != ''
+  GROUP BY b.household_id, fc.id
+) AS picks
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM budget_category_mappings m
+  WHERE m.category_id = picks.category_id
+);
 --> statement-breakpoint
 INSERT INTO financial_categories (
   id,

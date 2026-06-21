@@ -275,6 +275,10 @@ on pushes to `main` and pull requests targeting `main`.
 
 This workflow does not deploy the app.
 
+### Main branch protection
+
+For security hardening, `main` uses a repository ruleset: pull requests with review, required CI and CodeQL checks, signed commits, and linear history. **Merge commits are disabled** at the repository level; changes land via squash or rebase merge only. See [Contributing § Main branch policy](./CONTRIBUTING.md#main-branch-policy-security-hardening) for contributor-facing details.
+
 ## License
 
 Copyright © 2026 James Cadena.

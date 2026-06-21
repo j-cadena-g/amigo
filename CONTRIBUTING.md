@@ -84,8 +84,21 @@ Remote migrations are applied at deploy time (`bun run deploy`); do not run remo
 
 - Target branch: `main`
 - All CI checks must pass
-- Address review feedback; maintainers may request changes or squash-merge depending on history
+- Address review feedback; maintainers squash- or rebase-merge approved PRs
 - Do not include unrelated formatting churn, generated `node_modules`, `.wrangler` state, or secrets
+
+### Main branch policy (security hardening)
+
+`main` is protected by a repository ruleset for supply-chain and integrity hardening:
+
+- Pull requests are required; at least one approving review is required, stale reviews are dismissed when new commits are pushed, and the latest push must be approved
+- Review threads must be resolved before merge
+- Required status checks must pass and stay up to date (`lint-and-typecheck`, `test`, `CodeQL`)
+- **Merge commits are disabled**; only squash or rebase merges are allowed, with linear history enforced
+- **Commits must be signed** ([configure commit signing](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits) with GPG or SSH before opening a PR)
+- Merged pull request branches are deleted automatically
+
+See [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) for what CI runs locally and in GitHub Actions.
 
 ## What to contribute
 

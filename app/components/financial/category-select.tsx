@@ -1,4 +1,4 @@
-import { groupCategoriesForSelect } from "@/app/components/financial/use-financial-categories";
+import { listCategoriesForSelect } from "@/app/components/financial/use-financial-categories";
 import type {
   FinancialCategoryItem,
   FinancialCategoryType,
@@ -25,7 +25,7 @@ export function CategorySelect({
   placeholder = "Select category",
   "aria-label": ariaLabel,
 }: CategorySelectProps) {
-  const groups = groupCategoriesForSelect(categories, type);
+  const options = listCategoriesForSelect(categories, type);
 
   return (
     <select
@@ -37,25 +37,13 @@ export function CategorySelect({
       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
     >
       <option value="">{placeholder}</option>
-      {groups.map((group) =>
-        group.label ? (
-          <optgroup key={group.label} label={group.label}>
-            {group.options.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.icon ? `${category.icon} ` : ""}
-                {category.name}
-              </option>
-            ))}
-          </optgroup>
-        ) : (
-          group.options.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.icon ? `${category.icon} ` : ""}
-              {category.name}
-            </option>
-          ))
-        )
-      )}
+      {options.map(({ category, indent }) => (
+        <option key={category.id} value={category.id}>
+          {indent ? "\u00A0\u00A0" : ""}
+          {category.icon ? `${category.icon} ` : ""}
+          {category.name}
+        </option>
+      ))}
     </select>
   );
 }

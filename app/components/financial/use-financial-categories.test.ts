@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupCategoriesForSelect } from "./use-financial-categories";
+import { listCategoriesForSelect } from "./use-financial-categories";
 import type { FinancialCategoryItem } from "@/app/lib/financial-category-types";
 
 function category(
@@ -18,8 +18,8 @@ function category(
   };
 }
 
-describe("groupCategoriesForSelect", () => {
-  it("includes a parent as the first option when it has subcategories", () => {
+describe("listCategoriesForSelect", () => {
+  it("lists the parent once with indented subcategories", () => {
     const parent = category({
       id: "parent-1",
       name: "Subscriptions",
@@ -32,21 +32,17 @@ describe("groupCategoriesForSelect", () => {
       sortOrder: 1,
     });
 
-    const groups = groupCategoriesForSelect([parent, child], "expense");
-
-    expect(groups).toEqual([
-      {
-        label: "Subscriptions",
-        options: [parent, child],
-      },
+    expect(listCategoriesForSelect([parent, child], "expense")).toEqual([
+      { category: parent, indent: false },
+      { category: child, indent: true },
     ]);
   });
 
-  it("lists leaf parents without an optgroup label", () => {
+  it("lists leaf categories without indentation", () => {
     const parent = category({ id: "parent-1", name: "Groceries" });
 
-    const groups = groupCategoriesForSelect([parent], "expense");
-
-    expect(groups).toEqual([{ label: null, options: [parent] }]);
+    expect(listCategoriesForSelect([parent], "expense")).toEqual([
+      { category: parent, indent: false },
+    ]);
   });
 });

@@ -37,12 +37,19 @@ export function useFinancialCategories(options?: { includeArchived?: boolean }) 
   return { categories, loading, error, reload };
 }
 
-export function groupCategoriesForSelect(
+export type CategorySelectOption = {
+  category: FinancialCategoryItem;
+  indent: boolean;
+};
+
+export function listCategoriesForSelect(
   categories: FinancialCategoryItem[],
   type: FinancialCategoryType
-) {
+): CategorySelectOption[] {
   const filtered = categories.filter((c) => c.type === type && !c.archived);
-  const parents = filtered.filter((c) => c.parentId === null);
+  const parents = filtered
+    .filter((c) => c.parentId === null)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   const childrenByParent = new Map<string, FinancialCategoryItem[]>();
 
   for (const category of filtered) {
@@ -52,23 +59,26 @@ export function groupCategoriesForSelect(
     childrenByParent.set(category.parentId, list);
   }
 
-  const groups: { label: string | null; options: FinancialCategoryItem[] }[] = [];
+  const options: CategorySelectOption[] = [];
 
   for (const parent of parents) {
     const children = (childrenByParent.get(parent.id) ?? [])
       .filter((c) => c.selectable)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+
     if (children.length > 0) {
-      groups.push({
-        label: parent.name,
-        options: parent.selectable ? [parent, ...children] : children,
-      });
+      if (parent.selectable) {
+        options.push({ category: parent, indent: false });
+      }
+      for (const child of children) {
+        options.push({ category: child, indent: true });
+      }
     } else if (parent.selectable) {
-      groups.push({ label: null, options: [parent] });
+      options.push({ category: parent, indent: false });
     }
   }
 
-  return groups;
+  return options;
 }
 
 export function buildCategoryTree(categories: FinancialCategoryItem[]) {

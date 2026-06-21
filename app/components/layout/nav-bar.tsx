@@ -30,7 +30,8 @@ function isNavLinkActive(pathname: string, href: string) {
     return (
       pathname === "/financial" ||
       pathname.startsWith("/financial/") ||
-      pathname.startsWith("/budget") ||
+      pathname === "/budget" ||
+      pathname.startsWith("/budget/") ||
       pathname === "/assets" ||
       pathname === "/debts" ||
       pathname === "/accounts"

@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router";
 import { useUser, useClerk } from "@clerk/react-router";
 import {
   LayoutDashboard,
-  Wallet,
   ShoppingCart,
   Landmark,
   Settings,
@@ -18,16 +17,11 @@ import { ModeToggle } from "@/app/components/mode-toggle";
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/groceries", label: "Groceries", icon: ShoppingCart },
-  { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/financial", label: "Financial", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function isNavLinkActive(pathname: string, href: string) {
-  if (href === "/budget") {
-    return pathname.startsWith("/budget");
-  }
-
   if (href === "/dashboard") {
     return pathname === "/dashboard";
   }
@@ -36,6 +30,7 @@ function isNavLinkActive(pathname: string, href: string) {
     return (
       pathname === "/financial" ||
       pathname.startsWith("/financial/") ||
+      pathname.startsWith("/budget") ||
       pathname === "/assets" ||
       pathname === "/debts" ||
       pathname === "/accounts"

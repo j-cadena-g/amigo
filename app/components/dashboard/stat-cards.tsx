@@ -30,7 +30,7 @@ export function DashboardStatCards({
 }: DashboardStatCardsProps) {
   return (
     <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-stagger-in mb-6">
-      <Link to="/budget?type=expense" className="block">
+      <Link to="/financial?type=expense" className="block">
         <Card className="card-interactive overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-orange-500/10 dark:from-red-500/20 dark:to-orange-500/20 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
@@ -50,7 +50,7 @@ export function DashboardStatCards({
         </Card>
       </Link>
 
-      <Link to="/budget?type=income" className="block">
+      <Link to="/financial?type=income" className="block">
         <Card className="card-interactive overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
@@ -70,7 +70,7 @@ export function DashboardStatCards({
         </Card>
       </Link>
 
-      <Link to="/budget" className="block">
+      <Link to="/financial" className="block">
         <Card className="card-interactive overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">

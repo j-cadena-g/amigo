@@ -2,9 +2,9 @@ import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 
 export function loader(_args: LoaderFunctionArgs) {
-  return redirect("/financial/accounts");
+  return redirect("/financial/recurring");
 }
 
-export default function FinancialAssetsRedirect() {
+export default function BudgetRecurringRedirect() {
   return null;
 }

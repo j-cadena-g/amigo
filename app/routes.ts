@@ -43,15 +43,18 @@ export default [
   layout("routes/_app.tsx", [
     route("dashboard", "routes/dashboard.tsx"),
     route("groceries", "routes/groceries.tsx"),
-    route("budget", "routes/budget.tsx", [
-      index("routes/budget.transactions.tsx"),
-      route("budgets", "routes/budget.budgets.tsx"),
-      route("recurring", "routes/budget.recurring.tsx"),
+    route("budget", "routes/budget-redirect.tsx", [
+      index("routes/budget-redirect.index.tsx"),
+      route("budgets", "routes/budget-redirect.budgets.tsx"),
+      route("recurring", "routes/budget-redirect.recurring.tsx"),
     ]),
     route("financial", "routes/financial.tsx", [
-      index("routes/financial.accounts.tsx"),
-      route("assets", "routes/financial.assets.tsx"),
+      index("routes/budget.transactions.tsx"),
+      route("recurring", "routes/budget.recurring.tsx"),
+      route("budgets", "routes/budget.budgets.tsx"),
+      route("accounts", "routes/financial.accounts.tsx"),
       route("debts", "routes/financial.debts.tsx"),
+      route("assets", "routes/financial.assets.tsx"),
     ]),
     route("debts", "routes/debts.tsx"),
     route("assets", "routes/assets.tsx"),

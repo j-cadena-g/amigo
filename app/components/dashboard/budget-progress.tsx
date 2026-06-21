@@ -21,7 +21,7 @@ export function DashboardBudgetProgress({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Budget Progress</CardTitle>
           <Link
-            to="/budget/budgets"
+            to="/financial/budgets"
             className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
           >
             Manage

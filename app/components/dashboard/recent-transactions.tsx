@@ -23,7 +23,7 @@ export function DashboardRecentTransactions({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Recent Transactions</CardTitle>
           <Link
-            to="/budget"
+            to="/financial"
             className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
           >
             View all

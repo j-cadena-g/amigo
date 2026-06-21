@@ -193,7 +193,7 @@ export function AddTransactionForm({
 
       <p className="text-sm text-muted-foreground">
         Need this on a schedule?{" "}
-        <Link to="/budget/recurring" className="font-medium text-primary hover:underline">
+        <Link to="/financial/recurring" className="font-medium text-primary hover:underline">
           Set up a recurring transaction
         </Link>
       </p>

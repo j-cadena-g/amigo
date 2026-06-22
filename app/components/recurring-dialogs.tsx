@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -117,15 +117,49 @@ function RecurringForm({
   onSubmit,
   submitting,
   submitLabel,
+  initialBudgetSuggest = true,
 }: {
   form: RecurringFormData;
   setForm: React.Dispatch<React.SetStateAction<RecurringFormData>>;
   onSubmit: () => void;
   submitting: boolean;
   submitLabel: string;
+  /** When false, category changes won't overwrite an existing budget until the user picks a category. */
+  initialBudgetSuggest?: boolean;
 }) {
   const { categories } = useFinancialCategories();
+  const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
+
+  useEffect(() => {
+    setAllowBudgetSuggest(initialBudgetSuggest);
+  }, [initialBudgetSuggest]);
+
+  useEffect(() => {
+    if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/budgets/match-category?${new URLSearchParams({
+              categoryId: form.categoryId,
+            })}`,
+            { signal: ac.signal }
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as { budgetId: string | null };
+          setForm((f) => ({ ...f, budgetId: data.budgetId ?? null }));
+        } catch {
+          /* aborted */
+        }
+      })();
+    }, 200);
+    return () => {
+      ac.abort();
+      clearTimeout(timer);
+    };
+  }, [form.categoryId, form.type, allowBudgetSuggest, setForm]);
 
   return (
     <div className="space-y-4">
@@ -183,7 +217,10 @@ function RecurringForm({
         <label className="text-sm font-medium">Category</label>
         <CategorySelect
           value={form.categoryId}
-          onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
+          onChange={(categoryId) => {
+            setAllowBudgetSuggest(true);
+            setForm((f) => ({ ...f, categoryId }));
+          }}
           type={form.type}
           categories={categories}
         />
@@ -311,7 +348,10 @@ function RecurringForm({
           <label className="text-sm font-medium">Budget</label>
           <BudgetSelect
             value={form.budgetId}
-            onChange={(v) => setForm((f) => ({ ...f, budgetId: v }))}
+            onChange={(v) => {
+              setAllowBudgetSuggest(false);
+              setForm((f) => ({ ...f, budgetId: v }));
+            }}
           />
         </div>
       )}
@@ -529,6 +569,7 @@ export function EditRecurringDialog({
           onSubmit={handleSubmit}
           submitting={submitting}
           submitLabel="Save Changes"
+          initialBudgetSuggest={false}
         />
       </DialogContent>
     </Dialog>

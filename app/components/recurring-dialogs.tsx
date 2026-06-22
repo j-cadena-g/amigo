@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -129,6 +129,7 @@ function RecurringForm({
 }) {
   const { categories } = useFinancialCategories();
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
+  const budgetSuggestRequestSeq = useRef(0);
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
   useEffect(() => {
@@ -136,20 +137,27 @@ function RecurringForm({
   }, [initialBudgetSuggest]);
 
   useEffect(() => {
+    const requestSeq = ++budgetSuggestRequestSeq.current;
     if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
+    const requestedCategoryId = form.categoryId;
     const ac = new AbortController();
     const timer = setTimeout(() => {
       void (async () => {
         try {
           const res = await fetch(
             `/api/budgets/match-category?${new URLSearchParams({
-              categoryId: form.categoryId,
+              categoryId: requestedCategoryId,
             })}`,
             { signal: ac.signal }
           );
           if (!res.ok) return;
           const data = (await res.json()) as { budgetId: string | null };
-          setForm((f) => ({ ...f, budgetId: data.budgetId ?? null }));
+          if (requestSeq !== budgetSuggestRequestSeq.current) return;
+          setForm((f) =>
+            f.type === "expense" && f.categoryId === requestedCategoryId
+              ? { ...f, budgetId: data.budgetId ?? null }
+              : f
+          );
         } catch {
           /* aborted */
         }

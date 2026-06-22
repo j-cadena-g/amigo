@@ -244,7 +244,8 @@ export const handleCategoriesRequest: ApiHandler = async ({
           householdId,
           validated.name,
           existing.type,
-          existing.parentId
+          existing.parentId,
+          id
         );
         if (duplicate) {
           throw new ActionError(

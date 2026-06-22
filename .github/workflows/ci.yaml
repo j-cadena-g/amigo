@@ -1,10 +1,16 @@
 name: CI
 
 on:
+  # Backup trigger: pull_request synchronize is occasionally dropped; push always
+  # fires for branch updates and keeps required checks from going missing on PRs.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

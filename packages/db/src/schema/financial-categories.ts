@@ -1,10 +1,11 @@
+import { sql } from "drizzle-orm";
 import {
+  foreignKey,
   index,
   integer,
   sqliteTable,
   text,
   uniqueIndex,
-  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { budgets } from "./budgets";
@@ -20,9 +21,7 @@ export const financialCategories = sqliteTable(
     householdId: text("household_id")
       .notNull()
       .references(() => households.id, { onDelete: "cascade" }),
-    parentId: text("parent_id").references((): AnySQLiteColumn => financialCategories.id, {
-      onDelete: "cascade",
-    }),
+    parentId: text("parent_id"),
     name: text("name").notNull(),
     type: text("type", { enum: FINANCIAL_CATEGORY_TYPES }).notNull(),
     icon: text("icon"),
@@ -43,6 +42,23 @@ export const financialCategories = sqliteTable(
       table.householdId,
       table.parentId
     ),
+    uniqueIndex("financial_categories_household_id_id_unique").on(
+      table.householdId,
+      table.id
+    ),
+    uniqueIndex("financial_categories_sibling_name_unique")
+      .on(
+        table.householdId,
+        sql`coalesce(${table.parentId}, '')`,
+        table.type,
+        sql`lower(${table.name})`
+      )
+      .where(sql`${table.deletedAt} IS NULL`),
+    foreignKey({
+      columns: [table.householdId, table.parentId],
+      foreignColumns: [table.householdId, table.id],
+      name: "financial_categories_parent_household_fk",
+    }),
   ]
 );
 
@@ -55,12 +71,8 @@ export const budgetCategoryMappings = sqliteTable(
     householdId: text("household_id")
       .notNull()
       .references(() => households.id, { onDelete: "cascade" }),
-    budgetId: text("budget_id")
-      .notNull()
-      .references(() => budgets.id, { onDelete: "cascade" }),
-    categoryId: text("category_id")
-      .notNull()
-      .references(() => financialCategories.id, { onDelete: "cascade" }),
+    budgetId: text("budget_id").notNull(),
+    categoryId: text("category_id").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -72,6 +84,16 @@ export const budgetCategoryMappings = sqliteTable(
   (table) => [
     uniqueIndex("budget_category_mappings_category_id_unique").on(table.categoryId),
     index("budget_category_mappings_household_id_idx").on(table.householdId),
+    foreignKey({
+      columns: [table.householdId, table.budgetId],
+      foreignColumns: [budgets.householdId, budgets.id],
+      name: "budget_category_mappings_budget_household_fk",
+    }),
+    foreignKey({
+      columns: [table.householdId, table.categoryId],
+      foreignColumns: [financialCategories.householdId, financialCategories.id],
+      name: "budget_category_mappings_category_household_fk",
+    }),
   ]
 );
 

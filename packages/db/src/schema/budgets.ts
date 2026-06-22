@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
 import { CURRENCY_CODES } from "./currencies";
@@ -40,7 +40,10 @@ export const budgets = sqliteTable(
       .$onUpdate(() => new Date()),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   },
-  (table) => [index("budgets_household_id_idx").on(table.householdId)]
+  (table) => [
+    index("budgets_household_id_idx").on(table.householdId),
+    uniqueIndex("budgets_household_id_id_unique").on(table.householdId, table.id),
+  ]
 );
 
 export type Budget = typeof budgets.$inferSelect;

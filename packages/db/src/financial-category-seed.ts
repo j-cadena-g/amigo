@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { drizzle } from "drizzle-orm/d1";
 import {
   financialCategories,
@@ -18,15 +18,14 @@ export async function seedStarterFinancialCategories(
   db: CategorySeedDb,
   householdId: string
 ): Promise<FinancialCategory[]> {
-  const existing = await db.query.financialCategories.findMany({
+  const existing = await db.query.financialCategories.findFirst({
     where: and(
       eq(financialCategories.householdId, householdId),
       isNull(financialCategories.deletedAt)
     ),
-    limit: 1,
   });
 
-  if (existing.length > 0) {
+  if (existing) {
     return [];
   }
 
@@ -43,11 +42,16 @@ export async function seedStarterFinancialCategories(
     updatedAt: now,
   }));
 
-  await db.insert(financialCategories).values(rows);
+  await db.insert(financialCategories).values(rows).onConflictDoNothing();
+
   return db.query.financialCategories.findMany({
     where: and(
       eq(financialCategories.householdId, householdId),
-      isNull(financialCategories.deletedAt)
+      isNull(financialCategories.deletedAt),
+      inArray(
+        financialCategories.name,
+        STARTER_FINANCIAL_CATEGORIES.map((starter) => starter.name)
+      )
     ),
     orderBy: (category, { asc }) => [asc(category.sortOrder), asc(category.name)],
   });

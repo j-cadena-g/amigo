@@ -227,7 +227,7 @@ function RecurringForm({
           value={form.categoryId}
           onChange={(categoryId) => {
             setAllowBudgetSuggest(true);
-            setForm((f) => ({ ...f, categoryId }));
+            setForm((f) => ({ ...f, categoryId, budgetId: null }));
           }}
           type={form.type}
           categories={categories}
@@ -358,6 +358,7 @@ function RecurringForm({
             value={form.budgetId}
             onChange={(v) => {
               setAllowBudgetSuggest(false);
+              budgetSuggestRequestSeq.current += 1;
               setForm((f) => ({ ...f, budgetId: v }));
             }}
           />

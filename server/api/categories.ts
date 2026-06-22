@@ -130,6 +130,7 @@ export const handleCategoriesRequest: ApiHandler = async ({
       db,
       householdId,
       validated.name,
+      validated.type,
       parentId
     );
     if (duplicate) {
@@ -139,7 +140,7 @@ export const handleCategoriesRequest: ApiHandler = async ({
       );
     }
 
-    const category = await db
+    const [category] = await db
       .insert(financialCategories)
       .values({
         householdId,
@@ -149,13 +150,31 @@ export const handleCategoriesRequest: ApiHandler = async ({
         icon: validated.icon ?? null,
         sortOrder: validated.sortOrder ?? 0,
       })
-      .returning()
-      .get();
+      .onConflictDoNothing()
+      .returning();
 
-    return Response.json(
-      { ...category, hasChildren: false, selectable: true },
-      { status: 201 }
+    if (category) {
+      return Response.json(
+        { ...category, hasChildren: false, selectable: true },
+        { status: 201 }
+      );
+    }
+
+    const raced = await findDuplicateCategoryName(
+      db,
+      householdId,
+      validated.name,
+      validated.type,
+      parentId
     );
+    if (raced) {
+      throw new ActionError(
+        "A category with this name already exists",
+        "VALIDATION_ERROR"
+      );
+    }
+
+    throw new ActionError("Failed to create category", "VALIDATION_ERROR");
   }
 
   if (request.method === "PATCH" && id) {
@@ -183,6 +202,7 @@ export const handleCategoriesRequest: ApiHandler = async ({
         db,
         householdId,
         validated.name,
+        existing.type,
         existing.parentId,
         id
       );
@@ -194,27 +214,48 @@ export const handleCategoriesRequest: ApiHandler = async ({
       }
     }
 
-    const updated = await db
-      .update(financialCategories)
-      .set({
-        ...(validated.name !== undefined ? { name: validated.name.trim() } : {}),
-        ...(validated.icon !== undefined ? { icon: validated.icon } : {}),
-        ...(validated.sortOrder !== undefined
-          ? { sortOrder: validated.sortOrder }
-          : {}),
-        ...(validated.archived !== undefined
-          ? { archived: validated.archived }
-          : {}),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(financialCategories.id, id),
-          scopeToHousehold(financialCategories.householdId, householdId)
+    let updated;
+    try {
+      updated = await db
+        .update(financialCategories)
+        .set({
+          ...(validated.name !== undefined ? { name: validated.name.trim() } : {}),
+          ...(validated.icon !== undefined ? { icon: validated.icon } : {}),
+          ...(validated.sortOrder !== undefined
+            ? { sortOrder: validated.sortOrder }
+            : {}),
+          ...(validated.archived !== undefined
+            ? { archived: validated.archived }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(financialCategories.id, id),
+            scopeToHousehold(financialCategories.householdId, householdId)
+          )
         )
-      )
-      .returning()
-      .get();
+        .returning()
+        .get();
+    } catch {
+      if (validated.name !== undefined) {
+        const duplicate = await findDuplicateCategoryName(
+          db,
+          householdId,
+          validated.name,
+          existing.type,
+          existing.parentId,
+          id
+        );
+        if (duplicate) {
+          throw new ActionError(
+            "A category with this name already exists",
+            "VALIDATION_ERROR"
+          );
+        }
+      }
+      throw new ActionError("Failed to update category", "VALIDATION_ERROR");
+    }
 
     if (!updated) {
       throw new ActionError("Category not found", "NOT_FOUND");

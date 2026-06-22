@@ -197,6 +197,7 @@ export async function findDuplicateCategoryName(
   db: DrizzleD1,
   householdId: string,
   name: string,
+  type: "income" | "expense",
   parentId: string | null,
   excludeId?: string
 ): Promise<FinancialCategory | null> {
@@ -204,6 +205,7 @@ export async function findDuplicateCategoryName(
   const conditions = [
     scopeToHousehold(financialCategories.householdId, householdId),
     isNull(financialCategories.deletedAt),
+    eq(financialCategories.type, type),
     sql`lower(${financialCategories.name}) = lower(${trimmed})`,
     parentId
       ? eq(financialCategories.parentId, parentId)
@@ -357,29 +359,21 @@ export async function resolveOrCreateImportCategory(
   if (existing) return existing;
 
   const trimmed = name.trim();
-  const duplicate = await findDuplicateCategoryName(db, householdId, trimmed, null);
-  if (duplicate) {
-    if (duplicate.type === type) return duplicate;
-    throw new ActionError(
-      "Category name exists with a different type",
-      "VALIDATION_ERROR"
-    );
-  }
+  await db
+    .insert(financialCategories)
+    .values({
+      householdId,
+      parentId: null,
+      name: trimmed,
+      type,
+    })
+    .onConflictDoNothing();
 
-  try {
-    return await db
-      .insert(financialCategories)
-      .values({
-        householdId,
-        parentId: null,
-        name: trimmed,
-        type,
-      })
-      .returning()
-      .get();
-  } catch {
-    const raced = await resolveCategoryIdByName(db, householdId, name, type);
-    if (raced) return raced;
-    throw new ActionError("Failed to resolve import category", "VALIDATION_ERROR");
-  }
+  const resolved = await resolveCategoryIdByName(db, householdId, name, type);
+  if (resolved) return resolved;
+
+  const duplicate = await findDuplicateCategoryName(db, householdId, trimmed, type, null);
+  if (duplicate) return duplicate;
+
+  throw new ActionError("Failed to resolve import category", "VALIDATION_ERROR");
 }

@@ -271,6 +271,8 @@ GitHub Actions in [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) cur
 
 - `pnpm run lint`
 - `pnpm run typecheck`
+- `pnpm run typegen`
+- `pnpm run db:migrate:local`
 - `pnpm run test`
 
 on pushes to `main` and pull requests targeting `main`.

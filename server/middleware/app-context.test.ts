@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createRouterLoadContext, getApp } from "../../router-context";
 import { appContextMiddleware } from "./app-context";
 
 const mocks = vi.hoisted(() => ({
@@ -14,26 +15,9 @@ vi.mock("../lib/session", () => ({
   resolveSession: mocks.resolveSession,
 }));
 
-type MiddlewareArgs = {
-  context: {
-    app: {
-      cspNonce: string;
-      sessionStatus: string;
-      session?: unknown;
-    };
-    cloudflare: {
-      env: {
-        DB: string;
-        CACHE: string;
-        CLERK_SECRET_KEY: string;
-      };
-    };
-  };
-};
-
-function createArgs(): MiddlewareArgs {
+function createArgs() {
   return {
-    context: {
+    context: createRouterLoadContext({
       app: {
         cspNonce: "",
         sessionStatus: "unauthenticated",
@@ -43,9 +27,11 @@ function createArgs(): MiddlewareArgs {
           DB: "db",
           CACHE: "cache",
           CLERK_SECRET_KEY: "secret",
-        },
+        } as never,
+        ctx: {} as ExecutionContext,
+        caches: {} as CacheStorage,
       },
-    },
+    }),
   };
 }
 
@@ -78,8 +64,8 @@ describe("appContextMiddleware", () => {
     expect(mocks.getAuth).toHaveBeenCalledWith(args, {
       treatPendingAsSignedOut: false,
     });
-    expect(args.context.app.sessionStatus).toBe("authenticated");
-    expect(args.context.app.session).toEqual(
+    expect(getApp(args.context).sessionStatus).toBe("authenticated");
+    expect(getApp(args.context).session).toEqual(
       expect.objectContaining({ userId: "user-1" })
     );
   });
@@ -98,8 +84,8 @@ describe("appContextMiddleware", () => {
 
     expect(response.status).toBe(204);
     expect(mocks.resolveSession).not.toHaveBeenCalled();
-    expect(args.context.app.sessionStatus).toBe("unauthenticated");
-    expect(args.context.app.session).toBeUndefined();
+    expect(getApp(args.context).sessionStatus).toBe("unauthenticated");
+    expect(getApp(args.context).session).toBeUndefined();
   });
 
   it("propagates needs_setup when the user has no household yet", async () => {
@@ -118,8 +104,8 @@ describe("appContextMiddleware", () => {
     )) as Response;
 
     expect(response.status).toBe(204);
-    expect(args.context.app.sessionStatus).toBe("needs_setup");
-    expect(args.context.app.session).toBeUndefined();
+    expect(getApp(args.context).sessionStatus).toBe("needs_setup");
+    expect(getApp(args.context).session).toBeUndefined();
   });
 
   it("propagates revoked when the user was removed from a household", async () => {
@@ -138,7 +124,7 @@ describe("appContextMiddleware", () => {
     )) as Response;
 
     expect(response.status).toBe(204);
-    expect(args.context.app.sessionStatus).toBe("revoked");
-    expect(args.context.app.session).toBeUndefined();
+    expect(getApp(args.context).sessionStatus).toBe("revoked");
+    expect(getApp(args.context).session).toBeUndefined();
   });
 });

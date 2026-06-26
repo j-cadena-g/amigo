@@ -1,4 +1,4 @@
-import type { AppLoadContext, EntryContext } from "react-router";
+import type { EntryContext, RouterContextProvider } from "react-router";
 import { ServerRouter } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
 import { isbot } from "isbot";
@@ -9,7 +9,7 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  loadContext: AppLoadContext
+  loadContext: RouterContextProvider
 ) {
   const userAgent = request.headers.get("user-agent");
   const cspNonce = getCspNonce(loadContext);

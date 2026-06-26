@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/react-router/server";
 import type { MiddlewareFunction } from "react-router";
+import { getApp, getCloudflare } from "../../router-context";
 import { getClerkIdentity } from "../lib/clerk";
 import { createCspNonce } from "../lib/security";
 import { resolveSession } from "../lib/session";
@@ -8,8 +9,8 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
   args,
   next
 ) => {
-  const app = args.context.app;
-  const env = args.context.cloudflare.env;
+  const app = getApp(args.context);
+  const env = getCloudflare(args.context).env;
   const existingNonce =
     typeof app?.cspNonce === "string"
       ? app.cspNonce

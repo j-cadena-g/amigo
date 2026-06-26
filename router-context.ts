@@ -1,4 +1,4 @@
-import { RouterContextProvider } from "react-router";
+import { createContext, RouterContextProvider } from "react-router";
 import type { Env } from "./server/env";
 import type { AppSession, SessionStatus } from "./server/env";
 
@@ -15,17 +15,25 @@ export type AppContextValue = {
   session?: AppSession;
 };
 
-declare module "react-router" {
-  interface RouterContextProvider {
-    cloudflare: Cloudflare;
-    app: AppContextValue;
-  }
-}
+export const cloudflareContext = createContext<Cloudflare>();
+export const appContext = createContext<AppContextValue>();
 
-export function createRouterLoadContext(context: {
+export type RouterContext = Pick<RouterContextProvider, "get">;
+
+export function createRouterLoadContext(values: {
   cloudflare: Cloudflare;
   app: AppContextValue;
 }): RouterContextProvider {
   const provider = new RouterContextProvider();
-  return Object.assign(provider, context);
+  provider.set(cloudflareContext, values.cloudflare);
+  provider.set(appContext, values.app);
+  return provider;
+}
+
+export function getCloudflare(context: RouterContext): Cloudflare {
+  return context.get(cloudflareContext);
+}
+
+export function getApp(context: RouterContext): AppContextValue {
+  return context.get(appContext);
 }

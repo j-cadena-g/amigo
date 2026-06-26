@@ -1,18 +1,23 @@
 import { describe, expect, it } from "vitest";
 import type { LoaderFunctionArgs } from "react-router";
+import { createRouterLoadContext } from "../../router-context";
+import type { SessionStatus } from "../../server/env";
 import { loader } from "./_index";
 
-function makeLoaderArgs(
-  sessionStatus: LoaderFunctionArgs["context"]["app"]["sessionStatus"]
-): LoaderFunctionArgs {
+function makeLoaderArgs(sessionStatus: SessionStatus): LoaderFunctionArgs {
   return {
-    context: {
+    context: createRouterLoadContext({
       app: {
         cspNonce: "test-nonce",
         sessionStatus,
       },
-    },
-  } as LoaderFunctionArgs;
+      cloudflare: {
+        env: {} as never,
+        ctx: {} as ExecutionContext,
+        caches: {} as CacheStorage,
+      },
+    }),
+  } as unknown as LoaderFunctionArgs;
 }
 
 describe("index route loader", () => {

@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, "..");
-const examplePath = path.join(rootDir, ".dev.vars.example");
+const repoRoot = path.resolve(__dirname, "..");
+const examplePath = path.join(repoRoot, "apps/web/.dev.vars.example");
 
 const manifest = readFileSync(examplePath, "utf8");
 const required = parseManifestKeys(manifest);
@@ -32,7 +32,7 @@ if (present.length > 0) {
 if (missing.length > 0) {
   console.error(`FAIL: missing or empty: ${missing.join(", ")}`);
   console.error(
-    "hint: local dev — set OP_ENVIRONMENT_ID in .op/refs.env and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (amigo dev) in Cursor environment secrets",
+    "hint: local dev — set OP_ENVIRONMENT_ID in apps/web/.op/refs.env and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (amigo dev) in Cursor environment secrets",
   );
   process.exit(1);
 }

@@ -1,14 +1,14 @@
 # amigo
 
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
-[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?labelColor=171717&color=FF570A)](https://coderabbit.ai)
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?utm_source=oss&utm_medium=github&utm_campaign=j-cadena-g%2Famigo&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 [![License](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.license&label=License&color=blue)](https://www.gnu.org/licenses/agpl-3.0)
 [![pnpm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.packageManager&label=pnpm&logo=pnpm&logoColor=fff&color=F69220)](https://pnpm.io)
-[![TypeScript](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/typescript?label=TypeScript&logo=typescript&logoColor=fff&color=3178C6)](https://www.typescriptlang.org/)
-[![React Router](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/react-router?label=React%20Router&logo=reactrouter&logoColor=fff&color=CA4245)](https://reactrouter.com/)
-[![Wrangler](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/wrangler?label=Wrangler&logo=cloudflare&logoColor=fff&color=F38020)](https://developers.cloudflare.com/workers/wrangler/)
+[![TypeScript](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fapps%2Fweb%2Fpackage.json&query=%24.devDependencies.typescript&label=TypeScript&logo=typescript&logoColor=fff&color=3178C6)](https://www.typescriptlang.org/)
+[![React Router](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fapps%2Fweb%2Fpackage.json&query=%24.dependencies.react-router&label=React%20Router&logo=reactrouter&logoColor=fff&color=CA4245)](https://reactrouter.com/)
+[![Wrangler](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fapps%2Fweb%2Fpackage.json&query=%24.devDependencies.wrangler&label=Wrangler&logo=cloudflare&logoColor=fff&color=F38020)](https://developers.cloudflare.com/workers/wrangler/)
 
-![amigo](public/icon-192.png)
+![amigo](apps/web/public/icon-192.png)
 
 Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v8 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
 
@@ -25,17 +25,17 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 ## Stack
 
 - Runtime: Cloudflare Workers
-- Server: React Router v8 framework mode (HTTP + `/api/*` resource routes), `worker.ts` for `/ws`, cron, and security headers
-- Frontend: React 19, Tailwind CSS 4, shadcn/ui (route modules under `app/routes/`)
+- Server: React Router v8 framework mode (HTTP + `/api/*` resource routes), `apps/web/worker.ts` for `/ws`, cron, and security headers
+- Frontend: React 19, Tailwind CSS 4, shadcn/ui (route modules under `apps/web/app/routes/`)
 - Data: Cloudflare D1 (SQLite) with Drizzle ORM
 - Realtime and caching: Durable Objects, KV, Workers Cache API
 - Offline: Dexie + `vite-plugin-pwa`
 - Auth: Clerk
-- Tooling: pnpm, Vite, Wrangler, ESLint, Vitest
+- Tooling: pnpm workspaces, Turborepo, Vite, Wrangler, ESLint, Vitest
 
 ## How it works
 
-One Cloudflare Worker (`worker.ts`) serves everything. React Router v8 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
+One Cloudflare Worker (`apps/web/worker.ts`) serves everything. React Router v8 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
 
 ### Design choices
 
@@ -47,19 +47,19 @@ One Cloudflare Worker (`worker.ts`) serves everything. React Router v8 framework
 ### Request flow
 
 ```text
-Client → worker.ts
+Client → apps/web/worker.ts
   → /ws → Household Durable Object (WebSocket hub)
   → else → React Router (createRequestHandler)
       → clerkMiddleware + app context middleware
-      → /api/* resource routes → server/api/* handlers
+      → /api/* resource routes → apps/web/server/api/* handlers
       → page loaders/actions (context.app + context.cloudflare)
 ```
 
 ### Code layout
 
-- `app/routes/*.tsx` — pages and `api.*` resource routes
-- `server/api/*` — shared handlers (Zod validation, D1, rate limits)
-- `server/durable-objects/household.ts` — per-household WebSocket hub (Hibernation API)
+- `apps/web/app/routes/*.tsx` — pages and `api.*` resource routes
+- `apps/web/server/api/*` — shared handlers (Zod validation, D1, rate limits)
+- `apps/web/server/durable-objects/household.ts` — per-household WebSocket hub (Hibernation API)
 - `packages/db/` — Drizzle schema, migrations, `getDb()`, `scopeToHousehold()`
 
 Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packages/db/src/schema/`.
@@ -67,7 +67,7 @@ Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packag
 ### Realtime
 
 1. Client opens `/ws` → routed to the household’s Durable Object
-2. Mutations call `broadcastToHousehold()` in `server/lib/realtime.ts`
+2. Mutations call `broadcastToHousehold()` in `apps/web/server/lib/realtime.ts`
 3. Connected clients receive an event and revalidate loaders
 4. Optional `senderId` skips the connection that initiated the mutation
 
@@ -79,7 +79,7 @@ Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packag
 
 ### Security
 
-KV-backed rate limits (`server/middleware/rate-limit.ts`):
+KV-backed rate limits (`apps/web/server/middleware/rate-limit.ts`):
 
 | Preset | Limit | Use case |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ KV-backed rate limits (`server/middleware/rate-limit.ts`):
 | SENSITIVE | 10/min | Settings, members |
 | READ | 60/min | List reads |
 
-Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canManageMembers` require owner or admin; `canTransferOwnership` is owner-only. Helpers live in `server/lib/permissions.ts`.
+Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canManageMembers` require owner or admin; `canTransferOwnership` is owner-only. Helpers live in `apps/web/server/lib/permissions.ts`.
 
 ### Offline groceries
 
@@ -112,7 +112,7 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 pnpm install
 pnpm run dev:setup
 
-cp .op/refs.env.example .op/refs.env
+cp apps/web/.op/refs.env.example apps/web/.op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
 pnpm run dev:verify
@@ -123,11 +123,11 @@ Open the local Vite/Workers dev URL printed by `pnpm run dev`.
 
 ### Local Environment Notes
 
-- Copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
+- Copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password. The helper still falls back to a legacy root `.op/refs.env` if you already have one.
 - `pnpm run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
-- `pnpm run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
+- `pnpm run dev:verify` checks that every key from `apps/web/.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
-- `pnpm run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
+- `pnpm run deploy` also uses `op run` and renders ignored `apps/web/.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
 ## Cursor Cloud Agents
 
@@ -141,7 +141,7 @@ Cursor cloud agents should **not** copy individual app secrets into the Cursor d
 | `OP_SERVICE_ACCOUNT_TOKEN` | Runtime Secret | Read-only service account with access to **amigo (dev)** only |
 | `OP_ENVIRONMENT_ID` | Environment Variable | UUID of the **amigo (dev)** Environment |
 
-Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `.dev.vars.example` to Cursor. Commands like `pnpm run dev` and `pnpm run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `.op/refs.env`).
+Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `apps/web/.dev.vars.example` to Cursor. Commands like `pnpm run dev` and `pnpm run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `apps/web/.op/refs.env`).
 
 For the cloud environment **install/update** command, use `pnpm install && pnpm run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `pnpm run dev:verify` to confirm the Environment is complete (names only).
 
@@ -151,21 +151,22 @@ Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typeche
 
 | File / Source | Purpose |
 | --- | --- |
-| `.dev.vars.example` | Key manifest for local dev (`op run` + `dev:verify`) |
-| `.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `.wrangler.deploy.jsonc`) |
-| `.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
-| `.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `.op/refs.env`) |
-| `.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally / cloud agents, prod in Workers Builds) |
-| `wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
-| `.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
+| `apps/web/.dev.vars.example` | Key manifest for local dev (`op run` + `dev:verify`) |
+| `apps/web/.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `apps/web/.wrangler.deploy.jsonc`) |
+| `apps/web/.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
+| `apps/web/.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `apps/web/.op/refs.env`) |
+| `apps/web/.op/refs.env`, legacy `.op/refs.env`, or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally / cloud agents, prod in Workers Builds) |
+| `apps/web/wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
+| `apps/web/.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
 
-Current Worker bindings in the public `wrangler.jsonc` template:
+Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 
 - D1 database binding: `DB` (`amigo-db`)
 - KV namespace: `CACHE`
 - Durable Object: `HOUSEHOLD`
 - Static asset binding: `ASSETS`
 - Weekly cron: Sunday at `03:00 UTC` for audit log pruning
+- Daily cron: `04:23 UTC` for recurring transaction processing
 
 ## Scripts
 
@@ -191,13 +192,12 @@ Current Worker bindings in the public `wrangler.jsonc` template:
 ## Project Layout
 
 ```text
-app/                 React Router UI, route modules (pages + `api.*` resource routes), client utilities
-server/              Shared API handlers, middleware, libs, and Durable Objects (called from route modules)
+apps/web/            React Router UI, Worker entrypoint, and Cloudflare config
+apps/web/app/        Route modules, frontend components, and client utilities
+apps/web/server/     Shared API handlers, middleware, libs, and Durable Objects
 packages/db/         Shared D1 schema, migrations, seed data, and DB helpers
-public/              PWA icons and other static assets
 scripts/             Local development and migration helper scripts
-worker.ts            Cloudflare Worker entrypoint with fetch + scheduled handlers
-wrangler.jsonc       Cloudflare configuration and bindings
+turbo.json           Turborepo task graph
 CHANGELOG.md         Release history
 ```
 
@@ -232,30 +232,28 @@ Notable API groups:
 
 ## Deployment
 
-`pnpm run deploy` first renders `.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`wrangler.jsonc`](./wrangler.jsonc) stays as a public-safe template.
+`pnpm run deploy` first renders `apps/web/.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`apps/web/wrangler.jsonc`](./apps/web/wrangler.jsonc) stays as a public-safe template.
 
-All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
+All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
 
-**`amigo (dev)`** — local `pnpm run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `.op/refs.env`).
+**`amigo (dev)`** — local `pnpm run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`).
 
 **`amigo (prod)`** — Cloudflare Workers Builds (`OP_ENVIRONMENT_ID` build secret).
 
 Each Environment should define every key from both manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
 
-Local deploy: copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `pnpm run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
+Local deploy: copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `pnpm run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
 
 ### Cloudflare Workers Builds
 
-Git-connected production deploys must not use the placeholder [`wrangler.jsonc`](./wrangler.jsonc) alone. After [#53](https://github.com/j-cadena-g/amigo/pull/53), the build must render `.wrangler.deploy.jsonc` with real binding IDs.
+Git-connected production deploys must not use the placeholder [`apps/web/wrangler.jsonc`](./apps/web/wrangler.jsonc) alone. After [#53](https://github.com/j-cadena-g/amigo/pull/53), the build must render `apps/web/.wrangler.deploy.jsonc` with real binding IDs.
 
 1. Use the **`amigo (prod)`** 1Password Environment (production binding IDs and deploy keys). Keep **`amigo (dev)`** for local development only.
-2. Add every key from [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
+2. Add every key from [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
 3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to the **`amigo (prod)`** Environment UUID from 1Password.
 4. Workers Builds commands (Worker **Settings → Build**):
    - **Build:** `pnpm install && pnpm run build`
    - **Deploy:** `pnpm run deploy`
-
-   Replace any legacy Bun commands (`bun install && bun run build`, `bun run deploy`) after merging the pnpm migration.
 
 If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and set the deploy command above.
 
@@ -267,11 +265,11 @@ The generated deploy config contains:
 - Custom domain route from `CLOUDFLARE_CUSTOM_DOMAIN`
 - `workers_dev` disabled
 
-If you want to deploy this project to a different Cloudflare account or domain, change the deploy-time environment variables instead of editing the committed `wrangler.jsonc`.
+If you want to deploy this project to a different Cloudflare account or domain, change the deploy-time environment variables instead of editing the committed `apps/web/wrangler.jsonc`.
 
 ## CI
 
-GitHub Actions in [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) currently run:
+GitHub Actions in [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) currently run the root compatibility scripts, which fan out through Turborepo and workspace filters:
 
 - `pnpm run lint`
 - `pnpm run typecheck`
@@ -279,7 +277,7 @@ GitHub Actions in [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) cur
 - `pnpm run db:migrate:local`
 - `pnpm run test`
 
-on pushes to `main` and pull requests targeting `main`.
+on pushes to any branch and pull requests targeting `main`.
 
 This workflow does not deploy the app.
 

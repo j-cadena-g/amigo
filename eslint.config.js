@@ -48,7 +48,7 @@ export default [
   },
   // React config for frontend
   {
-    files: ["app/**/*.ts", "app/**/*.tsx"],
+    files: ["apps/web/app/**/*.ts", "apps/web/app/**/*.tsx"],
     languageOptions: {
       globals: {
         ...globals.browser,

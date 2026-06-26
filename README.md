@@ -2,10 +2,11 @@
 
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?labelColor=171717&color=FF570A)](https://coderabbit.ai)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Bun](https://img.shields.io/badge/Bun-1.3.10-000?logo=bun&logoColor=fff)](https://bun.sh)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org/)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=fff)](https://developers.cloudflare.com/workers/)
+[![License](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.license&label=License&color=blue)](https://www.gnu.org/licenses/agpl-3.0)
+[![Bun](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.packageManager&label=Bun&logo=bun&logoColor=fff&color=000000)](https://bun.sh)
+[![TypeScript](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/typescript?label=TypeScript&logo=typescript&logoColor=fff&color=3178C6)](https://www.typescriptlang.org/)
+[![React Router](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/react-router?label=React%20Router&logo=reactrouter&logoColor=fff&color=CA4245)](https://reactrouter.com/)
+[![Wrangler](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/wrangler?label=Wrangler&logo=cloudflare&logoColor=fff&color=F38020)](https://developers.cloudflare.com/workers/wrangler/)
 
 ![amigo](public/icon-192.png)
 

@@ -185,7 +185,7 @@ Current Worker bindings in the public `wrangler.jsonc` template:
 | `pnpm run typegen` | Generate React Router route types |
 | `pnpm run typecheck` | Run route typegen and TypeScript checks |
 | `pnpm run lint` | Run ESLint |
-| `pnpm run test` | Run Vitest once |
+| `pnpm run test` | Run the unit and Workers integration Vitest suites |
 | `pnpm run test:watch` | Run Vitest in watch mode |
 
 ## Project Layout

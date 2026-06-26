@@ -1,5 +1,5 @@
 -- Seed data for local development (idempotent — safe to re-run after migrations).
--- Run with: bun run db:seed:local
+-- Run with: pnpm run db:seed:local
 
 INSERT OR IGNORE INTO households (id, name, home_currency, created_at, updated_at)
 VALUES ('hh-seed-001', 'Demo Household', 'CAD', 1709942400000, 1709942400000);

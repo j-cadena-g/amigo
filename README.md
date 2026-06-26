@@ -3,7 +3,7 @@
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?labelColor=171717&color=FF570A)](https://coderabbit.ai)
 [![License](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.license&label=License&color=blue)](https://www.gnu.org/licenses/agpl-3.0)
-[![Bun](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.packageManager&label=Bun&logo=bun&logoColor=fff&color=000000)](https://bun.sh)
+[![pnpm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.packageManager&label=pnpm&logo=pnpm&logoColor=fff&color=F69220)](https://pnpm.io)
 [![TypeScript](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/typescript?label=TypeScript&logo=typescript&logoColor=fff&color=3178C6)](https://www.typescriptlang.org/)
 [![React Router](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/react-router?label=React%20Router&logo=reactrouter&logoColor=fff&color=CA4245)](https://reactrouter.com/)
 [![Wrangler](https://img.shields.io/github/package-json/dependency-version/j-cadena-g/amigo/dev/wrangler?label=Wrangler&logo=cloudflare&logoColor=fff&color=F38020)](https://developers.cloudflare.com/workers/wrangler/)
@@ -31,7 +31,7 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 - Realtime and caching: Durable Objects, KV, Workers Cache API
 - Offline: Dexie + `vite-plugin-pwa`
 - Auth: Clerk
-- Tooling: Bun, Vite, Wrangler, ESLint, Vitest
+- Tooling: pnpm, Vite, Wrangler, ESLint, Vitest
 
 ## How it works
 
@@ -100,7 +100,7 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 
 ### Prerequisites
 
-- Bun `1.3.10+`
+- pnpm 11.3.0 (run `corepack enable` to use the version pinned in `package.json`)
 - Node.js on `PATH` for local helper scripts
 - Wrangler `4+`
 - Clerk development keys
@@ -109,25 +109,25 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 ### Install and Run
 
 ```bash
-bun install
-bun run dev:setup
+pnpm install
+pnpm run dev:setup
 
 cp .op/refs.env.example .op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
-bun run dev:verify
-bun run dev
+pnpm run dev:verify
+pnpm run dev
 ```
 
-Open the local Vite/Workers dev URL printed by `bun run dev`.
+Open the local Vite/Workers dev URL printed by `pnpm run dev`.
 
 ### Local Environment Notes
 
 - Copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
-- `bun run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
-- `bun run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
+- `pnpm run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
+- `pnpm run dev:verify` checks that every key from `.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
-- `bun run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
+- `pnpm run deploy` also uses `op run` and renders an ignored `.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
 ## Cursor Cloud Agents
 
@@ -141,11 +141,11 @@ Cursor cloud agents should **not** copy individual app secrets into the Cursor d
 | `OP_SERVICE_ACCOUNT_TOKEN` | Runtime Secret | Read-only service account with access to **amigo (dev)** only |
 | `OP_ENVIRONMENT_ID` | Environment Variable | UUID of the **amigo (dev)** Environment |
 
-Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `.dev.vars.example` to Cursor. Commands like `bun run dev` and `bun run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `.op/refs.env`).
+Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `.dev.vars.example` to Cursor. Commands like `pnpm run dev` and `pnpm run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `.op/refs.env`).
 
-For the cloud environment **install/update** command, use `bun install && bun run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `bun run dev:verify` to confirm the Environment is complete (names only).
+For the cloud environment **install/update** command, use `pnpm install && pnpm run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `pnpm run dev:verify` to confirm the Environment is complete (names only).
 
-Before opening a PR from a cloud agent: `bun run dev:verify`, `bun run typecheck`, `bun run test:unit`, and relevant `bun run test:integration` when touching Workers/D1/DO code.
+Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typecheck`, `pnpm run test:unit`, and relevant `pnpm run test:integration` when touching Workers/D1/DO code.
 
 ## Environment and Config
 
@@ -171,22 +171,22 @@ Current Worker bindings in the public `wrangler.jsonc` template:
 
 | Command | Description |
 | --- | --- |
-| `bun run dev` | Start the local Vite + Workers development server |
-| `bun run dev:verify` | Verify the amigo (dev) Environment via `op run` (names only) |
-| `bun run dev:setup` | Apply local D1 migrations and seed the local database |
-| `bun run dev:reset` | Remove local Wrangler state and re-run local setup |
-| `bun run build` | Build the React Router app for production |
-| `bun run deploy` | Apply remote D1 migrations, then deploy the Worker |
-| `bun run db:generate` | Generate Drizzle migrations from schema changes |
-| `bun run db:migrate:local` | Apply migrations to the local D1 database |
-| `bun run db:migrate:remote` | Apply migrations to the remote D1 database |
-| `bun run db:seed:local` | Seed the local D1 database from `packages/db/seed.sql` |
-| `bun run db:studio` | Open Drizzle Studio from `packages/db` |
-| `bun run typegen` | Generate React Router route types |
-| `bun run typecheck` | Run route typegen and TypeScript checks |
-| `bun run lint` | Run ESLint |
-| `bun run test` | Run Vitest once |
-| `bun run test:watch` | Run Vitest in watch mode |
+| `pnpm run dev` | Start the local Vite + Workers development server |
+| `pnpm run dev:verify` | Verify the amigo (dev) Environment via `op run` (names only) |
+| `pnpm run dev:setup` | Apply local D1 migrations and seed the local database |
+| `pnpm run dev:reset` | Remove local Wrangler state and re-run local setup |
+| `pnpm run build` | Build the React Router app for production |
+| `pnpm run deploy` | Apply remote D1 migrations, then deploy the Worker |
+| `pnpm run db:generate` | Generate Drizzle migrations from schema changes |
+| `pnpm run db:migrate:local` | Apply migrations to the local D1 database |
+| `pnpm run db:migrate:remote` | Apply migrations to the remote D1 database |
+| `pnpm run db:seed:local` | Seed the local D1 database from `packages/db/seed.sql` |
+| `pnpm run db:studio` | Open Drizzle Studio from `packages/db` |
+| `pnpm run typegen` | Generate React Router route types |
+| `pnpm run typecheck` | Run route typegen and TypeScript checks |
+| `pnpm run lint` | Run ESLint |
+| `pnpm run test` | Run the unit and Workers integration Vitest suites |
+| `pnpm run test:watch` | Run Vitest in watch mode |
 
 ## Project Layout
 
@@ -232,17 +232,17 @@ Notable API groups:
 
 ## Deployment
 
-`bun run deploy` first renders `.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`wrangler.jsonc`](./wrangler.jsonc) stays as a public-safe template.
+`pnpm run deploy` first renders `.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`wrangler.jsonc`](./wrangler.jsonc) stays as a public-safe template.
 
-All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `bun run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
+All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
 
-**`amigo (dev)`** — local `bun run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `.op/refs.env`).
+**`amigo (dev)`** — local `pnpm run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `.op/refs.env`).
 
 **`amigo (prod)`** — Cloudflare Workers Builds (`OP_ENVIRONMENT_ID` build secret).
 
 Each Environment should define every key from both manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
 
-Local deploy: copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `bun run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
+Local deploy: copy [`.op/refs.env.example`](./.op/refs.env.example) to `.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `pnpm run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
 
 ### Cloudflare Workers Builds
 
@@ -251,9 +251,13 @@ Git-connected production deploys must not use the placeholder [`wrangler.jsonc`]
 1. Use the **`amigo (prod)`** 1Password Environment (production binding IDs and deploy keys). Keep **`amigo (dev)`** for local development only.
 2. Add every key from [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
 3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to the **`amigo (prod)`** Environment UUID from 1Password.
-4. Set the deploy step to `bun run deploy` after `bun install` and `bun run build` (same command as local deploy; installs pinned `op` when needed).
+4. Workers Builds commands (Worker **Settings → Build**):
+   - **Build:** `pnpm install && pnpm run build`
+   - **Deploy:** `pnpm run deploy`
 
-If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and set the deploy command to `bun run deploy`.
+   Replace any legacy Bun commands (`bun install && bun run build`, `bun run deploy`) after merging the pnpm migration.
+
+If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and set the deploy command above.
 
 The generated deploy config contains:
 
@@ -269,9 +273,11 @@ If you want to deploy this project to a different Cloudflare account or domain, 
 
 GitHub Actions in [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml) currently run:
 
-- `bun run lint`
-- `bun run typecheck`
-- `bun run test`
+- `pnpm run lint`
+- `pnpm run typecheck`
+- `pnpm run typegen`
+- `pnpm run db:migrate:local`
+- `pnpm run test`
 
 on pushes to `main` and pull requests targeting `main`.
 

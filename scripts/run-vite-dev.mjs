@@ -25,7 +25,7 @@ function assertRequiredKeys() {
 
   if (missing.length > 0) {
     console.error(
-      `error: missing local secrets: ${missing.join(", ")}. Set OP_ENVIRONMENT_ID (and OP_SERVICE_ACCOUNT_TOKEN on cloud agents) and run via bun run dev (op run).`,
+      `error: missing local secrets: ${missing.join(", ")}. Set OP_ENVIRONMENT_ID (and OP_SERVICE_ACCOUNT_TOKEN on cloud agents) and run via pnpm run dev (op run).`,
     );
     process.exit(1);
   }
@@ -39,7 +39,7 @@ async function assertDevPortAvailable(port) {
       if (error.code === "EADDRINUSE") {
         reject(
           new Error(
-            `Port ${port} is already in use (likely a stale "bun run dev"). Stop it with: lsof -ti :${port} -sTCP:LISTEN | xargs kill`,
+            `Port ${port} is already in use (likely a stale "pnpm run dev"). Stop it with: lsof -ti :${port} -sTCP:LISTEN | xargs kill`,
           ),
         );
         return;

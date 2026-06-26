@@ -18,7 +18,7 @@ If you run a modified version as a network service, AGPL obligations may apply t
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) `1.3.10+` (see `packageManager` in `package.json`)
+- [pnpm](https://pnpm.io) `11.3.0+` (see `packageManager` in `package.json`)
 - Node.js on `PATH` (used by helper scripts)
 - [Wrangler](https://developers.cloudflare.com/workers/wrangler/) `4+`
 - [1Password CLI](https://developer.1password.com/docs/cli/) and access to the **`amigo (dev)`** Environment (see `.op/refs.env.example`)
@@ -26,23 +26,23 @@ If you run a modified version as a network service, AGPL obligations may apply t
 ### First run
 
 ```bash
-bun install
-bun run dev:setup
+pnpm install
+pnpm run dev:setup
 
 cp .op/refs.env.example .op/refs.env
 # Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
 
-bun run dev:verify
-bun run dev
+pnpm run dev:verify
+pnpm run dev
 ```
 
-`bun run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
+`pnpm run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
 
-If `bun run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
+If `pnpm run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 
 For **Cursor Cloud Agents**, do not copy app secrets into Cursor. Set only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID` on the cloud environment — see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents).
 
-To reset local D1 state: `bun run dev:reset`.
+To reset local D1 state: `pnpm run dev:reset`.
 
 ## Making changes
 
@@ -51,9 +51,9 @@ To reset local D1 state: `bun run dev:reset`.
 3. Run checks locally before opening a pull request:
 
    ```bash
-   bun run lint
-   bun run typecheck
-   bun run test
+   pnpm run lint
+   pnpm run typecheck
+   pnpm run test
    ```
 
    CI on `main` runs the same commands (see [`.github/workflows/ci.yaml`](./.github/workflows/ci.yaml)).
@@ -67,18 +67,18 @@ To reset local D1 state: `bun run dev:reset`.
 ### Database schema changes
 
 1. Update schema under `packages/db`.
-2. Generate migrations: `bun run db:generate`
-3. Apply locally: `bun run db:migrate:local`
+2. Generate migrations: `pnpm run db:generate`
+3. Apply locally: `pnpm run db:migrate:local`
 4. Include new migration files in your PR and mention them in the description.
 
-Remote migrations are applied at deploy time (`bun run deploy`); do not run remote migrations from a PR without maintainer coordination.
+Remote migrations are applied at deploy time (`pnpm run deploy`); do not run remote migrations from a PR without maintainer coordination.
 
 ### Code style
 
 - Match existing patterns in the touched files (TypeScript, React Router loaders/actions, server handlers under `server/`).
 - Keep imports at the top of files.
 - Prefer small, reviewable diffs over large unrelated refactors.
-- Run `bun run typegen` when you change routes so generated types stay in sync (included in `typecheck`).
+- Run `pnpm run typegen` when you change routes so generated types stay in sync (included in `typecheck`).
 
 ## Pull request expectations
 

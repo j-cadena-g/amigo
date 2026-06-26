@@ -8,7 +8,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECRETS_FILE="$(mktemp "${TMPDIR:-/tmp}/amigo-wrangler-secrets.XXXXXX.json")"
 DEPLOY_CONFIG="${ROOT_DIR}/.wrangler.deploy.jsonc"
 # Workers Builds does not put node_modules/.bin on PATH for custom deploy scripts.
-WRANGLER=(bunx wrangler)
+WRANGLER=(pnpm exec wrangler)
 
 cleanup() {
   rm -f "${SECRETS_FILE}"
@@ -18,7 +18,7 @@ trap cleanup EXIT
 
 cd "${ROOT_DIR}"
 
-bun run wrangler:deploy-config
+pnpm run wrangler:deploy-config
 node scripts/render-wrangler-secrets.mjs "${SECRETS_FILE}"
 
 "${WRANGLER[@]}" d1 migrations apply amigo-db --remote --config "${DEPLOY_CONFIG}"

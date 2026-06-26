@@ -251,9 +251,13 @@ Git-connected production deploys must not use the placeholder [`wrangler.jsonc`]
 1. Use the **`amigo (prod)`** 1Password Environment (production binding IDs and deploy keys). Keep **`amigo (dev)`** for local development only.
 2. Add every key from [`.deploy.env.example`](./.deploy.env.example) and [`.wrangler.secrets.example`](./.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
 3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to the **`amigo (prod)`** Environment UUID from 1Password.
-4. Set the deploy step to `pnpm run deploy` after `pnpm install` and `pnpm run build` (same command as local deploy; installs pinned `op` when needed).
+4. Workers Builds commands (Worker **Settings → Build**):
+   - **Build:** `pnpm install && pnpm run build`
+   - **Deploy:** `pnpm run deploy`
 
-If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and set the deploy command to `pnpm run deploy`.
+   Replace any legacy Bun commands (`bun install && bun run build`, `bun run deploy`) after merging the pnpm migration.
+
+If Workers Builds was still running plain `wrangler deploy` against the template config, the post-merge failure is expected: add the bootstrap secrets and set the deploy command above.
 
 The generated deploy config contains:
 

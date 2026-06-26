@@ -1,7 +1,7 @@
 # amigo
 
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
-[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?utm_source=oss&utm_medium=github&utm_campaign=j-cadena-g%2Famigo&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo?utm_source=oss&utm_medium=github&utm_campaign=j-cadena-g%2Famigo&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 [![License](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.license&label=License&color=blue)](https://www.gnu.org/licenses/agpl-3.0)
 [![pnpm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fpackage.json&query=%24.packageManager&label=pnpm&logo=pnpm&logoColor=fff&color=F69220)](https://pnpm.io)
 [![TypeScript](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fj-cadena-g%2Famigo%2Fmain%2Fapps%2Fweb%2Fpackage.json&query=%24.devDependencies.typescript&label=TypeScript&logo=typescript&logoColor=fff&color=3178C6)](https://www.typescriptlang.org/)

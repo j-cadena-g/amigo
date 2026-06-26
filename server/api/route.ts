@@ -1,8 +1,8 @@
 import { getAuth } from "@clerk/react-router/server";
 import { getDb } from "@amigo/db";
+import { getApp, getCloudflare, type RouterContext } from "../../router-context";
 import type {
   ActionFunctionArgs,
-  AppLoadContext,
   LoaderFunctionArgs,
   Params,
 } from "react-router";
@@ -23,7 +23,7 @@ export type ApiHandlerArgs = {
   env: Env;
   sessionStatus: SessionStatus;
   session?: AppSession;
-  loadContext: AppLoadContext;
+  loadContext: RouterContext;
   auth?: ClerkAuth;
 };
 
@@ -41,9 +41,9 @@ export async function handleApiRoute(
     const baseArgs: ApiHandlerArgs = {
       request: args.request,
       params: args.params,
-      env: args.context.cloudflare.env,
-      sessionStatus: args.context.app.sessionStatus,
-      session: args.context.app.session,
+      env: getCloudflare(args.context).env,
+      sessionStatus: getApp(args.context).sessionStatus,
+      session: getApp(args.context).session,
       loadContext: args.context,
     };
 

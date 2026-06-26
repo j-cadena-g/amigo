@@ -11,6 +11,7 @@ import {
   lt,
   scopeToHousehold,
 } from "@amigo/db";
+import { getCloudflare } from "../../router-context";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { queueGroceryPush } from "../lib/push/queue";
@@ -66,7 +67,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
 
   // Run notifications (WebSocket broadcast + push) after the response is sent so
   // the client isn't blocked on a Durable Object fetch + queue write per tap.
-  const ctx = loadContext.cloudflare?.ctx;
+  const ctx = getCloudflare(loadContext).ctx;
   const runAfterResponse = (task: Promise<unknown>) => {
     const settled = task.catch((err) => {
       console.warn(

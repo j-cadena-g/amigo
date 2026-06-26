@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createRouterLoadContext } from "../../router-context";
+import type { AppContextValue } from "../../router-context";
 import { ActionError } from "../lib/errors";
 import { AMIGO_DEV_ORIGIN } from "../lib/dev-origin";
 import { handleApiRoute } from "./route";
@@ -27,7 +29,7 @@ vi.mock("@amigo/db", async (importOriginal) => ({
 
 function makeRouteArgs(
   request = new Request("http://localhost/api/test"),
-  app: LoaderFunctionArgs["context"]["app"] = {
+  app: AppContextValue = {
     cspNonce: "test-nonce",
     sessionStatus: "authenticated",
     session: undefined,
@@ -37,10 +39,14 @@ function makeRouteArgs(
   return {
     request,
     params: {},
-    context: {
-      cloudflare: { env },
+    context: createRouterLoadContext({
+      cloudflare: {
+        env: env as never,
+        ctx: {} as ExecutionContext,
+        caches: {} as CacheStorage,
+      },
       app,
-    },
+    }),
   } as unknown as LoaderFunctionArgs;
 }
 

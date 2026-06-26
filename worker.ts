@@ -1,6 +1,6 @@
 import { createClerkClient } from "@clerk/backend";
 import { createRequestHandler } from "react-router";
-import { createRouterLoadContext } from "./router-context";
+import { createRouterLoadContext, getApp } from "./router-context";
 import type { Cloudflare } from "./router-context";
 import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
@@ -42,7 +42,7 @@ export default {
     const response = await requestHandler(request, loadContext);
     const securityHeaders = buildSecurityHeaders({
       appEnv: env.APP_ENV,
-      cspNonce: loadContext.app.cspNonce,
+      cspNonce: getApp(loadContext).cspNonce,
       clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY,
     });
 

@@ -10,8 +10,9 @@ on:
 
 concurrency:
   # Key by branch + event so a same-repo pull_request (jobs skipped) cannot
-  # cancel the push run that actually executes CI.
-  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ github.event_name }}
+  # cancel the push run that actually executes CI. For pull_request, include
+  # the PR number so forked PRs sharing a branch name do not cancel each other.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.head_ref || github.ref_name) }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:

@@ -1,10 +1,19 @@
 name: CI
 
 on:
+  # Backup trigger: pull_request synchronize is occasionally dropped; push always
+  # fires for branch updates and keeps required checks from going missing on PRs.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Key by branch + event so a same-repo pull_request (jobs skipped) cannot
+  # cancel the push run that actually executes CI. For pull_request, include
+  # the PR number so forked PRs sharing a branch name do not cancel each other.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.head_ref || github.ref_name) }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,6 +23,7 @@ permissions:
 
 jobs:
   lint-and-typecheck:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -25,6 +35,7 @@ jobs:
       - run: bun run typecheck
 
   test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

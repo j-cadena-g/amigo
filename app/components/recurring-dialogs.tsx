@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -117,15 +117,67 @@ function RecurringForm({
   onSubmit,
   submitting,
   submitLabel,
+  initialBudgetSuggest = true,
+  budgetSuggestScopeRef,
 }: {
   form: RecurringFormData;
   setForm: React.Dispatch<React.SetStateAction<RecurringFormData>>;
   onSubmit: () => void;
   submitting: boolean;
   submitLabel: string;
+  /** When false, category changes won't overwrite an existing budget until the user picks a category. */
+  initialBudgetSuggest?: boolean;
+  /** When set, budget suggestions are ignored after this ref's value changes (e.g. edit dialog rule switch). */
+  budgetSuggestScopeRef?: React.RefObject<string | null | undefined>;
 }) {
   const { categories } = useFinancialCategories();
+  const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
+  const budgetSuggestRequestSeq = useRef(0);
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
+
+  useEffect(() => {
+    setAllowBudgetSuggest(initialBudgetSuggest);
+  }, [initialBudgetSuggest]);
+
+  useEffect(() => {
+    const requestSeq = ++budgetSuggestRequestSeq.current;
+    if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
+    const requestedCategoryId = form.categoryId;
+    const scopeAtRequest = budgetSuggestScopeRef?.current;
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/budgets/match-category?${new URLSearchParams({
+              categoryId: requestedCategoryId,
+            })}`,
+            { signal: ac.signal }
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as { budgetId: string | null };
+          if (requestSeq !== budgetSuggestRequestSeq.current) return;
+          if (
+            budgetSuggestScopeRef &&
+            scopeAtRequest !== budgetSuggestScopeRef.current
+          ) {
+            return;
+          }
+          setForm((f) =>
+            f.type === "expense" && f.categoryId === requestedCategoryId
+              ? { ...f, budgetId: data.budgetId ?? null }
+              : f
+          );
+        } catch {
+          /* aborted */
+        }
+      })();
+    }, 200);
+    return () => {
+      ac.abort();
+      clearTimeout(timer);
+    };
+  }, [form.categoryId, form.type, allowBudgetSuggest, setForm, budgetSuggestScopeRef]);
 
   return (
     <div className="space-y-4">
@@ -183,7 +235,10 @@ function RecurringForm({
         <label className="text-sm font-medium">Category</label>
         <CategorySelect
           value={form.categoryId}
-          onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
+          onChange={(categoryId) => {
+            setAllowBudgetSuggest(true);
+            setForm((f) => ({ ...f, categoryId, budgetId: null }));
+          }}
           type={form.type}
           categories={categories}
         />
@@ -311,7 +366,11 @@ function RecurringForm({
           <label className="text-sm font-medium">Budget</label>
           <BudgetSelect
             value={form.budgetId}
-            onChange={(v) => setForm((f) => ({ ...f, budgetId: v }))}
+            onChange={(v) => {
+              setAllowBudgetSuggest(false);
+              budgetSuggestRequestSeq.current += 1;
+              setForm((f) => ({ ...f, budgetId: v }));
+            }}
           />
         </div>
       )}
@@ -464,6 +523,8 @@ export function EditRecurringDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState<string | null>(null);
+  const budgetSuggestScopeRef = useRef<string | null>(rule?.id ?? null);
+  budgetSuggestScopeRef.current = rule?.id ?? null;
 
   // Sync form state when the rule changes
   if (rule && initialized !== rule.id) {
@@ -524,11 +585,14 @@ export function EditRecurringDialog({
           </p>
         )}
         <RecurringForm
+          key={rule?.id ?? "none"}
           form={form}
           setForm={setForm}
           onSubmit={handleSubmit}
           submitting={submitting}
           submitLabel="Save Changes"
+          initialBudgetSuggest={false}
+          budgetSuggestScopeRef={budgetSuggestScopeRef}
         />
       </DialogContent>
     </Dialog>

@@ -100,7 +100,7 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 
 ### Prerequisites
 
-- pnpm `11.3.0+`
+- pnpm 11.3.0 (run `corepack enable` to use the version pinned in `package.json`)
 - Node.js on `PATH` for local helper scripts
 - Wrangler `4+`
 - Clerk development keys

@@ -1,6 +1,7 @@
 # amigo
 
 [![CI](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/j-cadena-g/amigo/actions/workflows/ci.yaml)
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/j-cadena-g/amigo)](https://coderabbit.ai)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Bun](https://img.shields.io/badge/Bun-1.3.10-000?logo=bun&logoColor=fff)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org/)
@@ -8,7 +9,7 @@
 
 ![amigo](public/icon-192.png)
 
-Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v7 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
+Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v8 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
 
 ## What It Does
 
@@ -23,7 +24,7 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 ## Stack
 
 - Runtime: Cloudflare Workers
-- Server: React Router v7 framework mode (HTTP + `/api/*` resource routes), `worker.ts` for `/ws`, cron, and security headers
+- Server: React Router v8 framework mode (HTTP + `/api/*` resource routes), `worker.ts` for `/ws`, cron, and security headers
 - Frontend: React 19, Tailwind CSS 4, shadcn/ui (route modules under `app/routes/`)
 - Data: Cloudflare D1 (SQLite) with Drizzle ORM
 - Realtime and caching: Durable Objects, KV, Workers Cache API
@@ -33,7 +34,7 @@ Cloudflare-native household management app for shared budgeting, groceries, asse
 
 ## How it works
 
-One Cloudflare Worker (`worker.ts`) serves everything. React Router v7 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
+One Cloudflare Worker (`worker.ts`) serves everything. React Router v8 framework mode handles SSR, page loaders/actions, and `/api/*` JSON resource routes. There is no separate HTTP framework.
 
 ### Design choices
 

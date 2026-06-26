@@ -1,4 +1,4 @@
-import { createContext, RouterContextProvider } from "react-router";
+import { RouterContextProvider } from "react-router";
 import type { Env } from "./server/env";
 import type { AppSession, SessionStatus } from "./server/env";
 
@@ -15,25 +15,28 @@ export type AppContextValue = {
   session?: AppSession;
 };
 
-export const cloudflareContext = createContext<Cloudflare>();
-export const appContext = createContext<AppContextValue>();
+type AugmentedRouterContext = RouterContextProvider & {
+  cloudflare: Cloudflare;
+  app: AppContextValue;
+};
 
-export type RouterContext = Pick<RouterContextProvider, "get">;
+export type RouterLoadContext = Pick<RouterContextProvider, "get">;
 
 export function createRouterLoadContext(values: {
   cloudflare: Cloudflare;
   app: AppContextValue;
 }): RouterContextProvider {
   const provider = new RouterContextProvider();
-  provider.set(cloudflareContext, values.cloudflare);
-  provider.set(appContext, values.app);
-  return provider;
+  // Attach values directly on the provider. Do not use createContext here:
+  // worker.ts and the React Router server build are separate bundles, so
+  // context tokens would not match at runtime.
+  return Object.assign(provider, values);
 }
 
-export function getCloudflare(context: RouterContext): Cloudflare {
-  return context.get(cloudflareContext);
+export function getCloudflare(context: RouterLoadContext): Cloudflare {
+  return (context as AugmentedRouterContext).cloudflare;
 }
 
-export function getApp(context: RouterContext): AppContextValue {
-  return context.get(appContext);
+export function getApp(context: RouterLoadContext): AppContextValue {
+  return (context as AugmentedRouterContext).app;
 }

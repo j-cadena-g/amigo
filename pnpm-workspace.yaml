@@ -7,6 +7,9 @@ allowBuilds:
   sharp: true
   workerd: true
 
+minimumReleaseAgeExclude:
+  - eslint@10.6.0
+
 peerDependencyRules:
   allowedVersions:
     eslint-plugin-react>eslint: "10"

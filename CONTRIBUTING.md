@@ -36,7 +36,7 @@ pnpm run dev:verify
 pnpm run dev
 ```
 
-`pnpm run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`; a legacy root `.op/refs.env` still works). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
+`pnpm run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
 
 If `pnpm run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `apps/web/.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
 

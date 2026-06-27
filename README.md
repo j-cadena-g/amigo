@@ -123,7 +123,7 @@ Open the local Vite/Workers dev URL printed by `pnpm run dev`.
 
 ### Local Environment Notes
 
-- Copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password. The helper still falls back to a legacy root `.op/refs.env` if you already have one.
+- Copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
 - `pnpm run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
 - `pnpm run dev:verify` checks that every key from `apps/web/.dev.vars.example` is present (names only; no secret values printed).
 - All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
@@ -155,7 +155,7 @@ Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typeche
 | `apps/web/.deploy.env.example` | Deploy binding IDs and Worker vars (rendered into `apps/web/.wrangler.deploy.jsonc`) |
 | `apps/web/.wrangler.secrets.example` | Worker secrets for local dev (`secrets.required`) and deploy (`wrangler deploy --secrets-file`) |
 | `apps/web/.op/refs.env.example` | Template for local `OP_ENVIRONMENT_ID` reference (copy to gitignored `apps/web/.op/refs.env`) |
-| `apps/web/.op/refs.env`, legacy `.op/refs.env`, or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally / cloud agents, prod in Workers Builds) |
+| `apps/web/.op/refs.env` or `OP_ENVIRONMENT_ID` | 1Password Environment reference for `op run` (dev locally / cloud agents, prod in Workers Builds) |
 | `apps/web/wrangler.jsonc` | Public-safe Wrangler template used for local development and documentation |
 | `apps/web/.wrangler.deploy.jsonc` | Ignored production config rendered at deploy time from environment variables |
 

@@ -4,7 +4,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_REFS_FILE="${ROOT_DIR}/apps/web/.op/refs.env"
-LEGACY_REFS_FILE="${ROOT_DIR}/.op/refs.env"
 REF_KEY="OP_ENVIRONMENT_ID"
 
 trim() {
@@ -32,33 +31,30 @@ resolve_op_environment_id() {
     return 0
   fi
 
-  local refs_file
-  for refs_file in "${WEB_REFS_FILE}" "${LEGACY_REFS_FILE}"; do
-    if [ ! -f "${refs_file}" ]; then
+  if [ ! -f "${WEB_REFS_FILE}" ]; then
+    return 0
+  fi
+
+  local line
+  local key
+  local value
+
+  while IFS= read -r line || [ -n "${line}" ]; do
+    line="${line%$'\r'}"
+    line="$(trim "${line}")"
+    if [ -z "${line}" ] || [[ "${line}" == \#* ]] || [[ "${line}" != *=* ]]; then
       continue
     fi
 
-    local line
-    local key
-    local value
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-      line="${line%$'\r'}"
-      line="$(trim "${line}")"
-      if [ -z "${line}" ] || [[ "${line}" == \#* ]] || [[ "${line}" != *=* ]]; then
-        continue
-      fi
-
-      key="$(trim "${line%%=*}")"
-      value="$(trim "${line#*=}")"
-      case "${key}" in
-        "${REF_KEY}")
-          strip_wrapping_quotes "${value}"
-          return 0
-          ;;
-      esac
-    done < "${refs_file}"
-  done
+    key="$(trim "${line%%=*}")"
+    value="$(trim "${line#*=}")"
+    case "${key}" in
+      "${REF_KEY}")
+        strip_wrapping_quotes "${value}"
+        return 0
+        ;;
+    esac
+  done < "${WEB_REFS_FILE}"
 }
 
 while [ "$#" -gt 0 ]; do

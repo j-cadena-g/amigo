@@ -59,7 +59,6 @@ coverage/
 .turbo/
 
 # 1Password
-.op/refs.env
 apps/web/.op/refs.env
 
 # clerk configuration (can include secrets)

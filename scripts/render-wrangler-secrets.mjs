@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, "..");
-const manifestPath = path.join(rootDir, ".wrangler.secrets.example");
+const repoRoot = path.resolve(__dirname, "..");
+const manifestPath = path.join(repoRoot, "apps/web/.wrangler.secrets.example");
 
 async function main() {
   const outputPath = process.argv[2];

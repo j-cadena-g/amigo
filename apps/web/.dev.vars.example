@@ -1,10 +1,10 @@
 # =============================================================================
 # AMIGO - Local Development Secrets
 # =============================================================================
-# Key manifest for local Workers dev. `bun run dev` uses op run to inject these
+# Key manifest for local Workers dev. `pnpm run dev` uses op run to inject these
 # keys into process.env; Wrangler reads them via CLOUDFLARE_INCLUDE_PROCESS_ENV.
-# `bun run dev:verify` checks names only. Do not mount or commit `.dev.vars`.
-# Deploy keys live in .deploy.env.example and .wrangler.secrets.example.
+# `pnpm run dev:verify` checks names only. Do not mount or commit `.dev.vars`.
+# Deploy keys live in apps/web/.deploy.env.example and apps/web/.wrangler.secrets.example.
 # =============================================================================
 
 # Cloudflare (same account/DB/KV IDs as prod; local Vite uses simulated D1/KV)
@@ -13,7 +13,7 @@ CLOUDFLARE_D1_DATABASE_ID=
 CLOUDFLARE_KV_NAMESPACE_ID=
 CLOUDFLARE_CUSTOM_DOMAIN=
 APP_ENV=development
-# Must match server/lib/dev-origin.ts (Vite dev port).
+# Must match apps/web/server/lib/dev-origin.ts (Vite dev port).
 APP_ORIGIN=http://localhost:5190
 
 # Clerk authentication

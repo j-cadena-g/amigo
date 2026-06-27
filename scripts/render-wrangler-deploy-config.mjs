@@ -6,13 +6,14 @@ import { fileURLToPath } from "node:url";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, "..");
-const templatePath = path.join(rootDir, "wrangler.jsonc");
-const secretsExamplePath = path.join(rootDir, ".wrangler.secrets.example");
+const repoRoot = path.resolve(__dirname, "..");
+const webDir = path.join(repoRoot, "apps/web");
+const templatePath = path.join(webDir, "wrangler.jsonc");
+const secretsExamplePath = path.join(webDir, ".wrangler.secrets.example");
 
 const outputPath = process.env.WRANGLER_RENDER_OUTPUT
-  ? path.resolve(rootDir, process.env.WRANGLER_RENDER_OUTPUT)
-  : path.join(rootDir, ".wrangler.deploy.jsonc");
+  ? path.resolve(repoRoot, process.env.WRANGLER_RENDER_OUTPUT)
+  : path.join(webDir, ".wrangler.deploy.jsonc");
 
 const requiredValues = {
   CLOUDFLARE_ACCOUNT_ID: {
@@ -185,7 +186,7 @@ async function main() {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, rendered);
 
-  globalThis.console.log(`Wrote ${path.relative(rootDir, outputPath)}`);
+  globalThis.console.log(`Wrote ${path.relative(repoRoot, outputPath)}`);
 }
 
 await main();

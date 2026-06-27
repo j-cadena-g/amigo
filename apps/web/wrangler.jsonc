@@ -1,5 +1,5 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "../../node_modules/wrangler/config-schema.json",
   // Public template only. Real production identifiers are rendered into the
   // ignored .wrangler.deploy.jsonc by scripts/render-wrangler-deploy-config.mjs.
   // Keep placeholder IDs syntactically valid so local Wrangler commands work.
@@ -23,7 +23,7 @@
       "binding": "DB",
       "database_name": "amigo-db",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "packages/db/migrations"
+      "migrations_dir": "../../packages/db/migrations"
     }
   ],
 

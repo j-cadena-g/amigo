@@ -5,10 +5,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WEB_DIR="${ROOT_DIR}/apps/web"
 SECRETS_FILE="$(mktemp "${TMPDIR:-/tmp}/amigo-wrangler-secrets.XXXXXX.json")"
-DEPLOY_CONFIG="${ROOT_DIR}/.wrangler.deploy.jsonc"
+DEPLOY_CONFIG="${WEB_DIR}/.wrangler.deploy.jsonc"
 # Workers Builds does not put node_modules/.bin on PATH for custom deploy scripts.
-WRANGLER=(pnpm exec wrangler)
+WRANGLER=(pnpm --filter @amigo/web exec wrangler)
 
 cleanup() {
   rm -f "${SECRETS_FILE}"

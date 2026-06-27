@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REFS_FILE="${ROOT_DIR}/.op/refs.env"
+WEB_REFS_FILE="${ROOT_DIR}/apps/web/.op/refs.env"
 REF_KEY="OP_ENVIRONMENT_ID"
 
 trim() {
@@ -31,7 +31,7 @@ resolve_op_environment_id() {
     return 0
   fi
 
-  if [ ! -f "${REFS_FILE}" ]; then
+  if [ ! -f "${WEB_REFS_FILE}" ]; then
     return 0
   fi
 
@@ -54,7 +54,7 @@ resolve_op_environment_id() {
         return 0
         ;;
     esac
-  done < "${REFS_FILE}"
+  done < "${WEB_REFS_FILE}"
 }
 
 while [ "$#" -gt 0 ]; do

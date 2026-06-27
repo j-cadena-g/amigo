@@ -15,8 +15,9 @@ import { AMIGO_DEV_PORT } from "./lib/dev-origin.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, "..");
-const examplePath = path.join(rootDir, ".dev.vars.example");
+const repoRoot = path.resolve(__dirname, "..");
+const webDir = path.join(repoRoot, "apps/web");
+const examplePath = path.join(webDir, ".dev.vars.example");
 
 function assertRequiredKeys() {
   const manifest = readFileSync(examplePath, "utf8");
@@ -80,12 +81,12 @@ if (command === "vite") {
   }
 }
 
-const devWranglerConfig = path.join(rootDir, ".wrangler.dev.jsonc");
+const devWranglerConfig = path.join(webDir, ".wrangler.dev.jsonc");
 process.env.WRANGLER_RENDER_OUTPUT = devWranglerConfig;
 await import("./render-wrangler-deploy-config.mjs");
 process.env.AMIGO_WRANGLER_CONFIG = devWranglerConfig;
 
-const viteBin = path.join(rootDir, "node_modules/vite/bin/vite.js");
+const viteBin = path.join(repoRoot, "node_modules/vite/bin/vite.js");
 const useVite =
   command === "vite" && existsSync(viteBin)
     ? [viteBin, ...args]
@@ -94,7 +95,7 @@ const executable = useVite[0] === viteBin ? process.execPath : command;
 const spawnArgs = useVite[0] === viteBin ? useVite : args;
 
 const child = spawn(executable, spawnArgs, {
-  cwd: rootDir,
+  cwd: webDir,
   env: {
     ...process.env,
     CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",

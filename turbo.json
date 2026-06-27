@@ -1,0 +1,72 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": [
+    "eslint.config.js",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "tsconfig.json"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["build/**", ".react-router/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [".react-router/**"]
+    },
+    "lint": {
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test:unit": {
+      "outputs": []
+    },
+    "test:integration": {
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:verify": {
+      "cache": false
+    },
+    "dev:setup": {
+      "cache": false
+    },
+    "dev:reset": {
+      "cache": false
+    },
+    "wrangler:deploy-config": {
+      "cache": false
+    },
+    "deploy": {
+      "cache": false
+    },
+    "deploy:internal": {
+      "cache": false
+    },
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate:local": {
+      "cache": false
+    },
+    "db:migrate:remote": {
+      "cache": false
+    },
+    "db:migrate:remote:internal": {
+      "cache": false
+    },
+    "db:seed:local": {
+      "cache": false
+    },
+    "db:studio": {
+      "cache": false
+    }
+  }
+}

@@ -5,7 +5,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
     cloudflareTest(async () => {
-      const migrationsPath = path.join(import.meta.dirname, "packages/db/migrations");
+      const migrationsPath = path.join(
+        import.meta.dirname,
+        "../../packages/db/migrations"
+      );
       const migrations = await readD1Migrations(migrationsPath);
 
       return {
@@ -27,7 +30,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "."),
-      "@amigo/db": path.resolve(import.meta.dirname, "packages/db/src/index.ts"),
+      "@amigo/db": path.resolve(
+        import.meta.dirname,
+        "../../packages/db/src/index.ts"
+      ),
     },
   },
 });

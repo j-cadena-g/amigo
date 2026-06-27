@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { AMIGO_DEV_ORIGIN } from "../server/lib/dev-origin";
+import { AMIGO_DEV_ORIGIN } from "../apps/web/server/lib/dev-origin";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, "..");

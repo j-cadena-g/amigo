@@ -236,13 +236,13 @@ Notable API groups:
 
 All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
 
-**`amigo (dev)`** — local `pnpm run dev` and optional manual deploys (`OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`).
+**`amigo (dev)`** — local `pnpm run dev` (`OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`).
 
 **`amigo (prod)`** — Cloudflare Workers Builds (`OP_ENVIRONMENT_ID` build secret).
 
 Each Environment should define every key from both manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
 
-Local deploy: copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (dev)`**, then `pnpm run deploy`. Production deploys use **`amigo (prod)`** via Workers Builds.
+Local deploy: copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (prod)`**, then `pnpm run deploy`. The deploy renderer defaults `APP_ENV` to `production`; if you intentionally deploy against dev-scoped bindings, set `APP_ENV=development` before running `pnpm run deploy`.
 
 ### Cloudflare Workers Builds
 

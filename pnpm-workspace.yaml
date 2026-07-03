@@ -3,7 +3,7 @@ packages:
   - "packages/*"
 
 overrides:
-  esbuild: ">=0.25.0"
+  esbuild: ">=0.25.0 <1.0.0"
 
 allowBuilds:
   esbuild: true

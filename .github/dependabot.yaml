@@ -21,46 +21,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "npm"
-    directory: "/apps/web"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "America/Toronto"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-    groups:
-      app-dependencies:
-        dependency-type: "production"
-        patterns:
-          - "*"
-      dev-dependencies:
-        dependency-type: "development"
-        patterns:
-          - "*"
-
-  - package-ecosystem: "npm"
-    directory: "/packages/db"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "America/Toronto"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-    groups:
-      app-dependencies:
-        dependency-type: "production"
-        patterns:
-          - "*"
-      dev-dependencies:
-        dependency-type: "development"
-        patterns:
-          - "*"
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

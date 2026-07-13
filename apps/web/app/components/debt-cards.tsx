@@ -6,6 +6,7 @@ import { Pencil } from "lucide-react";
 import { EditDebtDialog } from "@/app/components/edit-debt-dialog";
 import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
+import { getCreditCardSummary } from "@/app/lib/credit-card-summary";
 
 export interface Debt {
   id: string;
@@ -24,12 +25,14 @@ export interface Debt {
 
 interface DebtCardsProps {
   debts: Debt[];
+  homeCurrency: CurrencyCode;
   session: { userId: string; role: string };
 }
 
-export function DebtCards({ debts, session: _session }: DebtCardsProps) {
+export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsProps) {
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
+  const creditCardSummary = getCreditCardSummary(debts);
   const shared = debts.filter((d) => d.isShared);
   const personal = debts.filter((d) => !d.isShared);
 
@@ -69,6 +72,12 @@ export function DebtCards({ debts, session: _session }: DebtCardsProps) {
   return (
     <>
       <div className="space-y-6">
+        {creditCardSummary ? (
+          <CreditCardSummary
+            summary={creditCardSummary}
+            homeCurrency={homeCurrency}
+          />
+        ) : null}
         {shared.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Shared</h2>
@@ -93,6 +102,59 @@ export function DebtCards({ debts, session: _session }: DebtCardsProps) {
         />
       )}
     </>
+  );
+}
+
+function CreditCardSummary({
+  summary,
+  homeCurrency,
+}: {
+  summary: NonNullable<ReturnType<typeof getCreditCardSummary>>;
+  homeCurrency: CurrencyCode;
+}) {
+  const barWidth = Math.min(100, summary.percentageUsed);
+  const barColor =
+    summary.percentageUsed < 30
+      ? "bg-green-500"
+      : summary.percentageUsed <= 70
+        ? "bg-orange-500"
+        : "bg-red-500";
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Available Credit</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Total available</p>
+            <p className="font-display text-2xl font-bold tracking-tight tabular-nums">
+              {formatCents(summary.availableCreditCents, homeCurrency)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Used</p>
+            <p className="text-lg font-semibold tabular-nums">
+              {summary.percentageUsed.toFixed(0)}%
+            </p>
+          </div>
+        </div>
+        <div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full transition-all", barColor)}
+              style={{ width: `${barWidth}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatCents(summary.usedCreditCents, homeCurrency)} used of{" "}
+            {formatCents(summary.totalLimitCents, homeCurrency)} across{" "}
+            {summary.cardCount} {summary.cardCount === 1 ? "card" : "cards"}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

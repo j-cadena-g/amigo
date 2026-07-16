@@ -29,6 +29,12 @@ interface DebtCardsProps {
   session: { userId: string; role: string };
 }
 
+function getCreditCardUtilizationColor(utilization: number) {
+  if (utilization < 30) return "bg-green-500";
+  if (utilization <= 70) return "bg-orange-500";
+  return "bg-red-500";
+}
+
 export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsProps) {
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
@@ -113,12 +119,7 @@ function CreditCardSummary({
   homeCurrency: CurrencyCode;
 }) {
   const barWidth = Math.min(100, summary.percentageUsed);
-  const barColor =
-    summary.percentageUsed < 30
-      ? "bg-green-500"
-      : summary.percentageUsed <= 70
-        ? "bg-orange-500"
-        : "bg-red-500";
+  const barColor = getCreditCardUtilizationColor(summary.percentageUsed);
 
   return (
     <Card className="overflow-hidden">
@@ -233,13 +234,7 @@ function CreditCardCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
   const usedAmount = creditLimit - availableCredit;
   const utilization = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
   const barWidth = Math.max(0, Math.min(100, utilization));
-
-  const barColor =
-    utilization < 30
-      ? "bg-green-500"
-      : utilization <= 70
-        ? "bg-orange-500"
-        : "bg-red-500";
+  const barColor = getCreditCardUtilizationColor(utilization);
 
   return (
     <Card>

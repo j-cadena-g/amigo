@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1",
-    "@cloudflare/vitest-pool-workers": "^0.18.5",
+    "@cloudflare/vitest-pool-workers": "^0.18.6",
     "@cloudflare/workers-types": "^5",
     "@eslint/js": "^10.0.1",
     "@react-router/dev": "^8.1.0",
@@ -74,6 +74,6 @@
     "workbox-core": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.111.0"
+    "wrangler": "^4.112.0"
   }
 }

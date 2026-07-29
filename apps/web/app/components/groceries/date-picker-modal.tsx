@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
 import type { GroceryItemWithTags } from "./types";
 import { toDateInputValue } from "./constants";
 
@@ -23,18 +30,22 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
     onConfirm(date);
   }
 
-  // Portal past transformed ancestors so fixed centering uses the viewport.
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-sm rounded-lg bg-popover p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-popover-foreground">
-          {item.isPurchased ? "Edit Purchase Date" : "Mark as Purchased"}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {item.itemName}
-        </p>
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>
+            {item.isPurchased ? "Edit Purchase Date" : "Mark as Purchased"}
+          </DialogTitle>
+          <DialogDescription>{item.itemName}</DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-4">
+        <div>
           <label
             htmlFor="purchase-date"
             className="block text-sm font-medium text-foreground"
@@ -51,7 +62,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
           />
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <DialogFooter>
           <button
             type="button"
             onClick={onCancel}
@@ -66,9 +77,8 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
           >
             Confirm
           </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

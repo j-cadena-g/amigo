@@ -70,7 +70,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    overflow-x: hidden;
+    /* overflow-x lives on the app shell — on body it breaks fixed modals on iOS */
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 

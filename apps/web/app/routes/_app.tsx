@@ -36,7 +36,7 @@ export default function AppLayout() {
       <ToastProvider>
         <ConfirmProvider>
           <PushPromptProvider>
-            <div className="min-h-screen bg-background relative">
+            <div className="relative min-h-screen overflow-x-hidden bg-background">
               <NavBar />
               <OfflineIndicator />
               <div className="page-enter relative z-10">

@@ -237,8 +237,20 @@
 
 /* ---- Page transition ---- */
 
+/* Opacity-only: fade-in's translateY leaves a transform on the element
+   (animation-fill-mode: both), which makes position:fixed descendants
+   center against the page content instead of the viewport. */
+@keyframes page-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .page-enter {
-  animation: fade-in 0.3s ease-out both;
+  animation: page-enter-fade 0.3s ease-out both;
 }
 
 /* ---- Selection color ---- */

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { GroceryItemWithTags } from "./types";
 import { toDateInputValue } from "./constants";
 
@@ -22,7 +23,8 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
     onConfirm(date);
   }
 
-  return (
+  // Portal past transformed ancestors so fixed centering uses the viewport.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="mx-4 w-full max-w-sm rounded-lg bg-popover p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-popover-foreground">
@@ -66,6 +68,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

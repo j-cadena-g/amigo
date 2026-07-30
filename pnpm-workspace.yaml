@@ -4,6 +4,13 @@ packages:
 
 overrides:
   esbuild: ">=0.25.0 <1.0.0"
+  # Dependabot: brace-expansion DoS (GHSA advisories on 1.x and 5.x lines)
+  brace-expansion@1: 1.1.17
+  brace-expansion@5: 5.0.8
+  # Dependabot: valibot flatten() inherited property names
+  valibot: 1.4.2
+  # Dependabot: sharp/libvips CVEs
+  sharp: ">=0.35.0"
 
 allowBuilds:
   esbuild: true
@@ -12,6 +19,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - eslint@10.6.0
+  - brace-expansion@1.1.17
 
 peerDependencyRules:
   allowedVersions:

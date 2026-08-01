@@ -73,6 +73,7 @@ export async function markMutationFailed(
   }
 }
 
+// processSyncQueue is the live discard path; this helper remains for manual cleanup.
 export async function clearFailedMutations(maxRetries = 5): Promise<number> {
   const db = getOfflineDB();
   const failed = await db.syncQueue

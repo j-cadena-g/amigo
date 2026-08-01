@@ -9,6 +9,16 @@ import {
 const MAX_RETRIES = 5;
 const SYNC_BATCH_SIZE = 10;
 
+export function partitionViableMutations<T extends { retryCount: number }>(
+  mutations: T[],
+  maxRetries = MAX_RETRIES
+): { viable: T[]; expired: T[] } {
+  return {
+    viable: mutations.filter((m) => m.retryCount < maxRetries),
+    expired: mutations.filter((m) => m.retryCount >= maxRetries),
+  };
+}
+
 interface BatchSyncResponse {
   processed: number;
   failed: number;
@@ -31,13 +41,14 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 export async function processSyncQueue(): Promise<{
   processed: number;
   failed: number;
+  discarded: number;
 }> {
   const mutations = await getPendingMutations();
-  if (mutations.length === 0) return { processed: 0, failed: 0 };
+  if (mutations.length === 0) {
+    return { processed: 0, failed: 0, discarded: 0 };
+  }
 
-  // Filter out mutations that have exceeded retry limit
-  const viable = mutations.filter((m) => m.retryCount < MAX_RETRIES);
-  const expired = mutations.filter((m) => m.retryCount >= MAX_RETRIES);
+  const { viable, expired } = partitionViableMutations(mutations, MAX_RETRIES);
 
   for (const m of expired) {
     await removeMutation(m.id);
@@ -45,7 +56,8 @@ export async function processSyncQueue(): Promise<{
 
   const batches = chunkArray(viable, SYNC_BATCH_SIZE);
   let totalProcessed = 0;
-  let totalFailed = expired.length;
+  let totalFailed = 0;
+  const discarded = expired.length;
 
   for (const batch of batches) {
     try {
@@ -111,7 +123,7 @@ export async function processSyncQueue(): Promise<{
     await setLastSyncTimestamp(Date.now());
   }
 
-  return { processed: totalProcessed, failed: totalFailed };
+  return { processed: totalProcessed, failed: totalFailed, discarded };
 }
 
 async function updateLocalFromServer(

@@ -179,14 +179,31 @@ export function useGroceryLogic({
           "@/app/lib/offline/sync-processor"
         );
         const result = await processSyncQueue();
-        if (cancelled || result.processed === 0) return;
-        revalidator.revalidate();
-        toast(
-          `Synced ${result.processed} offline change${
-            result.processed === 1 ? "" : "s"
-          }`,
-          { variant: "success" }
-        );
+        if (cancelled) return;
+
+        if (result.processed > 0) {
+          revalidator.revalidate();
+          toast(
+            `Synced ${result.processed} offline change${
+              result.processed === 1 ? "" : "s"
+            }`,
+            { variant: "success" }
+          );
+        }
+
+        if (result.discarded > 0) {
+          toast(
+            `${result.discarded} offline change${
+              result.discarded === 1 ? "" : "s"
+            } could not sync and ${
+              result.discarded === 1 ? "was" : "were"
+            } discarded — please re-apply ${
+              result.discarded === 1 ? "it" : "them"
+            }`,
+            { variant: "error", duration: 8000 }
+          );
+          revalidator.revalidate();
+        }
       } catch {
         // Leave the queue intact; we'll retry on the next online/sync event.
       }

@@ -76,6 +76,7 @@ export default {
             cron: event.cron,
             mode: "all_households",
             processed: result.processed,
+            failed: result.failed,
           })
         );
       } catch (err) {

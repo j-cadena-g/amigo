@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { overlayPendingMutations } from "./hydration";
+import {
+  overlayPendingMutations,
+  selectMutationsToOverlay,
+} from "./hydration";
 import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
 
 const ctx = { householdId: "hh1", userId: "u1", now: 1_700_000_000_100 };
@@ -14,6 +17,27 @@ function entry(
     payload: {},
     retryCount: 0,
     lastError: null,
+    ...partial,
+  };
+}
+
+function item(partial: Partial<OfflineGroceryItem> & { id: string }): OfflineGroceryItem {
+  return {
+    id: partial.id,
+    householdId: "hh1",
+    createdByUserId: "u1",
+    createdByUserDisplayName: null,
+    itemName: "Milk",
+    category: null,
+    isPurchased: false,
+    purchasedAt: null,
+    createdAt: ctx.now,
+    updatedAt: ctx.now,
+    deletedAt: null,
+    tagIds: [],
+    _localVersion: 0,
+    _serverVersion: 10,
+    _syncStatus: "synced",
     ...partial,
   };
 }
@@ -54,5 +78,50 @@ describe("overlayPendingMutations", () => {
       ctx
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("selectMutationsToOverlay", () => {
+  it("skips persisted pending mutations while replaying legacy synced rows", () => {
+    const mutations = [
+      entry({ operation: "toggle", entityId: "persisted-pending" }),
+      entry({ operation: "toggle", entityId: "legacy-synced" }),
+    ];
+
+    const selected = selectMutationsToOverlay(
+      [
+        item({
+          id: "persisted-pending",
+          isPurchased: true,
+          _syncStatus: "pending",
+        }),
+        item({
+          id: "legacy-synced",
+          isPurchased: false,
+          _syncStatus: "synced",
+        }),
+      ],
+      mutations
+    );
+    const result = overlayPendingMutations(
+      [
+        item({
+          id: "persisted-pending",
+          isPurchased: true,
+          _syncStatus: "pending",
+        }),
+        item({
+          id: "legacy-synced",
+          isPurchased: false,
+          _syncStatus: "synced",
+        }),
+      ],
+      selected,
+      ctx
+    );
+
+    expect(selected.map((mutation) => mutation.entityId)).toEqual(["legacy-synced"]);
+    expect(result.find((value) => value.id === "persisted-pending")?.isPurchased).toBe(true);
+    expect(result.find((value) => value.id === "legacy-synced")?.isPurchased).toBe(true);
   });
 });

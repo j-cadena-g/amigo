@@ -203,7 +203,25 @@ export async function getOfflineItems(
     householdId: householdId ?? session?.householdId ?? "",
     userId: session?.userId ?? "",
   };
-  return overlayPendingMutations(items, pending, ctx);
+  return overlayPendingMutations(
+    items,
+    selectMutationsToOverlay(items, pending),
+    ctx
+  );
+}
+
+export function selectMutationsToOverlay(
+  items: OfflineGroceryItem[],
+  mutations: SyncQueueEntry[]
+): SyncQueueEntry[] {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+
+  return mutations.filter((mutation) => {
+    if (mutation.entityType !== "groceryItem") return true;
+
+    const item = itemsById.get(mutation.entityId);
+    return !item || item._syncStatus === "synced";
+  });
 }
 
 export function overlayPendingMutations(

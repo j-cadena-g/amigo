@@ -1,5 +1,15 @@
-import { getOfflineDB, type OfflineGroceryItem, type OfflineGroceryTag } from "./db";
-import { setLastSyncTimestamp, setOfflineSessionContext } from "./sync-queue";
+import {
+  getOfflineDB,
+  type OfflineGroceryItem,
+  type OfflineGroceryTag,
+  type SyncQueueEntry,
+} from "./db";
+import { applyQueuedMutationToItems, type LocalMutationContext } from "./local-mutations";
+import {
+  getOfflineSessionContext,
+  setLastSyncTimestamp,
+  setOfflineSessionContext,
+} from "./sync-queue";
 import {
   detectConflict,
   resolveConflict,
@@ -178,14 +188,39 @@ export async function getOfflineItems(
   householdId?: string
 ): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
-  if (!householdId) {
-    return db.groceryItems.filter((item) => item.deletedAt === null).toArray();
+  const session = await getOfflineSessionContext();
+
+  const items = householdId
+    ? await db.groceryItems.where("householdId").equals(householdId).toArray()
+    : await db.groceryItems.toArray();
+
+  const pending = await db.syncQueue.orderBy("timestamp").toArray();
+  if (pending.length === 0) {
+    return items.filter((item) => item.deletedAt === null);
   }
-  return db.groceryItems
-    .where("householdId")
-    .equals(householdId)
-    .filter((item) => item.deletedAt === null)
-    .toArray();
+
+  const ctx: LocalMutationContext = {
+    householdId: householdId ?? session?.householdId ?? "",
+    userId: session?.userId ?? "",
+  };
+  return overlayPendingMutations(items, pending, ctx);
+}
+
+export function overlayPendingMutations(
+  items: OfflineGroceryItem[],
+  mutations: SyncQueueEntry[],
+  ctx: LocalMutationContext
+): OfflineGroceryItem[] {
+  const groceryMutations = mutations
+    .filter((mutation) => mutation.entityType === "groceryItem")
+    .slice()
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  let next = items;
+  for (const mutation of groceryMutations) {
+    next = applyQueuedMutationToItems(next, mutation, ctx);
+  }
+  return next.filter((item) => item.deletedAt === null);
 }
 
 export async function getOfflineTags(

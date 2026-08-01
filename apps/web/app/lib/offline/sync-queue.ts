@@ -1,4 +1,5 @@
 import { getOfflineDB, type SyncQueueEntry } from "./db";
+import { applyQueuedMutationToItems } from "./local-mutations";
 
 export type SyncOperation = "add" | "toggle" | "delete" | "updateTags";
 
@@ -21,6 +22,19 @@ export async function queueMutation(mutation: QueuedMutation): Promise<string> {
   };
 
   await db.syncQueue.add(entry);
+
+  const session = await getOfflineSessionContext();
+  if (session && mutation.entityType === "groceryItem") {
+    const existing = await db.groceryItems.toArray();
+    const next = applyQueuedMutationToItems(existing, mutation, {
+      householdId: session.householdId,
+      userId: session.userId,
+    });
+    const row = next.find((item) => item.id === mutation.entityId);
+    if (row) {
+      await db.groceryItems.put(row);
+    }
+  }
 
   // Attempt immediate sync if online
   if (typeof navigator !== "undefined" && navigator.onLine) {

@@ -23,7 +23,6 @@ function entry(
 
 function item(partial: Partial<OfflineGroceryItem> & { id: string }): OfflineGroceryItem {
   return {
-    id: partial.id,
     householdId: "hh1",
     createdByUserId: "u1",
     createdByUserDisplayName: null,

@@ -10,43 +10,71 @@ export interface QueuedMutation {
   payload: Record<string, unknown>;
 }
 
+export function compareSyncQueueEntries(
+  a: { timestamp: number; sequence?: number },
+  b: { timestamp: number; sequence?: number }
+): number {
+  if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+  return (a.sequence ?? 0) - (b.sequence ?? 0);
+}
+
 export async function queueMutation(mutation: QueuedMutation): Promise<string> {
   const db = getOfflineDB();
   const id = crypto.randomUUID();
-  const entry: SyncQueueEntry = {
-    id,
-    timestamp: Date.now(),
-    ...mutation,
-    retryCount: 0,
-    lastError: null,
-  };
 
-  await db.syncQueue.add(entry);
+  await db.transaction(
+    "rw",
+    db.syncQueue,
+    db.groceryItems,
+    db.syncMetadata,
+    async () => {
+      const seqMeta = await db.syncMetadata.get("mutationSequence");
+      const sequence =
+        (typeof seqMeta?.value === "number" ? seqMeta.value : 0) + 1;
+      await db.syncMetadata.put({ key: "mutationSequence", value: sequence });
 
-  const session = await getOfflineSessionContext();
-  if (session && mutation.entityType === "groceryItem") {
-    const existing = await db.groceryItems.toArray();
-    const next = applyQueuedMutationToItems(existing, mutation, {
-      householdId: session.householdId,
-      userId: session.userId,
-    });
-    const row = next.find((item) => item.id === mutation.entityId);
-    if (row) {
-      await db.groceryItems.put(row);
+      const entry: SyncQueueEntry = {
+        id,
+        timestamp: Date.now(),
+        sequence,
+        ...mutation,
+        retryCount: 0,
+        lastError: null,
+      };
+      await db.syncQueue.add(entry);
+
+      const household = await db.syncMetadata.get("householdId");
+      const user = await db.syncMetadata.get("userId");
+      if (
+        household?.value != null &&
+        user?.value != null &&
+        mutation.entityType === "groceryItem"
+      ) {
+        const existing = await db.groceryItems.toArray();
+        const next = applyQueuedMutationToItems(existing, mutation, {
+          householdId: String(household.value),
+          userId: String(user.value),
+        });
+        const row = next.find((item) => item.id === mutation.entityId);
+        if (row) {
+          await db.groceryItems.put(row);
+        }
+      }
     }
-  }
+  );
 
   // Attempt immediate sync if online
   if (typeof navigator !== "undefined" && navigator.onLine) {
     triggerBackgroundSync();
   }
 
-  return entry.id;
+  return id;
 }
 
 export async function getPendingMutations(): Promise<SyncQueueEntry[]> {
   const db = getOfflineDB();
-  return db.syncQueue.orderBy("timestamp").toArray();
+  const entries = await db.syncQueue.toArray();
+  return entries.sort(compareSyncQueueEntries);
 }
 
 export async function getPendingCount(): Promise<number> {
@@ -94,7 +122,11 @@ function triggerBackgroundSync(): void {
   ) {
     navigator.serviceWorker.ready
       .then((registration) => {
-        return (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register("sync-groceries");
+        return (
+          registration as ServiceWorkerRegistration & {
+            sync: { register: (tag: string) => Promise<void> };
+          }
+        ).sync.register("sync-groceries");
       })
       .catch(() => {
         // Background sync registration failed - will retry on next mutation

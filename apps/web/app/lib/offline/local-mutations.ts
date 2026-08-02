@@ -1,4 +1,5 @@
 import type { OfflineGroceryItem } from "./db";
+import type { QueuedMutation } from "./sync-queue";
 
 export type LocalMutationContext = {
   householdId: string;
@@ -6,11 +7,7 @@ export type LocalMutationContext = {
   now?: number;
 };
 
-type QueuedOp = {
-  operation: "add" | "toggle" | "delete" | "updateTags";
-  entityId: string;
-  payload: Record<string, unknown>;
-};
+type QueuedOp = Pick<QueuedMutation, "operation" | "entityId" | "payload">;
 
 function nowMs(ctx: LocalMutationContext): number {
   return ctx.now ?? Date.now();
@@ -53,49 +50,58 @@ export function applyQueuedMutationToItems(
 ): OfflineGroceryItem[] {
   const t = nowMs(ctx);
 
-  if (mutation.operation === "add") {
-    const without = items.filter((i) => i.id !== mutation.entityId);
-    return [
-      buildOfflineItemForAdd(ctx, mutation.entityId, mutation.payload),
-      ...without,
-    ];
+  switch (mutation.operation) {
+    case "add": {
+      const without = items.filter((i) => i.id !== mutation.entityId);
+      return [
+        buildOfflineItemForAdd(ctx, mutation.entityId, mutation.payload),
+        ...without,
+      ];
+    }
+    case "toggle":
+      return items.map((item) => {
+        if (item.id !== mutation.entityId) return item;
+        const isPurchased = !item.isPurchased;
+        return {
+          ...item,
+          isPurchased,
+          purchasedAt: isPurchased ? t : null,
+          updatedAt: t,
+          _localVersion: item._localVersion + 1,
+          _syncStatus: "pending" as const,
+        };
+      });
+    case "delete":
+      return items.map((item) => {
+        if (item.id !== mutation.entityId) return item;
+        return {
+          ...item,
+          deletedAt: t,
+          updatedAt: t,
+          _localVersion: item._localVersion + 1,
+          _syncStatus: "pending" as const,
+        };
+      });
+    case "updateTags":
+      return items.map((item) => {
+        if (item.id !== mutation.entityId) return item;
+        const tagIds = Array.isArray(mutation.payload.tagIds)
+          ? mutation.payload.tagIds.filter(
+              (id): id is string => typeof id === "string"
+            )
+          : (item.tagIds ?? []);
+        return {
+          ...item,
+          tagIds,
+          updatedAt: t,
+          _localVersion: item._localVersion + 1,
+          _syncStatus: "pending" as const,
+        };
+      });
+    default: {
+      const _exhaustive: never = mutation.operation;
+      void _exhaustive;
+      return items;
+    }
   }
-
-  return items.map((item) => {
-    if (item.id !== mutation.entityId) return item;
-
-    if (mutation.operation === "toggle") {
-      const isPurchased = !item.isPurchased;
-      return {
-        ...item,
-        isPurchased,
-        purchasedAt: isPurchased ? t : null,
-        updatedAt: t,
-        _localVersion: item._localVersion + 1,
-        _syncStatus: "pending",
-      };
-    }
-
-    if (mutation.operation === "delete") {
-      return {
-        ...item,
-        deletedAt: t,
-        updatedAt: t,
-        _localVersion: item._localVersion + 1,
-        _syncStatus: "pending",
-      };
-    }
-
-    // updateTags
-    const tagIds = Array.isArray(mutation.payload.tagIds)
-      ? mutation.payload.tagIds.filter((id): id is string => typeof id === "string")
-      : item.tagIds ?? [];
-    return {
-      ...item,
-      tagIds,
-      updatedAt: t,
-      _localVersion: item._localVersion + 1,
-      _syncStatus: "pending",
-    };
-  });
 }

@@ -7,12 +7,15 @@ import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
 
 const ctx = { householdId: "hh1", userId: "u1", now: 1_700_000_000_100 };
 
+let nextSequence = 1;
+
 function entry(
   partial: Partial<SyncQueueEntry> & Pick<SyncQueueEntry, "operation" | "entityId">
 ): SyncQueueEntry {
   return {
     id: crypto.randomUUID(),
     timestamp: ctx.now,
+    sequence: nextSequence++,
     entityType: "groceryItem",
     payload: {},
     retryCount: 0,
@@ -49,6 +52,30 @@ describe("overlayPendingMutations", () => {
       ctx
     );
     expect(result.map((i) => i.itemName)).toEqual(["Rice"]);
+  });
+
+  it("replays equal-timestamp mutations in sequence order", () => {
+    // Intentionally unordered: delete has higher sequence than add.
+    const result = overlayPendingMutations(
+      [],
+      [
+        entry({
+          operation: "delete",
+          entityId: "temp-1",
+          timestamp: ctx.now,
+          sequence: 2,
+        }),
+        entry({
+          operation: "add",
+          entityId: "temp-1",
+          payload: { name: "Rice", tagIds: [] },
+          timestamp: ctx.now,
+          sequence: 1,
+        }),
+      ],
+      ctx
+    );
+    expect(result).toEqual([]);
   });
 
   it("hides soft-deleted items after overlay", () => {

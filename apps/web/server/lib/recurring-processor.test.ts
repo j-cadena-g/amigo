@@ -41,6 +41,15 @@ describe("recurring-processor", () => {
     ).toBe("advance");
   });
 
+  it("shouldAdvanceAfterInsertAttempt skips unsuccessful attempts without error", () => {
+    expect(
+      shouldAdvanceAfterInsertAttempt({
+        inserted: false,
+        error: null,
+      })
+    ).toBe("skip");
+  });
+
   it("isSqlitePrimaryKeyConflict detects transaction id conflicts", () => {
     expect(
       isSqlitePrimaryKeyConflict(

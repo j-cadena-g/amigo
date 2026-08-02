@@ -129,7 +129,7 @@ export function shouldAdvanceAfterInsertAttempt(args: {
   inserted: boolean;
   error: unknown | null;
 }): "advance" | "skip" | "pk-conflict-advance" {
-  if (args.error == null) return "advance";
+  if (args.inserted) return "advance";
   if (isSqlitePrimaryKeyConflict(args.error)) return "pk-conflict-advance";
   return "skip";
 }

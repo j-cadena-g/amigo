@@ -6,6 +6,7 @@ import {
 } from "./db";
 import { applyQueuedMutationToItems, type LocalMutationContext } from "./local-mutations";
 import {
+  compareSyncQueueEntries,
   getOfflineSessionContext,
   setLastSyncTimestamp,
   setOfflineSessionContext,
@@ -232,7 +233,7 @@ export function overlayPendingMutations(
   const groceryMutations = mutations
     .filter((mutation) => mutation.entityType === "groceryItem")
     .slice()
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .sort(compareSyncQueueEntries);
 
   let next = items;
   for (const mutation of groceryMutations) {

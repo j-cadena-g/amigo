@@ -31,6 +31,8 @@ export interface OfflineGroceryTag {
 export interface SyncQueueEntry {
   id: string;
   timestamp: number;
+  /** Monotonic enqueue order; breaks ties when timestamps collide. */
+  sequence: number;
   operation: "add" | "toggle" | "delete" | "updateTags";
   entityType: "groceryItem" | "groceryTag";
   entityId: string;
@@ -59,6 +61,26 @@ class AmigoOfflineDB extends Dexie {
       syncQueue: "id, timestamp, entityType, entityId",
       syncMetadata: "key",
     });
+
+    this.version(2)
+      .stores({
+        groceryItems: "id, householdId, updatedAt, _syncStatus",
+        groceryTags: "id, householdId, _syncStatus",
+        syncQueue: "id, timestamp, sequence, entityType, entityId",
+        syncMetadata: "key",
+      })
+      .upgrade(async (tx) => {
+        const rows = await tx.table("syncQueue").orderBy("timestamp").toArray();
+        let sequence = 0;
+        for (const row of rows) {
+          sequence += 1;
+          await tx.table("syncQueue").update(row.id, { sequence });
+        }
+        await tx.table("syncMetadata").put({
+          key: "mutationSequence",
+          value: sequence,
+        });
+      });
   }
 }
 

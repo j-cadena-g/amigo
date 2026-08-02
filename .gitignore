@@ -74,3 +74,6 @@ apps/web/.op/refs.env
 
 # Local CodeRabbit CLI config
 .coderabbit.yaml
+
+# Local agent implementation plans
+docs/superpowers/

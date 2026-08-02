@@ -506,6 +506,39 @@ describe("processSyncQueue", () => {
     );
   });
 
+  it("marks successful add without serverItem as failed instead of removing it", async () => {
+    stubOfflineDb();
+    getPendingMutationsMock.mockResolvedValue([
+      entry({
+        id: "add-1",
+        operation: "add",
+        entityId: "temp-1",
+        retryCount: 0,
+      }),
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            processed: 1,
+            failed: 0,
+            results: [{ id: "add-1", success: true }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    await processSyncQueue();
+
+    expect(removeMutationMock).not.toHaveBeenCalledWith("add-1");
+    expect(markMutationFailedMock).toHaveBeenCalledWith(
+      "add-1",
+      "Server returned no usable item id"
+    );
+  });
+
   it("preserves mixed processed and discarded counts", async () => {
     stubOfflineDb({
       get: vi.fn().mockResolvedValue({

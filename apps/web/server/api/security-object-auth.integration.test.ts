@@ -6,6 +6,7 @@ import {
   debts,
   eq,
   financialAccounts,
+  groceryItems,
   groceryItemTags,
   groceryTags,
   isNull,
@@ -160,6 +161,61 @@ describe("security object authorization integration", () => {
       .from(groceryItemTags)
       .where(eq(groceryItemTags.tagId, foreignTagId));
     expect(joined).toHaveLength(0);
+  });
+
+  it("returns the same grocery item for repeated add mutation ids", async () => {
+    const mutationId = `mutation-${crypto.randomUUID()}`;
+    const entityId = `item-${crypto.randomUUID()}`;
+    const requestBody = {
+      mutations: [
+        {
+          id: mutationId,
+          operation: "add",
+          entityType: "groceryItem",
+          entityId,
+          payload: { name: "Bread" },
+        },
+      ],
+    };
+
+    const makeRequest = () =>
+      handleSyncRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }),
+        sessionStatus: "authenticated",
+        session: sessionFor({ userId: memberOneId, householdId }),
+        loadContext: {} as never,
+      });
+
+    const first = await makeRequest();
+    const second = await makeRequest();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const firstJson = (await first.json()) as {
+      results: Array<{ success: boolean; serverItem?: { id: string } }>;
+    };
+    const secondJson = (await second.json()) as {
+      results: Array<{ success: boolean; serverItem?: { id: string } }>;
+    };
+
+    expect(firstJson.results[0]?.success).toBe(true);
+    expect(secondJson.results[0]?.success).toBe(true);
+    expect(firstJson.results[0]?.serverItem?.id).toBe(
+      secondJson.results[0]?.serverItem?.id
+    );
+
+    const items = await db
+      .select({ id: groceryItems.id })
+      .from(groceryItems)
+      .where(eq(groceryItems.householdId, householdId));
+    expect(items).toHaveLength(1);
   });
 
   it("rejects transaction account references to another member's personal account", async () => {

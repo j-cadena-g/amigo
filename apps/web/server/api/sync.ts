@@ -4,6 +4,7 @@ import {
   getDb,
   groceryItems,
   groceryItemTags,
+  grocerySyncMutations,
   groceryTags,
   inArray,
   isNull,
@@ -107,6 +108,42 @@ export const handleSyncRequest: ApiHandler = async ({
   });
 };
 
+async function loadGroceryItemForSync(
+  db: ReturnType<typeof getDb>,
+  householdId: string,
+  itemId: string
+): Promise<Record<string, unknown>> {
+  const item = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, itemId),
+      scopeToHousehold(groceryItems.householdId, householdId),
+      isNull(groceryItems.deletedAt)
+    ),
+  });
+
+  if (!item) {
+    throw new Error("Item not found");
+  }
+
+  return item as unknown as Record<string, unknown>;
+}
+
+async function resolveIdempotentAdd(
+  db: ReturnType<typeof getDb>,
+  session: { householdId: string },
+  mutationId: string
+): Promise<Record<string, unknown> | null> {
+  const existing = await db.query.grocerySyncMutations.findFirst({
+    where: and(
+      eq(grocerySyncMutations.id, mutationId),
+      scopeToHousehold(grocerySyncMutations.householdId, session.householdId)
+    ),
+  });
+
+  if (!existing) return null;
+  return loadGroceryItemForSync(db, session.householdId, existing.groceryItemId);
+}
+
 async function processMutation(
   db: ReturnType<typeof getDb>,
   session: { userId: string; householdId: string },
@@ -122,6 +159,11 @@ async function processMutation(
 
       if (!name || typeof name !== "string") {
         throw new Error("Item name is required");
+      }
+
+      const existingItem = await resolveIdempotentAdd(db, session, mutation.id);
+      if (existingItem) {
+        return existingItem;
       }
 
       const item = await db
@@ -149,6 +191,31 @@ async function processMutation(
         }
         await db.insert(groceryItemTags).values(
           validTags.map((tag) => ({ itemId: item.id, tagId: tag.id }))
+        );
+      }
+
+      await db
+        .insert(grocerySyncMutations)
+        .values({
+          id: mutation.id,
+          householdId: session.householdId,
+          groceryItemId: item.id,
+        })
+        .onConflictDoNothing();
+
+      const recorded = await db.query.grocerySyncMutations.findFirst({
+        where: and(
+          eq(grocerySyncMutations.id, mutation.id),
+          scopeToHousehold(grocerySyncMutations.householdId, session.householdId)
+        ),
+      });
+
+      if (recorded && recorded.groceryItemId !== item.id) {
+        await db.delete(groceryItems).where(eq(groceryItems.id, item.id));
+        return loadGroceryItemForSync(
+          db,
+          session.householdId,
+          recorded.groceryItemId
         );
       }
 

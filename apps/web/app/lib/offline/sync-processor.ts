@@ -205,26 +205,36 @@ export async function processSyncQueue(): Promise<{
           if (!mutation) continue;
 
           let syncComplete = true;
-          if (r.serverItem) {
-            const serverId = await updateLocalFromServer(mutation, r.serverItem);
-            if (mutation.operation === "add" && !serverId) {
+          if (mutation.operation === "add") {
+            if (!r.serverItem) {
               await markMutationFailed(
                 mutation.id,
                 "Server returned no usable item id"
               );
               totalFailed++;
               syncComplete = false;
-            } else if (
-              mutation.operation === "add" &&
-              serverId &&
-              serverId !== mutation.entityId
-            ) {
-              remaining = remapEntityIdInMutations(
-                remaining,
-                mutation.entityId,
-                serverId
+            } else {
+              const serverId = await updateLocalFromServer(
+                mutation,
+                r.serverItem
               );
+              if (!serverId) {
+                await markMutationFailed(
+                  mutation.id,
+                  "Server returned no usable item id"
+                );
+                totalFailed++;
+                syncComplete = false;
+              } else if (serverId !== mutation.entityId) {
+                remaining = remapEntityIdInMutations(
+                  remaining,
+                  mutation.entityId,
+                  serverId
+                );
+              }
             }
+          } else if (r.serverItem) {
+            await updateLocalFromServer(mutation, r.serverItem);
           }
 
           if (syncComplete) {

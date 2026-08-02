@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cascadeExpiredAddDependents,
+  mergeServerItemWithLocal,
   partitionViableMutations,
   processSyncQueue,
   remapEntityIdInMutations,
   takeNextSyncBatch,
 } from "./sync-processor";
-import type { SyncQueueEntry } from "./db";
+import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
 
 vi.mock("./sync-queue", () => ({
   getPendingMutations: vi.fn(),
@@ -109,6 +110,45 @@ describe("remapEntityIdInMutations", () => {
     ];
     const remapped = remapEntityIdInMutations(mutations, "temp-1", "server-1");
     expect(remapped.map((m) => m.entityId)).toEqual(["server-1", "g2"]);
+  });
+});
+
+describe("mergeServerItemWithLocal", () => {
+  it("preserves temp tagIds when server payload omits them", () => {
+    const temp: OfflineGroceryItem = {
+      id: "temp-1",
+      householdId: "hh1",
+      createdByUserId: "u1",
+      createdByUserDisplayName: null,
+      itemName: "Milk",
+      category: null,
+      isPurchased: false,
+      purchasedAt: null,
+      createdAt: 1,
+      updatedAt: 1,
+      deletedAt: null,
+      tagIds: ["tag-a", "tag-b"],
+      _localVersion: 1,
+      _serverVersion: 0,
+      _syncStatus: "pending",
+    };
+
+    const merged = mergeServerItemWithLocal(
+      "server-1",
+      {
+        id: "server-1",
+        householdId: "hh1",
+        itemName: "Milk",
+        createdAt: 2,
+        updatedAt: 2,
+      },
+      temp,
+      3
+    );
+
+    expect(merged.id).toBe("server-1");
+    expect(merged.tagIds).toEqual(["tag-a", "tag-b"]);
+    expect(merged._syncStatus).toBe("synced");
   });
 });
 

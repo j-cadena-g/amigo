@@ -1,4 +1,8 @@
-import { getOfflineDB, type SyncQueueEntry } from "./db";
+import {
+  getOfflineDB,
+  type OfflineGroceryItem,
+  type SyncQueueEntry,
+} from "./db";
 import {
   getPendingMutations,
   removeMutation,
@@ -230,6 +234,61 @@ export async function processSyncQueue(): Promise<{
   return { processed: totalProcessed, failed: totalFailed, discarded };
 }
 
+export function mergeServerItemWithLocal(
+  serverId: string,
+  serverItem: Record<string, unknown>,
+  fallback: OfflineGroceryItem | undefined,
+  now: number
+): OfflineGroceryItem {
+  const tagIds = Array.isArray(serverItem.tagIds)
+    ? serverItem.tagIds.filter((id): id is string => typeof id === "string")
+    : fallback?.tagIds;
+
+  return {
+    id: serverId,
+    householdId:
+      typeof serverItem.householdId === "string"
+        ? serverItem.householdId
+        : (fallback?.householdId ?? ""),
+    createdByUserId:
+      typeof serverItem.createdByUserId === "string"
+        ? serverItem.createdByUserId
+        : (fallback?.createdByUserId ?? null),
+    createdByUserDisplayName:
+      typeof serverItem.createdByUserDisplayName === "string"
+        ? serverItem.createdByUserDisplayName
+        : (fallback?.createdByUserDisplayName ?? null),
+    itemName:
+      typeof serverItem.itemName === "string"
+        ? serverItem.itemName
+        : (fallback?.itemName ?? ""),
+    category:
+      typeof serverItem.category === "string"
+        ? serverItem.category
+        : (fallback?.category ?? null),
+    isPurchased: Boolean(
+      serverItem.isPurchased ?? fallback?.isPurchased ?? false
+    ),
+    purchasedAt:
+      serverItem.purchasedAt == null
+        ? null
+        : coerceTimestampMs(serverItem.purchasedAt, now),
+    createdAt: coerceTimestampMs(
+      serverItem.createdAt,
+      fallback?.createdAt ?? now
+    ),
+    updatedAt: coerceTimestampMs(serverItem.updatedAt, now),
+    deletedAt:
+      serverItem.deletedAt == null
+        ? null
+        : coerceTimestampMs(serverItem.deletedAt, now),
+    tagIds,
+    _localVersion: 0,
+    _serverVersion: coerceTimestampMs(serverItem.updatedAt, now),
+    _syncStatus: "synced",
+  };
+}
+
 async function updateLocalFromServer(
   mutation: SyncQueueEntry,
   serverItem: Record<string, unknown>
@@ -243,9 +302,11 @@ async function updateLocalFromServer(
   const tempId = mutation.entityId;
 
   await db.transaction("rw", db.groceryItems, db.syncQueue, async () => {
+    let tempItem: OfflineGroceryItem | undefined;
     if (mutation.operation === "add" && tempId !== serverId) {
-      const temp = await db.groceryItems.get(tempId);
-      if (temp) {
+      // Capture before delete so tagIds / local fields survive the remap.
+      tempItem = await db.groceryItems.get(tempId);
+      if (tempItem) {
         await db.groceryItems.delete(tempId);
       }
 
@@ -260,53 +321,10 @@ async function updateLocalFromServer(
     }
 
     const existing = await db.groceryItems.get(serverId);
-    const tagIds = Array.isArray(serverItem.tagIds)
-      ? serverItem.tagIds.filter((id): id is string => typeof id === "string")
-      : existing?.tagIds;
-
-    await db.groceryItems.put({
-      id: serverId,
-      householdId:
-        typeof serverItem.householdId === "string"
-          ? serverItem.householdId
-          : (existing?.householdId ?? ""),
-      createdByUserId:
-        typeof serverItem.createdByUserId === "string"
-          ? serverItem.createdByUserId
-          : (existing?.createdByUserId ?? null),
-      createdByUserDisplayName:
-        typeof serverItem.createdByUserDisplayName === "string"
-          ? serverItem.createdByUserDisplayName
-          : (existing?.createdByUserDisplayName ?? null),
-      itemName:
-        typeof serverItem.itemName === "string"
-          ? serverItem.itemName
-          : (existing?.itemName ?? ""),
-      category:
-        typeof serverItem.category === "string"
-          ? serverItem.category
-          : (existing?.category ?? null),
-      isPurchased: Boolean(
-        serverItem.isPurchased ?? existing?.isPurchased ?? false
-      ),
-      purchasedAt:
-        serverItem.purchasedAt == null
-          ? null
-          : coerceTimestampMs(serverItem.purchasedAt, now),
-      createdAt: coerceTimestampMs(
-        serverItem.createdAt,
-        existing?.createdAt ?? now
-      ),
-      updatedAt: coerceTimestampMs(serverItem.updatedAt, now),
-      deletedAt:
-        serverItem.deletedAt == null
-          ? null
-          : coerceTimestampMs(serverItem.deletedAt, now),
-      tagIds,
-      _localVersion: 0,
-      _serverVersion: coerceTimestampMs(serverItem.updatedAt, now),
-      _syncStatus: "synced",
-    });
+    const fallback = existing ?? tempItem;
+    await db.groceryItems.put(
+      mergeServerItemWithLocal(serverId, serverItem, fallback, now)
+    );
   });
 
   return serverId;

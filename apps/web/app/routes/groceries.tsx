@@ -124,8 +124,29 @@ export async function clientLoader({
     return serverLoader();
   }
 
+  let data: Awaited<ReturnType<typeof loader>>;
+
   try {
-    const data = await serverLoader();
+    data = await serverLoader();
+  } catch {
+    const session = await getOfflineSessionContext();
+    if (!session?.householdId) {
+      throw new Error("Offline and no cached grocery data");
+    }
+    const offlineItems = await getOfflineItems(session.householdId);
+    const offlineTags = await getOfflineTags(session.householdId);
+    if (offlineItems.length === 0 && offlineTags.length === 0) {
+      throw new Error("Offline and no cached grocery data");
+    }
+    return mapOfflineToLoaderShape(
+      offlineItems,
+      offlineTags,
+      session.userId,
+      session.householdId
+    );
+  }
+
+  try {
     await hydrateFromServer(
       data.items.map((item) => ({
         id: item.id,
@@ -155,24 +176,11 @@ export async function clientLoader({
       })),
       { householdId: data.householdId, userId: data.userId }
     );
-    return data;
-  } catch {
-    const session = await getOfflineSessionContext();
-    if (!session?.householdId) {
-      throw new Error("Offline and no cached grocery data");
-    }
-    const offlineItems = await getOfflineItems(session.householdId);
-    const offlineTags = await getOfflineTags(session.householdId);
-    if (offlineItems.length === 0 && offlineTags.length === 0) {
-      throw new Error("Offline and no cached grocery data");
-    }
-    return mapOfflineToLoaderShape(
-      offlineItems,
-      offlineTags,
-      session.userId,
-      session.householdId
-    );
+  } catch (error) {
+    console.warn("Failed to hydrate offline grocery cache:", error);
   }
+
+  return data;
 }
 
 clientLoader.hydrate = true;

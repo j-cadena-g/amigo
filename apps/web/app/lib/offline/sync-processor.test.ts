@@ -499,7 +499,11 @@ describe("processSyncQueue", () => {
 
     expect(groceryItems.delete).not.toHaveBeenCalled();
     expect(groceryItems.put).not.toHaveBeenCalled();
-    expect(removeMutationMock).toHaveBeenCalledWith("add-1");
+    expect(removeMutationMock).not.toHaveBeenCalledWith("add-1");
+    expect(markMutationFailedMock).toHaveBeenCalledWith(
+      "add-1",
+      "Server returned no usable item id"
+    );
   });
 
   it("preserves mixed processed and discarded counts", async () => {

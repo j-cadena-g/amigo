@@ -202,9 +202,19 @@ export async function processSyncQueue(): Promise<{
       for (const r of result.results) {
         if (r.success) {
           const mutation = batch.find((m) => m.id === r.id);
-          if (mutation && r.serverItem) {
+          if (!mutation) continue;
+
+          let syncComplete = true;
+          if (r.serverItem) {
             const serverId = await updateLocalFromServer(mutation, r.serverItem);
-            if (
+            if (mutation.operation === "add" && !serverId) {
+              await markMutationFailed(
+                mutation.id,
+                "Server returned no usable item id"
+              );
+              totalFailed++;
+              syncComplete = false;
+            } else if (
               mutation.operation === "add" &&
               serverId &&
               serverId !== mutation.entityId
@@ -216,10 +226,11 @@ export async function processSyncQueue(): Promise<{
               );
             }
           }
-          if (mutation) {
+
+          if (syncComplete) {
             await removeMutation(mutation.id);
+            totalProcessed++;
           }
-          totalProcessed++;
         } else {
           const mutation = batch.find((m) => m.id === r.id);
           if (mutation) {

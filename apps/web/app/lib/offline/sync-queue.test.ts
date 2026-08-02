@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comparePendingMutations } from "./sync-queue";
+import { sortPendingMutations } from "./sync-queue";
 import type { SyncQueueEntry } from "./db";
 
 function entry(
@@ -18,7 +18,7 @@ function entry(
   };
 }
 
-describe("comparePendingMutations", () => {
+describe("sortPendingMutations", () => {
   it("orders add before toggle on the same entity even when toggle is earlier", () => {
     const toggle = entry({
       operation: "toggle",
@@ -33,7 +33,37 @@ describe("comparePendingMutations", () => {
       sequence: 2,
     });
 
-    expect([toggle, add].sort(comparePendingMutations)).toEqual([add, toggle]);
+    const sorted = sortPendingMutations([toggle, add]);
+    expect(sorted.indexOf(add)).toBeLessThan(sorted.indexOf(toggle));
+  });
+
+  it("submits add before an earlier dependent when an unrelated mutation sits between", () => {
+    const toggle = entry({
+      id: "toggle-temp-1",
+      operation: "toggle",
+      entityId: "temp-1",
+      timestamp: 100,
+      sequence: 1,
+    });
+    const unrelated = entry({
+      id: "toggle-other",
+      operation: "toggle",
+      entityId: "temp-2",
+      timestamp: 150,
+      sequence: 2,
+    });
+    const add = entry({
+      id: "add-temp-1",
+      operation: "add",
+      entityId: "temp-1",
+      timestamp: 200,
+      sequence: 3,
+    });
+
+    const sorted = sortPendingMutations([toggle, unrelated, add]);
+
+    expect(sorted.indexOf(add)).toBeLessThan(sorted.indexOf(toggle));
+    expect(sorted.indexOf(unrelated)).toBeLessThan(sorted.indexOf(toggle));
   });
 
   it("falls back to timestamp and sequence for unrelated entities", () => {
@@ -50,9 +80,6 @@ describe("comparePendingMutations", () => {
       sequence: 1,
     });
 
-    expect([second, first].sort(comparePendingMutations)).toEqual([
-      first,
-      second,
-    ]);
+    expect(sortPendingMutations([second, first])).toEqual([first, second]);
   });
 });

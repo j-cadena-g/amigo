@@ -19,19 +19,63 @@ export function compareSyncQueueEntries(
 }
 
 /** Ensures grocery `add` precedes other ops on the same entityId. */
-export function comparePendingMutations(
-  a: SyncQueueEntry,
-  b: SyncQueueEntry
-): number {
-  if (
-    a.entityType === "groceryItem" &&
-    b.entityType === "groceryItem" &&
-    a.entityId === b.entityId
-  ) {
-    if (a.operation === "add" && b.operation !== "add") return -1;
-    if (b.operation === "add" && a.operation !== "add") return 1;
+export function sortPendingMutations(
+  entries: SyncQueueEntry[]
+): SyncQueueEntry[] {
+  if (entries.length <= 1) return [...entries];
+
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const addByEntityId = new Map<string, string>();
+
+  for (const entry of entries) {
+    if (entry.entityType === "groceryItem" && entry.operation === "add") {
+      addByEntityId.set(entry.entityId, entry.id);
+    }
   }
-  return compareSyncQueueEntries(a, b);
+
+  const dependents = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  for (const entry of entries) {
+    inDegree.set(entry.id, 0);
+  }
+
+  for (const entry of entries) {
+    if (entry.entityType !== "groceryItem" || entry.operation === "add") {
+      continue;
+    }
+    const addId = addByEntityId.get(entry.entityId);
+    if (!addId || addId === entry.id) continue;
+
+    inDegree.set(entry.id, (inDegree.get(entry.id) ?? 0) + 1);
+    const waiting = dependents.get(addId) ?? [];
+    waiting.push(entry.id);
+    dependents.set(addId, waiting);
+  }
+
+  const ready = entries
+    .filter((entry) => (inDegree.get(entry.id) ?? 0) === 0)
+    .sort(compareSyncQueueEntries);
+
+  const sorted: SyncQueueEntry[] = [];
+  while (ready.length > 0) {
+    ready.sort(compareSyncQueueEntries);
+    const current = ready.shift()!;
+    sorted.push(current);
+
+    for (const dependentId of dependents.get(current.id) ?? []) {
+      const nextDegree = (inDegree.get(dependentId) ?? 1) - 1;
+      inDegree.set(dependentId, nextDegree);
+      if (nextDegree === 0) {
+        ready.push(byId.get(dependentId)!);
+      }
+    }
+  }
+
+  if (sorted.length !== entries.length) {
+    return [...entries].sort(compareSyncQueueEntries);
+  }
+
+  return sorted;
 }
 
 export async function queueMutation(mutation: QueuedMutation): Promise<string> {
@@ -103,7 +147,7 @@ export async function queueMutation(mutation: QueuedMutation): Promise<string> {
 export async function getPendingMutations(): Promise<SyncQueueEntry[]> {
   const db = getOfflineDB();
   const entries = await db.syncQueue.toArray();
-  return entries.sort(comparePendingMutations);
+  return sortPendingMutations(entries);
 }
 
 export async function getPendingCount(): Promise<number> {

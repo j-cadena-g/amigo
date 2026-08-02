@@ -69,6 +69,38 @@ export function remapEntityIdInMutations<T extends { entityId: string }>(
   );
 }
 
+/**
+ * Take the next request batch. Close the batch immediately after a grocery
+ * `add` so dependents are submitted only after the temp→server ID remap.
+ */
+export function takeNextSyncBatch<T extends QueueLike>(
+  remaining: T[],
+  maxSize = SYNC_BATCH_SIZE
+): T[] {
+  const batch: T[] = [];
+  for (const mutation of remaining) {
+    if (batch.length >= maxSize) break;
+
+    const dependsOnQueuedAdd = batch.some(
+      (prior) =>
+        prior.operation === "add" &&
+        prior.entityType === "groceryItem" &&
+        prior.entityId === mutation.entityId
+    );
+    if (dependsOnQueuedAdd) break;
+
+    batch.push(mutation);
+
+    if (
+      mutation.operation === "add" &&
+      mutation.entityType === "groceryItem"
+    ) {
+      break;
+    }
+  }
+  return batch;
+}
+
 interface BatchSyncResponse {
   processed: number;
   failed: number;
@@ -78,14 +110,6 @@ interface BatchSyncResponse {
     serverItem?: Record<string, unknown>;
     error?: string;
   }>;
-}
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
 }
 
 function coerceTimestampMs(value: unknown, fallback: number): number {
@@ -117,13 +141,16 @@ export async function processSyncQueue(): Promise<{
     await removeMutation(m.id);
   }
 
-  const batches = chunkArray(viable, SYNC_BATCH_SIZE);
+  let remaining = [...viable];
   let totalProcessed = 0;
   let totalFailed = 0;
   const discarded = expired.length;
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    const batch = batches[batchIndex]!;
+  while (remaining.length > 0) {
+    const batch = takeNextSyncBatch(remaining, SYNC_BATCH_SIZE);
+    if (batch.length === 0) break;
+    remaining = remaining.slice(batch.length);
+
     try {
       const response = await fetch("/api/sync", {
         method: "POST",
@@ -148,10 +175,11 @@ export async function processSyncQueue(): Promise<{
       }
 
       const result = (await response.json()) as BatchSyncResponse;
+      let workingBatch = batch;
 
       for (const r of result.results) {
         if (r.success) {
-          const mutation = batch.find((m) => m.id === r.id);
+          const mutation = workingBatch.find((m) => m.id === r.id);
           if (mutation && r.serverItem) {
             const serverId = await updateLocalFromServer(mutation, r.serverItem);
             if (
@@ -159,13 +187,17 @@ export async function processSyncQueue(): Promise<{
               serverId &&
               serverId !== mutation.entityId
             ) {
-              for (let i = batchIndex + 1; i < batches.length; i++) {
-                batches[i] = remapEntityIdInMutations(
-                  batches[i]!,
-                  mutation.entityId,
-                  serverId
-                );
-              }
+              // Remap any same-batch leftovers (defensive) and all not-yet-submitted deps.
+              workingBatch = remapEntityIdInMutations(
+                workingBatch,
+                mutation.entityId,
+                serverId
+              );
+              remaining = remapEntityIdInMutations(
+                remaining,
+                mutation.entityId,
+                serverId
+              );
             }
           }
           if (mutation) {
@@ -173,7 +205,7 @@ export async function processSyncQueue(): Promise<{
           }
           totalProcessed++;
         } else {
-          const mutation = batch.find((m) => m.id === r.id);
+          const mutation = workingBatch.find((m) => m.id === r.id);
           if (mutation) {
             await markMutationFailed(mutation.id, r.error ?? "Unknown error");
           }

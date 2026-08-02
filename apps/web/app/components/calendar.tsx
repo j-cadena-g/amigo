@@ -113,12 +113,14 @@ export function Calendar({
   const fetchEvents = useCallback(
     async (y: number, m: number) => {
       const key = formatMonthKey(y, m);
+      // Invalidate any in-flight request before handling cache or starting a fetch.
+      const requestId = ++fetchRequestIdRef.current;
       if (eventsCache[key]) {
         setLoadError(null);
+        setLoading(false);
         return;
       }
 
-      const requestId = ++fetchRequestIdRef.current;
       setLoading(true);
       try {
         const res = await fetch(`/api/calendar?year=${y}&month=${m + 1}`);

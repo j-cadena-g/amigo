@@ -113,41 +113,51 @@ describe("selectMutationsToOverlay", () => {
       entry({ operation: "toggle", entityId: "persisted-pending" }),
       entry({ operation: "toggle", entityId: "legacy-synced" }),
     ];
+    const rows = [
+      item({
+        id: "persisted-pending",
+        isPurchased: true,
+        _syncStatus: "pending",
+      }),
+      item({
+        id: "legacy-synced",
+        isPurchased: false,
+        _syncStatus: "synced",
+      }),
+    ];
 
-    const selected = selectMutationsToOverlay(
-      [
-        item({
-          id: "persisted-pending",
-          isPurchased: true,
-          _syncStatus: "pending",
-        }),
-        item({
-          id: "legacy-synced",
-          isPurchased: false,
-          _syncStatus: "synced",
-        }),
-      ],
-      mutations
-    );
-    const result = overlayPendingMutations(
-      [
-        item({
-          id: "persisted-pending",
-          isPurchased: true,
-          _syncStatus: "pending",
-        }),
-        item({
-          id: "legacy-synced",
-          isPurchased: false,
-          _syncStatus: "synced",
-        }),
-      ],
-      selected,
-      ctx
-    );
+    const selected = selectMutationsToOverlay(rows, mutations);
+    const result = overlayPendingMutations(rows, selected, ctx);
 
     expect(selected.map((mutation) => mutation.entityId)).toEqual(["legacy-synced"]);
     expect(result.find((value) => value.id === "persisted-pending")?.isPurchased).toBe(true);
     expect(result.find((value) => value.id === "legacy-synced")?.isPurchased).toBe(true);
+  });
+
+  it("retains groceryTag mutations for overlay selection", () => {
+    const mutations = [
+      entry({
+        operation: "add",
+        entityId: "tag-1",
+        entityType: "groceryTag",
+        payload: { name: "Produce" },
+      }),
+      entry({ operation: "toggle", entityId: "legacy-synced" }),
+    ];
+    const rows = [
+      item({
+        id: "legacy-synced",
+        isPurchased: false,
+        _syncStatus: "synced",
+      }),
+    ];
+
+    const selected = selectMutationsToOverlay(rows, mutations);
+    expect(selected.map((m) => m.entityId)).toEqual(["tag-1", "legacy-synced"]);
+
+    // overlayPendingMutations intentionally filters to groceryItem only.
+    const result = overlayPendingMutations(rows, selected, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.isPurchased).toBe(true);
   });
 });

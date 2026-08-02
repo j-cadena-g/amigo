@@ -85,16 +85,10 @@ export function takeNextSyncBatch<T extends QueueLike>(
   for (const mutation of remaining) {
     if (batch.length >= maxSize) break;
 
-    const dependsOnQueuedAdd = batch.some(
-      (prior) =>
-        prior.operation === "add" &&
-        prior.entityType === "groceryItem" &&
-        prior.entityId === mutation.entityId
-    );
-    if (dependsOnQueuedAdd) break;
-
     batch.push(mutation);
 
+    // Closing after add is what keeps dependents out of this request; remap
+    // happens on `remaining` after the add succeeds.
     if (
       mutation.operation === "add" &&
       mutation.entityType === "groceryItem"
@@ -103,6 +97,28 @@ export function takeNextSyncBatch<T extends QueueLike>(
     }
   }
   return batch;
+}
+
+/**
+ * Revert local grocery projection for a permanently discarded queue entry so
+ * orphan `_syncStatus: "pending"` rows do not linger in the UI.
+ */
+export async function reconcileDiscardedMutation(
+  mutation: SyncQueueEntry
+): Promise<void> {
+  if (mutation.entityType !== "groceryItem") return;
+
+  const db = getOfflineDB();
+  const row = await db.groceryItems.get(mutation.entityId);
+  if (!row || row._syncStatus !== "pending") return;
+
+  if (mutation.operation === "add" && row._serverVersion === 0) {
+    await db.groceryItems.delete(mutation.entityId);
+    return;
+  }
+
+  // Let the next online hydrate overwrite any stale optimistic fields.
+  await db.groceryItems.update(mutation.entityId, { _syncStatus: "synced" });
 }
 
 interface BatchSyncResponse {
@@ -142,6 +158,7 @@ export async function processSyncQueue(): Promise<{
   );
 
   for (const m of expired) {
+    await reconcileDiscardedMutation(m);
     await removeMutation(m.id);
   }
 
@@ -175,15 +192,16 @@ export async function processSyncQueue(): Promise<{
           await markMutationFailed(m.id, `Server returned ${response.status}`);
         }
         totalFailed += batch.length;
+        // Whole-run failures: stop instead of burning retries on later batches.
+        if (response.status >= 500 || response.status === 429) break;
         continue;
       }
 
       const result = (await response.json()) as BatchSyncResponse;
-      let workingBatch = batch;
 
       for (const r of result.results) {
         if (r.success) {
-          const mutation = workingBatch.find((m) => m.id === r.id);
+          const mutation = batch.find((m) => m.id === r.id);
           if (mutation && r.serverItem) {
             const serverId = await updateLocalFromServer(mutation, r.serverItem);
             if (
@@ -191,12 +209,6 @@ export async function processSyncQueue(): Promise<{
               serverId &&
               serverId !== mutation.entityId
             ) {
-              // Remap any same-batch leftovers (defensive) and all not-yet-submitted deps.
-              workingBatch = remapEntityIdInMutations(
-                workingBatch,
-                mutation.entityId,
-                serverId
-              );
               remaining = remapEntityIdInMutations(
                 remaining,
                 mutation.entityId,
@@ -209,12 +221,19 @@ export async function processSyncQueue(): Promise<{
           }
           totalProcessed++;
         } else {
-          const mutation = workingBatch.find((m) => m.id === r.id);
+          const mutation = batch.find((m) => m.id === r.id);
           if (mutation) {
             await markMutationFailed(mutation.id, r.error ?? "Unknown error");
           }
           totalFailed++;
         }
+      }
+
+      const seen = new Set(result.results.map((r) => r.id));
+      for (const m of batch) {
+        if (seen.has(m.id)) continue;
+        await markMutationFailed(m.id, "No result returned by server");
+        totalFailed++;
       }
     } catch (error) {
       const errorMessage =

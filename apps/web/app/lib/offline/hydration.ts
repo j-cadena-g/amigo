@@ -8,6 +8,7 @@ import { applyQueuedMutationToItems, type LocalMutationContext } from "./local-m
 import {
   compareSyncQueueEntries,
   getOfflineSessionContext,
+  getPendingMutations,
   setLastSyncTimestamp,
   setOfflineSessionContext,
 } from "./sync-queue";
@@ -190,24 +191,36 @@ export async function getOfflineItems(
 ): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
   const session = await getOfflineSessionContext();
+  const resolvedHouseholdId = householdId ?? session?.householdId;
 
-  const items = householdId
-    ? await db.groceryItems.where("householdId").equals(householdId).toArray()
+  const items = resolvedHouseholdId
+    ? await db.groceryItems
+        .where("householdId")
+        .equals(resolvedHouseholdId)
+        .toArray()
     : await db.groceryItems.toArray();
 
-  const pending = await db.syncQueue.orderBy("timestamp").toArray();
-  if (pending.length === 0) {
-    return items.filter((item) => item.deletedAt === null);
+  const active = items.filter((item) => item.deletedAt === null);
+  if (!resolvedHouseholdId || !session?.userId) {
+    // No household/session context → never invent an empty overlay context.
+    return active;
   }
 
-  const ctx: LocalMutationContext = {
-    householdId: householdId ?? session?.householdId ?? "",
-    userId: session?.userId ?? "",
-  };
+  const pending = (await getPendingMutations()).filter(
+    (mutation) =>
+      !mutation.householdId || mutation.householdId === resolvedHouseholdId
+  );
+  if (pending.length === 0) {
+    return active;
+  }
+
   return overlayPendingMutations(
     items,
     selectMutationsToOverlay(items, pending),
-    ctx
+    {
+      householdId: resolvedHouseholdId,
+      userId: session.userId,
+    }
   );
 }
 

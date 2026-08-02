@@ -8,6 +8,7 @@ import {
   takeNextSyncBatch,
 } from "./sync-processor";
 import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
+import { getOfflineDB } from "./db";
 
 vi.mock("./sync-queue", () => ({
   getPendingMutations: vi.fn(),
@@ -33,6 +34,35 @@ const getPendingMutationsMock = vi.mocked(getPendingMutations);
 const removeMutationMock = vi.mocked(removeMutation);
 const markMutationFailedMock = vi.mocked(markMutationFailed);
 const setLastSyncTimestampMock = vi.mocked(setLastSyncTimestamp);
+const getOfflineDBMock = vi.mocked(getOfflineDB);
+
+function stubOfflineDb(overrides?: {
+  get?: ReturnType<typeof vi.fn>;
+  delete?: ReturnType<typeof vi.fn>;
+  update?: ReturnType<typeof vi.fn>;
+  put?: ReturnType<typeof vi.fn>;
+}) {
+  const groceryItems = {
+    get: overrides?.get ?? vi.fn().mockResolvedValue(null),
+    delete: overrides?.delete ?? vi.fn(),
+    update: overrides?.update ?? vi.fn(),
+    put: overrides?.put ?? vi.fn(),
+  };
+  const syncQueue = {
+    where: vi.fn(() => ({
+      equals: vi.fn(() => ({
+        toArray: vi.fn().mockResolvedValue([]),
+      })),
+    })),
+    update: vi.fn(),
+  };
+  getOfflineDBMock.mockReturnValue({
+    groceryItems,
+    syncQueue,
+    transaction: vi.fn(async (_mode, _t1, _t2, fn) => fn()),
+  } as never);
+  return groceryItems;
+}
 
 function entry(
   partial: Partial<SyncQueueEntry> &
@@ -184,7 +214,7 @@ describe("takeNextSyncBatch", () => {
 describe("processSyncQueue", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("returns zeros for an empty queue", async () => {
@@ -197,6 +227,16 @@ describe("processSyncQueue", () => {
   });
 
   it("discards expired mutations and cascades dependents", async () => {
+    const groceryItems = stubOfflineDb({
+      get: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: "temp-1",
+          _syncStatus: "pending",
+          _serverVersion: 0,
+        })
+        .mockResolvedValueOnce(null),
+    });
     getPendingMutationsMock.mockResolvedValue([
       entry({
         id: "add-1",
@@ -217,9 +257,76 @@ describe("processSyncQueue", () => {
     expect(result).toEqual({ processed: 0, failed: 0, discarded: 2 });
     expect(removeMutationMock).toHaveBeenCalledWith("add-1");
     expect(removeMutationMock).toHaveBeenCalledWith("toggle-1");
+    expect(groceryItems.delete).toHaveBeenCalledWith("temp-1");
+  });
+
+  it("marks omitted server results as failed", async () => {
+    stubOfflineDb();
+    getPendingMutationsMock.mockResolvedValue([
+      entry({
+        id: "m1",
+        operation: "toggle",
+        entityId: "g1",
+        retryCount: 0,
+      }),
+      entry({
+        id: "m2",
+        operation: "toggle",
+        entityId: "g2",
+        retryCount: 0,
+      }),
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            processed: 1,
+            failed: 0,
+            results: [{ id: "m1", success: true }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const result = await processSyncQueue();
+    expect(result).toEqual({ processed: 1, failed: 1, discarded: 0 });
+    expect(markMutationFailedMock).toHaveBeenCalledWith(
+      "m2",
+      "No result returned by server"
+    );
+  });
+
+  it("stops the run on HTTP 5xx instead of continuing batches", async () => {
+    stubOfflineDb();
+    getPendingMutationsMock.mockResolvedValue([
+      entry({
+        id: "m1",
+        operation: "toggle",
+        entityId: "g1",
+        retryCount: 0,
+      }),
+      entry({
+        id: "m2",
+        operation: "toggle",
+        entityId: "g2",
+        retryCount: 0,
+      }),
+    ]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await processSyncQueue();
+    // Both toggles fit one batch; 5xx marks them failed and stops the run.
+    expect(result).toEqual({ processed: 0, failed: 2, discarded: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("counts transient batch failures as failed", async () => {
+    stubOfflineDb();
     getPendingMutationsMock.mockResolvedValue([
       entry({
         id: "m1",
@@ -243,6 +350,7 @@ describe("processSyncQueue", () => {
   });
 
   it("counts successful batches as processed without serverItem", async () => {
+    stubOfflineDb();
     getPendingMutationsMock.mockResolvedValue([
       entry({
         id: "m1",
@@ -272,6 +380,7 @@ describe("processSyncQueue", () => {
   });
 
   it("submits add before dependents and remaps entity ids between requests", async () => {
+    stubOfflineDb();
     getPendingMutationsMock.mockResolvedValue([
       entry({
         id: "add-1",
@@ -329,26 +438,6 @@ describe("processSyncQueue", () => {
         )
       );
 
-    const groceryItems = {
-      get: vi.fn().mockResolvedValue(null),
-      delete: vi.fn(),
-      put: vi.fn(),
-    };
-    const syncQueue = {
-      where: vi.fn(() => ({
-        equals: vi.fn(() => ({
-          toArray: vi.fn().mockResolvedValue([]),
-        })),
-      })),
-      update: vi.fn(),
-    };
-    const { getOfflineDB } = await import("./db");
-    vi.mocked(getOfflineDB).mockReturnValue({
-      groceryItems,
-      syncQueue,
-      transaction: vi.fn(async (_mode, _t1, _t2, fn) => fn()),
-    } as never);
-
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await processSyncQueue();
@@ -370,6 +459,13 @@ describe("processSyncQueue", () => {
   });
 
   it("preserves mixed processed and discarded counts", async () => {
+    stubOfflineDb({
+      get: vi.fn().mockResolvedValue({
+        id: "g-old",
+        _syncStatus: "pending",
+        _serverVersion: 10,
+      }),
+    });
     getPendingMutationsMock.mockResolvedValue([
       entry({
         id: "expired",

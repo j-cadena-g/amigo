@@ -16,6 +16,15 @@ describe("readApiErrorMessage", () => {
 
     await expect(readApiErrorMessage(res)).resolves.toBeNull();
   });
+
+  it("reads message when error is absent", async () => {
+    const res = new Response(JSON.stringify({ message: "Budget limit hit" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    await expect(readApiErrorMessage(res)).resolves.toBe("Budget limit hit");
+  });
 });
 
 describe("toastMutationFailure", () => {

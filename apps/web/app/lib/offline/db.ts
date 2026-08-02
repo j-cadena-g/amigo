@@ -33,6 +33,8 @@ export interface SyncQueueEntry {
   timestamp: number;
   /** Monotonic enqueue order; breaks ties when timestamps collide. */
   sequence: number;
+  /** Household that enqueued this mutation; used to scope offline replay. */
+  householdId?: string;
   operation: "add" | "toggle" | "delete" | "updateTags";
   entityType: "groceryItem" | "groceryTag";
   entityId: string;

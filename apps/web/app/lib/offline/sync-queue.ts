@@ -33,28 +33,41 @@ export async function queueMutation(mutation: QueuedMutation): Promise<string> {
         (typeof seqMeta?.value === "number" ? seqMeta.value : 0) + 1;
       await db.syncMetadata.put({ key: "mutationSequence", value: sequence });
 
+      const household = await db.syncMetadata.get("householdId");
+      const user = await db.syncMetadata.get("userId");
+      const now = Date.now();
+      const householdId =
+        household?.value != null ? String(household.value) : undefined;
+
       const entry: SyncQueueEntry = {
         id,
-        timestamp: Date.now(),
+        timestamp: now,
         sequence,
         ...mutation,
+        householdId,
         retryCount: 0,
         lastError: null,
       };
       await db.syncQueue.add(entry);
 
-      const household = await db.syncMetadata.get("householdId");
-      const user = await db.syncMetadata.get("userId");
       if (
-        household?.value != null &&
+        householdId != null &&
         user?.value != null &&
         mutation.entityType === "groceryItem"
       ) {
-        const existing = await db.groceryItems.toArray();
-        const next = applyQueuedMutationToItems(existing, mutation, {
-          householdId: String(household.value),
-          userId: String(user.value),
-        });
+        const current =
+          mutation.operation === "add"
+            ? undefined
+            : await db.groceryItems.get(mutation.entityId);
+        const next = applyQueuedMutationToItems(
+          current ? [current] : [],
+          mutation,
+          {
+            householdId,
+            userId: String(user.value),
+            now,
+          }
+        );
         const row = next.find((item) => item.id === mutation.entityId);
         if (row) {
           await db.groceryItems.put(row);

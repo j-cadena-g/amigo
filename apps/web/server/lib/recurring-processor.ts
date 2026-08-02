@@ -283,7 +283,25 @@ export async function processDueRecurringRules(
       );
     }
 
-    await advanceRecurringRuleIfCurrent(db, rule);
+    try {
+      await advanceRecurringRuleIfCurrent(db, rule);
+    } catch (advanceError) {
+      if (scope.mode === "household_user") {
+        throw advanceError;
+      }
+      failedCount++;
+      console.error(
+        JSON.stringify({
+          message: "processDueRecurringRules advance failed",
+          ruleId: rule.id,
+          householdId: rule.householdId,
+          error:
+            advanceError instanceof Error
+              ? advanceError.message
+              : String(advanceError),
+        })
+      );
+    }
   }
 
   for (const [householdId, count] of countsByHousehold) {

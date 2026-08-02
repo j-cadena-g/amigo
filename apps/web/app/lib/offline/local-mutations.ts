@@ -59,6 +59,10 @@ export function applyQueuedMutationToItems(
       ];
     }
     case "toggle":
+      // Relative flip: replaying this entry twice reverts it. Callers must
+      // apply each queue entry exactly once per row. See
+      // selectMutationsToOverlay() in hydration.ts, which skips mutations
+      // whose local row is already `_syncStatus: "pending"`.
       return items.map((item) => {
         if (item.id !== mutation.entityId) return item;
         const isPurchased = !item.isPurchased;

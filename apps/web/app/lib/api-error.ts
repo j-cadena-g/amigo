@@ -4,8 +4,12 @@ export async function readApiErrorMessage(
   res: Response
 ): Promise<string | null> {
   try {
-    const data = (await res.json()) as { error?: unknown };
+    const data = (await res.json()) as {
+      error?: unknown;
+      message?: unknown;
+    };
     if (typeof data?.error === "string") return data.error;
+    if (typeof data?.message === "string") return data.message;
   } catch {
     // Non-JSON response body.
   }

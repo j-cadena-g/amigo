@@ -313,8 +313,9 @@ async function updateLocalFromServer(
   serverItem: Record<string, unknown>
 ): Promise<string | null> {
   const db = getOfflineDB();
+  const rawId = serverItem.id;
   const serverId =
-    typeof serverItem.id === "string" ? serverItem.id : null;
+    typeof rawId === "string" && rawId.trim() !== "" ? rawId : null;
   if (!serverId) return null;
 
   const now = Date.now();

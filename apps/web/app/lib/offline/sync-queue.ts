@@ -18,6 +18,22 @@ export function compareSyncQueueEntries(
   return (a.sequence ?? 0) - (b.sequence ?? 0);
 }
 
+/** Ensures grocery `add` precedes other ops on the same entityId. */
+export function comparePendingMutations(
+  a: SyncQueueEntry,
+  b: SyncQueueEntry
+): number {
+  if (
+    a.entityType === "groceryItem" &&
+    b.entityType === "groceryItem" &&
+    a.entityId === b.entityId
+  ) {
+    if (a.operation === "add" && b.operation !== "add") return -1;
+    if (b.operation === "add" && a.operation !== "add") return 1;
+  }
+  return compareSyncQueueEntries(a, b);
+}
+
 export async function queueMutation(mutation: QueuedMutation): Promise<string> {
   const db = getOfflineDB();
   const id = crypto.randomUUID();
@@ -87,7 +103,7 @@ export async function queueMutation(mutation: QueuedMutation): Promise<string> {
 export async function getPendingMutations(): Promise<SyncQueueEntry[]> {
   const db = getOfflineDB();
   const entries = await db.syncQueue.toArray();
-  return entries.sort(compareSyncQueueEntries);
+  return entries.sort(comparePendingMutations);
 }
 
 export async function getPendingCount(): Promise<number> {

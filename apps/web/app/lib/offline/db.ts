@@ -72,7 +72,13 @@ class AmigoOfflineDB extends Dexie {
         syncMetadata: "key",
       })
       .upgrade(async (tx) => {
-        const rows = await tx.table("syncQueue").orderBy("timestamp").toArray();
+        const rows = await tx.table("syncQueue").toArray();
+        rows.sort((a, b) => {
+          const ta = typeof a.timestamp === "number" ? a.timestamp : 0;
+          const tb = typeof b.timestamp === "number" ? b.timestamp : 0;
+          if (ta !== tb) return ta - tb;
+          return String(a.id).localeCompare(String(b.id));
+        });
         let sequence = 0;
         for (const row of rows) {
           sequence += 1;

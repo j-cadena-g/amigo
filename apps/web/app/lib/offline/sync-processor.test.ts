@@ -458,6 +458,50 @@ describe("processSyncQueue", () => {
     ]);
   });
 
+  it("rejects whitespace-only server ids during add remap", async () => {
+    const groceryItems = stubOfflineDb({
+      get: vi.fn().mockResolvedValue({
+        id: "temp-1",
+        householdId: "hh1",
+        _syncStatus: "pending",
+        _serverVersion: 0,
+      }),
+    });
+    getPendingMutationsMock.mockResolvedValue([
+      entry({
+        id: "add-1",
+        operation: "add",
+        entityId: "temp-1",
+        retryCount: 0,
+      }),
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            processed: 1,
+            failed: 0,
+            results: [
+              {
+                id: "add-1",
+                success: true,
+                serverItem: { id: "   " },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    await processSyncQueue();
+
+    expect(groceryItems.delete).not.toHaveBeenCalled();
+    expect(groceryItems.put).not.toHaveBeenCalled();
+    expect(removeMutationMock).toHaveBeenCalledWith("add-1");
+  });
+
   it("preserves mixed processed and discarded counts", async () => {
     stubOfflineDb({
       get: vi.fn().mockResolvedValue({

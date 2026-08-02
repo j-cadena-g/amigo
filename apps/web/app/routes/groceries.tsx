@@ -126,7 +126,7 @@ export async function clientLoader({
 
   try {
     const data = await serverLoader();
-    void hydrateFromServer(
+    await hydrateFromServer(
       data.items.map((item) => ({
         id: item.id,
         householdId: item.householdId,

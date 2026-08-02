@@ -71,3 +71,6 @@ apps/web/.op/refs.env
 
 # Debugging
 .debug/
+
+# Local CodeRabbit CLI config
+.coderabbit.yaml

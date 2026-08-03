@@ -539,6 +539,92 @@ describe("processSyncQueue", () => {
     );
   });
 
+  it("isolates local merge failures without aborting later batch results", async () => {
+    let mergeCalls = 0;
+    stubOfflineDb({
+      get: vi.fn().mockResolvedValue({
+        id: "g1",
+        householdId: "hh1",
+        _syncStatus: "pending",
+      }),
+    });
+    getOfflineDBMock.mockReturnValue({
+      groceryItems: {
+        get: vi.fn().mockResolvedValue({
+          id: "g1",
+          householdId: "hh1",
+          _syncStatus: "pending",
+        }),
+        delete: vi.fn(),
+        put: vi.fn(),
+      },
+      syncQueue: {
+        where: vi.fn(() => ({
+          equals: vi.fn(() => ({
+            toArray: vi.fn().mockResolvedValue([]),
+          })),
+        })),
+        update: vi.fn(),
+      },
+      transaction: vi.fn(async (_mode, _t1, _t2, fn) => {
+        mergeCalls += 1;
+        if (mergeCalls === 1) {
+          throw new Error("Local merge failed");
+        }
+        return fn();
+      }),
+    } as never);
+
+    getPendingMutationsMock.mockResolvedValue([
+      entry({
+        id: "m1",
+        operation: "toggle",
+        entityId: "g1",
+        retryCount: 0,
+      }),
+      entry({
+        id: "m2",
+        operation: "toggle",
+        entityId: "g2",
+        retryCount: 0,
+      }),
+    ]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            processed: 2,
+            failed: 0,
+            results: [
+              {
+                id: "m1",
+                success: true,
+                serverItem: { id: "g1", householdId: "hh1", updatedAt: 1 },
+              },
+              {
+                id: "m2",
+                success: true,
+                serverItem: { id: "g2", householdId: "hh1", updatedAt: 1 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const result = await processSyncQueue();
+
+    expect(result).toEqual({ processed: 1, failed: 1, discarded: 0 });
+    expect(markMutationFailedMock).toHaveBeenCalledWith(
+      "m1",
+      "Local merge failed"
+    );
+    expect(removeMutationMock).toHaveBeenCalledWith("m2");
+  });
+
   it("preserves mixed processed and discarded counts", async () => {
     stubOfflineDb({
       get: vi.fn().mockResolvedValue({

@@ -205,36 +205,47 @@ export async function processSyncQueue(): Promise<{
           if (!mutation) continue;
 
           let syncComplete = true;
-          if (mutation.operation === "add") {
-            if (!r.serverItem) {
-              await markMutationFailed(
-                mutation.id,
-                "Server returned no usable item id"
-              );
-              totalFailed++;
-              syncComplete = false;
-            } else {
-              const serverId = await updateLocalFromServer(
-                mutation,
-                r.serverItem
-              );
-              if (!serverId) {
+          try {
+            if (mutation.operation === "add") {
+              if (!r.serverItem) {
                 await markMutationFailed(
                   mutation.id,
                   "Server returned no usable item id"
                 );
                 totalFailed++;
                 syncComplete = false;
-              } else if (serverId !== mutation.entityId) {
-                remaining = remapEntityIdInMutations(
-                  remaining,
-                  mutation.entityId,
-                  serverId
+              } else {
+                const serverId = await updateLocalFromServer(
+                  mutation,
+                  r.serverItem
                 );
+                if (!serverId) {
+                  await markMutationFailed(
+                    mutation.id,
+                    "Server returned no usable item id"
+                  );
+                  totalFailed++;
+                  syncComplete = false;
+                } else if (serverId !== mutation.entityId) {
+                  remaining = remapEntityIdInMutations(
+                    remaining,
+                    mutation.entityId,
+                    serverId
+                  );
+                }
               }
+            } else if (r.serverItem) {
+              await updateLocalFromServer(mutation, r.serverItem);
             }
-          } else if (r.serverItem) {
-            await updateLocalFromServer(mutation, r.serverItem);
+          } catch (mergeError) {
+            await markMutationFailed(
+              mutation.id,
+              mergeError instanceof Error
+                ? mergeError.message
+                : "Local merge failed"
+            );
+            totalFailed++;
+            syncComplete = false;
           }
 
           if (syncComplete) {

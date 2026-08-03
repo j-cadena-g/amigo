@@ -8,6 +8,7 @@ import {
   groceryTags,
   inArray,
   isNull,
+  lt,
   scopeToHousehold,
 } from "@amigo/db";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 
 const MAX_BATCH_SIZE = 10;
+const GROCERY_SYNC_MUTATION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 const syncMutationSchema = z.object({
   id: z.string(),
@@ -127,24 +129,17 @@ async function loadGroceryItemForIdempotentAdd(
   return item as unknown as Record<string, unknown>;
 }
 
-async function loadGroceryItemForSync(
-  db: ReturnType<typeof getDb>,
-  householdId: string,
-  itemId: string
-): Promise<Record<string, unknown>> {
-  const item = await db.query.groceryItems.findFirst({
-    where: and(
-      eq(groceryItems.id, itemId),
-      scopeToHousehold(groceryItems.householdId, householdId),
-      isNull(groceryItems.deletedAt)
-    ),
-  });
+export async function cleanupStaleGrocerySyncMutations(
+  env: { DB: D1Database }
+): Promise<{ deletedCount: number }> {
+  const db = getDb(env.DB);
+  const cutoff = new Date(Date.now() - GROCERY_SYNC_MUTATION_RETENTION_MS);
+  const result = await db
+    .delete(grocerySyncMutations)
+    .where(lt(grocerySyncMutations.createdAt, cutoff))
+    .returning({ id: grocerySyncMutations.id });
 
-  if (!item) {
-    throw new Error("Item not found");
-  }
-
-  return item as unknown as Record<string, unknown>;
+  return { deletedCount: result.length };
 }
 
 async function resolveIdempotentAdd(

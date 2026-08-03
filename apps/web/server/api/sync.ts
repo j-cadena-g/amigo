@@ -8,7 +8,6 @@ import {
   groceryTags,
   inArray,
   isNull,
-  lt,
   scopeToHousehold,
 } from "@amigo/db";
 import { z } from "zod";
@@ -16,9 +15,10 @@ import { broadcastToHousehold } from "../lib/realtime";
 import { logServerError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
+import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
 
 const MAX_BATCH_SIZE = 10;
-const GROCERY_SYNC_MUTATION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE = 500;
 
 const syncMutationSchema = z.object({
   id: z.string(),
@@ -132,14 +132,27 @@ async function loadGroceryItemForIdempotentAdd(
 export async function cleanupStaleGrocerySyncMutations(
   env: { DB: D1Database }
 ): Promise<{ deletedCount: number }> {
-  const db = getDb(env.DB);
-  const cutoff = new Date(Date.now() - GROCERY_SYNC_MUTATION_RETENTION_MS);
-  const result = await db
-    .delete(grocerySyncMutations)
-    .where(lt(grocerySyncMutations.createdAt, cutoff))
-    .returning({ id: grocerySyncMutations.id });
+  const cutoff = Date.now() - GROCERY_SYNC_MUTATION_RETENTION_MS;
+  let deletedCount = 0;
 
-  return { deletedCount: result.length };
+  while (true) {
+    const result = await env.DB.prepare(
+      `DELETE FROM grocery_sync_mutations
+       WHERE rowid IN (
+         SELECT rowid FROM grocery_sync_mutations
+         WHERE created_at < ?
+         LIMIT ?
+       )`
+    )
+      .bind(cutoff, GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE)
+      .run();
+
+    const changes = result.meta.changes ?? 0;
+    deletedCount += changes;
+    if (changes < GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE) break;
+  }
+
+  return { deletedCount };
 }
 
 async function resolveIdempotentAdd(

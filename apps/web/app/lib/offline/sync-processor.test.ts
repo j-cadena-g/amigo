@@ -7,6 +7,7 @@ import {
   remapEntityIdInMutations,
   takeNextSyncBatch,
 } from "./sync-processor";
+import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "./sync-retention";
 import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
 import { getOfflineDB } from "./db";
 
@@ -69,7 +70,7 @@ function entry(
     Pick<SyncQueueEntry, "id" | "operation" | "entityId" | "retryCount">
 ): SyncQueueEntry {
   return {
-    timestamp: 1_700_000_000_000,
+    timestamp: Date.now(),
     sequence: 1,
     entityType: "groceryItem",
     payload: {},
@@ -88,6 +89,25 @@ describe("partitionViableMutations", () => {
     ]);
     expect(viable.map((m) => m.retryCount)).toEqual([0, 4]);
     expect(expired.map((m) => m.retryCount)).toEqual([5, 6]);
+  });
+
+  it("discards mutations older than the retention window", () => {
+    const now = 2_000_000_000_000;
+    const { viable, expired } = partitionViableMutations(
+      [
+        { retryCount: 0, timestamp: now - 1_000 },
+        {
+          retryCount: 0,
+          timestamp: now - GROCERY_SYNC_MUTATION_RETENTION_MS - 1,
+        },
+      ],
+      5,
+      GROCERY_SYNC_MUTATION_RETENTION_MS,
+      now
+    );
+
+    expect(viable).toHaveLength(1);
+    expect(expired).toHaveLength(1);
   });
 });
 
@@ -550,6 +570,7 @@ describe("processSyncQueue", () => {
         }),
         delete: vi.fn(),
         put: vi.fn(),
+        update: vi.fn(),
       },
       syncQueue: {
         where: vi.fn(() => ({

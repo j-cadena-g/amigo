@@ -9,6 +9,7 @@ import {
   markMutationFailed,
   setLastSyncTimestamp,
 } from "./sync-queue";
+import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "./sync-retention";
 
 const MAX_RETRIES = 5;
 const SYNC_BATCH_SIZE = 10;
@@ -21,13 +22,22 @@ type QueueLike = {
   retryCount: number;
 };
 
-export function partitionViableMutations<T extends { retryCount: number }>(
+export function partitionViableMutations<
+  T extends { retryCount: number; timestamp?: number },
+>(
   mutations: T[],
-  maxRetries = MAX_RETRIES
+  maxRetries = MAX_RETRIES,
+  maxAgeMs = GROCERY_SYNC_MUTATION_RETENTION_MS,
+  now = Date.now()
 ): { viable: T[]; expired: T[] } {
+  const isExpired = (mutation: T) =>
+    mutation.retryCount >= maxRetries ||
+    (typeof mutation.timestamp === "number" &&
+      now - mutation.timestamp > maxAgeMs);
+
   return {
-    viable: mutations.filter((m) => m.retryCount < maxRetries),
-    expired: mutations.filter((m) => m.retryCount >= maxRetries),
+    viable: mutations.filter((m) => !isExpired(m)),
+    expired: mutations.filter(isExpired),
   };
 }
 

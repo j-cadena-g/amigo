@@ -19,6 +19,7 @@ export const grocerySyncMutations = sqliteTable(
   },
   (table) => [
     index("grocery_sync_mutations_household_id_idx").on(table.householdId),
+    index("grocery_sync_mutations_created_at_idx").on(table.createdAt),
   ]
 );
 

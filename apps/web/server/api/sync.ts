@@ -108,6 +108,25 @@ export const handleSyncRequest: ApiHandler = async ({
   });
 };
 
+async function loadGroceryItemForIdempotentAdd(
+  db: ReturnType<typeof getDb>,
+  householdId: string,
+  itemId: string
+): Promise<Record<string, unknown>> {
+  const item = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, itemId),
+      scopeToHousehold(groceryItems.householdId, householdId)
+    ),
+  });
+
+  if (!item) {
+    throw new Error("Item not found");
+  }
+
+  return item as unknown as Record<string, unknown>;
+}
+
 async function loadGroceryItemForSync(
   db: ReturnType<typeof getDb>,
   householdId: string,
@@ -141,7 +160,11 @@ async function resolveIdempotentAdd(
   });
 
   if (!existing) return null;
-  return loadGroceryItemForSync(db, session.householdId, existing.groceryItemId);
+  return loadGroceryItemForIdempotentAdd(
+    db,
+    session.householdId,
+    existing.groceryItemId
+  );
 }
 
 async function processMutation(
@@ -167,7 +190,9 @@ async function processMutation(
       }
 
       const normalizedTagIds = Array.isArray(tagIds)
-        ? tagIds.filter((id): id is string => typeof id === "string")
+        ? Array.from(
+            new Set(tagIds.filter((id): id is string => typeof id === "string"))
+          )
         : [];
 
       let validTags: Array<{ id: string }> = [];

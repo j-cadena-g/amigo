@@ -541,13 +541,6 @@ describe("processSyncQueue", () => {
 
   it("isolates local merge failures without aborting later batch results", async () => {
     let mergeCalls = 0;
-    stubOfflineDb({
-      get: vi.fn().mockResolvedValue({
-        id: "g1",
-        householdId: "hh1",
-        _syncStatus: "pending",
-      }),
-    });
     getOfflineDBMock.mockReturnValue({
       groceryItems: {
         get: vi.fn().mockResolvedValue({

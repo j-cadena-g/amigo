@@ -239,7 +239,7 @@ async function processMutation(
         throw error;
       }
 
-      return loadGroceryItemForSync(db, session.householdId, newItemId);
+      return loadGroceryItemForIdempotentAdd(db, session.householdId, newItemId);
     }
 
     case "toggle": {

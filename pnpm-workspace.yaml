@@ -11,6 +11,8 @@ overrides:
   valibot: 1.4.2
   # Dependabot: sharp/libvips CVEs
   sharp: ">=0.35.0"
+  # Dependabot: undici cache/cookie/CRLF issues (via miniflare)
+  undici: 7.29.0
 
 allowBuilds:
   esbuild: true

@@ -1,5 +1,17 @@
-import { getOfflineDB, type OfflineGroceryItem, type OfflineGroceryTag } from "./db";
-import { setLastSyncTimestamp, setOfflineSessionContext } from "./sync-queue";
+import {
+  getOfflineDB,
+  type OfflineGroceryItem,
+  type OfflineGroceryTag,
+  type SyncQueueEntry,
+} from "./db";
+import { applyQueuedMutationToItems, type LocalMutationContext } from "./local-mutations";
+import {
+  compareSyncQueueEntries,
+  getOfflineSessionContext,
+  getPendingMutations,
+  setLastSyncTimestamp,
+  setOfflineSessionContext,
+} from "./sync-queue";
 import {
   detectConflict,
   resolveConflict,
@@ -178,14 +190,69 @@ export async function getOfflineItems(
   householdId?: string
 ): Promise<OfflineGroceryItem[]> {
   const db = getOfflineDB();
-  if (!householdId) {
-    return db.groceryItems.filter((item) => item.deletedAt === null).toArray();
+  const session = await getOfflineSessionContext();
+  const resolvedHouseholdId = householdId ?? session?.householdId;
+
+  const items = resolvedHouseholdId
+    ? await db.groceryItems
+        .where("householdId")
+        .equals(resolvedHouseholdId)
+        .toArray()
+    : await db.groceryItems.toArray();
+
+  const active = items.filter((item) => item.deletedAt === null);
+  if (!resolvedHouseholdId || !session?.userId) {
+    // No household/session context → never invent an empty overlay context.
+    return active;
   }
-  return db.groceryItems
-    .where("householdId")
-    .equals(householdId)
-    .filter((item) => item.deletedAt === null)
-    .toArray();
+
+  const pending = (await getPendingMutations()).filter(
+    (mutation) =>
+      !mutation.householdId || mutation.householdId === resolvedHouseholdId
+  );
+  if (pending.length === 0) {
+    return active;
+  }
+
+  return overlayPendingMutations(
+    items,
+    selectMutationsToOverlay(items, pending),
+    {
+      householdId: resolvedHouseholdId,
+      userId: session.userId,
+    }
+  );
+}
+
+export function selectMutationsToOverlay(
+  items: OfflineGroceryItem[],
+  mutations: SyncQueueEntry[]
+): SyncQueueEntry[] {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+
+  return mutations.filter((mutation) => {
+    if (mutation.entityType !== "groceryItem") return true;
+
+    const item = itemsById.get(mutation.entityId);
+    return !item || item._syncStatus === "synced";
+  });
+}
+
+export function overlayPendingMutations(
+  items: OfflineGroceryItem[],
+  mutations: SyncQueueEntry[],
+  ctx: LocalMutationContext
+): OfflineGroceryItem[] {
+  const groceryMutations = mutations
+    .filter((mutation) => mutation.entityType === "groceryItem")
+    .slice()
+    .sort(compareSyncQueueEntries);
+
+  let next = items;
+  for (const mutation of groceryMutations) {
+    next = applyQueuedMutationToItems(next, mutation, ctx);
+  }
+  return next.filter((item) => item.deletedAt === null);
 }
 
 export async function getOfflineTags(

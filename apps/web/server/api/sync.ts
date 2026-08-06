@@ -4,6 +4,7 @@ import {
   getDb,
   groceryItems,
   groceryItemTags,
+  grocerySyncMutations,
   groceryTags,
   inArray,
   isNull,
@@ -14,8 +15,10 @@ import { broadcastToHousehold } from "../lib/realtime";
 import { logServerError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
+import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
 
 const MAX_BATCH_SIZE = 10;
+const GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE = 500;
 
 const syncMutationSchema = z.object({
   id: z.string(),
@@ -107,6 +110,71 @@ export const handleSyncRequest: ApiHandler = async ({
   });
 };
 
+async function loadGroceryItemForIdempotentAdd(
+  db: ReturnType<typeof getDb>,
+  householdId: string,
+  itemId: string
+): Promise<Record<string, unknown>> {
+  const item = await db.query.groceryItems.findFirst({
+    where: and(
+      eq(groceryItems.id, itemId),
+      scopeToHousehold(groceryItems.householdId, householdId)
+    ),
+  });
+
+  if (!item) {
+    throw new Error("Item not found");
+  }
+
+  return item as unknown as Record<string, unknown>;
+}
+
+export async function cleanupStaleGrocerySyncMutations(
+  env: { DB: D1Database }
+): Promise<{ deletedCount: number }> {
+  const cutoff = Date.now() - GROCERY_SYNC_MUTATION_RETENTION_MS;
+  let deletedCount = 0;
+
+  while (true) {
+    const result = await env.DB.prepare(
+      `DELETE FROM grocery_sync_mutations
+       WHERE rowid IN (
+         SELECT rowid FROM grocery_sync_mutations
+         WHERE created_at < ?
+         LIMIT ?
+       )`
+    )
+      .bind(cutoff, GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE)
+      .run();
+
+    const changes = result.meta.changes ?? 0;
+    deletedCount += changes;
+    if (changes < GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE) break;
+  }
+
+  return { deletedCount };
+}
+
+async function resolveIdempotentAdd(
+  db: ReturnType<typeof getDb>,
+  session: { householdId: string },
+  mutationId: string
+): Promise<Record<string, unknown> | null> {
+  const existing = await db.query.grocerySyncMutations.findFirst({
+    where: and(
+      eq(grocerySyncMutations.id, mutationId),
+      scopeToHousehold(grocerySyncMutations.householdId, session.householdId)
+    ),
+  });
+
+  if (!existing) return null;
+  return loadGroceryItemForIdempotentAdd(
+    db,
+    session.householdId,
+    existing.groceryItemId
+  );
+}
+
 async function processMutation(
   db: ReturnType<typeof getDb>,
   session: { userId: string; householdId: string },
@@ -124,35 +192,62 @@ async function processMutation(
         throw new Error("Item name is required");
       }
 
-      const item = await db
-        .insert(groceryItems)
-        .values({
+      const existingItem = await resolveIdempotentAdd(db, session, mutation.id);
+      if (existingItem) {
+        return existingItem;
+      }
+
+      const normalizedTagIds = Array.isArray(tagIds)
+        ? Array.from(
+            new Set(tagIds.filter((id): id is string => typeof id === "string"))
+          )
+        : [];
+
+      let validTags: Array<{ id: string }> = [];
+      if (normalizedTagIds.length > 0) {
+        validTags = await db.query.groceryTags.findMany({
+          where: and(
+            inArray(groceryTags.id, normalizedTagIds),
+            scopeToHousehold(groceryTags.householdId, session.householdId)
+          ),
+        });
+        if (validTags.length !== normalizedTagIds.length) {
+          throw new Error("One or more tags are invalid for this household");
+        }
+      }
+
+      const newItemId = crypto.randomUUID();
+      const writes = [
+        db.insert(groceryItems).values({
+          id: newItemId,
           householdId: session.householdId,
           createdByUserId: session.userId,
           itemName: name.trim().slice(0, 255),
           category: category?.trim().slice(0, 100) || "General",
-        })
-        .returning()
-        .get();
+        }),
+        ...(validTags.length > 0
+          ? [
+              db.insert(groceryItemTags).values(
+                validTags.map((tag) => ({ itemId: newItemId, tagId: tag.id }))
+              ),
+            ]
+          : []),
+        db.insert(grocerySyncMutations).values({
+          id: mutation.id,
+          householdId: session.householdId,
+          groceryItemId: newItemId,
+        }),
+      ];
 
-      if (!item) throw new Error("Insert returned empty result");
-
-      if (tagIds && tagIds.length > 0) {
-        const validTags = await db.query.groceryTags.findMany({
-          where: and(
-            inArray(groceryTags.id, tagIds),
-            scopeToHousehold(groceryTags.householdId, session.householdId)
-          ),
-        });
-        if (validTags.length !== tagIds.length) {
-          throw new Error("One or more tags are invalid for this household");
-        }
-        await db.insert(groceryItemTags).values(
-          validTags.map((tag) => ({ itemId: item.id, tagId: tag.id }))
-        );
+      try {
+        await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
+      } catch (error) {
+        const raced = await resolveIdempotentAdd(db, session, mutation.id);
+        if (raced) return raced;
+        throw error;
       }
 
-      return item as unknown as Record<string, unknown>;
+      return loadGroceryItemForIdempotentAdd(db, session.householdId, newItemId);
     }
 
     case "toggle": {

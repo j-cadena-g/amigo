@@ -125,6 +125,15 @@ export function isSqlitePrimaryKeyConflict(error: unknown) {
   );
 }
 
+export function shouldAdvanceAfterInsertAttempt(args: {
+  inserted: boolean;
+  error: unknown | null;
+}): "advance" | "skip" | "pk-conflict-advance" {
+  if (args.inserted) return "advance";
+  if (isSqlitePrimaryKeyConflict(args.error)) return "pk-conflict-advance";
+  return "skip";
+}
+
 export async function advanceRecurringRuleIfCurrent(db: DrizzleD1, rule: RecurringRule) {
   const nextRunDate = calculateNextRunDate(
     rule.frequency,
@@ -170,7 +179,7 @@ export async function processDueRecurringRules(
   env: Env,
   db: DrizzleD1,
   scope: ProcessDueRecurringMode
-): Promise<{ processed: number }> {
+): Promise<{ processed: number; failed: number }> {
   const now = new Date();
   const farthestToday = todayInTz("Pacific/Kiritimati", now);
 
@@ -209,15 +218,17 @@ export async function processDueRecurringRules(
   });
 
   if (dueRules.length === 0) {
-    return { processed: 0 };
+    return { processed: 0, failed: 0 };
   }
 
   let processedCount = 0;
+  let failedCount = 0;
   const countsByHousehold = new Map<string, number>();
 
   for (const rule of dueRules) {
     const transactionId = buildRecurringOccurrenceTransactionId(rule.id, rule.nextRunDate);
     let inserted = false;
+    let error: unknown | null = null;
 
     try {
       const homeCurrency = await getHomeCurrency(db, rule.householdId);
@@ -243,10 +254,25 @@ export async function processDueRecurringRules(
       });
 
       inserted = true;
-    } catch (error) {
-      if (!isSqlitePrimaryKeyConflict(error)) {
+    } catch (err) {
+      error = err;
+    }
+
+    const decision = shouldAdvanceAfterInsertAttempt({ inserted, error });
+    if (decision === "skip") {
+      if (scope.mode === "household_user") {
         throw error;
       }
+      failedCount++;
+      console.error(
+        JSON.stringify({
+          message: "processDueRecurringRules rule failed",
+          ruleId: rule.id,
+          householdId: rule.householdId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      continue;
     }
 
     if (inserted) {
@@ -257,7 +283,25 @@ export async function processDueRecurringRules(
       );
     }
 
-    await advanceRecurringRuleIfCurrent(db, rule);
+    try {
+      await advanceRecurringRuleIfCurrent(db, rule);
+    } catch (advanceError) {
+      if (scope.mode === "household_user") {
+        throw advanceError;
+      }
+      failedCount++;
+      console.error(
+        JSON.stringify({
+          message: "processDueRecurringRules advance failed",
+          ruleId: rule.id,
+          householdId: rule.householdId,
+          error:
+            advanceError instanceof Error
+              ? advanceError.message
+              : String(advanceError),
+        })
+      );
+    }
   }
 
   for (const [householdId, count] of countsByHousehold) {
@@ -268,5 +312,5 @@ export async function processDueRecurringRules(
     });
   }
 
-  return { processed: processedCount };
+  return { processed: processedCount, failed: failedCount };
 }

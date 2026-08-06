@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useRevalidator } from "react-router";
+import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
+import { useToast } from "@/app/components/toast-provider";
 import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
 import { CategoryBudgetMappingPanel } from "@/app/components/financial/category-budget-mapping-panel";
 import { Button } from "@/app/components/ui/button";
@@ -280,6 +282,7 @@ export function BudgetList({
   homeCurrency,
 }: BudgetListProps) {
   const revalidator = useRevalidator();
+  const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<BudgetWithSpending | null>(null);
@@ -373,7 +376,11 @@ export function BudgetList({
       if (res.ok) {
         setDeletingBudget(null);
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Delete budget");
+    } catch {
+      await toastMutationFailure(toast, null, "Delete budget");
     } finally {
       setSubmitting(false);
     }

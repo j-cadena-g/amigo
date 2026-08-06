@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Button } from "@/app/components/ui/button";
 import {
   Card,
@@ -13,8 +13,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/app/components/ui/dialog";
+import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
+import { useToast } from "@/app/components/toast-provider";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
 
@@ -91,6 +93,7 @@ export function Calendar({
   initialMonth,
   compact = false,
 }: CalendarProps) {
+  const toast = useToast();
   const initial = parseMonth(initialMonth);
   const [year, setYear] = useState(initial.year);
   const [month, setMonth] = useState(initial.month);
@@ -100,7 +103,9 @@ export function Calendar({
     [initialMonth]: initialEvents,
   });
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const fetchRequestIdRef = useRef(0);
 
   const currentKey = formatMonthKey(year, month);
   const events = eventsCache[currentKey] ?? [];
@@ -108,22 +113,38 @@ export function Calendar({
   const fetchEvents = useCallback(
     async (y: number, m: number) => {
       const key = formatMonthKey(y, m);
-      if (eventsCache[key]) return;
+      // Invalidate any in-flight request before handling cache or starting a fetch.
+      const requestId = ++fetchRequestIdRef.current;
+      if (eventsCache[key]) {
+        setLoadError(null);
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
         const res = await fetch(`/api/calendar?year=${y}&month=${m + 1}`);
+        if (requestId !== fetchRequestIdRef.current) return;
         if (res.ok) {
           const data = (await res.json()) as { events?: CalendarEvent[] };
+          if (requestId !== fetchRequestIdRef.current) return;
           setEventsCache((prev) => ({ ...prev, [key]: data.events ?? [] }));
+          setLoadError(null);
+          return;
         }
+        setLoadError("Couldn't load this month");
+        await toastMutationFailure(toast, res, "Load calendar");
       } catch {
-        // Silently fail, show empty month
+        if (requestId !== fetchRequestIdRef.current) return;
+        setLoadError("Couldn't load this month");
+        await toastMutationFailure(toast, null, "Load calendar");
       } finally {
-        setLoading(false);
+        if (requestId === fetchRequestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [eventsCache]
+    [eventsCache, toast]
   );
 
   function navigate(direction: -1 | 1) {
@@ -226,6 +247,9 @@ export function Calendar({
               </Button>
             </div>
           </div>
+          {loadError && (
+            <p className="mt-1 text-sm text-destructive">{loadError}</p>
+          )}
         </CardHeader>
         <CardContent className={compact ? "px-4 pb-4 pt-0" : undefined}>
           {loading && (

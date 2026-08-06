@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useRevalidator } from "react-router";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { EmptyState } from "@/app/components/empty-state";
+import { useToast } from "@/app/components/toast-provider";
 import { Switch } from "@/app/components/ui/switch";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -115,6 +117,7 @@ function formatDate(iso: string): string {
 
 export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
   const revalidator = useRevalidator();
+  const toast = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -129,7 +132,11 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
       });
       if (res.ok) {
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Update recurring rule");
+    } catch {
+      await toastMutationFailure(toast, null, "Update recurring rule");
     } finally {
       setToggling(null);
     }
@@ -145,7 +152,11 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
       if (res.ok) {
         setDeletingRule(null);
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Delete recurring rule");
+    } catch {
+      await toastMutationFailure(toast, null, "Delete recurring rule");
     } finally {
       setDeleting(false);
     }

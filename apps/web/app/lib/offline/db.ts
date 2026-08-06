@@ -31,6 +31,10 @@ export interface OfflineGroceryTag {
 export interface SyncQueueEntry {
   id: string;
   timestamp: number;
+  /** Monotonic enqueue order; breaks ties when timestamps collide. */
+  sequence: number;
+  /** Household that enqueued this mutation; used to scope offline replay. */
+  householdId?: string;
   operation: "add" | "toggle" | "delete" | "updateTags";
   entityType: "groceryItem" | "groceryTag";
   entityId: string;
@@ -59,6 +63,32 @@ class AmigoOfflineDB extends Dexie {
       syncQueue: "id, timestamp, entityType, entityId",
       syncMetadata: "key",
     });
+
+    this.version(2)
+      .stores({
+        groceryItems: "id, householdId, updatedAt, _syncStatus",
+        groceryTags: "id, householdId, _syncStatus",
+        syncQueue: "id, timestamp, sequence, entityType, entityId",
+        syncMetadata: "key",
+      })
+      .upgrade(async (tx) => {
+        const rows = await tx.table("syncQueue").toArray();
+        rows.sort((a, b) => {
+          const ta = typeof a.timestamp === "number" ? a.timestamp : 0;
+          const tb = typeof b.timestamp === "number" ? b.timestamp : 0;
+          if (ta !== tb) return ta - tb;
+          return String(a.id).localeCompare(String(b.id));
+        });
+        let sequence = 0;
+        for (const row of rows) {
+          sequence += 1;
+          await tx.table("syncQueue").update(row.id, { sequence });
+        }
+        await tx.table("syncMetadata").put({
+          key: "mutationSequence",
+          value: sequence,
+        });
+      });
   }
 }
 

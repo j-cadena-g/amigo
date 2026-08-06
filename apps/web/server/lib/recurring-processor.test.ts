@@ -4,6 +4,7 @@ import {
   calculateNextRunDate,
   getInitialNextRunDate,
   isSqlitePrimaryKeyConflict,
+  shouldAdvanceAfterInsertAttempt,
 } from "./recurring-processor";
 
 describe("recurring-processor", () => {
@@ -11,6 +12,42 @@ describe("recurring-processor", () => {
     expect(buildRecurringOccurrenceTransactionId("rule-1", "2026-01-15")).toBe(
       "recurring:rule-1:2026-01-15"
     );
+  });
+
+  it("shouldAdvanceAfterInsertAttempt skips non-PK errors", () => {
+    expect(
+      shouldAdvanceAfterInsertAttempt({
+        inserted: false,
+        error: new Error("FX API down"),
+      })
+    ).toBe("skip");
+  });
+
+  it("shouldAdvanceAfterInsertAttempt advances on PK conflict", () => {
+    expect(
+      shouldAdvanceAfterInsertAttempt({
+        inserted: false,
+        error: new Error("UNIQUE constraint failed: transactions.id"),
+      })
+    ).toBe("pk-conflict-advance");
+  });
+
+  it("shouldAdvanceAfterInsertAttempt advances on success", () => {
+    expect(
+      shouldAdvanceAfterInsertAttempt({
+        inserted: true,
+        error: null,
+      })
+    ).toBe("advance");
+  });
+
+  it("shouldAdvanceAfterInsertAttempt skips unsuccessful attempts without error", () => {
+    expect(
+      shouldAdvanceAfterInsertAttempt({
+        inserted: false,
+        error: null,
+      })
+    ).toBe("skip");
   });
 
   it("isSqlitePrimaryKeyConflict detects transaction id conflicts", () => {

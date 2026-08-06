@@ -11,6 +11,7 @@ import {
 import { useWebSocket } from "@/app/lib/websocket";
 import { useToast } from "@/app/components/toast-provider";
 import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
@@ -72,16 +73,6 @@ function toQueuedMutation(action: OptimisticAction): QueuedMutation | null {
     default:
       return null;
   }
-}
-
-async function readErrorMessage(res: Response): Promise<string | null> {
-  try {
-    const data = (await res.json()) as { error?: unknown };
-    if (typeof data?.error === "string") return data.error;
-  } catch {
-    // Non-JSON body; fall back to a generic message.
-  }
-  return null;
 }
 
 function buildItemFromServer(
@@ -179,14 +170,31 @@ export function useGroceryLogic({
           "@/app/lib/offline/sync-processor"
         );
         const result = await processSyncQueue();
-        if (cancelled || result.processed === 0) return;
-        revalidator.revalidate();
-        toast(
-          `Synced ${result.processed} offline change${
-            result.processed === 1 ? "" : "s"
-          }`,
-          { variant: "success" }
-        );
+        if (cancelled) return;
+
+        if (result.processed > 0) {
+          revalidator.revalidate();
+          toast(
+            `Synced ${result.processed} offline change${
+              result.processed === 1 ? "" : "s"
+            }`,
+            { variant: "success" }
+          );
+        }
+
+        if (result.discarded > 0) {
+          toast(
+            `${result.discarded} offline change${
+              result.discarded === 1 ? "" : "s"
+            } could not sync and ${
+              result.discarded === 1 ? "was" : "were"
+            } discarded — please re-apply ${
+              result.discarded === 1 ? "it" : "them"
+            }`,
+            { variant: "error", duration: 8000 }
+          );
+          revalidator.revalidate();
+        }
       } catch {
         // Leave the queue intact; we'll retry on the next online/sync event.
       }
@@ -260,7 +268,7 @@ export function useGroceryLogic({
             });
             return;
           }
-          const message = await readErrorMessage(res);
+          const message = await readApiErrorMessage(res);
           toast(message ?? `${label} failed`, { variant: "error" });
         } catch {
           // Network failure (likely offline). Queue supported operations so

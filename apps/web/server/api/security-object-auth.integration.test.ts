@@ -6,6 +6,7 @@ import {
   debts,
   eq,
   financialAccounts,
+  groceryItems,
   groceryItemTags,
   groceryTags,
   isNull,
@@ -160,6 +161,137 @@ describe("security object authorization integration", () => {
       .from(groceryItemTags)
       .where(eq(groceryItemTags.tagId, foreignTagId));
     expect(joined).toHaveLength(0);
+  });
+
+  it("returns the same grocery item for repeated add mutation ids", async () => {
+    const mutationId = `mutation-${crypto.randomUUID()}`;
+    const entityId = `item-${crypto.randomUUID()}`;
+    const requestBody = {
+      mutations: [
+        {
+          id: mutationId,
+          operation: "add",
+          entityType: "groceryItem",
+          entityId,
+          payload: { name: "Bread" },
+        },
+      ],
+    };
+
+    const makeRequest = () =>
+      handleSyncRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }),
+        sessionStatus: "authenticated",
+        session: sessionFor({ userId: memberOneId, householdId }),
+        loadContext: {} as never,
+      });
+
+    const first = await makeRequest();
+    const second = await makeRequest();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const firstJson = (await first.json()) as {
+      results: Array<{ success: boolean; serverItem?: { id: string } }>;
+    };
+    const secondJson = (await second.json()) as {
+      results: Array<{ success: boolean; serverItem?: { id: string } }>;
+    };
+
+    expect(firstJson.results[0]?.success).toBe(true);
+    expect(secondJson.results[0]?.success).toBe(true);
+    expect(firstJson.results[0]?.serverItem?.id).toBe(
+      secondJson.results[0]?.serverItem?.id
+    );
+
+    const items = await db
+      .select({ id: groceryItems.id })
+      .from(groceryItems)
+      .where(eq(groceryItems.householdId, householdId));
+    expect(items).toHaveLength(1);
+  });
+
+  it("retries the same add mutation id after tag validation failure", async () => {
+    const mutationId = `mutation-${crypto.randomUUID()}`;
+    const entityId = `item-${crypto.randomUUID()}`;
+    const foreignTagId = `tag-foreign-${crypto.randomUUID()}`;
+    await db.insert(groceryTags).values({
+      id: foreignTagId,
+      householdId: otherHouseholdId,
+      name: "Foreign",
+      color: "red",
+    });
+
+    const validTagId = `tag-valid-${crypto.randomUUID()}`;
+    await db.insert(groceryTags).values({
+      id: validTagId,
+      householdId,
+      name: "Valid",
+      color: "blue",
+    });
+
+    const makeRequest = (tagIds: string[]) =>
+      handleSyncRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mutations: [
+              {
+                id: mutationId,
+                operation: "add",
+                entityType: "groceryItem",
+                entityId,
+                payload: { name: "Eggs", tagIds },
+              },
+            ],
+          }),
+        }),
+        sessionStatus: "authenticated",
+        session: sessionFor({ userId: memberOneId, householdId }),
+        loadContext: {} as never,
+      });
+
+    const failed = await makeRequest([foreignTagId]);
+    expect(failed.status).toBe(200);
+    await expect(failed.json()).resolves.toMatchObject({
+      processed: 0,
+      failed: 1,
+      results: [
+        {
+          success: false,
+          error: "One or more tags are invalid for this household",
+        },
+      ],
+    });
+
+    const retry = await makeRequest([validTagId]);
+    expect(retry.status).toBe(200);
+    const retryJson = (await retry.json()) as {
+      results: Array<{ success: boolean; serverItem?: { id: string } }>;
+    };
+    expect(retryJson.results[0]?.success).toBe(true);
+
+    const items = await db
+      .select({ id: groceryItems.id })
+      .from(groceryItems)
+      .where(eq(groceryItems.householdId, householdId));
+    expect(items).toHaveLength(1);
+
+    const joined = await db
+      .select()
+      .from(groceryItemTags)
+      .where(eq(groceryItemTags.tagId, validTagId));
+    expect(joined).toHaveLength(1);
   });
 
   it("rejects transaction account references to another member's personal account", async () => {

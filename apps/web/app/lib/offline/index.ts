@@ -17,3 +17,9 @@ export type { GroceryItemWithTags, GroceryTag } from "./hydration";
 
 export { detectConflict, resolveConflict, mergeItems } from "./conflict-resolver";
 export type { ServerGroceryItem, ResolutionStrategy } from "./conflict-resolver";
+
+export {
+  applyQueuedMutationToItems,
+  buildOfflineItemForAdd,
+} from "./local-mutations";
+export type { LocalMutationContext } from "./local-mutations";

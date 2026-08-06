@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useRevalidator } from "react-router";
+import { toastMutationFailure } from "@/app/lib/api-error";
+import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import {
   DropdownMenu,
@@ -45,6 +47,7 @@ export function MemberRoleManager({
   currentUserId,
 }: MemberRoleManagerProps) {
   const revalidator = useRevalidator();
+  const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -70,7 +73,11 @@ export function MemberRoleManager({
       });
       if (res.ok) {
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Update role");
+    } catch {
+      await toastMutationFailure(toast, null, "Update role");
     } finally {
       setSubmitting(false);
     }
@@ -85,7 +92,11 @@ export function MemberRoleManager({
       if (res.ok) {
         setTransferOpen(false);
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Transfer ownership");
+    } catch {
+      await toastMutationFailure(toast, null, "Transfer ownership");
     } finally {
       setSubmitting(false);
     }
@@ -99,7 +110,11 @@ export function MemberRoleManager({
       if (res.ok) {
         const data = (await res.json()) as DataSummary;
         setDataSummary(data);
+        return;
       }
+      await toastMutationFailure(toast, res, "Load member summary");
+    } catch {
+      await toastMutationFailure(toast, null, "Load member summary");
     } finally {
       setLoadingSummary(false);
     }
@@ -114,7 +129,11 @@ export function MemberRoleManager({
       if (res.ok) {
         setRemoveOpen(false);
         revalidator.revalidate();
+        return;
       }
+      await toastMutationFailure(toast, res, "Remove member");
+    } catch {
+      await toastMutationFailure(toast, null, "Remove member");
     } finally {
       setSubmitting(false);
     }

@@ -113,6 +113,20 @@
       "when": 1778891700000,
       "tag": "0015_financial_categories_db_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1778891800000,
+      "tag": "0016_grocery_sync_mutations",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1778891900000,
+      "tag": "0017_grocery_sync_mutations_created_at_idx",
+      "breakpoints": true
     }
   ]
 }

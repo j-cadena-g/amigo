@@ -1,13 +1,22 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
-import { getDb, users, households, eq, and, isNull, scopeToHousehold } from "@amigo/db";
+import {
+  getDb,
+  users,
+  households,
+  eq,
+  and,
+  isNull,
+  parseHomeCurrency,
+  scopeToHousehold,
+} from "@amigo/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { HouseholdSettingsForm } from "@/app/components/settings/household-settings-form";
 import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
-import { TimezoneSelect } from "@/app/components/settings/timezone-select";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -68,16 +77,13 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="text-lg">Household</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <p className="font-medium">{household.name}</p>
-            </div>
-            <div>
-              <TimezoneSelect
-                timezone={household.timezone ?? "UTC"}
-                canEdit={canManageMembers}
-              />
-            </div>
+          <CardContent>
+            <HouseholdSettingsForm
+              name={household.name}
+              homeCurrency={parseHomeCurrency(household.homeCurrency)}
+              timezone={household.timezone ?? "UTC"}
+              canEdit={canManageMembers}
+            />
           </CardContent>
         </Card>
 

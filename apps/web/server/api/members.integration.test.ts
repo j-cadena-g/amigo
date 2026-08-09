@@ -94,7 +94,7 @@ describe("members integration", () => {
     });
   });
 
-  it("soft-deletes a member then clears Clerk household metadata", async () => {
+  it("claims soft-delete, clears Clerk metadata, then cleans up member data", async () => {
     const response = await handleMembersRequest({
       env: getIntegrationEnv(),
       params: { "*": memberId },
@@ -266,34 +266,37 @@ describe("members integration", () => {
     expect(owner?.deletedAt).toBeNull();
   });
 
-  it("keeps D1 leave when Clerk metadata clear fails", async () => {
+  it("restores D1 membership when leave Clerk metadata clear fails", async () => {
     mocks.updateUserMetadata.mockRejectedValueOnce(
       new Error("Clerk unavailable")
     );
 
-    const response = await handleMembersRequest({
-      env: getIntegrationEnv(),
-      params: { "*": "leave" },
-      request: new Request("http://localhost/api/members/leave", {
-        method: "POST",
-      }),
-      sessionStatus: "authenticated",
-      session: testSession({
-        userId: memberId,
-        householdId,
-        role: "member",
-      }),
-      loadContext: {} as never,
+    await expect(
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "leave" },
+        request: new Request("http://localhost/api/members/leave", {
+          method: "POST",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: memberId,
+          householdId,
+          role: "member",
+        }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: "Failed to clear household metadata from Clerk user",
     });
-
-    expect(response.status).toBe(200);
 
     const left = await getDb(getIntegrationEnv().DB)
       .select({ deletedAt: users.deletedAt })
       .from(users)
       .where(eq(users.id, memberId))
       .get();
-    expect(left?.deletedAt).toBeInstanceOf(Date);
+    expect(left?.deletedAt).toBeNull();
   });
 
   it("resolves concurrent leave and ownership transfer without a soft-deleted owner", async () => {

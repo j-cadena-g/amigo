@@ -169,13 +169,19 @@ export const handleSettingsRequest: ApiHandler = async ({
 
       const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
       const householdId = session!.householdId;
-      const householdName = validated.name!;
+      // Re-read households.name at write time so a slower waitUntil from an
+      // earlier rename cannot overwrite Clerk with a stale name.
       const syncMembers = Promise.all(
         members.map(async (member) => {
           try {
+            const latest = await db.query.households.findFirst({
+              where: eq(households.id, householdId),
+              columns: { name: true },
+            });
+            if (!latest) return;
             await setClerkHouseholdMetadata(clerk, member.authId, {
               householdId,
-              householdName,
+              householdName: latest.name,
             });
           } catch (error) {
             logServerError("settings-clerk-household-metadata", error, {

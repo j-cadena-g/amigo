@@ -9,7 +9,6 @@ import {
   groceryItems,
   isNull,
   ne,
-  pushSubscriptions,
   recurringTransactions,
   scopeToHousehold,
   sql,
@@ -21,6 +20,11 @@ import { clearClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { broadcastToHousehold, invalidateUserSession } from "../lib/realtime";
 import { ActionError, logSecurityEvent, logServerError } from "../lib/errors";
 import {
+  claimNonOwnerSoftDelete,
+  cleanupDepartedMemberData,
+  restoreSoftDeleteClaim,
+} from "../lib/member-lifecycle";
+import {
   assertPermission,
   canChangeRole,
   canManageMembers,
@@ -31,8 +35,6 @@ import { invalidateSessionCachesForHouseholdMembers } from "../lib/session-cache
 import { assertSessionStillValid } from "../lib/session";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
-
-const RESTORE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
 
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
@@ -301,6 +303,16 @@ export const handleMembersRequest: ApiHandler = async ({
         });
       }
 
+      // Roles may have changed either way; drop cached sessions before failing.
+      await invalidateSessionCachesForHouseholdMembers(env, [
+        { authId: currentUser.authId },
+        { authId: newOwner.authId },
+      ]);
+      await Promise.all([
+        invalidateUserSession(env, householdId, currentOwnerId),
+        invalidateUserSession(env, householdId, newOwnerId),
+      ]);
+
       if (!promotedOwner || promotedOwner.deletedAt != null) {
         throw new ActionError("User not found in household", "NOT_FOUND");
       }
@@ -457,23 +469,15 @@ export const handleMembersRequest: ApiHandler = async ({
 
     const displayName = targetUser.name ?? targetUser.email;
     const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
 
     // Soft-delete first under a non-owner constraint so a concurrent ownership
-    // transfer cannot remove the new owner. Cleanup/Clerk run only after claim.
-    const removed = await db
-      .update(users)
-      .set({ deletedAt: new Date(), restoreAllowedUntil })
-      .where(
-        and(
-          eq(users.id, userId),
-          scopeToHousehold(users.householdId, session!.householdId),
-          isNull(users.deletedAt),
-          ne(users.role, "owner")
-        )
-      )
-      .returning({ id: users.id })
-      .get();
+    // transfer cannot remove the new owner. Clerk then cleanup; Clerk first so
+    // a metadata failure can restore without dropping push subscriptions.
+    const removed = await claimNonOwnerSoftDelete(
+      db,
+      userId,
+      session!.householdId
+    );
 
     if (!removed) {
       throw new ActionError(
@@ -482,48 +486,10 @@ export const handleMembersRequest: ApiHandler = async ({
       );
     }
 
-    const restoreRemovalClaim = async () => {
-      await db
-        .update(users)
-        .set({ deletedAt: null, restoreAllowedUntil: null })
-        .where(eq(users.id, userId));
-    };
-
-    try {
-      await db.batch([
-        db
-          .update(transactions)
-          .set({ userDisplayName: displayName })
-          .where(eq(transactions.userId, userId)),
-        db
-          .update(recurringTransactions)
-          .set({ userDisplayName: displayName })
-          .where(eq(recurringTransactions.userId, userId)),
-        db
-          .update(assets)
-          .set({ userDisplayName: displayName })
-          .where(eq(assets.userId, userId)),
-        db
-          .update(debts)
-          .set({ userDisplayName: displayName })
-          .where(eq(debts.userId, userId)),
-        db
-          .update(groceryItems)
-          .set({ createdByUserDisplayName: displayName })
-          .where(eq(groceryItems.createdByUserId, userId)),
-        db
-          .delete(pushSubscriptions)
-          .where(eq(pushSubscriptions.userId, userId)),
-      ]);
-    } catch (error) {
-      await restoreRemovalClaim();
-      throw error;
-    }
-
     try {
       await clearClerkHouseholdMetadata(clerk, targetUser.authId);
     } catch (error) {
-      await restoreRemovalClaim();
+      await restoreSoftDeleteClaim(db, userId);
       logServerError("remove-member-clerk-metadata", error, {
         householdId: session!.householdId,
         removedUserId: userId,
@@ -533,6 +499,13 @@ export const handleMembersRequest: ApiHandler = async ({
         "Failed to clear household metadata from Clerk user",
         "INTERNAL_ERROR"
       );
+    }
+
+    try {
+      await cleanupDepartedMemberData(db, userId, displayName);
+    } catch (error) {
+      await restoreSoftDeleteClaim(db, userId);
+      throw error;
     }
 
     await invalidateSessionCachesForHouseholdMembers(env, [
@@ -596,24 +569,14 @@ export const handleMembersRequest: ApiHandler = async ({
     const displayName = currentUser.name ?? currentUser.email;
     const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
     const leavingUserId = session!.userId;
-    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
 
-    // Soft-delete first under a non-owner constraint so a concurrent ownership
-    // transfer cannot soft-delete an owner. Cleanup runs only after a successful
-    // claim; on cleanup failure, undelete so leave is not half-applied.
-    const left = await db
-      .update(users)
-      .set({ deletedAt: new Date(), restoreAllowedUntil })
-      .where(
-        and(
-          eq(users.id, leavingUserId),
-          scopeToHousehold(users.householdId, session!.householdId),
-          isNull(users.deletedAt),
-          ne(users.role, "owner")
-        )
-      )
-      .returning({ id: users.id })
-      .get();
+    // Same claim → Clerk → cleanup policy as admin removal so Clerk failures
+    // restore membership instead of leaving a soft-deleted row.
+    const left = await claimNonOwnerSoftDelete(
+      db,
+      leavingUserId,
+      session!.householdId
+    );
 
     if (!left) {
       throw new ActionError(
@@ -623,47 +586,24 @@ export const handleMembersRequest: ApiHandler = async ({
     }
 
     try {
-      await db.batch([
-        db
-          .update(transactions)
-          .set({ userDisplayName: displayName })
-          .where(eq(transactions.userId, leavingUserId)),
-        db
-          .update(recurringTransactions)
-          .set({ userDisplayName: displayName })
-          .where(eq(recurringTransactions.userId, leavingUserId)),
-        db
-          .update(assets)
-          .set({ userDisplayName: displayName })
-          .where(eq(assets.userId, leavingUserId)),
-        db
-          .update(debts)
-          .set({ userDisplayName: displayName })
-          .where(eq(debts.userId, leavingUserId)),
-        db
-          .update(groceryItems)
-          .set({ createdByUserDisplayName: displayName })
-          .where(eq(groceryItems.createdByUserId, leavingUserId)),
-        db
-          .delete(pushSubscriptions)
-          .where(eq(pushSubscriptions.userId, leavingUserId)),
-      ]);
-    } catch (error) {
-      await db
-        .update(users)
-        .set({ deletedAt: null, restoreAllowedUntil: null })
-        .where(eq(users.id, leavingUserId));
-      throw error;
-    }
-
-    try {
       await clearClerkHouseholdMetadata(clerk, currentUser.authId);
     } catch (error) {
+      await restoreSoftDeleteClaim(db, leavingUserId);
       logServerError("leave-household-clerk-metadata", error, {
         householdId: session!.householdId,
         userId: leavingUserId,
       });
-      // Membership already removed in D1 (source of truth).
+      throw new ActionError(
+        "Failed to clear household metadata from Clerk user",
+        "INTERNAL_ERROR"
+      );
+    }
+
+    try {
+      await cleanupDepartedMemberData(db, leavingUserId, displayName);
+    } catch (error) {
+      await restoreSoftDeleteClaim(db, leavingUserId);
+      throw error;
     }
 
     await invalidateSessionCachesForHouseholdMembers(env, [

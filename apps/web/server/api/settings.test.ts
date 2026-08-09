@@ -242,6 +242,11 @@ describe("handleSettingsRequest home currency", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.setClerkHouseholdMetadata).toHaveBeenCalledTimes(2);
+    expect(mocks.setClerkHouseholdMetadata).toHaveBeenCalledWith(
+      expect.anything(),
+      "auth-ok",
+      expect.objectContaining({ householdName: "Renamed" })
+    );
     expect(mocks.logServerError).toHaveBeenCalledWith(
       "settings-clerk-household-metadata",
       expect.any(Error),

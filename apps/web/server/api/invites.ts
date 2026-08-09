@@ -151,7 +151,12 @@ export const handleInvitesRequest: ApiHandler = async ({
       .from(householdInvites)
       .where(pendingInviteFilter(session!.householdId, now));
 
-    return Response.json(invites);
+    return Response.json(
+      invites.map((invite) => ({
+        ...invite,
+        joinUrl: buildJoinUrl(env.APP_ORIGIN, invite.codeDisplay),
+      }))
+    );
   }
 
   if (request.method === "POST" && !path) {

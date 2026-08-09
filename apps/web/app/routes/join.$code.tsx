@@ -71,12 +71,20 @@ export default function JoinInvite() {
   const { status, code } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    status === "needs_setup" && !code ? "Invite code is missing" : null
+  );
   const [accepting, setAccepting] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (status !== "needs_setup" || !code) {
+    if (status !== "needs_setup") {
+      return;
+    }
+
+    if (!code) {
+      setError("Invite code is missing");
+      setAccepting(false);
       return;
     }
 

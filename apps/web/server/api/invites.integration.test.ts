@@ -160,6 +160,39 @@ describe("invites integration", () => {
     });
   });
 
+  it("lists pending invites with server-canonical joinUrl", async () => {
+    const { body } = await createInvite();
+
+    const listResponse = await handleInvitesRequest({
+      env: testEnv(),
+      params: {},
+      request: new Request("http://localhost/api/invites", {
+        method: "GET",
+      }),
+      sessionStatus: "authenticated",
+      session: testSession({
+        userId: ownerId,
+        householdId,
+        role: "owner",
+      }),
+      loadContext: {} as never,
+    });
+
+    expect(listResponse.status).toBe(200);
+    const listed = (await listResponse.json()) as Array<{
+      id: string;
+      codeDisplay: string;
+      joinUrl: string;
+    }>;
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.id).toBe(body.id);
+    expect(listed[0]?.codeDisplay).toBe(body.code);
+    expect(listed[0]?.joinUrl).toBe(
+      `https://app.example.test/join/${encodeURIComponent(body.code)}`
+    );
+    expect(listed[0]?.joinUrl).toBe(body.joinUrl);
+  });
+
   it("rejects a second accept of the same code", async () => {
     const { body } = await createInvite();
     const firstAuthId = `clerk_invites_first_${suffix}`;

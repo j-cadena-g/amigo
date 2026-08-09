@@ -8,6 +8,7 @@ import { Input } from "@/app/components/ui/input";
 interface PendingInvite {
   id: string;
   codeDisplay: string;
+  joinUrl: string;
   invitedEmail: string | null;
   emailSentAt: string | null;
   emailLastError: string | null;
@@ -23,13 +24,6 @@ interface CreatedInvite {
   invitedEmail: string | null;
   emailSent: boolean;
   emailError?: string;
-}
-
-function buildJoinUrl(codeDisplay: string): string {
-  if (typeof window === "undefined") {
-    return `/join/${encodeURIComponent(codeDisplay)}`;
-  }
-  return `${window.location.origin}/join/${encodeURIComponent(codeDisplay)}`;
 }
 
 function formatExpiry(expiresAt: string): string {
@@ -277,9 +271,7 @@ export function InviteManager() {
                     size="sm"
                     variant="outline"
                     disabled={busyId === invite.id}
-                    onClick={() =>
-                      void copyText("Invite link", buildJoinUrl(invite.codeDisplay))
-                    }
+                    onClick={() => void copyText("Invite link", invite.joinUrl)}
                   >
                     Copy link
                   </Button>

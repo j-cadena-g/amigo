@@ -1,10 +1,20 @@
-import { redirect, Outlet, type LoaderFunctionArgs } from "react-router";
+import {
+  redirect,
+  Outlet,
+  useLoaderData,
+  useRevalidator,
+  type LoaderFunctionArgs,
+} from "react-router";
 import { NavBar } from "@/app/components/layout/nav-bar";
 import { OfflineIndicator } from "@/app/components/offline-indicator";
 import { ConfirmProvider } from "@/app/components/confirm-provider";
 import { ToastProvider } from "@/app/components/toast-provider";
 import { PushPromptProvider } from "@/app/components/push-prompt-provider";
 import { ThemeProvider } from "@/app/components/theme-provider";
+import {
+  HouseholdRealtimeProvider,
+  useHouseholdRealtime,
+} from "@/app/components/realtime/household-realtime-provider";
 import { requireSession, getSessionStatus } from "@/app/lib/session.server";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -30,19 +40,33 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+/** Default shell subscriber: revalidate route data on any household event. */
+function HouseholdRealtimeDefaults() {
+  const revalidator = useRevalidator();
+  useHouseholdRealtime(() => {
+    revalidator.revalidate();
+  });
+  return null;
+}
+
 export default function AppLayout() {
+  const { userId } = useLoaderData<typeof loader>();
+
   return (
     <ThemeProvider>
       <ToastProvider>
         <ConfirmProvider>
           <PushPromptProvider>
-            <div className="relative min-h-screen overflow-x-hidden bg-background">
-              <NavBar />
-              <OfflineIndicator />
-              <div className="page-enter relative z-10">
-                <Outlet />
+            <HouseholdRealtimeProvider userId={userId}>
+              <HouseholdRealtimeDefaults />
+              <div className="relative min-h-screen overflow-x-hidden bg-background">
+                <NavBar />
+                <OfflineIndicator />
+                <div className="page-enter relative z-10">
+                  <Outlet />
+                </div>
               </div>
-            </div>
+            </HouseholdRealtimeProvider>
           </PushPromptProvider>
         </ConfirmProvider>
       </ToastProvider>

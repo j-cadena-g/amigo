@@ -14,6 +14,10 @@ import { getCloudflare } from "../../router-context";
 import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { isValidTimeZone } from "../lib/dates";
 import { ActionError, logServerError } from "../lib/errors";
+import {
+  enqueueHouseholdClerkNameSync,
+  householdTimestampMs,
+} from "../lib/household-clerk-sync";
 import { refreshHouseholdHomeCurrencyRates } from "../lib/home-currency-refresh";
 import { assertPermission, canManageSharedBudgets } from "../lib/permissions";
 import { assertSessionStillValid } from "../lib/session";
@@ -169,28 +173,38 @@ export const handleSettingsRequest: ApiHandler = async ({
 
       const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
       const householdId = session!.householdId;
-      // Re-read households.name at write time so a slower waitUntil from an
-      // earlier rename cannot overwrite Clerk with a stale name.
-      const syncMembers = Promise.all(
-        members.map(async (member) => {
-          try {
-            const latest = await db.query.households.findFirst({
-              where: eq(households.id, householdId),
-              columns: { name: true },
-            });
-            if (!latest) return;
-            await setClerkHouseholdMetadata(clerk, member.authId, {
-              householdId,
-              householdName: latest.name,
-            });
-          } catch (error) {
-            logServerError("settings-clerk-household-metadata", error, {
-              householdId,
-              authId: member.authId,
-            });
-          }
-        })
-      );
+      const requestedName = validated.name!;
+      const syncGenerationMs = householdTimestampMs(updated.updatedAt);
+
+      // Serialize per household and skip when a newer rename already landed.
+      const syncMembers = enqueueHouseholdClerkNameSync(householdId, async () => {
+        const latest = await db.query.households.findFirst({
+          where: eq(households.id, householdId),
+          columns: { name: true, updatedAt: true },
+        });
+        if (!latest) return;
+
+        const latestMs = householdTimestampMs(latest.updatedAt);
+        if (latestMs > syncGenerationMs && latest.name !== requestedName) {
+          return;
+        }
+
+        await Promise.all(
+          members.map(async (member) => {
+            try {
+              await setClerkHouseholdMetadata(clerk, member.authId, {
+                householdId,
+                householdName: latest.name,
+              });
+            } catch (error) {
+              logServerError("settings-clerk-household-metadata", error, {
+                householdId,
+                authId: member.authId,
+              });
+            }
+          })
+        );
+      });
 
       const ctx = getCloudflare(loadContext).ctx;
       if (ctx && typeof ctx.waitUntil === "function") {

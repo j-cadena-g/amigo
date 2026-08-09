@@ -11,13 +11,14 @@ const mocks = vi.hoisted(() => ({
   householdUpdate: vi.fn(),
   setClerkHouseholdMetadata: vi.fn(),
   createClerkClient: vi.fn(),
-  getCloudflare: vi.fn(() => ({ ctx: undefined })),
+  getCloudflare: vi.fn(() => ({ ctx: undefined as undefined | { waitUntil: (task: Promise<unknown>) => void } })),
   members: [] as Array<{ authId: string }>,
   householdState: {
     id: "hh-1",
     name: "Original Name",
     homeCurrency: "CAD" as const,
     timezone: "UTC",
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   },
 }));
 
@@ -105,6 +106,7 @@ describe("handleSettingsRequest home currency", () => {
     mocks.householdState.homeCurrency = "CAD";
     mocks.householdState.name = "Original Name";
     mocks.householdState.timezone = "UTC";
+    mocks.householdState.updatedAt = new Date("2026-01-01T00:00:00.000Z");
     mocks.getDb.mockReset().mockReturnValue(createMockDb());
   });
 
@@ -252,5 +254,106 @@ describe("handleSettingsRequest home currency", () => {
       expect.any(Error),
       expect.objectContaining({ authId: "auth-fail" })
     );
+  });
+
+  it("skips Clerk sync when a newer rename already committed", async () => {
+    mocks.members = [{ authId: "auth-1" }];
+    const db = createMockDb();
+    let findFirstCalls = 0;
+    db.query.households.findFirst = vi.fn(async () => {
+      findFirstCalls += 1;
+      if (findFirstCalls === 1) {
+        // PATCH reads the previous household row.
+        return { ...mocks.householdState };
+      }
+      // Sync read: a newer rename landed with a different name.
+      return {
+        ...mocks.householdState,
+        name: "Name B",
+        updatedAt: new Date(mocks.householdState.updatedAt.getTime() + 5_000),
+      };
+    });
+    mocks.getDb.mockReturnValue(db);
+
+    const response = await handleSettingsRequest({
+      env: { CLERK_SECRET_KEY: "sk_test" } as never,
+      params: {},
+      request: new Request("http://localhost/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Name A" }),
+      }),
+      sessionStatus: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "hh-1",
+        role: "owner",
+        email: "owner@example.com",
+        name: "Owner",
+      },
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.setClerkHouseholdMetadata).not.toHaveBeenCalled();
+  });
+
+  it("serializes renames so the latest Clerk write uses the newest name", async () => {
+    mocks.members = [{ authId: "auth-1" }];
+    const writes: string[] = [];
+    const waitUntilTasks: Promise<unknown>[] = [];
+    mocks.getCloudflare.mockReturnValue({
+      ctx: {
+        waitUntil: (task: Promise<unknown>) => {
+          waitUntilTasks.push(task);
+        },
+      },
+    });
+    mocks.setClerkHouseholdMetadata.mockImplementation(
+      async (_clerk, _authId, metadata: { householdName: string }) => {
+        writes.push(metadata.householdName);
+      }
+    );
+
+    await handleSettingsRequest({
+      env: { CLERK_SECRET_KEY: "sk_test" } as never,
+      params: {},
+      request: new Request("http://localhost/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Name A" }),
+      }),
+      sessionStatus: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "hh-1",
+        role: "owner",
+        email: "owner@example.com",
+        name: "Owner",
+      },
+      loadContext: {} as never,
+    });
+
+    await handleSettingsRequest({
+      env: { CLERK_SECRET_KEY: "sk_test" } as never,
+      params: {},
+      request: new Request("http://localhost/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Name B" }),
+      }),
+      sessionStatus: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "hh-1",
+        role: "owner",
+        email: "owner@example.com",
+        name: "Owner",
+      },
+      loadContext: {} as never,
+    });
+
+    await Promise.all(waitUntilTasks);
+    expect(writes.at(-1)).toBe("Name B");
   });
 });

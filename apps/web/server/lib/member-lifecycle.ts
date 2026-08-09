@@ -16,20 +16,26 @@ import {
 
 const RESTORE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
 
+export type SoftDeleteClaim = {
+  userId: string;
+  householdId: string;
+  deletedAt: Date;
+};
+
 /**
- * Soft-delete a non-owner member, then clean up denormalized display names and
- * push subscriptions. Call Clerk metadata clearing between claim and cleanup so
- * a Clerk failure can restore the membership without losing push rows.
+ * Soft-delete a non-owner member. Returns a claim token that must be used for
+ * restore so a delayed failure cannot clear a later soft-delete of the same user.
  */
 export async function claimNonOwnerSoftDelete(
   db: DrizzleD1,
   userId: string,
   householdId: string
-): Promise<boolean> {
-  const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
+): Promise<SoftDeleteClaim | null> {
+  const deletedAt = new Date();
+  const restoreAllowedUntil = new Date(deletedAt.getTime() + RESTORE_GRACE_MS);
   const claimed = await db
     .update(users)
-    .set({ deletedAt: new Date(), restoreAllowedUntil })
+    .set({ deletedAt, restoreAllowedUntil })
     .where(
       and(
         eq(users.id, userId),
@@ -38,20 +44,36 @@ export async function claimNonOwnerSoftDelete(
         ne(users.role, "owner")
       )
     )
+    .returning({ id: users.id, deletedAt: users.deletedAt })
+    .get();
+
+  if (!claimed?.deletedAt) return null;
+  return {
+    userId,
+    householdId,
+    deletedAt: claimed.deletedAt,
+  };
+}
+
+/** Restores only when the row still matches the exact claim token. */
+export async function restoreSoftDeleteClaim(
+  db: DrizzleD1,
+  claim: SoftDeleteClaim
+): Promise<boolean> {
+  const restored = await db
+    .update(users)
+    .set({ deletedAt: null, restoreAllowedUntil: null })
+    .where(
+      and(
+        eq(users.id, claim.userId),
+        scopeToHousehold(users.householdId, claim.householdId),
+        eq(users.deletedAt, claim.deletedAt)
+      )
+    )
     .returning({ id: users.id })
     .get();
 
-  return claimed != null;
-}
-
-export async function restoreSoftDeleteClaim(
-  db: DrizzleD1,
-  userId: string
-): Promise<void> {
-  await db
-    .update(users)
-    .set({ deletedAt: null, restoreAllowedUntil: null })
-    .where(eq(users.id, userId));
+  return restored != null;
 }
 
 export async function cleanupDepartedMemberData(

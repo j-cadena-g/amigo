@@ -91,13 +91,8 @@ export const handleSettingsRequest: ApiHandler = async ({
       updateData.timezone = validated.timezone;
     }
 
-    const updated = await db
-      .update(households)
-      .set(updateData)
-      .where(eq(households.id, session!.householdId))
-      .returning()
-      .get();
-
+    // Refresh FX snapshots before committing home_currency so a missing rate
+    // cannot leave the household row updated with stale denormalized rates.
     if (validated.homeCurrency !== undefined) {
       try {
         await refreshHouseholdHomeCurrencyRates(
@@ -119,6 +114,13 @@ export const handleSettingsRequest: ApiHandler = async ({
         );
       }
     }
+
+    const updated = await db
+      .update(households)
+      .set(updateData)
+      .where(eq(households.id, session!.householdId))
+      .returning()
+      .get();
 
     if (validated.name !== undefined) {
       const members = await db

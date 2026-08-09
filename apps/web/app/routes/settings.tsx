@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, users, households, eq, and, isNull, scopeToHousehold } from "@amigo/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { InviteManager } from "@/app/components/settings/invite-manager";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
 import { TimezoneSelect } from "@/app/components/settings/timezone-select";
@@ -37,6 +38,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
 
 export default function Settings() {
   const { household, members, session } = useLoaderData<typeof loader>();
+  const canManageMembers =
+    session.role === "owner" || session.role === "admin";
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
@@ -71,7 +74,7 @@ export default function Settings() {
             <div>
               <TimezoneSelect
                 timezone={household.timezone ?? "UTC"}
-                canEdit={session.role === "owner" || session.role === "admin"}
+                canEdit={canManageMembers}
               />
             </div>
           </CardContent>
@@ -102,19 +105,33 @@ export default function Settings() {
                       {member.role}
                     </p>
                   </div>
-                  {member.id !== session.userId &&
-                    session.role === "owner" && (
-                      <MemberRoleManager
-                        member={{ id: member.id, displayName: member.name || member.email, role: member.role }}
-                        currentUserRole={session.role}
-                        currentUserId={session.userId}
-                      />
-                    )}
+                  {member.id !== session.userId && canManageMembers && (
+                    <MemberRoleManager
+                      member={{
+                        id: member.id,
+                        displayName: member.name || member.email,
+                        role: member.role,
+                      }}
+                      currentUserRole={session.role}
+                      currentUserId={session.userId}
+                    />
+                  )}
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+
+        {canManageMembers && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Invites</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <InviteManager />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );

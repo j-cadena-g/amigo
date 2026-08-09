@@ -34,6 +34,10 @@ export default function Setup() {
   const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInviteCode, setShowInviteCode] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [acceptingInvite, setAcceptingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,6 +73,36 @@ export default function Setup() {
     }
   }
 
+  async function handleAcceptInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setAcceptingInvite(true);
+    setInviteError(null);
+
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/invites/accept", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ code: inviteCode.trim() }),
+      });
+
+      if (res.ok) {
+        navigate("/dashboard");
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setInviteError(data?.error ?? "Could not accept invite");
+    } catch {
+      setInviteError("Network error. Please try again.");
+    } finally {
+      setAcceptingInvite(false);
+    }
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md mx-auto p-6">
@@ -77,6 +111,50 @@ export default function Setup() {
           <p className="text-muted-foreground mt-2">
             Let&apos;s set up your household.
           </p>
+        </div>
+
+        <div className="mb-8 space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowInviteCode((open) => !open)}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            {showInviteCode ? "Hide invite code" : "Have an invite code?"}
+          </button>
+
+          {showInviteCode && (
+            <form onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
+              <div>
+                <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
+                  Invite code
+                </label>
+                <input
+                  id="inviteCode"
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border bg-background text-sm font-mono uppercase"
+                  placeholder="AMIGO-XXXXXX"
+                  autoComplete="off"
+                  required
+                />
+              </div>
+
+              {inviteError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {inviteError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={acceptingInvite || inviteCode.trim().length === 0}
+                className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              >
+                {acceptingInvite ? "Joining..." : "Join household"}
+              </button>
+            </form>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

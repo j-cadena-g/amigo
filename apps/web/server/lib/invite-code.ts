@@ -21,7 +21,7 @@ export async function hashInviteCode(normalized: string): Promise<string> {
 function randomCharsetChar(): string {
   const charsetLength = CODE_CHARSET.length;
   const maxUnbiased = Math.floor(256 / charsetLength) * charsetLength;
-  let byte = 0;
+  let byte: number;
   do {
     byte = crypto.getRandomValues(new Uint8Array(1))[0]!;
   } while (byte >= maxUnbiased);

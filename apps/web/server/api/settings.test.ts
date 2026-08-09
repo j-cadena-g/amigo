@@ -185,6 +185,36 @@ describe("handleSettingsRequest home currency", () => {
     );
   });
 
+  it("skips FX refresh when homeCurrency is unchanged", async () => {
+    const response = await handleSettingsRequest({
+      env: {} as never,
+      params: {},
+      request: new Request("http://localhost/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          homeCurrency: "CAD",
+          name: "Renamed Only",
+        }),
+      }),
+      sessionStatus: "authenticated",
+      session: {
+        userId: "user-1",
+        householdId: "hh-1",
+        role: "owner",
+        email: "owner@example.com",
+        name: "Owner",
+      },
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.refreshHouseholdHomeCurrencyRates).not.toHaveBeenCalled();
+    expect(mocks.householdUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Renamed Only", homeCurrency: "CAD" })
+    );
+  });
+
   it("keeps succeeding when one Clerk member sync fails", async () => {
     mocks.members = [{ authId: "auth-ok" }, { authId: "auth-fail" }];
     mocks.setClerkHouseholdMetadata

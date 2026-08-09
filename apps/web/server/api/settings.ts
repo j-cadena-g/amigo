@@ -102,15 +102,20 @@ export const handleSettingsRequest: ApiHandler = async ({
 
     let updated: typeof previous;
 
+    const homeCurrencyChanged =
+      validated.homeCurrency !== undefined &&
+      validated.homeCurrency !== previous.homeCurrency;
+
     // Refresh FX snapshots and commit home_currency in one atomic batch so a
     // missing rate cannot leave converted values disagreeing with the household row.
-    if (validated.homeCurrency !== undefined) {
+    // Skip the provider when homeCurrency is unchanged (name/timezone-only updates).
+    if (homeCurrencyChanged) {
       try {
         await refreshHouseholdHomeCurrencyRates(
           env,
           db,
           session!.householdId,
-          validated.homeCurrency,
+          validated.homeCurrency!,
           {
             buildAdditionalStatements: (refreshDb) => [
               refreshDb

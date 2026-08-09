@@ -94,7 +94,7 @@ describe("members integration", () => {
     });
   });
 
-  it("clears Clerk household metadata before soft-deleting a member", async () => {
+  it("soft-deletes a member then clears Clerk household metadata", async () => {
     const response = await handleMembersRequest({
       env: getIntegrationEnv(),
       params: { "*": memberId },
@@ -407,5 +407,78 @@ describe("members integration", () => {
       .where(eq(users.id, memberId))
       .get();
     expect(member?.deletedAt).toBeNull();
+  });
+
+  it("resolves concurrent admin removal and ownership transfer without zero owners", async () => {
+    const raceHouseholdId = crypto.randomUUID();
+    const raceOwnerId = crypto.randomUUID();
+    const raceAdminId = crypto.randomUUID();
+    const db = createTestDb(getIntegrationEnv().DB);
+    await seedHouseholdWithOwner(db, {
+      householdId: raceHouseholdId,
+      ownerId: raceOwnerId,
+      ownerAuthId: `clerk_remove_race_owner_${raceOwnerId}`,
+    });
+    await db.insert(users).values({
+      id: raceAdminId,
+      authId: `clerk_remove_race_admin_${raceAdminId}`,
+      email: "remove-race-admin@example.com",
+      householdId: raceHouseholdId,
+      role: "admin",
+    });
+
+    const results = await Promise.allSettled([
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": raceAdminId },
+        request: new Request("http://localhost/api/members/admin", {
+          method: "DELETE",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: raceOwnerId,
+          householdId: raceHouseholdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      }),
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "transfer-ownership" },
+        request: new Request("http://localhost/api/members/transfer-ownership", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newOwnerId: raceAdminId }),
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: raceOwnerId,
+          householdId: raceHouseholdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      }),
+    ]);
+
+    expect(results.some((r) => r.status === "fulfilled")).toBe(true);
+
+    const rows = await getDb(getIntegrationEnv().DB)
+      .select({
+        id: users.id,
+        role: users.role,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.householdId, raceHouseholdId));
+
+    const activeOwners = rows.filter(
+      (row) => row.role === "owner" && row.deletedAt == null
+    );
+    expect(activeOwners).toHaveLength(1);
+
+    const softDeletedOwners = rows.filter(
+      (row) => row.role === "owner" && row.deletedAt != null
+    );
+    expect(softDeletedOwners).toHaveLength(0);
   });
 });

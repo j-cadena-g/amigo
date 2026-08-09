@@ -457,10 +457,73 @@ export const handleMembersRequest: ApiHandler = async ({
 
     const displayName = targetUser.name ?? targetUser.email;
     const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
+
+    // Soft-delete first under a non-owner constraint so a concurrent ownership
+    // transfer cannot remove the new owner. Cleanup/Clerk run only after claim.
+    const removed = await db
+      .update(users)
+      .set({ deletedAt: new Date(), restoreAllowedUntil })
+      .where(
+        and(
+          eq(users.id, userId),
+          scopeToHousehold(users.householdId, session!.householdId),
+          isNull(users.deletedAt),
+          ne(users.role, "owner")
+        )
+      )
+      .returning({ id: users.id })
+      .get();
+
+    if (!removed) {
+      throw new ActionError(
+        "Cannot remove this member — they may have become the owner",
+        "CONFLICT"
+      );
+    }
+
+    const restoreRemovalClaim = async () => {
+      await db
+        .update(users)
+        .set({ deletedAt: null, restoreAllowedUntil: null })
+        .where(eq(users.id, userId));
+    };
+
+    try {
+      await db.batch([
+        db
+          .update(transactions)
+          .set({ userDisplayName: displayName })
+          .where(eq(transactions.userId, userId)),
+        db
+          .update(recurringTransactions)
+          .set({ userDisplayName: displayName })
+          .where(eq(recurringTransactions.userId, userId)),
+        db
+          .update(assets)
+          .set({ userDisplayName: displayName })
+          .where(eq(assets.userId, userId)),
+        db
+          .update(debts)
+          .set({ userDisplayName: displayName })
+          .where(eq(debts.userId, userId)),
+        db
+          .update(groceryItems)
+          .set({ createdByUserDisplayName: displayName })
+          .where(eq(groceryItems.createdByUserId, userId)),
+        db
+          .delete(pushSubscriptions)
+          .where(eq(pushSubscriptions.userId, userId)),
+      ]);
+    } catch (error) {
+      await restoreRemovalClaim();
+      throw error;
+    }
 
     try {
       await clearClerkHouseholdMetadata(clerk, targetUser.authId);
     } catch (error) {
+      await restoreRemovalClaim();
       logServerError("remove-member-clerk-metadata", error, {
         householdId: session!.householdId,
         removedUserId: userId,
@@ -471,36 +534,6 @@ export const handleMembersRequest: ApiHandler = async ({
         "INTERNAL_ERROR"
       );
     }
-
-    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
-
-    await db.batch([
-      db
-        .update(transactions)
-        .set({ userDisplayName: displayName })
-        .where(eq(transactions.userId, userId)),
-      db
-        .update(recurringTransactions)
-        .set({ userDisplayName: displayName })
-        .where(eq(recurringTransactions.userId, userId)),
-      db
-        .update(assets)
-        .set({ userDisplayName: displayName })
-        .where(eq(assets.userId, userId)),
-      db
-        .update(debts)
-        .set({ userDisplayName: displayName })
-        .where(eq(debts.userId, userId)),
-      db
-        .update(groceryItems)
-        .set({ createdByUserDisplayName: displayName })
-        .where(eq(groceryItems.createdByUserId, userId)),
-      db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)),
-      db
-        .update(users)
-        .set({ deletedAt: new Date(), restoreAllowedUntil })
-        .where(eq(users.id, userId)),
-    ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: targetUser.authId },

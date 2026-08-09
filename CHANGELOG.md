@@ -6,16 +6,40 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Household invites** — create/list/resend/revoke invite codes, email delivery, join link (`/join/:code`), and setup-page acceptance ([#115](https://github.com/j-cadena-g/amigo/pull/115))
+- **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
+- Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))
+- Shared household WebSocket at the app shell with reconnect/resume and session-invalidation cleanup ([#115](https://github.com/j-cadena-g/amigo/pull/115))
+- First-class **financial categories** with budget linking and seeded defaults ([#64](https://github.com/j-cadena-g/amigo/pull/64))
+- **Available credit** summary on the Financial debts tab ([#91](https://github.com/j-cadena-g/amigo/pull/91))
+- Offline grocery mutation persistence across reload, discarded-sync toasts, and shared API mutation error feedback ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - `CONTRIBUTING.md` and `SECURITY.md`
 - README badges (CI, license, Bun, TypeScript, Cloudflare Workers)
 
 ### Changed
 
+- Unified Budget and Financial navigation/sections ([#63](https://github.com/j-cadena-g/amigo/pull/63))
+- React Router v8 / `createContext` migration and worker↔server load-context fixes ([#73](https://github.com/j-cadena-g/amigo/pull/73), [#74](https://github.com/j-cadena-g/amigo/pull/74))
+- Workspace migrated to **pnpm**; monorepo prep for a future iOS client ([#75](https://github.com/j-cadena-g/amigo/pull/75), [#76](https://github.com/j-cadena-g/amigo/pull/76))
+- Household timezone handling for transaction and grocery calendar days
+- Recurring cron isolates per-rule failures so one household/FX error cannot abort the run ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
 - `CHANGELOG.md` moved to repository root
+- Dependency and GitHub Actions updates (including Dependabot security advisories)
+
+### Fixed
+
+- Grocery date picker centering on mobile Safari ([#107](https://github.com/j-cadena-g/amigo/pull/107), [#108](https://github.com/j-cadena-g/amigo/pull/108))
+- Grocery list toggle latency/reliability and offline conflict/tag handling
+- Production hydration blocked by CSP on stream scripts ([#57](https://github.com/j-cadena-g/amigo/pull/57))
+- Deep security scan findings and finance/offline audit remediations ([#56](https://github.com/j-cadena-g/amigo/pull/56), [#58](https://github.com/j-cadena-g/amigo/pull/58))
+- Local dev blank screen after removing Clerk organizations ([#60](https://github.com/j-cadena-g/amigo/pull/60))
+- Recurring form budget auto-select from category mapping ([#69](https://github.com/j-cadena-g/amigo/pull/69))
+- Concurrent transaction import `externalId` dedup and migration journal registration
 
 ### Removed
 
+- Clerk Organizations integration (household tenancy stays D1-native) ([#60](https://github.com/j-cadena-g/amigo/pull/60))
 - CodeRabbit pull request review badge and agent references
 - `docs/` directory (unused images and index)
 - `ARCHITECTURE.md` (content folded into README)

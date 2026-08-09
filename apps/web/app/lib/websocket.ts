@@ -230,6 +230,8 @@ export function useWebSocket({
   ]);
 
   const disconnect = useCallback(() => {
+    // Block resume/online reconnects and any pending initial connect timeout.
+    permanentlyClosedRef.current = true;
     clearTimers();
     if (wsRef.current) {
       // Drop handlers so intentional close does not schedule reconnect.

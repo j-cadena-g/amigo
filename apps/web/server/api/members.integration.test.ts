@@ -126,6 +126,146 @@ describe("members integration", () => {
     expect(removed?.deletedAt).toBeInstanceOf(Date);
   });
 
+  it("sets restoreAllowedUntil to about 14 days when removing a member", async () => {
+    const before = Date.now();
+    const response = await handleMembersRequest({
+      env: getIntegrationEnv(),
+      params: { "*": memberId },
+      request: new Request("http://localhost/api/members/member", {
+        method: "DELETE",
+      }),
+      sessionStatus: "authenticated",
+      session: testSession({
+        userId: adminOneId,
+        householdId,
+        role: "admin",
+      }),
+      loadContext: {} as never,
+    });
+    const after = Date.now();
+
+    expect(response.status).toBe(200);
+
+    const removed = await getDb(getIntegrationEnv().DB)
+      .select({
+        deletedAt: users.deletedAt,
+        restoreAllowedUntil: users.restoreAllowedUntil,
+      })
+      .from(users)
+      .where(eq(users.id, memberId))
+      .get();
+
+    expect(removed?.deletedAt).toBeInstanceOf(Date);
+    expect(removed?.restoreAllowedUntil).toBeInstanceOf(Date);
+    const restoreMs = removed!.restoreAllowedUntil!.getTime();
+    const graceMs = 14 * 24 * 60 * 60 * 1000;
+    expect(restoreMs).toBeGreaterThanOrEqual(before + graceMs - 1000);
+    expect(restoreMs).toBeLessThanOrEqual(after + graceMs + 1000);
+  });
+
+  it("lets a member leave with soft-delete, restore grace, and cleared Clerk metadata", async () => {
+    const before = Date.now();
+    const response = await handleMembersRequest({
+      env: getIntegrationEnv(),
+      params: { "*": "leave" },
+      request: new Request("http://localhost/api/members/leave", {
+        method: "POST",
+      }),
+      sessionStatus: "authenticated",
+      session: testSession({
+        userId: memberId,
+        householdId,
+        role: "member",
+      }),
+      loadContext: {} as never,
+    });
+    const after = Date.now();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(mocks.updateUserMetadata).toHaveBeenCalledWith(memberAuthId, {
+      publicMetadata: {
+        householdId: null,
+        householdName: null,
+      },
+    });
+
+    const left = await getDb(getIntegrationEnv().DB)
+      .select({
+        deletedAt: users.deletedAt,
+        restoreAllowedUntil: users.restoreAllowedUntil,
+      })
+      .from(users)
+      .where(eq(users.id, memberId))
+      .get();
+
+    expect(left?.deletedAt).toBeInstanceOf(Date);
+    expect(left?.restoreAllowedUntil).toBeInstanceOf(Date);
+    const restoreMs = left!.restoreAllowedUntil!.getTime();
+    const graceMs = 14 * 24 * 60 * 60 * 1000;
+    expect(restoreMs).toBeGreaterThanOrEqual(before + graceMs - 1000);
+    expect(restoreMs).toBeLessThanOrEqual(after + graceMs + 1000);
+  });
+
+  it("denies leave for a sole owner", async () => {
+    const suffix = crypto.randomUUID();
+    const soleHouseholdId = `hh-sole-${suffix}`;
+    const soleOwnerId = `user-sole-owner-${suffix}`;
+    const db = createTestDb(getIntegrationEnv().DB);
+    await seedHouseholdWithOwner(db, {
+      householdId: soleHouseholdId,
+      ownerId: soleOwnerId,
+      ownerAuthId: `clerk_sole_owner_${suffix}`,
+    });
+
+    await expect(
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "leave" },
+        request: new Request("http://localhost/api/members/leave", {
+          method: "POST",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: soleOwnerId,
+          householdId: soleHouseholdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "PERMISSION_DENIED",
+    });
+  });
+
+  it("denies leave for an owner even when other members exist", async () => {
+    await expect(
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "leave" },
+        request: new Request("http://localhost/api/members/leave", {
+          method: "POST",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: ownerId,
+          householdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "PERMISSION_DENIED",
+    });
+
+    const owner = await getDb(getIntegrationEnv().DB)
+      .select({ deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, ownerId))
+      .get();
+    expect(owner?.deletedAt).toBeNull();
+  });
+
   it("does not soft-delete the app member when Clerk metadata clearing fails", async () => {
     mocks.updateUserMetadata.mockRejectedValueOnce(
       new Error("Clerk unavailable")

@@ -4,6 +4,7 @@ import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, users, households, eq, and, isNull, scopeToHousehold } from "@amigo/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { InviteManager } from "@/app/components/settings/invite-manager";
+import { LeaveHousehold } from "@/app/components/settings/leave-household";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
 import { TimezoneSelect } from "@/app/components/settings/timezone-select";
@@ -132,6 +133,15 @@ export default function Settings() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Danger zone</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LeaveHousehold role={session.role} />
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

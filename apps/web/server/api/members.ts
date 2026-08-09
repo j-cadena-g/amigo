@@ -31,6 +31,8 @@ import { assertSessionStillValid } from "../lib/session";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
+const RESTORE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
+
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
 });
@@ -340,6 +342,8 @@ export const handleMembersRequest: ApiHandler = async ({
       );
     }
 
+    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
+
     await db.batch([
       db
         .update(transactions)
@@ -364,7 +368,7 @@ export const handleMembersRequest: ApiHandler = async ({
       db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)),
       db
         .update(users)
-        .set({ deletedAt: new Date(), restoreAllowedUntil: null })
+        .set({ deletedAt: new Date(), restoreAllowedUntil })
         .where(eq(users.id, userId)),
     ]);
 
@@ -386,6 +390,104 @@ export const handleMembersRequest: ApiHandler = async ({
     });
 
     return Response.json({ success: true });
+  }
+
+  if (request.method === "POST" && path === "leave") {
+    await enforceRateLimit(
+      env,
+      `${session!.userId}:members:leave`,
+      ROUTE_RATE_LIMITS.members.leave
+    );
+
+    if (session!.role === "owner") {
+      throw new ActionError(
+        "Owners must transfer ownership before leaving the household",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    await assertSessionStillValid(db, session!);
+
+    const currentUser = await db.query.users.findFirst({
+      where: and(
+        eq(users.id, session!.userId),
+        scopeToHousehold(users.householdId, session!.householdId),
+        isNull(users.deletedAt)
+      ),
+    });
+
+    if (!currentUser) {
+      throw new ActionError(
+        "Session inconsistency — please sign out and back in",
+        "UNAUTHORIZED"
+      );
+    }
+
+    const displayName = currentUser.name ?? currentUser.email;
+    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+    const leavingUserId = session!.userId;
+    const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
+
+    try {
+      await clearClerkHouseholdMetadata(clerk, currentUser.authId);
+    } catch (error) {
+      logServerError("leave-household-clerk-metadata", error, {
+        householdId: session!.householdId,
+        userId: leavingUserId,
+      });
+      throw new ActionError(
+        "Failed to clear household metadata from Clerk user",
+        "INTERNAL_ERROR"
+      );
+    }
+
+    await db.batch([
+      db
+        .update(transactions)
+        .set({ userDisplayName: displayName })
+        .where(eq(transactions.userId, leavingUserId)),
+      db
+        .update(recurringTransactions)
+        .set({ userDisplayName: displayName })
+        .where(eq(recurringTransactions.userId, leavingUserId)),
+      db
+        .update(assets)
+        .set({ userDisplayName: displayName })
+        .where(eq(assets.userId, leavingUserId)),
+      db
+        .update(debts)
+        .set({ userDisplayName: displayName })
+        .where(eq(debts.userId, leavingUserId)),
+      db
+        .update(groceryItems)
+        .set({ createdByUserDisplayName: displayName })
+        .where(eq(groceryItems.createdByUserId, leavingUserId)),
+      db
+        .delete(pushSubscriptions)
+        .where(eq(pushSubscriptions.userId, leavingUserId)),
+      db
+        .update(users)
+        .set({ deletedAt: new Date(), restoreAllowedUntil })
+        .where(eq(users.id, leavingUserId)),
+    ]);
+
+    await invalidateSessionCachesForHouseholdMembers(env, [
+      { authId: currentUser.authId },
+    ]);
+    await invalidateUserSession(env, session!.householdId, leavingUserId);
+
+    logSecurityEvent("member_left", {
+      userId: leavingUserId,
+      householdId: session!.householdId,
+    });
+
+    await broadcastToHousehold(env, session!.householdId, {
+      type: "MEMBER_UPDATE",
+      action: "removed",
+      entityId: leavingUserId,
+    });
+
+    return Response.json({ ok: true });
   }
 
   return new Response(null, {

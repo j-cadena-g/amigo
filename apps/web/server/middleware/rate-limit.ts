@@ -62,6 +62,7 @@ export const ROUTE_RATE_LIMITS = {
     transfer: RATE_LIMIT_PRESETS.SENSITIVE,
     summary: RATE_LIMIT_PRESETS.READ,
     remove: RATE_LIMIT_PRESETS.SENSITIVE,
+    leave: RATE_LIMIT_PRESETS.SENSITIVE,
   },
   invites: {
     list: RATE_LIMIT_PRESETS.READ,

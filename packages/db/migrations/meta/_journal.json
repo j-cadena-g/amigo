@@ -127,6 +127,13 @@
       "when": 1778891900000,
       "tag": "0017_grocery_sync_mutations_created_at_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1786249512703,
+      "tag": "0018_household_invites",
+      "breakpoints": true
     }
   ]
 }

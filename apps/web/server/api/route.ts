@@ -125,14 +125,16 @@ function getSessionErrorResponse(
 
 function mapApiError(error: unknown) {
   if (error instanceof ActionError) {
-    const status = {
+    const statusByCode: Record<ActionError["code"], number> = {
       UNAUTHORIZED: 401,
       VALIDATION_ERROR: 400,
       INTERNAL_ERROR: 500,
       RATE_LIMITED: 429,
       PERMISSION_DENIED: 403,
       NOT_FOUND: 404,
-    }[error.code] ?? 500;
+      CONFLICT: 409,
+    };
+    const status = statusByCode[error.code];
 
     return Response.json(
       { error: error.message, code: error.code },

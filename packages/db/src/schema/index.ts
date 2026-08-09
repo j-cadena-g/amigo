@@ -13,3 +13,4 @@ export * from "./financial-categories";
 export * from "./audit-logs";
 export * from "./recurring";
 export * from "./push-subscriptions";
+export * from "./household-invites";

@@ -1,6 +1,10 @@
+import type { SendEmailBinding } from "./lib/email";
+
 export interface RateLimiterBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
+
+export type { SendEmailBinding };
 
 export interface Env {
   DB: D1Database;
@@ -11,6 +15,7 @@ export interface Env {
   RATE_LIMIT_READ: RateLimiterBinding;
   HOUSEHOLD: DurableObjectNamespace;
   ASSETS: Fetcher;
+  EMAIL: SendEmailBinding;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   APP_ORIGIN: string;

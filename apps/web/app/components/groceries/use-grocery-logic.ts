@@ -8,7 +8,7 @@ import {
   createOptimisticMutation,
   type OptimisticMutation,
 } from "./optimistic-state";
-import { useWebSocket } from "@/app/lib/websocket";
+import { useHouseholdRealtime } from "@/app/components/realtime/household-realtime-provider";
 import { useToast } from "@/app/components/toast-provider";
 import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
 import { readApiErrorMessage } from "@/app/lib/api-error";
@@ -157,7 +157,7 @@ export function useGroceryLogic({
     [revalidator]
   );
 
-  useWebSocket({ onMessage, userId });
+  useHouseholdRealtime(onMessage);
 
   // Replay any mutations that were queued while offline once connectivity
   // returns (browser `online` event or the service worker's background sync).

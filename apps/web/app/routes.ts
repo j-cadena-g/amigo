@@ -3,8 +3,12 @@ import { type RouteConfig, index, route, layout } from "@react-router/dev/routes
 export default [
   index("routes/_index.tsx"),
   route("setup", "routes/setup.tsx"),
+  route("join/:code", "routes/join.$code.tsx"),
   route("api/health", "routes/api.health.ts"),
   route("api/setup", "routes/api.setup.ts"),
+  route("api/invites/accept", "routes/api.invites.accept.ts"),
+  route("api/invites", "routes/api.invites.ts", { id: "api-invites" }),
+  route("api/invites/*", "routes/api.invites.ts", { id: "api-invites-splat" }),
   route("api/groceries", "routes/api.groceries.ts", { id: "api-groceries" }),
   route("api/groceries/*", "routes/api.groceries.ts", {
     id: "api-groceries-splat",

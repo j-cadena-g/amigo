@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
 import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import { acceptInvite } from "@/app/lib/accept-invite";
 import {
   buildTimezoneOptions,
   getBrowserTimezone,
@@ -34,6 +35,10 @@ export default function Setup() {
   const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInviteCode, setShowInviteCode] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [acceptingInvite, setAcceptingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,6 +74,21 @@ export default function Setup() {
     }
   }
 
+  async function handleAcceptInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setAcceptingInvite(true);
+    setInviteError(null);
+
+    const result = await acceptInvite(inviteCode.trim(), getToken);
+    if (result.ok) {
+      navigate("/dashboard");
+      return;
+    }
+
+    setInviteError(result.error);
+    setAcceptingInvite(false);
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md mx-auto p-6">
@@ -77,6 +97,50 @@ export default function Setup() {
           <p className="text-muted-foreground mt-2">
             Let&apos;s set up your household.
           </p>
+        </div>
+
+        <div className="mb-8 space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowInviteCode((open) => !open)}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            {showInviteCode ? "Hide invite code" : "Have an invite code?"}
+          </button>
+
+          {showInviteCode && (
+            <form onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
+              <div>
+                <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
+                  Invite code
+                </label>
+                <input
+                  id="inviteCode"
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border bg-background text-sm font-mono uppercase"
+                  placeholder="AMIGO-XXXXXXXXXXXXX"
+                  autoComplete="off"
+                  required
+                />
+              </div>
+
+              {inviteError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {inviteError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={acceptingInvite || inviteCode.trim().length === 0}
+                className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              >
+                {acceptingInvite ? "Joining..." : "Join household"}
+              </button>
+            </form>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

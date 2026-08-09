@@ -57,6 +57,13 @@
     }
   ],
 
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["invites@mail.mi-amigo.com"]
+    }
+  ],
+
   "durable_objects": {
     "bindings": [
       {

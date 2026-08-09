@@ -193,6 +193,57 @@ describe("invites integration", () => {
     expect(listed[0]?.joinUrl).toBe(body.joinUrl);
   });
 
+  it("commits D1 membership before Clerk metadata and keeps it if Clerk fails", async () => {
+    const { body } = await createInvite();
+    const joinerAuthId = `clerk_invites_clerk_fail_${suffix}`;
+    const callOrder: string[] = [];
+
+    mocks.updateUserMetadata.mockImplementation(async () => {
+      callOrder.push("clerk");
+      throw new Error("Clerk metadata write failed");
+    });
+
+    const acceptResponse = await handleInviteAcceptRequest({
+      env: testEnv(),
+      params: {},
+      request: new Request("http://localhost/api/invites/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: body.code }),
+      }),
+      sessionStatus: "needs_setup",
+      loadContext: {} as never,
+      auth: clerkAuth(joinerAuthId),
+    });
+
+    expect(acceptResponse.status).toBe(201);
+    expect(callOrder).toEqual(["clerk"]);
+
+    const db = getDb(getIntegrationEnv().DB);
+    const member = await db
+      .select()
+      .from(users)
+      .where(eq(users.authId, joinerAuthId))
+      .get();
+    expect(member?.householdId).toBe(householdId);
+    expect(member?.role).toBe("member");
+
+    const invite = await db
+      .select()
+      .from(householdInvites)
+      .where(eq(householdInvites.id, body.id))
+      .get();
+    expect(invite?.usedAt).toBeInstanceOf(Date);
+    expect(invite?.usedByUserId).toBe(member?.id);
+
+    expect(mocks.updateUserMetadata).toHaveBeenCalledWith(joinerAuthId, {
+      publicMetadata: {
+        householdId,
+        householdName: "Invite Household",
+      },
+    });
+  });
+
   it("rejects a second accept of the same code", async () => {
     const { body } = await createInvite();
     const firstAuthId = `clerk_invites_first_${suffix}`;

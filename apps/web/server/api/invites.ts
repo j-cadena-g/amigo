@@ -11,10 +11,7 @@ import {
   users,
 } from "@amigo/db";
 import { z } from "zod";
-import {
-  clearClerkHouseholdMetadata,
-  setClerkHouseholdMetadata,
-} from "../lib/clerk-household-metadata";
+import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { sendTransactionalEmail } from "../lib/email";
 import { ActionError, logServerError } from "../lib/errors";
 import { buildInviteEmailContent } from "../lib/invite-email";
@@ -451,11 +448,9 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
   const userId = crypto.randomUUID();
   const usedAt = new Date();
 
-  await setClerkHouseholdMetadata(clerk, auth.userId, {
-    householdId: invite.householdId,
-    householdName: invite.householdName,
-  });
-
+  // D1-first: invite consumption must commit before Clerk metadata. setup.ts
+  // still does Clerk-then-D1 for household create; accept differs to avoid an
+  // unused-invite leak if we crash between Clerk write and D1.
   try {
     await db.batch([
       db.insert(users).values({
@@ -482,15 +477,6 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
         ),
     ]);
   } catch (error) {
-    try {
-      await clearClerkHouseholdMetadata(clerk, auth.userId);
-    } catch (clearError) {
-      logServerError("invite-accept-clear-clerk-metadata", clearError, {
-        authUserId: auth.userId,
-        householdId: invite.householdId,
-      });
-    }
-
     if (isAuthIdUniqueConstraintError(error)) {
       throw new ActionError(
         "You already belong to a household",
@@ -509,15 +495,21 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
 
   if (marked?.usedByUserId !== userId) {
     await db.delete(users).where(eq(users.id, userId));
-    try {
-      await clearClerkHouseholdMetadata(clerk, auth.userId);
-    } catch (clearError) {
-      logServerError("invite-accept-race-clear-clerk-metadata", clearError, {
-        authUserId: auth.userId,
-        householdId: invite.householdId,
-      });
-    }
     throw new ActionError("Invalid or expired invite code", "VALIDATION_ERROR");
+  }
+
+  // Best-effort after D1 (matches settings rename). Session can repair later.
+  try {
+    await setClerkHouseholdMetadata(clerk, auth.userId, {
+      householdId: invite.householdId,
+      householdName: invite.householdName,
+    });
+  } catch (error) {
+    logServerError("invite-accept-clerk-metadata", error, {
+      authUserId: auth.userId,
+      householdId: invite.householdId,
+      userId,
+    });
   }
 
   return Response.json(

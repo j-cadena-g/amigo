@@ -57,6 +57,11 @@ export function shouldResumeOnVisibility(
   return visibilityState === "visible" && status === "disconnected";
 }
 
+/** Online / resume must not tear down keepalive on an already-open socket. */
+export function shouldResumeWhileDisconnected(status: WebSocketStatus): boolean {
+  return status === "disconnected";
+}
+
 /**
  * WebSocket hook connecting to the Durable Object via /ws.
  * - Automatic reconnection with exponential backoff
@@ -99,6 +104,12 @@ export function useWebSocket({
       pingIntervalRef.current = null;
     }
   }, []);
+
+  const invalidateSession = useCallback(() => {
+    if (permanentlyClosedRef.current) return;
+    permanentlyClosedRef.current = true;
+    onSessionInvalidated?.();
+  }, [onSessionInvalidated]);
 
   useEffect(() => {
     connectRef.current = () => {
@@ -148,7 +159,7 @@ export function useWebSocket({
           >;
 
           if (data.type === "SESSION_INVALIDATED") {
-            onSessionInvalidated?.();
+            invalidateSession();
             return;
           }
 
@@ -169,7 +180,7 @@ export function useWebSocket({
         clearTimers();
 
         if (event.code === SESSION_INVALIDATED_CLOSE_CODE) {
-          permanentlyClosedRef.current = true;
+          invalidateSession();
           return;
         }
 
@@ -199,7 +210,7 @@ export function useWebSocket({
     };
   }, [
     onMessage,
-    onSessionInvalidated,
+    invalidateSession,
     userId,
     maxRetries,
     baseDelay,
@@ -212,13 +223,19 @@ export function useWebSocket({
   const disconnect = useCallback(() => {
     clearTimers();
     if (wsRef.current) {
+      // Drop handlers so intentional close does not schedule reconnect.
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
       wsRef.current.close();
       wsRef.current = null;
     }
-  }, [clearTimers]);
+    updateStatus("disconnected");
+  }, [clearTimers, updateStatus]);
 
   const resume = useCallback(() => {
     if (!isMountedRef.current || permanentlyClosedRef.current) return;
+    if (!shouldResumeWhileDisconnected(statusRef.current)) return;
     retryCountRef.current = 0;
     clearTimers();
     connectRef.current();

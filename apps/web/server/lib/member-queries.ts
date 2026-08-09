@@ -1,9 +1,16 @@
 import { and, eq, isNull, scopeToHousehold, users } from "@amigo/db";
 
+type TransferOwnershipUser = {
+  authId: string | null;
+  role: "owner" | "admin" | "member";
+};
+
 interface TransferOwnershipQueryDb {
   query: {
     users: {
-      findFirst(args: { where: ReturnType<typeof and> }): Promise<{ authId: string | null } | undefined>;
+      findFirst(args: {
+        where: ReturnType<typeof and>;
+      }): Promise<TransferOwnershipUser | undefined>;
     };
   };
 }

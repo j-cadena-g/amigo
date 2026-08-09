@@ -4,6 +4,7 @@ import {
   computeReconnectDelay,
   SESSION_INVALIDATED_CLOSE_CODE,
   shouldResumeOnVisibility,
+  shouldResumeWhileDisconnected,
   shouldScheduleBackoffReconnect,
 } from "./websocket";
 
@@ -53,5 +54,13 @@ describe("shouldResumeOnVisibility", () => {
     expect(shouldResumeOnVisibility("visible", "connected")).toBe(false);
     expect(shouldResumeOnVisibility("visible", "connecting")).toBe(false);
     expect(shouldResumeOnVisibility("hidden", "disconnected")).toBe(false);
+  });
+});
+
+describe("shouldResumeWhileDisconnected", () => {
+  it("allows online/resume only while disconnected", () => {
+    expect(shouldResumeWhileDisconnected("disconnected")).toBe(true);
+    expect(shouldResumeWhileDisconnected("connected")).toBe(false);
+    expect(shouldResumeWhileDisconnected("connecting")).toBe(false);
   });
 });

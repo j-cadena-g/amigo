@@ -266,6 +266,116 @@ describe("members integration", () => {
     expect(owner?.deletedAt).toBeNull();
   });
 
+  it("keeps D1 leave when Clerk metadata clear fails", async () => {
+    mocks.updateUserMetadata.mockRejectedValueOnce(
+      new Error("Clerk unavailable")
+    );
+
+    const response = await handleMembersRequest({
+      env: getIntegrationEnv(),
+      params: { "*": "leave" },
+      request: new Request("http://localhost/api/members/leave", {
+        method: "POST",
+      }),
+      sessionStatus: "authenticated",
+      session: testSession({
+        userId: memberId,
+        householdId,
+        role: "member",
+      }),
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+
+    const left = await getDb(getIntegrationEnv().DB)
+      .select({ deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, memberId))
+      .get();
+    expect(left?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("resolves concurrent leave and ownership transfer without a soft-deleted owner", async () => {
+    const raceHouseholdId = crypto.randomUUID();
+    const raceOwnerId = crypto.randomUUID();
+    const raceAdminId = crypto.randomUUID();
+    const db = createTestDb(getIntegrationEnv().DB);
+    await seedHouseholdWithOwner(db, {
+      householdId: raceHouseholdId,
+      ownerId: raceOwnerId,
+      ownerAuthId: `clerk_race_owner_${raceOwnerId}`,
+    });
+    await db.insert(users).values({
+      id: raceAdminId,
+      authId: `clerk_race_admin_${raceAdminId}`,
+      email: "race-admin@example.com",
+      householdId: raceHouseholdId,
+      role: "admin",
+    });
+
+    const results = await Promise.allSettled([
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "leave" },
+        request: new Request("http://localhost/api/members/leave", {
+          method: "POST",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: raceAdminId,
+          householdId: raceHouseholdId,
+          role: "admin",
+        }),
+        loadContext: {} as never,
+      }),
+      handleMembersRequest({
+        env: getIntegrationEnv(),
+        params: { "*": "transfer-ownership" },
+        request: new Request("http://localhost/api/members/transfer-ownership", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newOwnerId: raceAdminId }),
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: raceOwnerId,
+          householdId: raceHouseholdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      }),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    expect(fulfilled.length).toBeGreaterThanOrEqual(1);
+
+    const rows = await getDb(getIntegrationEnv().DB)
+      .select({
+        id: users.id,
+        role: users.role,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.householdId, raceHouseholdId));
+
+    const softDeletedOwners = rows.filter(
+      (row) => row.role === "owner" && row.deletedAt != null
+    );
+    expect(softDeletedOwners).toHaveLength(0);
+
+    const activeOwners = rows.filter(
+      (row) => row.role === "owner" && row.deletedAt == null
+    );
+    expect(activeOwners).toHaveLength(1);
+
+    const raceAdmin = rows.find((row) => row.id === raceAdminId);
+    expect(raceAdmin).toBeDefined();
+    if (raceAdmin?.deletedAt != null) {
+      expect(raceAdmin.role).not.toBe("owner");
+    }
+  });
+
   it("does not soft-delete the app member when Clerk metadata clearing fails", async () => {
     mocks.updateUserMetadata.mockRejectedValueOnce(
       new Error("Clerk unavailable")

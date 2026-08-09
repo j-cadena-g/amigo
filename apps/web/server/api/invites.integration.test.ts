@@ -9,7 +9,12 @@ import {
   handleInviteAcceptRequest,
   handleInvitesRequest,
 } from "./invites";
-import { createTestDb, seedHouseholdWithOwner, testSession } from "../test/fixtures";
+import {
+  createTestDb,
+  seedHouseholdWithOwner,
+  seedSoftDeletedMember,
+  testSession,
+} from "../test/fixtures";
 import { getIntegrationEnv } from "../test/integration-env";
 import type { Env } from "../env";
 
@@ -196,10 +201,19 @@ describe("invites integration", () => {
   it("commits D1 membership before Clerk metadata and keeps it if Clerk fails", async () => {
     const { body } = await createInvite();
     const joinerAuthId = `clerk_invites_clerk_fail_${suffix}`;
-    const callOrder: string[] = [];
+    let memberAtClerkCall:
+      | { householdId: string | null; role: string }
+      | undefined;
 
     mocks.updateUserMetadata.mockImplementation(async () => {
-      callOrder.push("clerk");
+      memberAtClerkCall = await getDb(getIntegrationEnv().DB)
+        .select({
+          householdId: users.householdId,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.authId, joinerAuthId))
+        .get();
       throw new Error("Clerk metadata write failed");
     });
 
@@ -217,7 +231,10 @@ describe("invites integration", () => {
     });
 
     expect(acceptResponse.status).toBe(201);
-    expect(callOrder).toEqual(["clerk"]);
+    expect(memberAtClerkCall).toMatchObject({
+      householdId,
+      role: "member",
+    });
 
     const db = getDb(getIntegrationEnv().DB);
     const member = await db
@@ -242,6 +259,44 @@ describe("invites integration", () => {
         householdName: "Invite Household",
       },
     });
+  });
+
+  it("rejects invite accept for a soft-deleted auth identity", async () => {
+    const { body } = await createInvite();
+    const softDeletedAuthId = `clerk_invites_soft_deleted_${suffix}`;
+    const db = createTestDb(getIntegrationEnv().DB);
+    await seedSoftDeletedMember(db, {
+      userId: crypto.randomUUID(),
+      authId: softDeletedAuthId,
+      householdId,
+      restoreAllowedUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
+
+    await expect(
+      handleInviteAcceptRequest({
+        env: testEnv(),
+        params: {},
+        request: new Request("http://localhost/api/invites/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: body.code }),
+        }),
+        sessionStatus: "needs_setup",
+        loadContext: {} as never,
+        auth: clerkAuth(softDeletedAuthId),
+      })
+    ).rejects.toMatchObject({
+      code: "PERMISSION_DENIED",
+      message:
+        "Restore or permanently leave your previous household before joining another",
+    });
+
+    const invite = await db
+      .select({ usedAt: householdInvites.usedAt })
+      .from(householdInvites)
+      .where(eq(householdInvites.id, body.id))
+      .get();
+    expect(invite?.usedAt).toBeNull();
   });
 
   it("rejects a second accept of the same code", async () => {
@@ -332,11 +387,14 @@ describe("invites integration", () => {
       })
     );
 
-    mocks.sendEmail.mockRejectedValueOnce(new Error("SMTP down"));
+    mocks.sendEmail.mockRejectedValueOnce(
+      new Error("SMTP down: secret=provider-token-xyz")
+    );
     const failed = await createInvite("other@example.com");
     expect(failed.response.status).toBe(201);
     expect(failed.body.emailSent).toBe(false);
-    expect(failed.body.emailError).toMatch(/SMTP down/);
+    expect(failed.body.emailError).toBe("Failed to send invite email");
+    expect(failed.body.emailError).not.toMatch(/SMTP|secret|provider-token/i);
 
     const db = getDb(getIntegrationEnv().DB);
     const invite = await db
@@ -347,6 +405,46 @@ describe("invites integration", () => {
     expect(invite).toBeDefined();
     expect(invite?.invitedEmail).toBe("other@example.com");
     expect(invite?.emailSentAt).toBeNull();
-    expect(invite?.emailLastError).toMatch(/SMTP down/);
+    expect(invite?.emailLastError).toBe("Failed to send invite email");
+    expect(invite?.emailLastError).not.toMatch(/SMTP|secret|provider-token/i);
+  });
+
+  it("rejects a concurrent revoke of an already-used invite", async () => {
+    const { body } = await createInvite();
+    const joinerAuthId = `clerk_invites_used_revoke_${suffix}`;
+
+    const acceptResponse = await handleInviteAcceptRequest({
+      env: testEnv(),
+      params: {},
+      request: new Request("http://localhost/api/invites/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: body.code }),
+      }),
+      sessionStatus: "needs_setup",
+      loadContext: {} as never,
+      auth: clerkAuth(joinerAuthId),
+    });
+    expect(acceptResponse.status).toBe(201);
+
+    await expect(
+      handleInvitesRequest({
+        env: testEnv(),
+        params: { "*": body.id },
+        request: new Request(`http://localhost/api/invites/${body.id}`, {
+          method: "DELETE",
+        }),
+        sessionStatus: "authenticated",
+        session: testSession({
+          userId: ownerId,
+          householdId,
+          role: "owner",
+        }),
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Invite already used",
+    });
   });
 });

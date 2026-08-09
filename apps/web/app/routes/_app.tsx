@@ -40,10 +40,22 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
-/** Default shell subscriber: revalidate route data on any household event. */
+/**
+ * Default shell subscriber: revalidate on household events.
+ * GROCERY_UPDATE is owned by the groceries page (pending-aware); skipping it
+ * here preserves optimistic overlays during in-flight grocery mutations.
+ */
 function HouseholdRealtimeDefaults() {
   const revalidator = useRevalidator();
-  useHouseholdRealtime(() => {
+  useHouseholdRealtime((data) => {
+    if (
+      data &&
+      typeof data === "object" &&
+      "type" in data &&
+      (data as { type: string }).type === "GROCERY_UPDATE"
+    ) {
+      return;
+    }
     revalidator.revalidate();
   });
   return null;

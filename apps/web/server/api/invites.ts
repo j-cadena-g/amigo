@@ -26,7 +26,8 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const EMAIL_ERROR_MAX_LENGTH = 500;
+/** Stable client-facing message — never echo provider Error.message. */
+const INVITE_EMAIL_FAILURE_MESSAGE = "Failed to send invite email";
 
 const createInviteSchema = z.object({
   email: z.string().email().optional(),
@@ -43,20 +44,6 @@ function isAuthIdUniqueConstraintError(error: unknown) {
       error.message
     )
   );
-}
-
-function truncateError(message: string): string {
-  if (message.length <= EMAIL_ERROR_MAX_LENGTH) {
-    return message;
-  }
-  return `${message.slice(0, EMAIL_ERROR_MAX_LENGTH - 1)}…`;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return "Failed to send invite email";
 }
 
 function buildJoinUrl(appOrigin: string, codeDisplay: string): string {
@@ -107,8 +94,11 @@ async function sendInviteEmail(options: {
     });
     return { sent: true, error: null };
   } catch (error) {
-    logServerError("invite-email-send", error, { to: options.to });
-    return { sent: false, error: truncateError(errorMessage(error)) };
+    // Log operational detail without recipient PII; never return provider text.
+    logServerError("invite-email-send", error, {
+      code: "invite_email_delivery_failed",
+    });
+    return { sent: false, error: INVITE_EMAIL_FAILURE_MESSAGE };
   }
 }
 
@@ -277,10 +267,23 @@ export const handleInvitesRequest: ApiHandler = async ({
       throw new ActionError("Invite already revoked", "VALIDATION_ERROR");
     }
 
-    await db
+    const revoked = await db
       .update(householdInvites)
       .set({ revokedAt: new Date() })
-      .where(eq(householdInvites.id, inviteId));
+      .where(
+        and(
+          eq(householdInvites.id, inviteId),
+          scopeToHousehold(householdInvites.householdId, session!.householdId),
+          isNull(householdInvites.usedAt),
+          isNull(householdInvites.revokedAt)
+        )
+      )
+      .returning({ id: householdInvites.id })
+      .get();
+
+    if (!revoked) {
+      throw new ActionError("Invite is no longer valid", "VALIDATION_ERROR");
+    }
 
     return Response.json({ success: true });
   }
@@ -410,14 +413,21 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
   const now = new Date();
 
   const existingUser = await db
-    .select({ id: users.id })
+    .select({ id: users.id, deletedAt: users.deletedAt })
     .from(users)
-    .where(and(eq(users.authId, auth.userId), isNull(users.deletedAt)))
+    .where(eq(users.authId, auth.userId))
     .get();
 
-  if (existingUser) {
+  if (existingUser && !existingUser.deletedAt) {
     throw new ActionError(
       "You already belong to a household",
+      "PERMISSION_DENIED"
+    );
+  }
+
+  if (existingUser?.deletedAt) {
+    throw new ActionError(
+      "Restore or permanently leave your previous household before joining another",
       "PERMISSION_DENIED"
     );
   }
@@ -448,36 +458,60 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
   const userId = crypto.randomUUID();
   const usedAt = new Date();
 
-  // D1-first: invite consumption must commit before Clerk metadata. setup.ts
-  // still does Clerk-then-D1 for household create; accept differs to avoid an
-  // unused-invite leak if we crash between Clerk write and D1.
+  // Claim with usedAt only first (usedByUserId FKs to users). A crash after
+  // claim leaves a burned code, not an unused code after a membership row.
+  const claimed = await db
+    .update(householdInvites)
+    .set({ usedAt })
+    .where(
+      and(
+        eq(householdInvites.id, invite.id),
+        isNull(householdInvites.usedAt),
+        isNull(householdInvites.revokedAt),
+        gt(householdInvites.expiresAt, usedAt)
+      )
+    )
+    .returning({ id: householdInvites.id })
+    .get();
+
+  if (!claimed) {
+    throw new ActionError("Invalid or expired invite code", "VALIDATION_ERROR");
+  }
+
   try {
-    await db.batch([
-      db.insert(users).values({
-        id: userId,
-        authId: auth.userId,
-        email,
-        name,
-        householdId: invite.householdId,
-        role: "member",
-      }),
-      db
-        .update(householdInvites)
-        .set({
-          usedAt,
-          usedByUserId: userId,
-        })
-        .where(
-          and(
-            eq(householdInvites.id, invite.id),
-            isNull(householdInvites.usedAt),
-            isNull(householdInvites.revokedAt),
-            gt(householdInvites.expiresAt, usedAt)
-          )
-        ),
-    ]);
+    await db.insert(users).values({
+      id: userId,
+      authId: auth.userId,
+      email,
+      name,
+      householdId: invite.householdId,
+      role: "member",
+    });
   } catch (error) {
+    await db
+      .update(householdInvites)
+      .set({ usedAt: null, usedByUserId: null })
+      .where(
+        and(
+          eq(householdInvites.id, invite.id),
+          isNull(householdInvites.usedByUserId)
+        )
+      );
+
     if (isAuthIdUniqueConstraintError(error)) {
+      const conflicting = await db
+        .select({ deletedAt: users.deletedAt })
+        .from(users)
+        .where(eq(users.authId, auth.userId))
+        .get();
+
+      if (conflicting?.deletedAt) {
+        throw new ActionError(
+          "Restore or permanently leave your previous household before joining another",
+          "PERMISSION_DENIED"
+        );
+      }
+
       throw new ActionError(
         "You already belong to a household",
         "PERMISSION_DENIED"
@@ -487,16 +521,15 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
     throw error;
   }
 
-  const marked = await db
-    .select({ usedByUserId: householdInvites.usedByUserId })
-    .from(householdInvites)
-    .where(eq(householdInvites.id, invite.id))
-    .get();
-
-  if (marked?.usedByUserId !== userId) {
-    await db.delete(users).where(eq(users.id, userId));
-    throw new ActionError("Invalid or expired invite code", "VALIDATION_ERROR");
-  }
+  await db
+    .update(householdInvites)
+    .set({ usedByUserId: userId })
+    .where(
+      and(
+        eq(householdInvites.id, invite.id),
+        isNull(householdInvites.usedByUserId)
+      )
+    );
 
   // Best-effort after D1 (matches settings rename). Session can repair later.
   try {

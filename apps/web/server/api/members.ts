@@ -8,6 +8,7 @@ import {
   getDb,
   groceryItems,
   isNull,
+  ne,
   pushSubscriptions,
   recurringTransactions,
   scopeToHousehold,
@@ -176,10 +177,130 @@ export const handleMembersRequest: ApiHandler = async ({
       );
     }
 
+    if (currentUser.role !== "owner") {
+      throw new ActionError(
+        "Only the owner can transfer ownership",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    if (newOwner.role === "owner") {
+      throw new ActionError("User is already the owner", "VALIDATION_ERROR");
+    }
+
+    const previousNewOwnerRole = newOwner.role;
+    const householdId = session!.householdId;
+    const currentOwnerId = session!.userId;
+
+    // One D1 batch: promote only while the current owner is still active, then
+    // demote only once the new owner row is owner (sees prior statement).
     await db.batch([
-      db.update(users).set({ role: "admin" }).where(eq(users.id, session!.userId)),
-      db.update(users).set({ role: "owner" }).where(eq(users.id, newOwnerId)),
+      db
+        .update(users)
+        .set({ role: "owner" })
+        .where(
+          and(
+            eq(users.id, newOwnerId),
+            scopeToHousehold(users.householdId, householdId),
+            isNull(users.deletedAt),
+            ne(users.role, "owner"),
+            sql`exists (
+              select 1 from users as current_owner
+              where current_owner.id = ${currentOwnerId}
+                and current_owner.household_id = ${householdId}
+                and current_owner.deleted_at is null
+                and current_owner.role = 'owner'
+            )`
+          )
+        ),
+      db
+        .update(users)
+        .set({ role: "admin" })
+        .where(
+          and(
+            eq(users.id, currentOwnerId),
+            scopeToHousehold(users.householdId, householdId),
+            isNull(users.deletedAt),
+            eq(users.role, "owner"),
+            sql`exists (
+              select 1 from users as next_owner
+              where next_owner.id = ${newOwnerId}
+                and next_owner.household_id = ${householdId}
+                and next_owner.deleted_at is null
+                and next_owner.role = 'owner'
+            )`
+          )
+        ),
     ]);
+
+    const [promotedOwner, demotedOwner] = await Promise.all([
+      db
+        .select({ role: users.role, deletedAt: users.deletedAt })
+        .from(users)
+        .where(eq(users.id, newOwnerId))
+        .get(),
+      db
+        .select({ role: users.role, deletedAt: users.deletedAt })
+        .from(users)
+        .where(eq(users.id, currentOwnerId))
+        .get(),
+    ]);
+
+    const transferOk =
+      promotedOwner?.role === "owner" &&
+      promotedOwner.deletedAt == null &&
+      demotedOwner?.role === "admin" &&
+      demotedOwner.deletedAt == null;
+
+    if (!transferOk) {
+      try {
+        await db.batch([
+          db
+            .update(users)
+            .set({ role: previousNewOwnerRole })
+            .where(
+              and(
+                eq(users.id, newOwnerId),
+                scopeToHousehold(users.householdId, householdId),
+                eq(users.role, "owner")
+              )
+            ),
+          db
+            .update(users)
+            .set({ role: "owner" })
+            .where(
+              and(
+                eq(users.id, currentOwnerId),
+                scopeToHousehold(users.householdId, householdId),
+                isNull(users.deletedAt),
+                ne(users.role, "owner"),
+                sql`not exists (
+                  select 1 from users as other_owner
+                  where other_owner.household_id = ${householdId}
+                    and other_owner.id != ${currentOwnerId}
+                    and other_owner.deleted_at is null
+                    and other_owner.role = 'owner'
+                )`
+              )
+            ),
+        ]);
+      } catch (rollbackError) {
+        logServerError("transfer-ownership-rollback", rollbackError, {
+          householdId,
+          currentOwnerId,
+          newOwnerId,
+        });
+      }
+
+      if (!promotedOwner || promotedOwner.deletedAt != null) {
+        throw new ActionError("User not found in household", "NOT_FOUND");
+      }
+
+      throw new ActionError(
+        "Ownership transfer failed — please retry",
+        "CONFLICT"
+      );
+    }
 
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: currentUser.authId },
@@ -423,10 +544,75 @@ export const handleMembersRequest: ApiHandler = async ({
       );
     }
 
+    if (currentUser.role === "owner") {
+      throw new ActionError(
+        "Owners must transfer ownership before leaving the household",
+        "PERMISSION_DENIED"
+      );
+    }
+
     const displayName = currentUser.name ?? currentUser.email;
     const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
     const leavingUserId = session!.userId;
     const restoreAllowedUntil = new Date(Date.now() + RESTORE_GRACE_MS);
+
+    // Soft-delete first under a non-owner constraint so a concurrent ownership
+    // transfer cannot soft-delete an owner. Cleanup runs only after a successful
+    // claim; on cleanup failure, undelete so leave is not half-applied.
+    const left = await db
+      .update(users)
+      .set({ deletedAt: new Date(), restoreAllowedUntil })
+      .where(
+        and(
+          eq(users.id, leavingUserId),
+          scopeToHousehold(users.householdId, session!.householdId),
+          isNull(users.deletedAt),
+          ne(users.role, "owner")
+        )
+      )
+      .returning({ id: users.id })
+      .get();
+
+    if (!left) {
+      throw new ActionError(
+        "Owners must transfer ownership before leaving the household",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    try {
+      await db.batch([
+        db
+          .update(transactions)
+          .set({ userDisplayName: displayName })
+          .where(eq(transactions.userId, leavingUserId)),
+        db
+          .update(recurringTransactions)
+          .set({ userDisplayName: displayName })
+          .where(eq(recurringTransactions.userId, leavingUserId)),
+        db
+          .update(assets)
+          .set({ userDisplayName: displayName })
+          .where(eq(assets.userId, leavingUserId)),
+        db
+          .update(debts)
+          .set({ userDisplayName: displayName })
+          .where(eq(debts.userId, leavingUserId)),
+        db
+          .update(groceryItems)
+          .set({ createdByUserDisplayName: displayName })
+          .where(eq(groceryItems.createdByUserId, leavingUserId)),
+        db
+          .delete(pushSubscriptions)
+          .where(eq(pushSubscriptions.userId, leavingUserId)),
+      ]);
+    } catch (error) {
+      await db
+        .update(users)
+        .set({ deletedAt: null, restoreAllowedUntil: null })
+        .where(eq(users.id, leavingUserId));
+      throw error;
+    }
 
     try {
       await clearClerkHouseholdMetadata(clerk, currentUser.authId);
@@ -435,41 +621,8 @@ export const handleMembersRequest: ApiHandler = async ({
         householdId: session!.householdId,
         userId: leavingUserId,
       });
-      throw new ActionError(
-        "Failed to clear household metadata from Clerk user",
-        "INTERNAL_ERROR"
-      );
+      // Membership already removed in D1 (source of truth).
     }
-
-    await db.batch([
-      db
-        .update(transactions)
-        .set({ userDisplayName: displayName })
-        .where(eq(transactions.userId, leavingUserId)),
-      db
-        .update(recurringTransactions)
-        .set({ userDisplayName: displayName })
-        .where(eq(recurringTransactions.userId, leavingUserId)),
-      db
-        .update(assets)
-        .set({ userDisplayName: displayName })
-        .where(eq(assets.userId, leavingUserId)),
-      db
-        .update(debts)
-        .set({ userDisplayName: displayName })
-        .where(eq(debts.userId, leavingUserId)),
-      db
-        .update(groceryItems)
-        .set({ createdByUserDisplayName: displayName })
-        .where(eq(groceryItems.createdByUserId, leavingUserId)),
-      db
-        .delete(pushSubscriptions)
-        .where(eq(pushSubscriptions.userId, leavingUserId)),
-      db
-        .update(users)
-        .set({ deletedAt: new Date(), restoreAllowedUntil })
-        .where(eq(users.id, leavingUserId)),
-    ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: currentUser.authId },

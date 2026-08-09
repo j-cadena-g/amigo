@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
 import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import { acceptInvite } from "@/app/lib/accept-invite";
 import {
   buildTimezoneOptions,
   getBrowserTimezone,
@@ -78,29 +79,14 @@ export default function Setup() {
     setAcceptingInvite(true);
     setInviteError(null);
 
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/invites/accept", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ code: inviteCode.trim() }),
-      });
-
-      if (res.ok) {
-        navigate("/dashboard");
-        return;
-      }
-
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      setInviteError(data?.error ?? "Could not accept invite");
-    } catch {
-      setInviteError("Network error. Please try again.");
-    } finally {
-      setAcceptingInvite(false);
+    const result = await acceptInvite(inviteCode.trim(), getToken);
+    if (result.ok) {
+      navigate("/dashboard");
+      return;
     }
+
+    setInviteError(result.error);
+    setAcceptingInvite(false);
   }
 
   return (
@@ -134,7 +120,7 @@ export default function Setup() {
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   className="w-full px-3 py-2 rounded-md border bg-background text-sm font-mono uppercase"
-                  placeholder="AMIGO-XXXXXX"
+                  placeholder="AMIGO-XXXXXXXXXXXXX"
                   autoComplete="off"
                   required
                 />

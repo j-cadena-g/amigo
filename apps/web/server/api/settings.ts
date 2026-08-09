@@ -10,6 +10,7 @@ import {
   users,
 } from "@amigo/db";
 import { z } from "zod";
+import { getCloudflare } from "../../router-context";
 import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { isValidTimeZone } from "../lib/dates";
 import { ActionError, logServerError } from "../lib/errors";
@@ -29,6 +30,7 @@ export const handleSettingsRequest: ApiHandler = async ({
   env,
   request,
   session,
+  loadContext,
 }) => {
   const db = getDb(env.DB);
 
@@ -76,6 +78,13 @@ export const handleSettingsRequest: ApiHandler = async ({
       throw new ActionError("Invalid timezone", "VALIDATION_ERROR");
     }
 
+    const previous = await db.query.households.findFirst({
+      where: eq(households.id, session!.householdId),
+    });
+    if (!previous) {
+      throw new ActionError("Household not found", "NOT_FOUND");
+    }
+
     const updateData: Partial<typeof households.$inferInsert> & {
       updatedAt: Date;
     } = {
@@ -91,15 +100,25 @@ export const handleSettingsRequest: ApiHandler = async ({
       updateData.timezone = validated.timezone;
     }
 
-    // Refresh FX snapshots before committing home_currency so a missing rate
-    // cannot leave the household row updated with stale denormalized rates.
+    let updated: typeof previous;
+
+    // Refresh FX snapshots and commit home_currency in one atomic batch so a
+    // missing rate cannot leave converted values disagreeing with the household row.
     if (validated.homeCurrency !== undefined) {
       try {
         await refreshHouseholdHomeCurrencyRates(
           env,
           db,
           session!.householdId,
-          validated.homeCurrency
+          validated.homeCurrency,
+          {
+            buildAdditionalStatements: (refreshDb) => [
+              refreshDb
+                .update(households)
+                .set(updateData)
+                .where(eq(households.id, session!.householdId)),
+            ],
+          }
         );
       } catch (error) {
         logServerError("settings-home-currency-refresh", error, {
@@ -107,22 +126,31 @@ export const handleSettingsRequest: ApiHandler = async ({
           homeCurrency: validated.homeCurrency,
         });
         throw new ActionError(
-          error instanceof Error
-            ? error.message
-            : "Failed to refresh home currency rates",
+          "Failed to refresh home currency rates",
           "INTERNAL_ERROR"
         );
       }
+
+      const afterRefresh = await db.query.households.findFirst({
+        where: eq(households.id, session!.householdId),
+      });
+      if (!afterRefresh) {
+        throw new ActionError("Household not found", "NOT_FOUND");
+      }
+      updated = afterRefresh;
+    } else {
+      updated = await db
+        .update(households)
+        .set(updateData)
+        .where(eq(households.id, session!.householdId))
+        .returning()
+        .get();
     }
 
-    const updated = await db
-      .update(households)
-      .set(updateData)
-      .where(eq(households.id, session!.householdId))
-      .returning()
-      .get();
+    const nameChanged =
+      validated.name !== undefined && validated.name !== previous.name;
 
-    if (validated.name !== undefined) {
+    if (nameChanged) {
       const members = await db
         .select({ authId: users.authId })
         .from(users)
@@ -135,18 +163,29 @@ export const handleSettingsRequest: ApiHandler = async ({
         .all();
 
       const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-      for (const member of members) {
-        try {
-          await setClerkHouseholdMetadata(clerk, member.authId, {
-            householdId: session!.householdId,
-            householdName: validated.name,
-          });
-        } catch (error) {
-          logServerError("settings-clerk-household-metadata", error, {
-            householdId: session!.householdId,
-            authId: member.authId,
-          });
-        }
+      const householdId = session!.householdId;
+      const householdName = validated.name!;
+      const syncMembers = Promise.all(
+        members.map(async (member) => {
+          try {
+            await setClerkHouseholdMetadata(clerk, member.authId, {
+              householdId,
+              householdName,
+            });
+          } catch (error) {
+            logServerError("settings-clerk-household-metadata", error, {
+              householdId,
+              authId: member.authId,
+            });
+          }
+        })
+      );
+
+      const ctx = getCloudflare(loadContext).ctx;
+      if (ctx && typeof ctx.waitUntil === "function") {
+        ctx.waitUntil(syncMembers);
+      } else {
+        await syncMembers;
       }
     }
 

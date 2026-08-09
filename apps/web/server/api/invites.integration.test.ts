@@ -112,7 +112,7 @@ describe("invites integration", () => {
   it("creates an invite and accepts it as a member", async () => {
     const { response, body } = await createInvite();
     expect(response.status).toBe(201);
-    expect(body.code).toMatch(/^AMIGO-[A-Z2-9]{6}$/);
+    expect(body.code).toMatch(/^AMIGO-[A-Z2-9]{13}$/);
     expect(body.joinUrl).toBe(
       `https://app.example.test/join/${encodeURIComponent(body.code)}`
     );

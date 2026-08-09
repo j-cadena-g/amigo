@@ -177,4 +177,52 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
     expect(getExchangeRateForRecord).not.toHaveBeenCalled();
     expect(batches).toHaveLength(0);
   });
+
+  it("batches additional statements with FX updates atomically", async () => {
+    vi.mocked(getExchangeRateForRecord).mockResolvedValue(1.2);
+    const { db, batches } = createMockDb({
+      financial_accounts: [{ currency: "USD" }],
+      debts: [],
+      assets: [],
+      transactions: [],
+      budgets: [],
+    });
+    const extra = { kind: "household-update" };
+
+    await refreshHouseholdHomeCurrencyRates(
+      {} as never,
+      db as never,
+      "hh-1",
+      "CAD",
+      {
+        buildAdditionalStatements: () => [extra as never],
+      }
+    );
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toContain(extra);
+  });
+
+  it("still commits additional statements when there are no FX rows", async () => {
+    const { db, batches } = createMockDb({
+      financial_accounts: [],
+      debts: [],
+      assets: [],
+      transactions: [],
+      budgets: [],
+    });
+    const extra = { kind: "household-update" };
+
+    await refreshHouseholdHomeCurrencyRates(
+      {} as never,
+      db as never,
+      "hh-1",
+      "CAD",
+      {
+        buildAdditionalStatements: () => [extra as never],
+      }
+    );
+
+    expect(batches).toEqual([[extra]]);
+  });
 });

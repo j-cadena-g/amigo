@@ -108,8 +108,17 @@ export function useWebSocket({
   const invalidateSession = useCallback(() => {
     if (permanentlyClosedRef.current) return;
     permanentlyClosedRef.current = true;
+    clearTimers();
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    updateStatus("disconnected");
     onSessionInvalidated?.();
-  }, [onSessionInvalidated]);
+  }, [clearTimers, onSessionInvalidated, updateStatus]);
 
   useEffect(() => {
     connectRef.current = () => {

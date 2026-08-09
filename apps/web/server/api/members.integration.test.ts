@@ -182,7 +182,7 @@ describe("members integration", () => {
     const after = Date.now();
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toEqual({ success: true });
     expect(mocks.updateUserMetadata).toHaveBeenCalledWith(memberAuthId, {
       publicMetadata: {
         householdId: null,

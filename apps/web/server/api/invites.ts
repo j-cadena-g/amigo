@@ -30,7 +30,7 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const INVITE_EMAIL_FAILURE_MESSAGE = "Failed to send invite email";
 
 const createInviteSchema = z.object({
-  email: z.string().email().optional(),
+  email: z.email().optional(),
 });
 
 const acceptInviteSchema = z.object({
@@ -365,7 +365,12 @@ export const handleInvitesRequest: ApiHandler = async ({
           ? { emailSentAt: new Date(), emailLastError: null }
           : { emailLastError: sendResult.error }
       )
-      .where(eq(householdInvites.id, inviteId));
+      .where(
+        and(
+          eq(householdInvites.id, inviteId),
+          scopeToHousehold(householdInvites.householdId, session!.householdId)
+        )
+      );
 
     return Response.json({
       success: sendResult.sent,
@@ -402,7 +407,9 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
     ROUTE_RATE_LIMITS.invites.accept
   );
 
-  const { code } = acceptInviteSchema.parse(await request.json());
+  const { code } = acceptInviteSchema.parse(
+    await request.json().catch(() => ({}))
+  );
   const normalized = normalizeInviteCode(code);
   if (!normalized) {
     throw new ActionError("Invalid or expired invite code", "VALIDATION_ERROR");
@@ -449,10 +456,15 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
 
   const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
   const clerkUser = await clerk.users.getUser(auth.userId);
-  const email =
-    clerkUser.emailAddresses.find(
-      (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId
-    )?.emailAddress ?? "unknown@example.com";
+  const email = clerkUser.emailAddresses.find(
+    (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId
+  )?.emailAddress;
+  if (!email) {
+    throw new ActionError(
+      "A primary email address is required to join a household",
+      "VALIDATION_ERROR"
+    );
+  }
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null;
   const userId = crypto.randomUUID();

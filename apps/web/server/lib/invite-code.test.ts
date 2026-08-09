@@ -23,7 +23,7 @@ describe("hashInviteCode", () => {
 describe("generateInviteCode", () => {
   it("returns AMIGO- display code whose hash matches normalize(code)", async () => {
     const generated = await generateInviteCode();
-    expect(generated.codeDisplay).toMatch(/^AMIGO-[A-Z2-9]{6}$/);
+    expect(generated.codeDisplay).toMatch(/^AMIGO-[A-Z2-9]{13}$/);
     expect(generated.code).toBe(generated.codeDisplay);
     expect(generated.codeHash).toBe(
       await hashInviteCode(normalizeInviteCode(generated.code))

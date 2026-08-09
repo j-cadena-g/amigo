@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import { toastMutationFailure } from "@/app/lib/api-error";
@@ -27,8 +27,10 @@ export function HouseholdSettingsForm({
   const [currencyValue, setCurrencyValue] = useState<CurrencyCode>(homeCurrency);
   const [timezoneValue, setTimezoneValue] = useState(timezone);
   const [saving, setSaving] = useState(false);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
+    if (dirtyRef.current) return;
     setNameValue(name);
     setCurrencyValue(homeCurrency);
     setTimezoneValue(timezone);
@@ -39,6 +41,7 @@ export function HouseholdSettingsForm({
     trimmedName !== name ||
     currencyValue !== homeCurrency ||
     timezoneValue !== timezone;
+  dirtyRef.current = dirty;
   const canSave = canEdit && dirty && trimmedName.length > 0 && !saving;
 
   async function handleSave() {

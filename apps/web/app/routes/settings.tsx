@@ -48,7 +48,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
 
 export default function Settings() {
   const { household, members, session } = useLoaderData<typeof loader>();
-  const canManageMembers =
+  const canManageHousehold =
     session.role === "owner" || session.role === "admin";
 
   return (
@@ -82,7 +82,7 @@ export default function Settings() {
               name={household.name}
               homeCurrency={parseHomeCurrency(household.homeCurrency)}
               timezone={household.timezone ?? "UTC"}
-              canEdit={canManageMembers}
+              canEdit={canManageHousehold}
             />
           </CardContent>
         </Card>
@@ -112,7 +112,7 @@ export default function Settings() {
                       {member.role}
                     </p>
                   </div>
-                  {member.id !== session.userId && canManageMembers && (
+                  {member.id !== session.userId && canManageHousehold && (
                     <MemberRoleManager
                       member={{
                         id: member.id,
@@ -129,7 +129,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {canManageMembers && (
+        {canManageHousehold && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Invites</CardTitle>

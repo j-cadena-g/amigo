@@ -1,8 +1,15 @@
-import { and, eq, isNull, scopeToHousehold, users } from "@amigo/db";
+import {
+  and,
+  eq,
+  isNull,
+  scopeToHousehold,
+  users,
+  type UserRole,
+} from "@amigo/db";
 
 type TransferOwnershipUser = {
   authId: string | null;
-  role: "owner" | "admin" | "member";
+  role: UserRole;
 };
 
 interface TransferOwnershipQueryDb {

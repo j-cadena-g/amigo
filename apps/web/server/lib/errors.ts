@@ -4,7 +4,8 @@ type ErrorCode =
   | "INTERNAL_ERROR"
   | "RATE_LIMITED"
   | "PERMISSION_DENIED"
-  | "NOT_FOUND";
+  | "NOT_FOUND"
+  | "CONFLICT";
 
 export class ActionError extends Error {
   constructor(

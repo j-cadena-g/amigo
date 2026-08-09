@@ -254,6 +254,8 @@ export const handleMembersRequest: ApiHandler = async ({
 
     if (!transferOk) {
       try {
+        // Only demote the new owner when the former owner is still an active
+        // admin — otherwise a concurrent leave/role change can leave zero owners.
         await db.batch([
           db
             .update(users)
@@ -262,7 +264,14 @@ export const handleMembersRequest: ApiHandler = async ({
               and(
                 eq(users.id, newOwnerId),
                 scopeToHousehold(users.householdId, householdId),
-                eq(users.role, "owner")
+                eq(users.role, "owner"),
+                sql`exists (
+                  select 1 from users as former_owner
+                  where former_owner.id = ${currentOwnerId}
+                    and former_owner.household_id = ${householdId}
+                    and former_owner.deleted_at is null
+                    and former_owner.role = 'admin'
+                )`
               )
             ),
           db
@@ -640,7 +649,7 @@ export const handleMembersRequest: ApiHandler = async ({
       entityId: leavingUserId,
     });
 
-    return Response.json({ ok: true });
+    return Response.json({ success: true });
   }
 
   return new Response(null, {

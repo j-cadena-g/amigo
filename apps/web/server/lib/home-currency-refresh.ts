@@ -15,13 +15,21 @@ import {
 import type { Env } from "../env";
 import { getExchangeRateForRecord } from "./exchange-rates";
 
-const BATCH_CHUNK_SIZE = 25;
-
 type FxRowTable =
   | typeof financialAccounts
   | typeof debts
   | typeof assets
   | typeof transactions;
+
+type BatchStatement = Parameters<DrizzleD1["batch"]>[0][number];
+
+export type HomeCurrencyRefreshOptions = {
+  /**
+   * Built only after rates resolve, then committed in the same D1 batch as FX
+   * updates (e.g. the households.home_currency write).
+   */
+  buildAdditionalStatements?: (db: DrizzleD1) => BatchStatement[];
+};
 
 async function resolveRatesForCurrencies(
   env: Env,
@@ -65,14 +73,6 @@ async function listDistinctCurrencies(
   return rows.map((row) => row.currency as CurrencyCode);
 }
 
-async function runBatched(db: DrizzleD1, statements: unknown[]): Promise<void> {
-  for (let i = 0; i < statements.length; i += BATCH_CHUNK_SIZE) {
-    const chunk = statements.slice(i, i + BATCH_CHUNK_SIZE);
-    if (chunk.length === 0) continue;
-    await db.batch(chunk as unknown as Parameters<typeof db.batch>[0]);
-  }
-}
-
 function buildFxUpdates(
   db: DrizzleD1,
   table: FxRowTable,
@@ -81,8 +81,8 @@ function buildFxUpdates(
   currencies: CurrencyCode[],
   rates: Map<CurrencyCode, number>,
   now: Date
-): unknown[] {
-  const statements: unknown[] = [];
+): BatchStatement[] {
+  const statements: BatchStatement[] = [];
 
   if (currencies.includes(newHome)) {
     statements.push(
@@ -131,8 +131,8 @@ function buildBudgetUpdates(
   currencies: CurrencyCode[],
   rates: Map<CurrencyCode, number>,
   now: Date
-): unknown[] {
-  const statements: unknown[] = [];
+): BatchStatement[] {
+  const statements: BatchStatement[] = [];
 
   if (currencies.includes(newHome)) {
     statements.push(
@@ -186,12 +186,16 @@ function buildBudgetUpdates(
 /**
  * Refresh denormalized home-currency FX snapshots after a household
  * `home_currency` change. Never rewrites native amounts.
+ *
+ * Optional additional statements (e.g. the households row update) are built
+ * only after rates resolve and committed in the same atomic `db.batch`.
  */
 export async function refreshHouseholdHomeCurrencyRates(
   env: Env,
   db: DrizzleD1,
   householdId: string,
-  newHome: CurrencyCode
+  newHome: CurrencyCode,
+  options?: HomeCurrencyRefreshOptions
 ): Promise<void> {
   const now = new Date();
   const fxTables: FxRowTable[] = [
@@ -217,7 +221,7 @@ export async function refreshHouseholdHomeCurrencyRates(
   // Fail before any writes if a required rate is missing.
   const rates = await resolveRatesForCurrencies(env, allCurrencies, newHome);
 
-  const statements: unknown[] = [];
+  const statements: BatchStatement[] = [];
   for (const table of fxTables) {
     statements.push(
       ...buildFxUpdates(
@@ -242,5 +246,14 @@ export async function refreshHouseholdHomeCurrencyRates(
     )
   );
 
-  await runBatched(db, statements);
+  if (options?.buildAdditionalStatements) {
+    statements.push(...options.buildAdditionalStatements(db));
+  }
+
+  if (statements.length === 0) return;
+
+  // Single batch keeps FX snapshots and the household row update atomic.
+  await db.batch(
+    statements as unknown as Parameters<DrizzleD1["batch"]>[0]
+  );
 }

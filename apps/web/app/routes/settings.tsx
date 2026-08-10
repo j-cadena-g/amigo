@@ -16,6 +16,7 @@ import { HouseholdSettingsForm } from "@/app/components/settings/household-setti
 import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
+import { NotificationSettings } from "@/app/components/settings/notification-settings";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -69,6 +70,15 @@ export default function Settings() {
           </CardHeader>
           <CardContent>
             <SettingsThemeToggle />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Notifications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NotificationSettings />
           </CardContent>
         </Card>
 

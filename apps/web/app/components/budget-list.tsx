@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/app/components/ui/alert-dialog";
 import type { CurrencyCode } from "@amigo/db";
+import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
 interface BudgetWithSpending {
   id: string;
@@ -179,6 +180,8 @@ function BudgetFormDialog({
   onSubmit,
   submitting,
   error,
+  recordId,
+  homeCurrency,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -188,10 +191,12 @@ function BudgetFormDialog({
   onSubmit: () => void;
   submitting: boolean;
   error?: string | null;
+  recordId?: string;
+  homeCurrency: CurrencyCode;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -257,6 +262,13 @@ function BudgetFormDialog({
               Shared (household-wide)
             </label>
           </div>
+          {recordId ? (
+            <AuditHistoryPanel
+              recordId={recordId}
+              table="budgets"
+              homeCurrency={homeCurrency}
+            />
+          ) : null}
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
@@ -452,6 +464,7 @@ export function BudgetList({
         onSubmit={handleAdd}
         submitting={submitting}
         error={error}
+        homeCurrency={homeCurrency}
       />
 
       {/* Edit dialog */}
@@ -466,6 +479,8 @@ export function BudgetList({
         onSubmit={handleEdit}
         submitting={submitting}
         error={error}
+        recordId={editingBudget?.id}
+        homeCurrency={homeCurrency}
       />
 
       {/* Delete confirmation */}

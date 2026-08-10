@@ -54,15 +54,20 @@ export async function subscribeToPush(): Promise<void> {
     throw new Error("Push notifications are not configured on this server");
   }
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-  });
+  const existingSubscription = await registration.pushManager.getSubscription();
+  const subscription =
+    existingSubscription ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    }));
 
   const p256dhKey = subscription.getKey("p256dh");
   const authKey = subscription.getKey("auth");
 
-  if (!p256dhKey || !authKey) {
+  if (pushSubscriptionKeysMissing(p256dhKey, authKey)) {
+    // Drop invalid subscriptions (new or existing) so retries can recreate them.
+    await subscription.unsubscribe().catch(() => undefined);
     throw new Error("Failed to get subscription keys");
   }
 
@@ -72,13 +77,16 @@ export async function subscribeToPush(): Promise<void> {
     body: JSON.stringify({
       endpoint: subscription.endpoint,
       keys: {
-        p256dh: arrayBufferToBase64(p256dhKey),
-        auth: arrayBufferToBase64(authKey),
+        p256dh: arrayBufferToBase64(p256dhKey as ArrayBuffer),
+        auth: arrayBufferToBase64(authKey as ArrayBuffer),
       },
     }),
   });
 
   if (!res.ok) {
+    if (!existingSubscription) {
+      await subscription.unsubscribe().catch(() => undefined);
+    }
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? "Failed to save subscription");
   }
@@ -131,6 +139,14 @@ export async function isSubscribed(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** True when a PushSubscription cannot be persisted (missing crypto keys). */
+export function pushSubscriptionKeysMissing(
+  p256dh: ArrayBuffer | null,
+  auth: ArrayBuffer | null
+): boolean {
+  return p256dh == null || auth == null;
 }
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {

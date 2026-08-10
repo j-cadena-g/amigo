@@ -15,6 +15,7 @@ import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
 import { Trash2 } from "lucide-react";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
+import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
 interface EditDebtDialogProps {
   debt: Debt;
@@ -126,7 +127,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit {debt.type === "LOAN" ? "Loan" : "Credit Card"}</DialogTitle>
           <DialogDescription>
@@ -244,6 +245,8 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               Shared (household-wide)
             </label>
           </div>
+
+          <AuditHistoryPanel recordId={debt.id} table="debts" />
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>

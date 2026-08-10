@@ -23,6 +23,7 @@ import {
   isAssetHoldingType,
   isTransactionalAccountType,
 } from "@/app/lib/financial-account-types";
+import { Button } from "@/app/components/ui/button";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -42,29 +43,49 @@ export async function loader({ context }: LoaderFunctionArgs) {
     isNull(financialAccounts.userId)
   );
 
-  const [accountItems, legacyAssetItems] = await Promise.all([
-    db.query.financialAccounts.findMany({
-      where: and(
-        householdScope,
-        visibility,
-        isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, false),
-        ne(financialAccounts.type, "CREDIT")
-      ),
-      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-    }),
-    db.query.assets.findMany({
-      where: and(
-        scopeToHousehold(assets.householdId, session.householdId),
-        or(eq(assets.userId, session.userId), isNull(assets.userId)),
-        isNull(assets.deletedAt)
-      ),
-      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-    }),
-  ]);
+  const [accountItems, archivedAccountItems, legacyAssetItems] =
+    await Promise.all([
+      db.query.financialAccounts.findMany({
+        where: and(
+          householdScope,
+          visibility,
+          isNull(financialAccounts.deletedAt),
+          eq(financialAccounts.archived, false),
+          ne(financialAccounts.type, "CREDIT")
+        ),
+        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+      }),
+      db.query.financialAccounts.findMany({
+        where: and(
+          householdScope,
+          visibility,
+          isNull(financialAccounts.deletedAt),
+          eq(financialAccounts.archived, true),
+          ne(financialAccounts.type, "CREDIT")
+        ),
+        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+      }),
+      db.query.assets.findMany({
+        where: and(
+          scopeToHousehold(assets.householdId, session.householdId),
+          or(eq(assets.userId, session.userId), isNull(assets.userId)),
+          isNull(assets.deletedAt)
+        ),
+        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+      }),
+    ]);
 
   return {
-    accounts: accountItems.map((a) => ({ ...a, isShared: a.userId === null })),
+    accounts: accountItems.map((a) => ({
+      ...a,
+      isShared: a.userId === null,
+      archived: false as const,
+    })),
+    archivedAccounts: archivedAccountItems.map((a) => ({
+      ...a,
+      isShared: a.userId === null,
+      archived: true as const,
+    })),
     legacyAssets: legacyAssetItems.map((a) => ({
       ...a,
       isShared: a.userId === null,
@@ -76,9 +97,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
 }
 
 export default function FinancialAccounts() {
-  const { accounts, legacyAssets, homeCurrency, userId, role } =
+  const { accounts, archivedAccounts, legacyAssets, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const transactional = accounts.filter((a) => isTransactionalAccountType(a.type));
   const holdings = accounts.filter((a) => isAssetHoldingType(a.type));
@@ -118,8 +140,27 @@ export default function FinancialAccounts() {
           </div>
         )}
 
-        {accounts.length === 0 && (
-          <AccountCards accounts={[]} />
+        {accounts.length === 0 && <AccountCards accounts={[]} />}
+
+        {archivedAccounts.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Archived
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowArchived((value) => !value)}
+              >
+                {showArchived
+                  ? "Hide"
+                  : `Show (${archivedAccounts.length})`}
+              </Button>
+            </div>
+            {showArchived ? <AccountCards accounts={archivedAccounts} /> : null}
+          </div>
         )}
 
         <AddAccountDialog
@@ -133,7 +174,7 @@ export default function FinancialAccounts() {
         <div className="space-y-4">
           <FinancialSectionHeader
             title="Legacy assets"
-            description="Older asset entries. Re-create them as accounts above when you can, then delete these."
+            description="Older asset entries. Convert each to an account, or delete when no longer needed."
           />
           <AssetCards assets={legacyAssets} session={{ userId, role }} />
         </div>

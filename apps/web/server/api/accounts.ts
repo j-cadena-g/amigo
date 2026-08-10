@@ -53,13 +53,19 @@ const updateAccountSchema = z.object({
   archived: z.boolean().optional(),
 });
 
+const archiveAccountSchema = z
+  .object({
+    archived: z.boolean(),
+  })
+  .strict();
+
 export const handleAccountsRequest: ApiHandler = async ({
   env,
   params,
   request,
   session,
 }) => {
-  const [id] = getSplatSegments(params);
+  const [id, action] = getSplatSegments(params);
   const db = getDb(env.DB);
 
   if (request.method === "GET" && !id) {
@@ -134,7 +140,80 @@ export const handleAccountsRequest: ApiHandler = async ({
     return Response.json(row, { status: 201 });
   }
 
-  if (request.method === "PATCH" && id) {
+  if (request.method === "PATCH" && id && action === "archived") {
+    await enforceRateLimit(
+      env,
+      `${session!.userId}:accounts:archive`,
+      ROUTE_RATE_LIMITS.accounts.archive
+    );
+
+    const validated = archiveAccountSchema.parse(await request.json());
+    const existing = await db.query.financialAccounts.findFirst({
+      where: and(
+        eq(financialAccounts.id, id),
+        scopeToHousehold(financialAccounts.householdId, session!.householdId),
+        isNull(financialAccounts.deletedAt)
+      ),
+    });
+
+    if (!existing) {
+      throw new ActionError("Account not found", "NOT_FOUND");
+    }
+
+    const isShared = existing.userId === null;
+    if (isShared) {
+      assertPermission(
+        canManageSharedItems(session!),
+        "Only owners and admins can archive shared accounts"
+      );
+    } else if (existing.userId !== session!.userId) {
+      throw new ActionError(
+        "Cannot archive another user's personal account",
+        "PERMISSION_DENIED"
+      );
+    }
+
+    if (existing.archived === validated.archived) {
+      return Response.json(existing);
+    }
+
+    const updated = await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "financial_accounts",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: session!.userId,
+      },
+      async () =>
+        db
+          .update(financialAccounts)
+          .set({
+            archived: validated.archived,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(financialAccounts.id, id),
+              scopeToHousehold(financialAccounts.householdId, session!.householdId),
+              isNull(financialAccounts.deletedAt)
+            )
+          )
+          .returning()
+          .get()
+    );
+
+    if (!updated) {
+      throw new ActionError("Account not found", "NOT_FOUND");
+    }
+
+    return Response.json(updated);
+  }
+
+  if (request.method === "PATCH" && id && !action) {
     await enforceRateLimit(
       env,
       `${session!.userId}:accounts:update`,
@@ -224,7 +303,7 @@ export const handleAccountsRequest: ApiHandler = async ({
     return Response.json(updated);
   }
 
-  if (request.method === "DELETE" && id) {
+  if (request.method === "DELETE" && id && !action) {
     await enforceRateLimit(
       env,
       `${session!.userId}:accounts:delete`,

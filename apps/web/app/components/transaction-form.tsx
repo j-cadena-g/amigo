@@ -7,6 +7,7 @@ import { useFinancialCategories } from "@/app/components/financial/use-financial
 import { CurrencySelect } from "@/app/components/currency-select";
 import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
+import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
 export interface TransactionFormState {
   amount: string;
@@ -237,6 +238,7 @@ interface EditTransactionFormProps {
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
   onCancel: () => void;
   onSubmit: (e: FormEvent) => void;
+  recordId?: string;
 }
 
 export function EditTransactionForm({
@@ -246,6 +248,7 @@ export function EditTransactionForm({
   onChange,
   onCancel,
   onSubmit,
+  recordId,
 }: EditTransactionFormProps) {
   const categoryFieldId = useId();
   const { categories } = useFinancialCategories();
@@ -368,6 +371,10 @@ export function EditTransactionForm({
           />
         </div>
       )}
+
+      {recordId ? (
+        <AuditHistoryPanel recordId={recordId} table="transactions" />
+      ) : null}
 
       <div className="flex gap-2">
         <button

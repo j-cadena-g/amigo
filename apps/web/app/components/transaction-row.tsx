@@ -85,6 +85,7 @@ export function TransactionRow({
         onChange={onEditFormChange}
         onCancel={onCancelEdit}
         onSubmit={onSaveEdit}
+        recordId={transaction.id}
       />
     );
   }

@@ -13,6 +13,7 @@ import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import type { CurrencyCode } from "@amigo/db";
+import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
 type SchedulePreset =
   | "daily"
@@ -594,6 +595,12 @@ export function EditRecurringDialog({
           initialBudgetSuggest={false}
           budgetSuggestScopeRef={budgetSuggestScopeRef}
         />
+        {rule ? (
+          <AuditHistoryPanel
+            recordId={rule.id}
+            table="recurring_transactions"
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );

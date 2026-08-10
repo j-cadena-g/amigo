@@ -15,6 +15,7 @@ export type AccountRow = {
   currency: CurrencyCode;
   userId: string | null;
   isShared?: boolean;
+  archived?: boolean;
 };
 
 interface AccountCardsProps {
@@ -29,13 +30,14 @@ function AccountCard({
   onEdit: () => void;
 }) {
   return (
-    <Card>
+    <Card className={account.archived ? "opacity-70" : undefined}>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
         <div className="min-w-0">
           <CardTitle className="text-base truncate">{account.name}</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
             {accountTypeLabel(account.type)}
             {account.isShared ? " · Shared" : " · Personal"}
+            {account.archived ? " · Archived" : ""}
           </p>
         </div>
         <Button

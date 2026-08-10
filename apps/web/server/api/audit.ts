@@ -33,6 +33,14 @@ interface AuditEntry {
   userName: string | null;
   timestamp: number;
   changes: Record<string, unknown> | null;
+  /** Currency from full snapshots (present even when currency did not change). */
+  recordCurrency: { from: string | null; to: string | null };
+}
+
+function snapshotCurrency(values: unknown): string | null {
+  if (!values || typeof values !== "object") return null;
+  const currency = (values as Record<string, unknown>).currency;
+  return typeof currency === "string" ? currency : null;
 }
 
 export const auditTableSchema = z.enum(AUDIT_TABLES);
@@ -230,6 +238,10 @@ export const handleAuditRequest: ApiHandler = async ({
       userName,
       timestamp: log.createdAt.getTime(),
       changes,
+      recordCurrency: {
+        from: snapshotCurrency(log.oldValues),
+        to: snapshotCurrency(log.newValues),
+      },
     };
   });
 

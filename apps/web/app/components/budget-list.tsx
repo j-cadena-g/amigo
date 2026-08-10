@@ -181,6 +181,7 @@ function BudgetFormDialog({
   submitting,
   error,
   recordId,
+  homeCurrency,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -191,6 +192,7 @@ function BudgetFormDialog({
   submitting: boolean;
   error?: string | null;
   recordId?: string;
+  homeCurrency: CurrencyCode;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -261,7 +263,11 @@ function BudgetFormDialog({
             </label>
           </div>
           {recordId ? (
-            <AuditHistoryPanel recordId={recordId} table="budgets" />
+            <AuditHistoryPanel
+              recordId={recordId}
+              table="budgets"
+              homeCurrency={homeCurrency}
+            />
           ) : null}
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -458,6 +464,7 @@ export function BudgetList({
         onSubmit={handleAdd}
         submitting={submitting}
         error={error}
+        homeCurrency={homeCurrency}
       />
 
       {/* Edit dialog */}
@@ -473,6 +480,7 @@ export function BudgetList({
         submitting={submitting}
         error={error}
         recordId={editingBudget?.id}
+        homeCurrency={homeCurrency}
       />
 
       {/* Delete confirmation */}

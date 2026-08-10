@@ -1,7 +1,6 @@
 import {
   and,
   assets,
-  CURRENCY_CODES,
   eq,
   financialAccounts,
   FINANCIAL_ACCOUNT_TYPES,
@@ -24,21 +23,14 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import { insertManyAuditLogs, withAudit } from "../lib/audit";
+import { zCurrencyCode } from "../lib/request-validation";
 import {
   convertedAccountIdForAsset,
   isLegacyAssetType,
   mapLegacyAssetTypeToAccountType,
 } from "../lib/legacy-asset-migration";
 
-const zCurrencyCode = z.enum(
-  CURRENCY_CODES as unknown as [CurrencyCode, ...CurrencyCode[]]
-);
-const zAccountType = z.enum(
-  FINANCIAL_ACCOUNT_TYPES as unknown as [
-    (typeof FINANCIAL_ACCOUNT_TYPES)[number],
-    ...(typeof FINANCIAL_ACCOUNT_TYPES)[number][],
-  ]
-);
+const zAccountType = z.enum(FINANCIAL_ACCOUNT_TYPES);
 
 const createAssetSchema = z.object({
   name: z.string().min(1),
@@ -188,17 +180,17 @@ export const handleAssetsRequest: ApiHandler = async ({
     assertCanMutateAsset(session!, existing, "convert");
 
     const accountId = convertedAccountIdForAsset(existing.id);
+    // Include soft-deleted rows so reconversion cannot collide on the deterministic id.
     const existingAccount = await db.query.financialAccounts.findFirst({
       where: and(
         eq(financialAccounts.id, accountId),
-        scopeToHousehold(financialAccounts.householdId, session!.householdId),
-        isNull(financialAccounts.deletedAt)
+        scopeToHousehold(financialAccounts.householdId, session!.householdId)
       ),
     });
 
     // Idempotent retry: conversion already completed.
     if (existing.deletedAt) {
-      if (!existingAccount) {
+      if (!existingAccount || existingAccount.deletedAt) {
         throw new ActionError(
           "Asset was deleted and cannot be converted",
           "VALIDATION_ERROR"
@@ -208,6 +200,13 @@ export const handleAssetsRequest: ApiHandler = async ({
         account: { ...existingAccount, isShared: existingAccount.userId === null },
         asset: { ...existing, isShared: existing.userId === null },
       });
+    }
+
+    if (existingAccount?.deletedAt) {
+      throw new ActionError(
+        "A converted account for this asset already exists and was deleted. Restore it instead of converting again.",
+        "VALIDATION_ERROR"
+      );
     }
 
     // Repair path: account exists but asset delete never landed.
@@ -343,6 +342,18 @@ export const handleAssetsRequest: ApiHandler = async ({
         ),
       });
       if (!racedAccount) {
+        // Batch already committed. Undo our soft-delete so the asset is not lost.
+        if (deletedAsset) {
+          await db
+            .update(assets)
+            .set({ deletedAt: null })
+            .where(
+              and(
+                eq(assets.id, id),
+                scopeToHousehold(assets.householdId, session!.householdId)
+              )
+            );
+        }
         throw new ActionError("Converted account not found", "NOT_FOUND");
       }
 

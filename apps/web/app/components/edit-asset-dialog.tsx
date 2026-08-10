@@ -87,27 +87,36 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   }
 
   async function handleConvert() {
+    if (busy) return;
+    if (type !== asset.type) {
+      setError("Save the type change before you convert this asset.");
+      return;
+    }
+
+    setConverting(true);
+    setError(null);
+
     const ok = await confirm({
       title: "Convert to account",
       description:
         "Create a matching account from this legacy asset, then delete the legacy entry. Balances are copied; transactions were never linked to legacy assets.",
       confirmText: "Convert",
     });
-    if (!ok) return;
-
-    setConverting(true);
-    setError(null);
+    if (!ok) {
+      setConverting(false);
+      return;
+    }
 
     try {
+      // Convert from persisted asset values; only accountType is a convert-time choice (BANK).
       const res = await fetch(`/api/assets/${asset.id}/convert`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          accountType,
-          balance: parseFloat(balance) || 0,
-          currency,
-          isShared,
+          accountType:
+            asset.type === "BANK"
+              ? accountType
+              : mapLegacyAssetTypeToAccountType(asset.type as LegacyAssetType),
         }),
       });
 
@@ -128,16 +137,21 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   }
 
   async function handleDelete() {
+    if (busy) return;
+
+    setDeleting(true);
+    setError(null);
+
     const ok = await confirm({
       title: "Delete Asset",
       description: "Are you sure you want to delete this asset? This action cannot be undone.",
       confirmText: "Delete",
       variant: "destructive",
     });
-    if (!ok) return;
-
-    setDeleting(true);
-    setError(null);
+    if (!ok) {
+      setDeleting(false);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/assets/${asset.id}`, {
@@ -211,9 +225,13 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
               <select
                 id="convert-account-type"
                 value={accountType}
-                onChange={(e) =>
-                  setAccountType(e.target.value as FinancialAccount["type"])
-                }
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const match = BANK_CONVERSION_ACCOUNT_TYPES.find(
+                    (t) => t.value === next
+                  );
+                  if (match) setAccountType(match.value);
+                }}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {BANK_CONVERSION_ACCOUNT_TYPES.map((t) => (
@@ -273,6 +291,12 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
           <AuditHistoryPanel recordId={asset.id} table="assets" />
 
+          {type !== asset.type ? (
+            <p className="text-sm text-muted-foreground">
+              Save the type change before converting this asset.
+            </p>
+          ) : null}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
@@ -281,7 +305,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                 type="button"
                 variant="outline"
                 onClick={() => void handleConvert()}
-                disabled={busy || !name.trim()}
+                disabled={busy || !name.trim() || type !== asset.type}
               >
                 <ArrowRightLeft className="mr-1 h-4 w-4" />
                 {converting ? "Converting…" : "Convert to account"}

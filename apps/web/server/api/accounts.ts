@@ -22,7 +22,7 @@ import { getExchangeRateForRecord } from "../lib/exchange-rates";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
-import { withAudit } from "../lib/audit";
+import { insertManyAuditLogs, withAudit } from "../lib/audit";
 
 const zCurrencyCode = z.enum(
   CURRENCY_CODES as unknown as [CurrencyCode, ...CurrencyCode[]]
@@ -177,38 +177,55 @@ export const handleAccountsRequest: ApiHandler = async ({
       return Response.json(existing);
     }
 
-    const updated = await withAudit(
-      db,
+    const updated = await db
+      .update(financialAccounts)
+      .set({
+        archived: validated.archived,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(financialAccounts.id, id),
+          scopeToHousehold(financialAccounts.householdId, session!.householdId),
+          isNull(financialAccounts.deletedAt),
+          // Compare-and-set so concurrent archive/restore cannot double-write audit.
+          eq(financialAccounts.archived, existing.archived)
+        )
+      )
+      .returning()
+      .get();
+
+    if (!updated) {
+      const current = await db.query.financialAccounts.findFirst({
+        where: and(
+          eq(financialAccounts.id, id),
+          scopeToHousehold(financialAccounts.householdId, session!.householdId),
+          isNull(financialAccounts.deletedAt)
+        ),
+      });
+      if (!current) {
+        throw new ActionError("Account not found", "NOT_FOUND");
+      }
+      if (current.archived === validated.archived) {
+        return Response.json(current);
+      }
+      throw new ActionError(
+        "Account was modified concurrently; retry the archive action",
+        "CONFLICT"
+      );
+    }
+
+    await insertManyAuditLogs(db, [
       {
         householdId: session!.householdId,
         tableName: "financial_accounts",
         recordId: id,
         operation: "UPDATE",
-        oldValues: existing,
-        newValues: (result) => result,
+        oldValues: { archived: existing.archived },
+        newValues: { archived: validated.archived },
         changedBy: session!.userId,
       },
-      async () =>
-        db
-          .update(financialAccounts)
-          .set({
-            archived: validated.archived,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(financialAccounts.id, id),
-              scopeToHousehold(financialAccounts.householdId, session!.householdId),
-              isNull(financialAccounts.deletedAt)
-            )
-          )
-          .returning()
-          .get()
-    );
-
-    if (!updated) {
-      throw new ActionError("Account not found", "NOT_FOUND");
-    }
+    ]);
 
     return Response.json(updated);
   }

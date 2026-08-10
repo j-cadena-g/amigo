@@ -332,6 +332,24 @@ export const handleAssetsRequest: ApiHandler = async ({
     const insertedAccount = insertedAccounts[0];
     const deletedAsset = deletedAssets[0];
 
+    // Concurrent DELETE won the asset soft-delete: undo the orphan account insert.
+    if (insertedAccount && !deletedAsset) {
+      await db
+        .update(financialAccounts)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(financialAccounts.id, accountId),
+            scopeToHousehold(financialAccounts.householdId, session!.householdId),
+            isNull(financialAccounts.deletedAt)
+          )
+        );
+      throw new ActionError(
+        "Asset was deleted and cannot be converted",
+        "VALIDATION_ERROR"
+      );
+    }
+
     // Concurrent convert: another request won the insert.
     if (!insertedAccount) {
       const racedAccount = await db.query.financialAccounts.findFirst({
@@ -405,7 +423,7 @@ export const handleAssetsRequest: ApiHandler = async ({
       {
         account: { ...insertedAccount, isShared: insertedAccount.userId === null },
         asset: {
-          ...(deletedAsset ?? { ...existing, deletedAt }),
+          ...deletedAsset,
           isShared: existing.userId === null,
         },
       },

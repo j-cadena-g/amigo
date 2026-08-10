@@ -52,10 +52,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const [error, setError] = useState<string | null>(null);
 
   const busy = loading || deleting || converting;
+  const parsedBalance = Number(balance);
+  const hasInvalidBalance =
+    balance.trim() === "" || !Number.isFinite(parsedBalance);
   const hasUnsavedChanges =
     name.trim() !== asset.name ||
     type !== asset.type ||
-    Math.round((parseFloat(balance) || 0) * 100) !== asset.balance ||
+    hasInvalidBalance ||
+    Math.round(parsedBalance * 100) !== asset.balance ||
     currency !== asset.currency ||
     isShared !== (asset.userId === null);
 

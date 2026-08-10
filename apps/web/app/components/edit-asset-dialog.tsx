@@ -52,18 +52,15 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const [error, setError] = useState<string | null>(null);
 
   const busy = loading || deleting || converting;
-  const parsedBalance = Number(balance);
-  const balanceInCents = parsedBalance * 100;
-  const hasInvalidBalance =
-    balance.trim() === "" ||
-    !Number.isFinite(parsedBalance) ||
-    parsedBalance < 0 ||
-    Math.abs(balanceInCents - Math.round(balanceInCents)) > 1e-8;
+  const trimmedBalance = balance.trim();
+  // Exact decimal shape (non-negative, ≤2 fraction digits) — avoids float tolerance gaps.
+  const hasInvalidBalance = !/^\d+(\.\d{1,2})?$/.test(trimmedBalance);
+  const parsedBalance = Number(trimmedBalance);
   const hasUnsavedChanges =
     name.trim() !== asset.name ||
     type !== asset.type ||
     hasInvalidBalance ||
-    Math.round(balanceInCents) !== asset.balance ||
+    Math.round(parsedBalance * 100) !== asset.balance ||
     currency !== asset.currency ||
     isShared !== (asset.userId === null);
 

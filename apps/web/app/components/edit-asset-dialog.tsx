@@ -52,6 +52,12 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const [error, setError] = useState<string | null>(null);
 
   const busy = loading || deleting || converting;
+  const hasUnsavedChanges =
+    name.trim() !== asset.name ||
+    type !== asset.type ||
+    Math.round((parseFloat(balance) || 0) * 100) !== asset.balance ||
+    currency !== asset.currency ||
+    isShared !== (asset.userId === null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,8 +94,8 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
   async function handleConvert() {
     if (busy) return;
-    if (type !== asset.type) {
-      setError("Save the type change before you convert this asset.");
+    if (hasUnsavedChanges) {
+      setError("Save your changes before you convert this asset.");
       return;
     }
 
@@ -291,9 +297,9 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
           <AuditHistoryPanel recordId={asset.id} table="assets" />
 
-          {type !== asset.type ? (
+          {hasUnsavedChanges ? (
             <p className="text-sm text-muted-foreground">
-              Save the type change before converting this asset.
+              Save your changes before converting this asset.
             </p>
           ) : null}
 
@@ -305,7 +311,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                 type="button"
                 variant="outline"
                 onClick={() => void handleConvert()}
-                disabled={busy || !name.trim() || type !== asset.type}
+                disabled={busy || !name.trim() || hasUnsavedChanges}
               >
                 <ArrowRightLeft className="mr-1 h-4 w-4" />
                 {converting ? "Converting…" : "Convert to account"}

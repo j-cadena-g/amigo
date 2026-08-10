@@ -163,6 +163,42 @@ describe("assets convert integration", () => {
     expect(assetAfter?.deletedAt).toBeNull();
   });
 
+  it("convert rollback does not clear a newer soft-delete timestamp", async () => {
+    const env = getIntegrationEnv();
+    const db = getDb(env.DB);
+    const assetId = `asset-rollback-${crypto.randomUUID()}`;
+    const convertDeletedAt = new Date("2026-01-01T00:00:00.000Z");
+    const laterDeletedAt = new Date("2026-01-02T00:00:00.000Z");
+
+    await db.insert(assets).values({
+      id: assetId,
+      householdId,
+      userId: ownerId,
+      name: "Rollback guard",
+      type: "CASH",
+      balance: 100,
+      currency: "CAD",
+      deletedAt: laterDeletedAt,
+    });
+
+    // Mirrors the convert failure rollback: only undo if deletedAt is still ours.
+    await db
+      .update(assets)
+      .set({ deletedAt: null })
+      .where(
+        and(
+          eq(assets.id, assetId),
+          eq(assets.householdId, householdId),
+          eq(assets.deletedAt, convertDeletedAt)
+        )
+      );
+
+    const after = await db.query.assets.findFirst({
+      where: eq(assets.id, assetId),
+    });
+    expect(after?.deletedAt?.getTime()).toBe(laterDeletedAt.getTime());
+  });
+
   it("rejects converting a normally deleted asset", async () => {
     const env = getIntegrationEnv();
     const db = getDb(env.DB);

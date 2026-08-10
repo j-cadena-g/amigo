@@ -177,6 +177,11 @@ export const handleAccountsRequest: ApiHandler = async ({
       return Response.json(existing);
     }
 
+    const ownershipCondition =
+      existing.userId === null
+        ? isNull(financialAccounts.userId)
+        : eq(financialAccounts.userId, existing.userId);
+
     const updated = await db
       .update(financialAccounts)
       .set({
@@ -188,8 +193,10 @@ export const handleAccountsRequest: ApiHandler = async ({
           eq(financialAccounts.id, id),
           scopeToHousehold(financialAccounts.householdId, session!.householdId),
           isNull(financialAccounts.deletedAt),
-          // Compare-and-set so concurrent archive/restore cannot double-write audit.
-          eq(financialAccounts.archived, existing.archived)
+          // Compare-and-set so concurrent archive/restore cannot double-write audit,
+          // and ownership cannot change under an already-authorized request.
+          eq(financialAccounts.archived, existing.archived),
+          ownershipCondition
         )
       )
       .returning()
@@ -206,6 +213,20 @@ export const handleAccountsRequest: ApiHandler = async ({
       if (!current) {
         throw new ActionError("Account not found", "NOT_FOUND");
       }
+
+      const currentIsShared = current.userId === null;
+      if (currentIsShared) {
+        assertPermission(
+          canManageSharedItems(session!),
+          "Only owners and admins can archive shared accounts"
+        );
+      } else if (current.userId !== session!.userId) {
+        throw new ActionError(
+          "Cannot archive another user's personal account",
+          "PERMISSION_DENIED"
+        );
+      }
+
       if (current.archived === validated.archived) {
         return Response.json(current);
       }

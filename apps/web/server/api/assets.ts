@@ -343,14 +343,16 @@ export const handleAssetsRequest: ApiHandler = async ({
       });
       if (!racedAccount) {
         // Batch already committed. Undo our soft-delete so the asset is not lost.
-        if (deletedAsset) {
+        // Only clear deletedAt if it still matches this request's value (not a later DELETE).
+        if (deletedAsset?.deletedAt) {
           await db
             .update(assets)
             .set({ deletedAt: null })
             .where(
               and(
                 eq(assets.id, id),
-                scopeToHousehold(assets.householdId, session!.householdId)
+                scopeToHousehold(assets.householdId, session!.householdId),
+                eq(assets.deletedAt, deletedAsset.deletedAt)
               )
             );
         }

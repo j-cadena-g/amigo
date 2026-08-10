@@ -1,4 +1,4 @@
-import { and, eq, financialAccounts, getDb } from "@amigo/db";
+import { and, eq, financialAccounts, getDb, users } from "@amigo/db";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleAccountsRequest } from "./accounts";
 import {
@@ -108,5 +108,66 @@ describe("accounts archive integration", () => {
     expect(restored?.currency).toBe("CAD");
     expect(restored?.userId).toBe(ownerId);
     expect(restored?.exchangeRateToHome).toBeNull();
+  });
+
+  it("rejects archive after ownership transfers to another user", async () => {
+    const env = getIntegrationEnv();
+    const db = getDb(env.DB);
+    const session = testSession({ userId: ownerId, householdId });
+    const accountId = `acct-ownership-${crypto.randomUUID()}`;
+    const otherUserId = `user-other-${crypto.randomUUID()}`;
+
+    await db.insert(users).values({
+      id: otherUserId,
+      authId: `clerk_other_${crypto.randomUUID()}`,
+      email: "other@example.com",
+      name: "Other",
+      householdId,
+      role: "member",
+    });
+
+    await db.insert(financialAccounts).values({
+      id: accountId,
+      householdId,
+      userId: ownerId,
+      name: "Personal",
+      type: "CHECKING",
+      balance: 100,
+      currency: "CAD",
+      archived: false,
+    });
+
+    // Ownership transferred away before this archive attempt.
+    await db
+      .update(financialAccounts)
+      .set({ userId: otherUserId })
+      .where(eq(financialAccounts.id, accountId));
+
+    await expect(
+      handleAccountsRequest({
+        env,
+        params: { "*": `${accountId}/archived` },
+        request: new Request(
+          `http://localhost/api/accounts/${accountId}/archived`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ archived: true }),
+          }
+        ),
+        session,
+        sessionStatus: "authenticated",
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "PERMISSION_DENIED",
+      message: "Cannot archive another user's personal account",
+    });
+
+    const after = await db.query.financialAccounts.findFirst({
+      where: eq(financialAccounts.id, accountId),
+    });
+    expect(after?.archived).toBe(false);
+    expect(after?.userId).toBe(otherUserId);
   });
 });

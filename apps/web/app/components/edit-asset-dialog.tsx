@@ -67,6 +67,10 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (hasInvalidBalance) {
+      setError("Enter a non-negative amount with at most two decimal places.");
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -77,7 +81,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
         body: JSON.stringify({
           name,
           type,
-          balance: parseFloat(balance) || 0,
+          balance: Number(trimmedBalance),
           currency,
           isShared,
         }),
@@ -340,7 +344,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy || !name.trim()}>
+              <Button type="submit" disabled={busy || !name.trim() || hasInvalidBalance}>
                 {loading ? "Saving…" : "Save"}
               </Button>
             </div>

@@ -124,6 +124,7 @@ async function assertCanViewAuditRecord(
         where: and(
           eq(recurringTransactions.id, recordId),
           scopeToHousehold(recurringTransactions.householdId, householdId),
+          isNull(recurringTransactions.deletedAt),
           visibleRecurringRulesCondition(viewerUserId)
         ),
       });

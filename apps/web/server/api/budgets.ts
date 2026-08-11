@@ -88,7 +88,8 @@ export const handleBudgetsRequest: ApiHandler = async ({
         where: and(
           eq(recurringTransactions.id, recurringRuleId),
           scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-          visibleRecurringRulesCondition(session!.userId)
+          visibleRecurringRulesCondition(session!.userId),
+          isNull(recurringTransactions.deletedAt)
         ),
       });
       if (rule?.budgetId) {

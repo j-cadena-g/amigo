@@ -1,6 +1,6 @@
 import { and, eq, getDb, lt, pushSubscriptions } from "@amigo/db";
 import { z } from "zod";
-import { ActionError } from "../lib/errors";
+import { ActionError, jsonError } from "../lib/errors";
 import type { ApiHandler } from "./route";
 
 const PUSH_SUBSCRIPTION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -105,9 +105,9 @@ export const handlePushRequest: ApiHandler = async ({
 
     if (existing) {
       if (existing.userId !== session!.userId) {
-        return Response.json(
-          { error: "Subscription endpoint belongs to another user" },
-          { status: 403 }
+        return jsonError(
+          "Subscription endpoint belongs to another user",
+          "PERMISSION_DENIED"
         );
       }
 
@@ -138,9 +138,9 @@ export const handlePushRequest: ApiHandler = async ({
     });
 
     if (existing && existing.userId !== session!.userId) {
-      return Response.json(
-        { error: "Subscription endpoint belongs to another user" },
-        { status: 403 }
+      return jsonError(
+        "Subscription endpoint belongs to another user",
+        "PERMISSION_DENIED"
       );
     }
 

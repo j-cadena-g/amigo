@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { logServerError } from "../lib/errors";
+import { withAudit } from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
@@ -52,7 +53,7 @@ export const handleSyncRequest: ApiHandler = async ({
   }
 
   await enforceRateLimit(
-      env,
+    env,
     `${session!.userId}:sync`,
     ROUTE_RATE_LIMITS.sync.batch
   );
@@ -192,6 +193,7 @@ async function processMutation(
         throw new Error("Item name is required");
       }
 
+      // Idempotent replay: do not write a second INSERT audit.
       const existingItem = await resolveIdempotentAdd(db, session, mutation.id);
       if (existingItem) {
         return existingItem;
@@ -247,7 +249,27 @@ async function processMutation(
         throw error;
       }
 
-      return loadGroceryItemForIdempotentAdd(db, session.householdId, newItemId);
+      const created = await loadGroceryItemForIdempotentAdd(
+        db,
+        session.householdId,
+        newItemId
+      );
+
+      // Audit after successful write (mirrors groceries REST create).
+      await withAudit(
+        db,
+        {
+          householdId: session.householdId,
+          tableName: "grocery_items",
+          recordId: newItemId,
+          operation: "INSERT",
+          newValues: created,
+          changedBy: session.userId,
+        },
+        async () => created
+      );
+
+      return created;
     }
 
     case "toggle": {
@@ -261,36 +283,75 @@ async function processMutation(
 
       if (!existing) throw new Error("Item not found");
 
-      const updated = await db
-        .update(groceryItems)
-        .set({
-          isPurchased: !existing.isPurchased,
-          purchasedAt: existing.isPurchased ? null : new Date(),
-        })
-        .where(
-          and(
-            eq(groceryItems.id, mutation.entityId),
-            scopeToHousehold(groceryItems.householdId, session.householdId)
-          )
-        )
-        .returning()
-        .get();
+      const updated = await withAudit(
+        db,
+        {
+          householdId: session.householdId,
+          tableName: "grocery_items",
+          recordId: mutation.entityId,
+          operation: "UPDATE",
+          oldValues: existing,
+          newValues: (result) => result,
+          changedBy: session.userId,
+        },
+        async () =>
+          db
+            .update(groceryItems)
+            .set({
+              isPurchased: !existing.isPurchased,
+              purchasedAt: existing.isPurchased ? null : new Date(),
+            })
+            .where(
+              and(
+                eq(groceryItems.id, mutation.entityId),
+                scopeToHousehold(groceryItems.householdId, session.householdId)
+              )
+            )
+            .returning()
+            .get()
+      );
 
       return updated as unknown as Record<string, unknown>;
     }
 
     case "delete": {
-      const deleted = await db
-        .update(groceryItems)
-        .set({ deletedAt: new Date() })
-        .where(
-          and(
-            eq(groceryItems.id, mutation.entityId),
-            scopeToHousehold(groceryItems.householdId, session.householdId)
-          )
-        )
-        .returning()
-        .get();
+      const existing = await db.query.groceryItems.findFirst({
+        where: and(
+          eq(groceryItems.id, mutation.entityId),
+          scopeToHousehold(groceryItems.householdId, session.householdId),
+          isNull(groceryItems.deletedAt)
+        ),
+      });
+
+      if (!existing) throw new Error("Item not found");
+
+      const deleted = await withAudit(
+        db,
+        {
+          householdId: session.householdId,
+          tableName: "grocery_items",
+          recordId: mutation.entityId,
+          operation: "DELETE",
+          oldValues: existing,
+          changedBy: session.userId,
+        },
+        async () => {
+          const result = await db
+            .update(groceryItems)
+            .set({ deletedAt: new Date() })
+            .where(
+              and(
+                eq(groceryItems.id, mutation.entityId),
+                scopeToHousehold(groceryItems.householdId, session.householdId),
+                isNull(groceryItems.deletedAt)
+              )
+            )
+            .returning()
+            .get();
+          if (!result) throw new Error("Item not found");
+          return result;
+        }
+      );
 
       return deleted as unknown as Record<string, unknown>;
     }
@@ -309,6 +370,11 @@ async function processMutation(
 
       if (!existing) throw new Error("Item not found");
 
+      const priorTags = await db.query.groceryItemTags.findMany({
+        where: eq(groceryItemTags.itemId, mutation.entityId),
+      });
+      const priorTagIds = priorTags.map((row) => row.tagId);
+
       let validTagIds: string[] = [];
       if (tagIds.length > 0) {
         const validTags = await db.query.groceryTags.findMany({
@@ -323,23 +389,43 @@ async function processMutation(
         validTagIds = validTags.map((t) => t.id);
       }
 
-      await db.batch([
-        db
-          .delete(groceryItemTags)
-          .where(eq(groceryItemTags.itemId, mutation.entityId)),
-        ...(validTagIds.length > 0
-          ? [
-              db.insert(groceryItemTags).values(
-                validTagIds.map((tagId) => ({ itemId: mutation.entityId, tagId }))
-              ),
-            ]
-          : []),
-      ]);
+      await withAudit(
+        db,
+        {
+          householdId: session.householdId,
+          tableName: "grocery_items",
+          recordId: mutation.entityId,
+          operation: "UPDATE",
+          oldValues: { ...existing, tagIds: priorTagIds },
+          newValues: { ...existing, tagIds: validTagIds },
+          changedBy: session.userId,
+        },
+        async () => {
+          await db.batch([
+            db
+              .delete(groceryItemTags)
+              .where(eq(groceryItemTags.itemId, mutation.entityId)),
+            ...(validTagIds.length > 0
+              ? [
+                  db.insert(groceryItemTags).values(
+                    validTagIds.map((tagId) => ({
+                      itemId: mutation.entityId,
+                      tagId,
+                    }))
+                  ),
+                ]
+              : []),
+          ]);
+          return existing;
+        }
+      );
 
       return null;
     }
 
-    default:
-      throw new Error(`Unknown operation: ${mutation.operation}`);
+    default: {
+      const _exhaustive: never = mutation.operation;
+      throw new Error(`Unknown operation: ${_exhaustive}`);
+    }
   }
 }

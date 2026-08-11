@@ -2,6 +2,7 @@ import {
   and,
   eq,
   getDb,
+  isNull,
   recurringTransactions,
   scopeToHousehold,
   sql,
@@ -81,7 +82,8 @@ export const handleRecurringRequest: ApiHandler = async ({
     const rules = await db.query.recurringTransactions.findMany({
       where: and(
         scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-        visibleRecurringRulesCondition(session!.userId)
+        visibleRecurringRulesCondition(session!.userId),
+        isNull(recurringTransactions.deletedAt)
       ),
       orderBy: (rule, { desc }) => [desc(rule.createdAt)],
     });
@@ -183,7 +185,8 @@ export const handleRecurringRequest: ApiHandler = async ({
       where: and(
         eq(recurringTransactions.id, id),
         scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-        eq(recurringTransactions.userId, session!.userId)
+        eq(recurringTransactions.userId, session!.userId),
+        isNull(recurringTransactions.deletedAt)
       ),
     });
 
@@ -291,7 +294,8 @@ export const handleRecurringRequest: ApiHandler = async ({
             and(
               eq(recurringTransactions.id, id),
               scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-              eq(recurringTransactions.userId, session!.userId)
+              eq(recurringTransactions.userId, session!.userId),
+              isNull(recurringTransactions.deletedAt)
             )
           )
           .returning()
@@ -317,7 +321,8 @@ export const handleRecurringRequest: ApiHandler = async ({
       where: and(
         eq(recurringTransactions.id, id),
         scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-        eq(recurringTransactions.userId, session!.userId)
+        eq(recurringTransactions.userId, session!.userId),
+        isNull(recurringTransactions.deletedAt)
       ),
     });
 
@@ -337,12 +342,14 @@ export const handleRecurringRequest: ApiHandler = async ({
       },
       async () =>
         db
-          .delete(recurringTransactions)
+          .update(recurringTransactions)
+          .set({ deletedAt: new Date(), active: false })
           .where(
             and(
               eq(recurringTransactions.id, id),
               scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-              eq(recurringTransactions.userId, session!.userId)
+              eq(recurringTransactions.userId, session!.userId),
+              isNull(recurringTransactions.deletedAt)
             )
           )
           .returning()
@@ -375,7 +382,8 @@ export const handleRecurringRequest: ApiHandler = async ({
         and(
           eq(recurringTransactions.id, id),
           scopeToHousehold(recurringTransactions.householdId, session!.householdId),
-          eq(recurringTransactions.userId, session!.userId)
+          eq(recurringTransactions.userId, session!.userId),
+          isNull(recurringTransactions.deletedAt)
         )
       )
       .returning()

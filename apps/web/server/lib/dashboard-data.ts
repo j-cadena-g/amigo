@@ -213,6 +213,7 @@ export async function loadDashboardData(
         ),
         visibleRecurringRulesCondition(session.userId),
         eq(recurringTransactions.active, true),
+        isNull(recurringTransactions.deletedAt),
         gte(recurringTransactions.nextRunDate, todayStr)
       ),
       orderBy: [asc(recurringTransactions.nextRunDate)],
@@ -391,6 +392,7 @@ export async function loadDashboardData(
         scopeToHousehold(recurringTransactions.householdId, session.householdId),
         visibleRecurringRulesCondition(session.userId),
         eq(recurringTransactions.active, true),
+        isNull(recurringTransactions.deletedAt),
         eq(recurringTransactions.type, "expense"),
         inArray(recurringTransactions.budgetId, budgetIdsForImpact),
         gte(recurringTransactions.nextRunDate, monthStart),

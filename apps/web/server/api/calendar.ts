@@ -159,7 +159,13 @@ export const handleCalendarRequest: ApiHandler = async ({
     db
       .select()
       .from(recurringTransactions)
-      .where(and(householdScope, visibleRecurringRulesCondition(session!.userId)))
+      .where(
+        and(
+          householdScope,
+          visibleRecurringRulesCondition(session!.userId),
+          isNull(recurringTransactions.deletedAt)
+        )
+      )
       .all(),
     db
       .select()

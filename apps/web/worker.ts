@@ -9,6 +9,8 @@ import { cleanupStalePushSubscriptions } from "./server/api/push";
 import { cleanupStaleGrocerySyncMutations } from "./server/api/sync";
 import type { Env } from "./server/env";
 import { getClerkIdentity } from "./server/lib/clerk";
+import { clerkTokenAuthOptions } from "./server/lib/clerk-auth-options";
+import { jsonError } from "./server/lib/errors";
 import { getRequestHandlerMode } from "./server/lib/request-handler-mode";
 import { buildSecurityHeaders } from "./server/lib/security";
 import { resolveSession } from "./server/lib/session";
@@ -105,21 +107,21 @@ export { HouseholdDO };
 
 async function handleWebSocketUpgrade(request: Request, env: Env) {
   if (!requestMatchesAllowedOrigin(request, env.APP_ORIGIN)) {
-    return Response.json({ error: "Invalid request origin" }, { status: 403 });
+    return jsonError("Invalid request origin", "PERMISSION_DENIED");
   }
 
   const clerk = createClerkClient({
     secretKey: env.CLERK_SECRET_KEY,
     publishableKey: env.CLERK_PUBLISHABLE_KEY,
   });
-  const authState = await clerk.authenticateRequest(request, {
-    acceptsToken: "any",
-    authorizedParties: [env.APP_ORIGIN],
-  });
+  const authState = await clerk.authenticateRequest(
+    request,
+    clerkTokenAuthOptions(env.APP_ORIGIN)
+  );
   const identity = getClerkIdentity(authState.toAuth());
 
   if (!identity) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return jsonError("Unauthorized", "UNAUTHORIZED");
   }
 
   const result = await resolveSession(
@@ -134,21 +136,15 @@ async function handleWebSocketUpgrade(request: Request, env: Env) {
   );
 
   if (result.status === "needs_setup") {
-    return Response.json(
-      { error: "Household setup required" },
-      { status: 403 }
-    );
+    return jsonError("Household setup required", "PERMISSION_DENIED");
   }
 
   if (result.status === "revoked") {
-    return Response.json(
-      { error: "Account access revoked" },
-      { status: 403 }
-    );
+    return jsonError("Account access revoked", "PERMISSION_DENIED");
   }
 
   if (result.status !== "authenticated") {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return jsonError("Unauthorized", "UNAUTHORIZED");
   }
 
   const id = env.HOUSEHOLD.idFromName(result.session.householdId);

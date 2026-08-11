@@ -8,7 +8,8 @@ import type {
 } from "react-router";
 import { ZodError } from "zod";
 import type { AppSession, Env, SessionStatus } from "../env";
-import { ActionError } from "../lib/errors";
+import { ActionError, jsonError } from "../lib/errors";
+import { clerkTokenAuthOptions } from "../lib/clerk-auth-options";
 import { isUnsafeHttpMethod, requestMatchesAllowedOrigin } from "../lib/request-origin";
 import { assertSessionStillValid } from "../lib/session";
 
@@ -52,10 +53,7 @@ export async function handleApiRoute(
       requestIsUnsafe &&
       !requestMatchesAllowedOrigin(args.request, baseArgs.env.APP_ORIGIN)
     ) {
-      return Response.json(
-        { error: "Invalid request origin", code: "PERMISSION_DENIED" },
-        { status: 403 }
-      );
+      return jsonError("Invalid request origin", "PERMISSION_DENIED");
     }
 
     if (options.auth === "strict") {
@@ -72,13 +70,13 @@ export async function handleApiRoute(
     }
 
     if (options.auth === "clerk") {
-      const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
-        acceptsToken: "any",
-        treatPendingAsSignedOut: false,
-      });
+      const auth = await getAuth(
+        args as Parameters<typeof getAuth>[0],
+        clerkTokenAuthOptions(baseArgs.env.APP_ORIGIN)
+      );
       const userId = "userId" in auth ? auth.userId : null;
       if (!userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return jsonError("Unauthorized", "UNAUTHORIZED");
       }
       baseArgs.auth = auth as NonNullable<ApiHandlerArgs["auth"]>;
     }
@@ -107,55 +105,31 @@ function getSessionErrorResponse(
   }
 
   if (status === "needs_setup") {
-    return Response.json(
-      { error: "Household setup required" },
-      { status: 403 }
-    );
+    return jsonError("Household setup required", "PERMISSION_DENIED");
   }
 
   if (status === "revoked") {
-    return Response.json(
-      { error: "Account access revoked" },
-      { status: 403 }
-    );
+    return jsonError("Account access revoked", "PERMISSION_DENIED");
   }
 
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
+  return jsonError("Unauthorized", "UNAUTHORIZED");
 }
 
 function mapApiError(error: unknown) {
   if (error instanceof ActionError) {
-    const statusByCode: Record<ActionError["code"], number> = {
-      UNAUTHORIZED: 401,
-      VALIDATION_ERROR: 400,
-      INTERNAL_ERROR: 500,
-      RATE_LIMITED: 429,
-      PERMISSION_DENIED: 403,
-      NOT_FOUND: 404,
-      CONFLICT: 409,
-    };
-    const status = statusByCode[error.code];
-
-    return Response.json(
-      { error: error.message, code: error.code },
-      { status }
-    );
+    return jsonError(error.message, error.code);
   }
 
   if (error instanceof ZodError) {
-    return Response.json(
-      { error: "Validation error", details: error.issues },
-      { status: 400 }
-    );
+    return jsonError("Validation error", "VALIDATION_ERROR", {
+      details: error.issues,
+    });
   }
 
   if (error instanceof SyntaxError) {
-    return Response.json(
-      { error: "Invalid JSON", code: "VALIDATION_ERROR" },
-      { status: 400 }
-    );
+    return jsonError("Invalid JSON", "VALIDATION_ERROR");
   }
 
   console.error("Unhandled API error:", error);
-  return Response.json({ error: "Internal server error" }, { status: 500 });
+  return jsonError("Internal server error", "INTERNAL_ERROR");
 }

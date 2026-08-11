@@ -1,4 +1,4 @@
-type ErrorCode =
+export type ErrorCode =
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR"
   | "INTERNAL_ERROR"
@@ -7,6 +7,16 @@ type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT";
 
+export const ERROR_STATUS_BY_CODE: Record<ErrorCode, number> = {
+  UNAUTHORIZED: 401,
+  VALIDATION_ERROR: 400,
+  INTERNAL_ERROR: 500,
+  RATE_LIMITED: 429,
+  PERMISSION_DENIED: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+};
+
 export class ActionError extends Error {
   constructor(
     public override message: string,
@@ -14,6 +24,18 @@ export class ActionError extends Error {
   ) {
     super(message);
   }
+}
+
+/** Standard API error envelope: always includes `code`. */
+export function jsonError(
+  message: string,
+  code: ErrorCode,
+  extra?: Record<string, unknown>
+): Response {
+  return Response.json(
+    { error: message, code, ...extra },
+    { status: ERROR_STATUS_BY_CODE[code] }
+  );
 }
 
 export function logServerError(

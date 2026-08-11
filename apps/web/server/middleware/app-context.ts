@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/react-router/server";
 import type { MiddlewareFunction } from "react-router";
 import { getApp, getCloudflare } from "../../router-context";
 import { getClerkIdentity } from "../lib/clerk";
+import { clerkSessionAuthOptions } from "../lib/clerk-auth-options";
 import { createCspNonce } from "../lib/security";
 import { resolveSession } from "../lib/session";
 
@@ -21,9 +22,10 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
   app.sessionStatus = "unauthenticated";
   delete app.session;
 
-  const auth = await getAuth(args as Parameters<typeof getAuth>[0], {
-    treatPendingAsSignedOut: false,
-  });
+  const auth = await getAuth(
+    args as Parameters<typeof getAuth>[0],
+    clerkSessionAuthOptions
+  );
   const identity = getClerkIdentity(auth);
 
   if (identity) {

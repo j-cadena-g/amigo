@@ -3,6 +3,7 @@ import {
   eq,
   households,
   inArray,
+  isNull,
   lte,
   recurringTransactions,
   scopeToHousehold,
@@ -160,6 +161,7 @@ export async function advanceRecurringRuleIfCurrent(db: DrizzleD1, rule: Recurri
       and(
         eq(recurringTransactions.id, rule.id),
         eq(recurringTransactions.active, true),
+        isNull(recurringTransactions.deletedAt),
         eq(recurringTransactions.nextRunDate, rule.nextRunDate)
       )
     )
@@ -185,6 +187,7 @@ export async function processDueRecurringRules(
 
   const conditions = [
     eq(recurringTransactions.active, true),
+    isNull(recurringTransactions.deletedAt),
     lte(recurringTransactions.nextRunDate, farthestToday),
   ];
 

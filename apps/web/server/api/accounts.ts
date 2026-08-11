@@ -1,6 +1,5 @@
 import {
   and,
-  CURRENCY_CODES,
   eq,
   financialAccounts,
   FINANCIAL_ACCOUNT_TYPES,
@@ -23,16 +22,9 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import { insertManyAuditLogs, withAudit } from "../lib/audit";
+import { zCurrencyCode } from "../lib/request-validation";
 
-const zCurrencyCode = z.enum(
-  CURRENCY_CODES as unknown as [CurrencyCode, ...CurrencyCode[]]
-);
-const zAccountType = z.enum(
-  FINANCIAL_ACCOUNT_TYPES as unknown as [
-    (typeof FINANCIAL_ACCOUNT_TYPES)[number],
-    ...(typeof FINANCIAL_ACCOUNT_TYPES)[number][],
-  ]
-);
+const zAccountType = z.enum(FINANCIAL_ACCOUNT_TYPES);
 
 const createAccountSchema = z.object({
   name: z.string().min(1),

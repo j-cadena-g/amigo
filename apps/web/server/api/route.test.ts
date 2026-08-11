@@ -125,6 +125,7 @@ describe("handleApiRoute", () => {
     };
     expect(body).toMatchObject({
       error: "Validation error",
+      code: "VALIDATION_ERROR",
       details: expect.any(Array),
     });
     expect(body.details).toHaveLength(1);
@@ -262,6 +263,7 @@ describe("handleApiRoute", () => {
     expect(mocks.getAuth).toHaveBeenCalledWith(args, {
       acceptsToken: "any",
       treatPendingAsSignedOut: false,
+      authorizedParties: [AMIGO_DEV_ORIGIN],
     });
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -279,6 +281,9 @@ describe("handleApiRoute", () => {
     });
 
     expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    await expect(response.json()).resolves.toEqual({
+      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+    });
   });
 });

@@ -61,9 +61,15 @@ export const recurringTransactions = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date())
       .$onUpdate(() => new Date()),
+    /** Tombstone: rule removed; retained for audit / future delta sync. */
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   },
   (table) => [
     index("recurring_transactions_household_id_idx").on(table.householdId),
+    index("recurring_transactions_household_deleted_idx").on(
+      table.householdId,
+      table.deletedAt
+    ),
   ]
 );
 

@@ -12,6 +12,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMIGO_DEV_PORT } from "./lib/dev-origin.mjs";
+import { classifyLocalDevSecrets } from "./lib/local-dev-secrets.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,14 +22,28 @@ const examplePath = path.join(webDir, ".dev.vars.example");
 
 function assertRequiredKeys() {
   const manifest = readFileSync(examplePath, "utf8");
-  const required = parseManifestKeys(manifest);
-  const missing = required.filter((key) => !process.env[key]?.trim());
+  const manifestKeys = parseManifestKeys(manifest);
+  const { missingRequired, missingOptional, unknownRequired } =
+    classifyLocalDevSecrets(manifestKeys);
 
-  if (missing.length > 0) {
+  if (unknownRequired.length > 0) {
     console.error(
-      `error: missing local secrets: ${missing.join(", ")}. Set OP_ENVIRONMENT_ID (and OP_SERVICE_ACCOUNT_TOKEN on cloud agents) and run via pnpm run dev (op run).`,
+      `error: required local keys missing from apps/web/.dev.vars.example: ${unknownRequired.join(", ")}`,
     );
     process.exit(1);
+  }
+
+  if (missingRequired.length > 0) {
+    console.error(
+      `error: missing required local secrets: ${missingRequired.join(", ")}. Set APP_ENV, APP_ORIGIN, and your Clerk keys (via OP_ENVIRONMENT_ID + op run, or export them in the shell).`,
+    );
+    process.exit(1);
+  }
+
+  if (missingOptional.length > 0) {
+    console.log(
+      `note: optional secrets not set: ${missingOptional.join(", ")} (Cloudflare IDs unused locally; VAPID only for push testing)`,
+    );
   }
 }
 

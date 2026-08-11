@@ -234,12 +234,39 @@ export async function processDueRecurringRules(
     let error: unknown | null = null;
 
     try {
+      // Revalidate at write time so a concurrent soft-delete cannot create an occurrence.
+      const liveRule = await db.query.recurringTransactions.findFirst({
+        where: and(
+          eq(recurringTransactions.id, rule.id),
+          eq(recurringTransactions.active, true),
+          isNull(recurringTransactions.deletedAt),
+          eq(recurringTransactions.nextRunDate, rule.nextRunDate)
+        ),
+        columns: { id: true },
+      });
+      if (!liveRule) {
+        continue;
+      }
+
       const homeCurrency = await getHomeCurrency(db, rule.householdId);
       const exchangeRateToHome = await getExchangeRateForRecord(
         env,
         rule.currency,
         homeCurrency
       );
+
+      const stillLive = await db.query.recurringTransactions.findFirst({
+        where: and(
+          eq(recurringTransactions.id, rule.id),
+          eq(recurringTransactions.active, true),
+          isNull(recurringTransactions.deletedAt),
+          eq(recurringTransactions.nextRunDate, rule.nextRunDate)
+        ),
+        columns: { id: true },
+      });
+      if (!stillLive) {
+        continue;
+      }
 
       await db.insert(transactions).values({
         id: transactionId,

@@ -294,8 +294,8 @@ async function processMutation(
           newValues: (result) => result,
           changedBy: session.userId,
         },
-        async () =>
-          db
+        async () => {
+          const result = await db
             .update(groceryItems)
             .set({
               isPurchased: !existing.isPurchased,
@@ -304,11 +304,15 @@ async function processMutation(
             .where(
               and(
                 eq(groceryItems.id, mutation.entityId),
-                scopeToHousehold(groceryItems.householdId, session.householdId)
+                scopeToHousehold(groceryItems.householdId, session.householdId),
+                isNull(groceryItems.deletedAt)
               )
             )
             .returning()
-            .get()
+            .get();
+          if (!result) throw new Error("Item not found");
+          return result;
+        }
       );
 
       return updated as unknown as Record<string, unknown>;
@@ -401,6 +405,20 @@ async function processMutation(
           changedBy: session.userId,
         },
         async () => {
+          // Reject if the item was soft-deleted after the initial read.
+          const stillActive = await db
+            .select({ id: groceryItems.id })
+            .from(groceryItems)
+            .where(
+              and(
+                eq(groceryItems.id, mutation.entityId),
+                scopeToHousehold(groceryItems.householdId, session.householdId),
+                isNull(groceryItems.deletedAt)
+              )
+            )
+            .get();
+          if (!stillActive) throw new Error("Item not found");
+
           await db.batch([
             db
               .delete(groceryItemTags)

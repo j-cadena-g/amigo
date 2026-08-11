@@ -184,9 +184,9 @@ export const handleInvitesRequest: ApiHandler = async ({
         operation: "INSERT",
         newValues: {
           id: inviteIdValue,
-          invitedEmail,
           expiresAt: expiresAt.toISOString(),
           createdByUserId: session!.userId,
+          hasInvitedEmail: Boolean(invitedEmail),
         },
         changedBy: session!.userId,
       },
@@ -601,7 +601,6 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
       operation: "INSERT",
       newValues: {
         id: userId,
-        email,
         role: "member",
         householdId: invite.householdId,
       },

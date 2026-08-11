@@ -33,7 +33,7 @@ export function jsonError(
   extra?: Record<string, unknown>
 ): Response {
   return Response.json(
-    { error: message, code, ...extra },
+    { ...extra, error: message, code },
     { status: ERROR_STATUS_BY_CODE[code] }
   );
 }

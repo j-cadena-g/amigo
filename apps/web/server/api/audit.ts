@@ -120,11 +120,11 @@ async function assertCanViewAuditRecord(
       });
       break;
     case "recurring_transactions":
+      // Tombstones remain readable for audit history authorization.
       record = await db.query.recurringTransactions.findFirst({
         where: and(
           eq(recurringTransactions.id, recordId),
           scopeToHousehold(recurringTransactions.householdId, householdId),
-          isNull(recurringTransactions.deletedAt),
           visibleRecurringRulesCondition(viewerUserId)
         ),
       });

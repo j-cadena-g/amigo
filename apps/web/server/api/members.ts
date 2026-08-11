@@ -598,7 +598,6 @@ export const handleMembersRequest: ApiHandler = async ({
         oldValues: {
           id: targetUser.id,
           role: targetUser.role,
-          email: targetUser.email,
         },
         changedBy: session!.userId,
       },
@@ -717,7 +716,6 @@ export const handleMembersRequest: ApiHandler = async ({
         oldValues: {
           id: currentUser.id,
           role: currentUser.role,
-          email: currentUser.email,
         },
         changedBy: leavingUserId,
       },

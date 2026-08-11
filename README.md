@@ -295,13 +295,7 @@ Cloud agents still need a signed-in Clerk user to use the app UI. Do **not** com
 | `AGENT_LOGIN_EMAIL` | Clerk Development user email for agentic login |
 | `AGENT_LOGIN_PASSWORD` | Password for that user |
 
-3. When the agent needs to sign in, load the Environment with `op run` (as `pnpm run dev` / `dev:verify` already do). Inside that subprocess, `process.env.AGENT_LOGIN_EMAIL` / `AGENT_LOGIN_PASSWORD` hold the real values — pass them directly into browser automation. **Do not print secrets or include them in logs.** Plain `printenv` under `op run` replaces secret values on stdout/stderr with `<concealed by 1Password>` unless you pass `--no-masking`:
-
-```bash
-# Load OP_ENVIRONMENT_ID from refs.env when it is not already exported:
-. apps/web/.op/refs.env
-op run --environment "$OP_ENVIRONMENT_ID" --no-masking -- printenv AGENT_LOGIN_EMAIL
-```
+1. When the agent needs to sign in, load the Environment with `op run` (as `pnpm run dev` / `dev:verify` already do). Inside that subprocess, `process.env.AGENT_LOGIN_EMAIL` / `AGENT_LOGIN_PASSWORD` hold the real values — pass them directly into browser automation. **Do not print secrets, disable masking to inspect them, or include them in logs.**
 
 Other developers doing agentic work should seed the same pattern in **their** Clerk app and Environment.
 

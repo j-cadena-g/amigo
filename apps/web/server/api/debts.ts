@@ -20,8 +20,9 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import { withAudit } from "../lib/audit";
+import { zCurrencyCode } from "../lib/request-validation";
 
-const currencySchema = z.enum(["CAD", "USD", "EUR", "GBP", "MXN"]).optional();
+const currencySchema = zCurrencyCode.optional();
 
 const loanShape = {
   type: z.literal("LOAN"),

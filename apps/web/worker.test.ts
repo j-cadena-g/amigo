@@ -80,6 +80,7 @@ describe("worker WebSocket security", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Invalid request origin",
+      code: "PERMISSION_DENIED",
     });
     expect(mocks.createClerkClient).not.toHaveBeenCalled();
   });
@@ -98,6 +99,7 @@ describe("worker WebSocket security", () => {
       expect.any(Request),
       {
         acceptsToken: "any",
+        treatPendingAsSignedOut: false,
         authorizedParties: ["https://app.example.test"],
       }
     );

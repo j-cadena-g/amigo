@@ -40,6 +40,7 @@ import { invalidateSessionCachesForHouseholdMembers } from "../lib/session-cache
 import { assertSessionStillValid } from "../lib/session";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
+import { insertManyAuditLogs, withAudit } from "../lib/audit";
 
 const updateRoleSchema = z.object({
   role: z.enum(["admin", "member"]),
@@ -158,7 +159,22 @@ export const handleMembersRequest: ApiHandler = async ({
       "Not authorized to assign this role"
     );
 
-    await db.update(users).set({ role }).where(eq(users.id, userId));
+    await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "users",
+        recordId: userId,
+        operation: "UPDATE",
+        oldValues: { role: targetUser.role },
+        newValues: { role },
+        changedBy: session!.userId,
+      },
+      async () => {
+        await db.update(users).set({ role }).where(eq(users.id, userId));
+        return { role };
+      }
+    );
 
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: targetUser.authId },
@@ -356,6 +372,27 @@ export const handleMembersRequest: ApiHandler = async ({
       );
     }
 
+    await insertManyAuditLogs(db, [
+      {
+        householdId,
+        tableName: "users",
+        recordId: newOwnerId,
+        operation: "UPDATE",
+        oldValues: { role: previousNewOwnerRole },
+        newValues: { role: "owner" },
+        changedBy: currentOwnerId,
+      },
+      {
+        householdId,
+        tableName: "users",
+        recordId: currentOwnerId,
+        operation: "UPDATE",
+        oldValues: { role: "owner" },
+        newValues: { role: "admin" },
+        changedBy: currentOwnerId,
+      },
+    ]);
+
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: currentUser.authId },
       { authId: newOwner.authId },
@@ -420,7 +457,12 @@ export const handleMembersRequest: ApiHandler = async ({
       db
         .select({ count: sql<number>`count(*)` })
         .from(recurringTransactions)
-        .where(eq(recurringTransactions.userId, userId))
+        .where(
+          and(
+            eq(recurringTransactions.userId, userId),
+            isNull(recurringTransactions.deletedAt)
+          )
+        )
         .then((result) => result[0]?.count ?? 0),
       db
         .select({ count: sql<number>`count(*)` })
@@ -547,6 +589,20 @@ export const handleMembersRequest: ApiHandler = async ({
       throw error;
     }
 
+    await insertManyAuditLogs(db, [
+      {
+        householdId: session!.householdId,
+        tableName: "users",
+        recordId: userId,
+        operation: "DELETE",
+        oldValues: {
+          id: targetUser.id,
+          role: targetUser.role,
+        },
+        changedBy: session!.userId,
+      },
+    ]);
+
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: targetUser.authId },
     ]);
@@ -650,6 +706,20 @@ export const handleMembersRequest: ApiHandler = async ({
       });
       throw error;
     }
+
+    await insertManyAuditLogs(db, [
+      {
+        householdId: session!.householdId,
+        tableName: "users",
+        recordId: leavingUserId,
+        operation: "DELETE",
+        oldValues: {
+          id: currentUser.id,
+          role: currentUser.role,
+        },
+        changedBy: leavingUserId,
+      },
+    ]);
 
     await invalidateSessionCachesForHouseholdMembers(env, [
       { authId: currentUser.authId },

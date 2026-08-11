@@ -9,6 +9,7 @@ import {
   and,
   visibleRecurringRulesCondition,
   eq,
+  isNull,
   parseHomeCurrency,
 } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
@@ -31,7 +32,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const rules = await db.query.recurringTransactions.findMany({
     where: and(
       scopeToHousehold(recurringTransactions.householdId, session.householdId),
-      visibleRecurringRulesCondition(session.userId)
+      visibleRecurringRulesCondition(session.userId),
+      isNull(recurringTransactions.deletedAt)
     ),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });

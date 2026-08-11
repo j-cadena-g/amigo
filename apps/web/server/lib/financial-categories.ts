@@ -118,7 +118,8 @@ export async function categoryHasUsage(
       .where(
         and(
           scopeToHousehold(recurringTransactions.householdId, householdId),
-          inArray(recurringTransactions.categoryId, categoryIds)
+          inArray(recurringTransactions.categoryId, categoryIds),
+          isNull(recurringTransactions.deletedAt)
         )
       )
       .limit(1),

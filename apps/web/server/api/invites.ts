@@ -24,6 +24,7 @@ import { assertPermission, canManageMembers } from "../lib/permissions";
 import { assertSessionStillValid } from "../lib/session";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
+import { insertManyAuditLogs, withAudit } from "../lib/audit";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Stable client-facing message — never echo provider Error.message. */
@@ -174,15 +175,34 @@ export const handleInvitesRequest: ApiHandler = async ({
       throw new ActionError("Household not found", "NOT_FOUND");
     }
 
-    await db.insert(householdInvites).values({
-      id: inviteIdValue,
-      householdId: session!.householdId,
-      codeHash,
-      codeDisplay,
-      createdByUserId: session!.userId,
-      invitedEmail,
-      expiresAt,
-    });
+    await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "household_invites",
+        recordId: inviteIdValue,
+        operation: "INSERT",
+        newValues: {
+          id: inviteIdValue,
+          expiresAt: expiresAt.toISOString(),
+          createdByUserId: session!.userId,
+          hasInvitedEmail: Boolean(invitedEmail),
+        },
+        changedBy: session!.userId,
+      },
+      async () => {
+        await db.insert(householdInvites).values({
+          id: inviteIdValue,
+          householdId: session!.householdId,
+          codeHash,
+          codeDisplay,
+          createdByUserId: session!.userId,
+          invitedEmail,
+          expiresAt,
+        });
+        return { id: inviteIdValue };
+      }
+    );
 
     let emailSent = false;
     let emailError: string | null = null;
@@ -267,23 +287,44 @@ export const handleInvitesRequest: ApiHandler = async ({
       throw new ActionError("Invite already revoked", "VALIDATION_ERROR");
     }
 
-    const revoked = await db
-      .update(householdInvites)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(householdInvites.id, inviteId),
-          scopeToHousehold(householdInvites.householdId, session!.householdId),
-          isNull(householdInvites.usedAt),
-          isNull(householdInvites.revokedAt)
-        )
-      )
-      .returning({ id: householdInvites.id })
-      .get();
+    await withAudit(
+      db,
+      {
+        householdId: session!.householdId,
+        tableName: "household_invites",
+        recordId: inviteId,
+        operation: "UPDATE",
+        oldValues: { revokedAt: null },
+        newValues: (result) => ({ revokedAt: result.revokedAt }),
+        changedBy: session!.userId,
+      },
+      async () => {
+        const result = await db
+          .update(householdInvites)
+          .set({ revokedAt: new Date() })
+          .where(
+            and(
+              eq(householdInvites.id, inviteId),
+              scopeToHousehold(
+                householdInvites.householdId,
+                session!.householdId
+              ),
+              isNull(householdInvites.usedAt),
+              isNull(householdInvites.revokedAt)
+            )
+          )
+          .returning({
+            id: householdInvites.id,
+            revokedAt: householdInvites.revokedAt,
+          })
+          .get();
 
-    if (!revoked) {
-      throw new ActionError("Invite is no longer valid", "VALIDATION_ERROR");
-    }
+        if (!result) {
+          throw new ActionError("Invite is no longer valid", "VALIDATION_ERROR");
+        }
+        return result;
+      }
+    );
 
     return Response.json({ success: true });
   }
@@ -542,6 +583,30 @@ export const handleInviteAcceptRequest: ApiHandler = async ({
         isNull(householdInvites.usedByUserId)
       )
     );
+
+  await insertManyAuditLogs(db, [
+    {
+      householdId: invite.householdId,
+      tableName: "household_invites",
+      recordId: invite.id,
+      operation: "UPDATE",
+      oldValues: { usedAt: null, usedByUserId: null },
+      newValues: { usedAt: usedAt.toISOString(), usedByUserId: userId },
+      changedBy: userId,
+    },
+    {
+      householdId: invite.householdId,
+      tableName: "users",
+      recordId: userId,
+      operation: "INSERT",
+      newValues: {
+        id: userId,
+        role: "member",
+        householdId: invite.householdId,
+      },
+      changedBy: userId,
+    },
+  ]);
 
   // Best-effort after D1 (matches settings rename). Session can repair later.
   try {

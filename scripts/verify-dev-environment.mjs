@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyLocalDevSecrets } from "./lib/local-dev-secrets.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,30 +12,50 @@ const repoRoot = path.resolve(__dirname, "..");
 const examplePath = path.join(repoRoot, "apps/web/.dev.vars.example");
 
 const manifest = readFileSync(examplePath, "utf8");
-const required = parseManifestKeys(manifest);
+const manifestKeys = parseManifestKeys(manifest);
+const {
+  requiredKeys,
+  optionalKeys,
+  agenticKeys,
+  unknownRequired,
+  missingRequired,
+  missingOptional,
+  presentRequired,
+  presentOptional,
+  presentAgentic,
+} = classifyLocalDevSecrets(manifestKeys);
 
-const present = [];
-const missing = [];
-
-for (const key of required) {
-  if (process.env[key]?.trim()) {
-    present.push(key);
-  } else {
-    missing.push(key);
-  }
-}
-
-console.log(`OK: ${present.length}/${required.length} manifest keys have values`);
-if (present.length > 0) {
-  console.log(`present: ${present.join(", ")}`);
-}
-
-if (missing.length > 0) {
-  console.error(`FAIL: missing or empty: ${missing.join(", ")}`);
+if (unknownRequired.length > 0) {
   console.error(
-    "hint: local dev — set OP_ENVIRONMENT_ID in apps/web/.op/refs.env to your personal Environment UUID and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (your local-dev Environment) in Cursor environment secrets",
+    `FAIL: required local keys missing from apps/web/.dev.vars.example: ${unknownRequired.join(", ")}`,
   );
   process.exit(1);
 }
 
-console.log("PASS: local-dev Environment is complete");
+const presentCount =
+  presentRequired.length + presentOptional.length + presentAgentic.length;
+const totalCount =
+  requiredKeys.length + optionalKeys.length + agenticKeys.length;
+console.log(
+  `OK: ${presentCount}/${totalCount} manifest keys have values (${presentRequired.length}/${requiredKeys.length} required)`,
+);
+const presentListed = [...presentRequired, ...presentOptional, ...presentAgentic];
+if (presentListed.length > 0) {
+  console.log(`present: ${presentListed.join(", ")}`);
+}
+
+if (missingRequired.length > 0) {
+  console.error(`FAIL: missing or empty required keys: ${missingRequired.join(", ")}`);
+  console.error(
+    "hint: set APP_ENV, APP_ORIGIN, CLERK_SECRET_KEY, and CLERK_PUBLISHABLE_KEY in your personal Environment (or export them in the shell). Prefer OP_ENVIRONMENT_ID in apps/web/.op/refs.env + op sign-in; cloud agents — OP_SERVICE_ACCOUNT_TOKEN + OP_ENVIRONMENT_ID.",
+  );
+  process.exit(1);
+}
+
+if (missingOptional.length > 0) {
+  console.log(
+    `note: optional keys not set (ok for first-run): ${missingOptional.join(", ")} — Cloudflare IDs are unused by local Vite; VAPID_* only needed to test web push`,
+  );
+}
+
+console.log("PASS: local-dev Environment has required secrets");

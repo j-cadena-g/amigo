@@ -3,24 +3,44 @@
 # =============================================================================
 # Key manifest for local Workers dev. `pnpm run dev` uses op run to inject these
 # keys into process.env; Wrangler reads them via CLOUDFLARE_INCLUDE_PROCESS_ENV.
-# `pnpm run dev:verify` checks names only. Do not mount or commit `.dev.vars`.
+# `pnpm run dev:verify` requires the Required section only (names only; no values
+# printed). Do not mount or commit `.dev.vars`.
 # Deploy keys live in apps/web/.deploy.env.example and apps/web/.wrangler.secrets.example.
 # =============================================================================
 
-# Cloudflare (same account/DB/KV IDs as prod; local Vite uses simulated D1/KV)
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_D1_DATABASE_ID=
-CLOUDFLARE_KV_NAMESPACE_ID=
-CLOUDFLARE_CUSTOM_DOMAIN=
+# -----------------------------------------------------------------------------
+# Required — enough for first `pnpm run dev`
+# -----------------------------------------------------------------------------
 APP_ENV=development
 # Must match apps/web/server/lib/dev-origin.ts (Vite dev port).
 APP_ORIGIN=http://localhost:5190
 
-# Clerk authentication
+# Clerk authentication (create your own Clerk application; use pk_test_ / sk_test_)
 CLERK_SECRET_KEY=sk_test_...
 CLERK_PUBLISHABLE_KEY=pk_test_...
 
-# Web Push (VAPID) — generate with: npx web-push generate-vapid-keys
+# -----------------------------------------------------------------------------
+# Optional — not required for local Vite / D1
+# -----------------------------------------------------------------------------
+# Local `pnpm run dev` renders placeholder Cloudflare IDs into .wrangler.dev.jsonc.
+# Real account/D1/KV/domain IDs are only needed for deploy / remote Wrangler.
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_D1_DATABASE_ID=
+CLOUDFLARE_KV_NAMESPACE_ID=
+CLOUDFLARE_CUSTOM_DOMAIN=
+
+# Web Push (VAPID) — optional unless testing push notifications.
+# Generate with: npx web-push generate-vapid-keys
 VAPID_SUBJECT=mailto:you@example.com
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+
+# -----------------------------------------------------------------------------
+# Agentic login (Cursor Cloud Agents / browser automation) — optional
+# -----------------------------------------------------------------------------
+# Create a dedicated Clerk Development user in *your* Clerk app for agents.
+# Store the credentials here (in your 1Password Environment), never in git.
+# Pass these values directly to browser automation after `op run`.
+# Do not print secrets or include them in logs.
+AGENT_LOGIN_EMAIL=
+AGENT_LOGIN_PASSWORD=

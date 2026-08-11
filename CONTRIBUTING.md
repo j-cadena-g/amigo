@@ -21,16 +21,20 @@ If you run a modified version as a network service, AGPL obligations may apply t
 - [pnpm](https://pnpm.io) `11.3.0+` (see `packageManager` in `package.json`)
 - Node.js on `PATH` (used by helper scripts)
 - [Wrangler](https://developers.cloudflare.com/workers/wrangler/) `4+`
-- [1Password CLI](https://developer.1password.com/docs/cli/) and access to the **`amigo (dev)`** Environment (see `apps/web/.op/refs.env.example`)
+- [1Password CLI](https://developer.1password.com/docs/cli/) and **your own** 1Password Environment for local secrets (see `apps/web/.op/refs.env.example`). Do not request access to anyone else’s Environment — create one in your account (a common display name is `amigo (dev)`).
 
 ### First run
+
+1. In 1Password → Developer → Environments, create a **personal** Environment for local work.
+2. Add every key from `apps/web/.dev.vars.example` (and any deploy keys you need from the other `*.example` manifests) using **your** Clerk / Cloudflare / VAPID credentials.
+3. Then:
 
 ```bash
 pnpm install
 pnpm run dev:setup
 
 cp apps/web/.op/refs.env.example apps/web/.op/refs.env
-# Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
+# Set OP_ENVIRONMENT_ID to the UUID of your personal local-dev Environment.
 
 pnpm run dev:verify
 pnpm run dev
@@ -38,9 +42,9 @@ pnpm run dev
 
 `pnpm run dev` wraps Vite in `op run --environment` (via `OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
 
-If `pnpm run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` is set, the 1Password CLI is installed (`op --version`) and signed in, and every key from `apps/web/.dev.vars.example` has a value in the **`amigo (dev)`** Environment.
+If `pnpm run dev:verify` fails, confirm `OP_ENVIRONMENT_ID` points at **your** Environment, the 1Password CLI is installed (`op --version`) and signed in, and every key from `apps/web/.dev.vars.example` has a value in that Environment.
 
-For **Cursor Cloud Agents**, do not copy app secrets into Cursor. Set only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID` on the cloud environment — see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents).
+For **Cursor Cloud Agents**, do not copy app secrets into Cursor. Point the agent at **your** Environment with only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID` — see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents).
 
 To reset local D1 state: `pnpm run dev:reset`.
 
@@ -109,7 +113,7 @@ Good candidates:
 - Documentation improvements in README or CHANGELOG
 - Accessibility and UX improvements with brief testing notes
 
-Please avoid drive-by refactors, dependency major bumps without discussion, and changes that commit live deployment-specific IDs or domains. Keep real Cloudflare binding identifiers in a 1Password Environment (see `apps/web/.deploy.env.example` and `apps/web/.op/refs.env.example`) or another deploy-time secret store, not in tracked config.
+Please avoid drive-by refactors, dependency major bumps without discussion, and changes that commit live deployment-specific IDs or domains. Keep real Cloudflare binding identifiers in **your** 1Password Environment (see `apps/web/.deploy.env.example` and `apps/web/.op/refs.env.example`) or another deploy-time secret store, not in tracked config.
 
 ## Security
 

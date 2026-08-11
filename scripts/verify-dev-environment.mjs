@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Verifies amigo (dev) Environment secrets injected by op run (names only). */
+/** Verifies local-dev Environment secrets injected by op run (names only). */
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -32,9 +32,9 @@ if (present.length > 0) {
 if (missing.length > 0) {
   console.error(`FAIL: missing or empty: ${missing.join(", ")}`);
   console.error(
-    "hint: local dev — set OP_ENVIRONMENT_ID in apps/web/.op/refs.env and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (amigo dev) in Cursor environment secrets",
+    "hint: local dev — set OP_ENVIRONMENT_ID in apps/web/.op/refs.env to your personal Environment UUID and sign in with op; cloud agents — set OP_SERVICE_ACCOUNT_TOKEN and OP_ENVIRONMENT_ID (your local-dev Environment) in Cursor environment secrets",
   );
   process.exit(1);
 }
 
-console.log("PASS: amigo (dev) Environment is complete");
+console.log("PASS: local-dev Environment is complete");

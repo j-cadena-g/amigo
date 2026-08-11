@@ -104,16 +104,20 @@ Household roles (`owner` > `admin` > `member`): `canManageHousehold` and `canMan
 - Node.js on `PATH` for local helper scripts
 - Wrangler `4+`
 - Clerk development keys
-- [1Password CLI](https://developer.1password.com/docs/cli/) and a 1Password Environment for secrets (recommended)
+- [1Password CLI](https://developer.1password.com/docs/cli/) and **your own** 1Password Environment for secrets (recommended). Each contributor creates and fills their own Environment — there is no shared team vault to request access to.
 
 ### Install and Run
+
+1. Create a personal 1Password Environment for local development (a common display name is `amigo (dev)`).
+2. Populate it with every key from [`apps/web/.dev.vars.example`](./apps/web/.dev.vars.example) using **your** Clerk / Cloudflare / VAPID credentials.
+3. Then:
 
 ```bash
 pnpm install
 pnpm run dev:setup
 
 cp apps/web/.op/refs.env.example apps/web/.op/refs.env
-# Set OP_ENVIRONMENT_ID to the amigo (dev) Environment UUID from 1Password.
+# Set OP_ENVIRONMENT_ID to the UUID of your personal local-dev Environment.
 
 pnpm run dev:verify
 pnpm run dev
@@ -123,27 +127,28 @@ Open the local Vite/Workers dev URL printed by `pnpm run dev`.
 
 ### Local Environment Notes
 
-- Copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env` and set `OP_ENVIRONMENT_ID` to the **`amigo (dev)`** Environment UUID from 1Password.
+- Copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env` and set `OP_ENVIRONMENT_ID` to the UUID of **your** local-dev Environment (not someone else’s).
+- `amigo (dev)` / `amigo (prod)` in this repo are **suggested display names** for personal or operator Environments — not shared Environments contributors are expected to join.
 - `pnpm run dev` uses `op run --environment` to inject secrets into `process.env`; the Cloudflare Vite plugin reads them directly (`CLOUDFLARE_INCLUDE_PROCESS_ENV`). Do not mount a `.dev.vars` file.
 - `pnpm run dev:verify` checks that every key from `apps/web/.dev.vars.example` is present (names only; no secret values printed).
-- All secrets and deploy identifiers live in 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
+- Secrets and deploy identifiers should live in each person’s (or each operator’s) 1Password Environments; the repo only tracks variable **names** in `*.example` manifests.
 - `pnpm run deploy` also uses `op run` and renders ignored `apps/web/.wrangler.deploy.jsonc` from environment variables, so live Cloudflare IDs and domains do not need to live in git.
 
 ## Cursor Cloud Agents
 
-Cursor cloud agents should **not** copy individual app secrets into the Cursor dashboard. Use the same bootstrap pattern as Cloudflare Workers Builds:
+Cursor cloud agents should **not** copy individual app secrets into the Cursor dashboard. Use the same bootstrap pattern as Cloudflare Workers Builds, pointed at **your** local-dev Environment:
 
-1. Create a read-only 1Password service account scoped to **`amigo (dev)`** only (separate from the prod Workers Builds token).
+1. Create a read-only 1Password service account scoped to **your** local-dev Environment only (separate from any production Workers Builds token).
 2. In Cursor → Cloud Agents → your amigo environment → Secrets, add only:
 
 | Secret | Cursor type | Value |
 | --- | --- | --- |
-| `OP_SERVICE_ACCOUNT_TOKEN` | Runtime Secret | Read-only service account with access to **amigo (dev)** only |
-| `OP_ENVIRONMENT_ID` | Environment Variable | UUID of the **amigo (dev)** Environment |
+| `OP_SERVICE_ACCOUNT_TOKEN` | Runtime Secret | Read-only service account with access to **your** local-dev Environment only |
+| `OP_ENVIRONMENT_ID` | Environment Variable | UUID of **your** local-dev Environment |
 
 Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, or other keys from `apps/web/.dev.vars.example` to Cursor. Commands like `pnpm run dev` and `pnpm run dev:verify` inject them via `op run --environment` through [`scripts/run-with-1password-environment.sh`](./scripts/run-with-1password-environment.sh). Cloud agents resolve `OP_ENVIRONMENT_ID` from Cursor secrets (not from gitignored `apps/web/.op/refs.env`).
 
-For the cloud environment **install/update** command, use `pnpm install && pnpm run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `pnpm run dev:verify` to confirm the Environment is complete (names only).
+For the cloud environment **install/update** command, use `pnpm install && pnpm run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `pnpm run dev:verify` to confirm your Environment is complete (names only).
 
 Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typecheck`, `pnpm run test:unit`, and relevant `pnpm run test:integration` when touching Workers/D1/DO code.
 
@@ -173,7 +178,7 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 | Command | Description |
 | --- | --- |
 | `pnpm run dev` | Start the local Vite + Workers development server |
-| `pnpm run dev:verify` | Verify the amigo (dev) Environment via `op run` (names only) |
+| `pnpm run dev:verify` | Verify your local-dev Environment via `op run` (names only) |
 | `pnpm run dev:setup` | Apply local D1 migrations and seed the local database |
 | `pnpm run dev:reset` | Remove local Wrangler state and re-run local setup |
 | `pnpm run build` | Build the React Router app for production |
@@ -234,23 +239,26 @@ Notable API groups:
 
 `pnpm run deploy` first renders `apps/web/.wrangler.deploy.jsonc` from the current shell environment, then uses that ignored file for remote D1 migrations and the Worker deploy. The committed [`apps/web/wrangler.jsonc`](./apps/web/wrangler.jsonc) stays as a public-safe template.
 
-All production and development secrets are stored in [1Password Environments](https://www.1password.dev/environments/) only. The repo tracks **names** in [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
+Operators should store production and development secrets in [1Password Environments](https://www.1password.dev/environments/) (or an equivalent secret store). Contributors use **their own** local-dev Environment for day-to-day work. The repo tracks **names** in [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example). Do not use `wrangler secret put` or the Cloudflare dashboard to author secrets — `pnpm run deploy` renders a temporary secrets file from `op run` and passes it to `wrangler deploy --secrets-file`.
 
-**`amigo (dev)`** — local `pnpm run dev` (`OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`).
+Suggested Environment display names (create these in **your** 1Password account; they are not shared project vaults):
 
-**`amigo (prod)`** — Cloudflare Workers Builds (`OP_ENVIRONMENT_ID` build secret).
+- **`amigo (dev)`** — local `pnpm run dev` (`OP_ENVIRONMENT_ID` in `apps/web/.op/refs.env`).
+- **`amigo (prod)`** — Cloudflare Workers Builds / production deploy (`OP_ENVIRONMENT_ID` build secret). Only needed if you operate a deployment.
 
-Each Environment should define every key from both manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
+Each Environment should define every key from the relevant manifests (dev vs prod values differ, e.g. `pk_test_` vs `pk_live_`).
 
-Local deploy: copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env`, set `OP_ENVIRONMENT_ID` to **`amigo (prod)`**, then `pnpm run deploy`. The deploy renderer defaults `APP_ENV` to `production`; if you intentionally deploy against dev-scoped bindings, set `APP_ENV=development` before running `pnpm run deploy`.
+Local deploy (operators): copy [`apps/web/.op/refs.env.example`](./apps/web/.op/refs.env.example) to `apps/web/.op/refs.env`, set `OP_ENVIRONMENT_ID` to **your** production Environment UUID, then `pnpm run deploy`. The deploy renderer defaults `APP_ENV` to `production`; if you intentionally deploy against dev-scoped bindings, set `APP_ENV=development` before running `pnpm run deploy`.
 
 ### Cloudflare Workers Builds
 
 Git-connected production deploys must not use the placeholder [`apps/web/wrangler.jsonc`](./apps/web/wrangler.jsonc) alone. After [#53](https://github.com/j-cadena-g/amigo/pull/53), the build must render `apps/web/.wrangler.deploy.jsonc` with real binding IDs.
 
-1. Use the **`amigo (prod)`** 1Password Environment (production binding IDs and deploy keys). Keep **`amigo (dev)`** for local development only.
-2. Add every key from [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example) to `amigo (prod)` in the 1Password app.
-3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to the **`amigo (prod)`** Environment UUID from 1Password.
+This section is for **operators** of a deployment, not required for opening PRs:
+
+1. Use **your** production 1Password Environment (commonly named `amigo (prod)`) for production binding IDs and deploy keys. Keep a separate local-dev Environment (commonly `amigo (dev)`) for day-to-day development.
+2. Add every key from [`apps/web/.deploy.env.example`](./apps/web/.deploy.env.example) and [`apps/web/.wrangler.secrets.example`](./apps/web/.wrangler.secrets.example) to that production Environment.
+3. Add Workers Builds secrets: `OP_SERVICE_ACCOUNT_TOKEN` (read-only service account) and `OP_ENVIRONMENT_ID` set to **your** production Environment UUID.
 4. Workers Builds commands (Worker **Settings → Build**):
    - **Build:** `pnpm install && pnpm run build`
    - **Deploy:** `pnpm run deploy`

@@ -10,17 +10,20 @@ All notable changes to this project will be documented in this file.
 - **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Shared household WebSocket at the app shell with reconnect/resume and session-invalidation cleanup ([#115](https://github.com/j-cadena-g/amigo/pull/115))
+- Audit history UI on key financial edit surfaces; account archive/restore; legacy asset → account convert; push controls in Settings ([#116](https://github.com/j-cadena-g/amigo/pull/116))
 - First-class **financial categories** with budget linking and seeded defaults ([#64](https://github.com/j-cadena-g/amigo/pull/64))
 - **Available credit** summary on the Financial debts tab ([#91](https://github.com/j-cadena-g/amigo/pull/91))
 - Offline grocery mutation persistence across reload, discarded-sync toasts, and shared API mutation error feedback ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - `CONTRIBUTING.md` and `SECURITY.md`
-- README badges (CI, license, Bun, TypeScript, Cloudflare Workers)
+- README badges (CI, CodeRabbit, CodeQL, license, pnpm, TypeScript, React, React Router, Clerk, Drizzle, Vitest, Cloudflare Workers/D1, Wrangler)
 
 ### Changed
 
 - Unified Budget and Financial navigation/sections ([#63](https://github.com/j-cadena-g/amigo/pull/63))
 - React Router v8 / `createContext` migration and worker↔server load-context fixes ([#73](https://github.com/j-cadena-g/amigo/pull/73), [#74](https://github.com/j-cadena-g/amigo/pull/74))
 - Workspace migrated to **pnpm**; monorepo prep for a future iOS client ([#75](https://github.com/j-cadena-g/amigo/pull/75), [#76](https://github.com/j-cadena-g/amigo/pull/76))
+- API hygiene: normalize `{ error, code }`, shared Clerk auth options, audit grocery sync + membership/invite writes, soft-delete recurring rules, shared `zCurrencyCode` ([#121](https://github.com/j-cadena-g/amigo/pull/121))
+- Local onboarding: contributor-owned 1Password Environments; first-run requires only Clerk + `APP_*`; optional Cloudflare/VAPID; agentic `AGENT_LOGIN_*` via Environment ([#122](https://github.com/j-cadena-g/amigo/pull/122), [#123](https://github.com/j-cadena-g/amigo/pull/123))
 - Household timezone handling for transaction and grocery calendar days
 - Recurring cron isolates per-rule failures so one household/FX error cannot abort the run ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
@@ -40,7 +43,6 @@ All notable changes to this project will be documented in this file.
 ### Removed
 
 - Clerk Organizations integration (household tenancy stays D1-native) ([#60](https://github.com/j-cadena-g/amigo/pull/60))
-- CodeRabbit pull request review badge and agent references
 - `docs/` directory (unused images and index)
 - `ARCHITECTURE.md` (content folded into README)
 - `scripts/migrate-to-d1.ts` (one-time PostgreSQL → D1 migration; platform migration complete)

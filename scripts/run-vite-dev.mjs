@@ -12,7 +12,11 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMIGO_DEV_PORT } from "./lib/dev-origin.mjs";
-import { classifyLocalDevSecrets } from "./lib/local-dev-secrets.mjs";
+import {
+  classifyLocalDevSecrets,
+  envForLocalViteWorker,
+  formatMissingAgenticNote,
+} from "./lib/local-dev-secrets.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +27,7 @@ const examplePath = path.join(webDir, ".dev.vars.example");
 function assertRequiredKeys() {
   const manifest = readFileSync(examplePath, "utf8");
   const manifestKeys = parseManifestKeys(manifest);
-  const { missingRequired, missingOptional, unknownRequired } =
+  const { missingRequired, missingOptional, missingAgentic, unknownRequired } =
     classifyLocalDevSecrets(manifestKeys);
 
   if (unknownRequired.length > 0) {
@@ -44,6 +48,11 @@ function assertRequiredKeys() {
     console.log(
       `note: optional secrets not set: ${missingOptional.join(", ")} (Cloudflare IDs unused locally; VAPID only for push testing)`,
     );
+  }
+
+  const agenticNote = formatMissingAgenticNote(missingAgentic);
+  if (agenticNote) {
+    console.log(agenticNote);
   }
 }
 
@@ -111,10 +120,7 @@ const spawnArgs = useVite[0] === viteBin ? useVite : args;
 
 const child = spawn(executable, spawnArgs, {
   cwd: webDir,
-  env: {
-    ...process.env,
-    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
-  },
+  env: envForLocalViteWorker(process.env),
   stdio: "inherit",
 });
 

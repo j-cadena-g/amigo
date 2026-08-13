@@ -1,0 +1,25 @@
+---
+description: Scope every D1 query to the session household
+globs: apps/web/server/**,packages/db/**
+alwaysApply: false
+---
+
+# Household tenancy
+
+There is no database RLS. Every D1 read/write must filter with `scopeToHousehold()` from `@amigo/db`.
+
+```ts
+// BAD
+eq(transactions.id, id)
+
+// GOOD
+and(
+  eq(transactions.id, id),
+  scopeToHousehold(transactions.householdId, session.householdId),
+  isNull(transactions.deletedAt)
+)
+```
+
+- Do not trust client-supplied `householdId`.
+- Use `session.householdId` from resolved Clerk session.
+- Soft-delete tables: also `isNull(….deletedAt)` unless the query is explicitly restoring.

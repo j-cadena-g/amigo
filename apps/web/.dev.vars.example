@@ -40,7 +40,7 @@ VAPID_PRIVATE_KEY=
 # -----------------------------------------------------------------------------
 # Create a dedicated Clerk Development user in *your* Clerk app for agents.
 # Store the credentials here (in your 1Password Environment), never in git.
-# Pass these values directly to browser automation after `op run`.
-# Do not print secrets or include them in logs.
+# Prefer `pnpm run agent:signin-url` for browser sessions (Clerk Agent Task / ticket).
+# AGENT_LOGIN_PASSWORD is last-resort form fill only and is never read by the Worker.
 AGENT_LOGIN_EMAIL=
 AGENT_LOGIN_PASSWORD=

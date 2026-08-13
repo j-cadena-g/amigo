@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   AGENTIC_LOCAL_DEV_KEYS,
   classifyLocalDevSecrets,
+  envForLocalViteWorker,
+  formatMissingAgenticNote,
   REQUIRED_LOCAL_DEV_KEYS,
 } from "./local-dev-secrets.mjs";
 
@@ -68,5 +70,31 @@ describe("classifyLocalDevSecrets", () => {
 
     expect(result.missingAgentic).toEqual([]);
     expect(result.presentAgentic).toEqual(AGENTIC_LOCAL_DEV_KEYS);
+  });
+});
+
+describe("formatMissingAgenticNote", () => {
+  it("returns null when agentic keys are present", () => {
+    expect(formatMissingAgenticNote([])).toBeNull();
+  });
+
+  it("warns that UI login will not attach to seed data", () => {
+    expect(formatMissingAgenticNote(AGENTIC_LOCAL_DEV_KEYS)).toBe(
+      "note: agentic login keys not set (AGENT_LOGIN_EMAIL, AGENT_LOGIN_PASSWORD) — UI login will not attach to seed household data"
+    );
+  });
+});
+
+describe("envForLocalViteWorker", () => {
+  it("forwards AGENT_LOGIN_EMAIL but strips AGENT_LOGIN_PASSWORD", () => {
+    const result = envForLocalViteWorker({
+      APP_ENV: "development",
+      AGENT_LOGIN_EMAIL: "agent@example.com",
+      AGENT_LOGIN_PASSWORD: "secret",
+    });
+
+    expect(result.CLOUDFLARE_INCLUDE_PROCESS_ENV).toBe("true");
+    expect(result.AGENT_LOGIN_EMAIL).toBe("agent@example.com");
+    expect(result.AGENT_LOGIN_PASSWORD).toBeUndefined();
   });
 });

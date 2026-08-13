@@ -1,0 +1,21 @@
+---
+description: Store and accept money as integer cents, never floats
+globs: packages/db/**,apps/web/server/api/**,apps/web/app/**
+alwaysApply: false
+---
+
+# Integer cents
+
+All money in D1 and API payloads is **integer cents**. Do not store or parse dollars as floats.
+
+```ts
+// BAD
+amount: z.number() // 12.99 dollars
+
+// GOOD
+amount: z.number().int() // 1299 cents
+```
+
+- Schema columns: `integer("…")` (see `packages/db/src/schema/`).
+- Convert at the UI edge (`apps/web/app/lib/decimal-input.ts`), not in handlers.
+- Home-currency columns are also cents (`limitAmountHome`, `*HomeCents` SQL helpers).

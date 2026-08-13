@@ -172,6 +172,7 @@ async function main() {
       '  "secrets": {',
       '    "required": [',
       ...requiredSecrets.map((key) => `      "${key}",`),
+      '      "AGENT_LOGIN_EMAIL",',
       "    ]",
       "  },",
     ].join("\n");

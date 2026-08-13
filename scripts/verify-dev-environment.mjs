@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { classifyLocalDevSecrets } from "./lib/local-dev-secrets.mjs";
+import { classifyLocalDevSecrets, formatMissingAgenticNote } from "./lib/local-dev-secrets.mjs";
 import { parseManifestKeys } from "./lib/parse-manifest-keys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +20,7 @@ const {
   unknownRequired,
   missingRequired,
   missingOptional,
+  missingAgentic,
   presentRequired,
   presentOptional,
   presentAgentic,
@@ -56,6 +57,11 @@ if (missingOptional.length > 0) {
   console.log(
     `note: optional keys not set (ok for first-run): ${missingOptional.join(", ")} — Cloudflare IDs are unused by local Vite; VAPID_* only needed to test web push`,
   );
+}
+
+const agenticNote = formatMissingAgenticNote(missingAgentic);
+if (agenticNote) {
+  console.log(agenticNote);
 }
 
 console.log("PASS: local-dev Environment has required secrets");

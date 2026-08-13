@@ -51,3 +51,26 @@ export function classifyLocalDevSecrets(manifestKeys, env = process.env) {
     presentAgentic,
   };
 }
+
+/**
+ * @param {string[]} missingAgentic
+ * @returns {string | null}
+ */
+export function formatMissingAgenticNote(missingAgentic) {
+  if (missingAgentic.length === 0) {
+    return null;
+  }
+
+  return `note: agentic login keys not set (${missingAgentic.join(", ")}) — UI login will not attach to seed household data`;
+}
+
+/**
+ * Env for the local Vite/Workers child. Forwards injected secrets except
+ * AGENT_LOGIN_PASSWORD, which is only for browser automation.
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ */
+export function envForLocalViteWorker(env = process.env) {
+  const next = { ...env, CLOUDFLARE_INCLUDE_PROCESS_ENV: "true" };
+  delete next.AGENT_LOGIN_PASSWORD;
+  return next;
+}

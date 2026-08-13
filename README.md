@@ -82,7 +82,7 @@ Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packag
 
 - `@clerk/react-router` for middleware, loaders, and client provider
 - Session cache in KV (24h TTL, keyed by Clerk user id)
-- First login auto-creates household + user rows in D1
+- First login with no household goes to `/setup`. In local development, a Clerk user whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household instead of creating an empty one.
 
 ### Security
 
@@ -180,6 +180,7 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 | `pnpm run dev:verify` | Verify required local-dev secrets via `op run` (names only) |
 | `pnpm run dev:setup` | Apply local D1 migrations and seed the local database |
 | `pnpm run dev:reset` | Remove local Wrangler state and re-run local setup |
+| `pnpm run agent:signin-url` | Print a one-time Clerk sign-in URL for local agent UI work |
 | `pnpm run build` | Build the React Router app for production |
 | `pnpm run deploy` | Apply remote D1 migrations, then deploy the Worker |
 | `pnpm run db:generate` | Generate Drizzle migrations from schema changes |
@@ -191,11 +192,14 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 | `pnpm run typecheck` | Run route typegen and TypeScript checks |
 | `pnpm run lint` | Run ESLint |
 | `pnpm run test` | Run the unit and Workers integration Vitest suites |
+| `pnpm run test:unit` | Unit tests (workspace Vitest + repo script tests) |
+| `pnpm run test:integration` | Workers / D1 / Durable Object integration tests |
 | `pnpm run test:watch` | Run Vitest in watch mode |
 
 ## Project Layout
 
 ```text
+AGENTS.md            Agent working-loop notes (commands, invariants, auth)
 apps/web/            React Router UI, Worker entrypoint, and Cloudflare config
 apps/web/app/        Route modules, frontend components, and client utilities
 apps/web/server/     Shared API handlers, middleware, libs, and Durable Objects
@@ -276,7 +280,7 @@ If you want to deploy this project to a different Cloudflare account or domain, 
 
 ## Cursor Cloud Agents (operators / maintainers)
 
-Optional. Not required to contribute or open a PR.
+Optional. Not required to contribute or open a PR. Day-to-day agent commands and invariants: [AGENTS.md](./AGENTS.md).
 
 Cursor cloud agents should **not** copy individual app secrets into the Cursor dashboard. Use the same bootstrap pattern as Cloudflare Workers Builds, pointed at **your** local-dev Environment:
 
@@ -294,7 +298,7 @@ Do not add Clerk keys, VAPID keys, Cloudflare binding IDs, agent login passwords
 
 Cloud agents still need a signed-in Clerk user to use the app UI. Do **not** commit passwords to git.
 
-1. In **your** Clerk Development application, create a dedicated user for agents (for example `agent@example.com`) with a password you control.
+1. In **your** Clerk Development application, create a dedicated user for agents (for example `agent@example.com`) with a password you control. Use that same email as `AGENT_LOGIN_EMAIL` so local first login claims the seeded Demo Household (`hh-seed-001`) instead of `/setup`.
 2. Add these keys to **your** local-dev 1Password Environment (see [`apps/web/.dev.vars.example`](./apps/web/.dev.vars.example)):
 
 | Key | Purpose |
@@ -302,13 +306,13 @@ Cloud agents still need a signed-in Clerk user to use the app UI. Do **not** com
 | `AGENT_LOGIN_EMAIL` | Clerk Development user email for agentic login |
 | `AGENT_LOGIN_PASSWORD` | Password for that user |
 
-1. When the agent needs to sign in, load the Environment with `op run` (as `pnpm run dev` / `dev:verify` already do). Inside that subprocess, `process.env.AGENT_LOGIN_EMAIL` / `AGENT_LOGIN_PASSWORD` hold the real values — pass them directly into browser automation. **Do not print secrets, disable masking to inspect them, or include them in logs.**
+1. When the agent needs a signed-in browser session, with `pnpm run dev` already up, run `pnpm run agent:signin-url` and open the URL on stdout immediately (Clerk Agent Task, or a hash `__clerk_ticket` fallback). Do **not** print `AGENT_LOGIN_PASSWORD`, disable masking, or paste the URL into logs, PRs, or chat. Filling the hosted Clerk form is a last resort only.
 
 Other developers doing agentic work should seed the same pattern in **their** Clerk app and Environment.
 
 For the cloud environment **install/update** command, use `pnpm install && pnpm run dev:setup` (local D1 only; no app secrets required). After bootstrap secrets are set, run `pnpm run dev:verify` to confirm your Environment is complete (names only).
 
-Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typecheck`, `pnpm run test:unit`, and relevant `pnpm run test:integration` when touching Workers/D1/DO code.
+Before opening a PR from a cloud agent: `pnpm run dev:verify`, `pnpm run typecheck`, `pnpm run test:unit`, and relevant `pnpm run test:integration` when touching Workers/D1/DO code. See [AGENTS.md](./AGENTS.md).
 
 ## CI
 
@@ -336,6 +340,7 @@ Copyright © 2026 James Cadena.
 
 ## Additional Docs
 
+- [AGENTS.md](./AGENTS.md) — commands, invariants, and local agent login
 - [Changelog](./CHANGELOG.md) — release history
 - [Contributing](./CONTRIBUTING.md) — development setup, PR expectations, AGPL note
 - [Security](./SECURITY.md) — reporting vulnerabilities responsibly

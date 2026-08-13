@@ -1,0 +1,17 @@
+---
+description: Keep route types and Drizzle migrations in the same change
+globs: apps/web/app/routes/**,packages/db/**
+alwaysApply: false
+---
+
+# Routes and schema
+
+When you add or rename a route module under `apps/web/app/routes/`, run `pnpm run typegen` (included in `pnpm run typecheck`). Commit generated route types with the PR.
+
+When you change Drizzle schema under `packages/db/`:
+
+1. `pnpm run db:generate`
+2. `pnpm run db:migrate:local`
+3. Include the new migration SQL in the PR and mention it in the description.
+
+Do not run remote migrations from a feature PR. JSON APIs are `api.*.ts` route modules that call `handleApiRoute` + a handler in `apps/web/server/api/`.

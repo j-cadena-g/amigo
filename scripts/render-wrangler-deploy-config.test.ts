@@ -9,6 +9,14 @@ import { AMIGO_DEV_ORIGIN } from "../apps/web/server/lib/dev-origin";
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
+function parseRenderedWranglerConfig(source: string) {
+  const withoutComments = source.replace(/^\s*\/\/.*$/gm, "");
+  const withoutTrailingCommas = withoutComments.replace(/,(\s*[}\]])/g, "$1");
+  return JSON.parse(withoutTrailingCommas) as {
+    secrets?: { required?: string[] };
+  };
+}
+
 function createDevEnv(outputPath: string, overrides: Record<string, string | undefined> = {}) {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -54,6 +62,9 @@ describe("render-wrangler-deploy-config", () => {
       expect(rendered).toContain(
         '"CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5kZXYk"'
       );
+      const requiredSecrets = parseRenderedWranglerConfig(rendered).secrets?.required ?? [];
+      expect(requiredSecrets).toContain("AGENT_LOGIN_EMAIL");
+      expect(requiredSecrets).not.toContain("AGENT_LOGIN_PASSWORD");
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

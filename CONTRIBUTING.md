@@ -11,52 +11,19 @@ If you run a modified version as a network service, AGPL obligations may apply t
 ## Before you start
 
 - Read [README.md](./README.md) for stack overview and local setup.
+- Agents: [AGENTS.md](./AGENTS.md) for commands, invariants, and local login.
 - For how the app is structured, see [How it works](./README.md#how-it-works) in the README.
 - Search [existing issues](https://github.com/j-cadena-g/amigo/issues) to avoid duplicate work. For larger changes, open an issue first to discuss approach.
 
 ## Development setup
 
-You do **not** need a Cloudflare account, Workers Builds, Cursor Cloud Agent secrets, or a production Environment to contribute. Local Vite uses simulated D1/KV.
+Follow [README Quick Start](./README.md#quick-start). You do **not** need a Cloudflare account, Workers Builds, Cursor Cloud Agent secrets, or a production Environment to contribute. Local Vite uses simulated D1/KV.
 
-### Prerequisites
+If `pnpm run dev:verify` fails, set the **required** keys (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Missing `AGENT_LOGIN_*` is fine for humans; agents who need the UI should set them so first login claims the seeded Demo Household.
 
-- [pnpm](https://pnpm.io) `11.3.0+` (see `packageManager` in `package.json`; run `corepack enable`)
-- Node.js on `PATH` (used by helper scripts)
-- Wrangler comes with the repo (`pnpm exec wrangler`); a global install is optional
-- A **personal** [Clerk](https://clerk.com/) development application (`pk_test_` / `sk_test_`)
-- [1Password CLI](https://developer.1password.com/docs/cli/) and **your own** 1Password Environment (recommended). Do not request access to anyone else’s Environment — create one in your account (a common display name is `amigo (dev)`). You can instead export required env vars in your shell; if `OP_ENVIRONMENT_ID` is unset, `pnpm run dev` uses the current environment.
+Invite **codes** and `/join/:code` work locally. Outbound invite email uses operator Email Routing and will not send without that domain — share the code manually instead.
 
-### Get Clerk keys
-
-1. Create your own Clerk application (Development instance).
-2. Copy the publishable key (`pk_test_…`) and secret key (`sk_test_…`).
-3. Allow the local origin `http://localhost:5190` (and matching sign-in/redirect URLs) in the Clerk dashboard.
-
-### First run
-
-1. Create a personal 1Password Environment for local work, **or** plan to export required vars in your shell.
-2. Set the **required** keys from `apps/web/.dev.vars.example`: `APP_ENV`, `APP_ORIGIN`, `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`. Cloudflare IDs and VAPID keys are optional for first-run.
-3. Then:
-
-```bash
-pnpm install
-pnpm run dev:setup
-
-cp apps/web/.op/refs.env.example apps/web/.op/refs.env
-# Set OP_ENVIRONMENT_ID to the UUID of your personal local-dev Environment
-# (skip refs.env if you export the required vars in your shell instead).
-
-pnpm run dev:verify
-pnpm run dev
-```
-
-`pnpm run dev` prefers `op run --environment` when `OP_ENVIRONMENT_ID` is set (via `apps/web/.op/refs.env`). Secrets are injected into `process.env` and read by Wrangler through `CLOUDFLARE_INCLUDE_PROCESS_ENV`. Do not mount, create, or commit `.dev.vars`.
-
-If `pnpm run dev:verify` fails, confirm the **required** keys are set (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Prefer signing in with `op` and pointing `OP_ENVIRONMENT_ID` at **your** Environment; otherwise export the vars directly.
-
-Invite **codes** and `/join/:code` work locally. Outbound invite email uses operator Email Routing (`invites@mail.mi-amigo.com`) and will not send without that domain — share the code manually instead.
-
-For **Cursor Cloud Agents** (operators/maintainers only), do not copy app secrets into Cursor. Point the agent at **your** Environment with only `OP_SERVICE_ACCOUNT_TOKEN` and `OP_ENVIRONMENT_ID`. For UI login, seed a dedicated Clerk Development user in **your** Clerk app and store `AGENT_LOGIN_EMAIL` / `AGENT_LOGIN_PASSWORD` in that Environment (never in git) — see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents-operators--maintainers).
+For **Cursor Cloud Agents** (operators/maintainers only), see [README § Cursor Cloud Agents](./README.md#cursor-cloud-agents-operators--maintainers) and [AGENTS.md](./AGENTS.md). Do not copy app secrets into Cursor.
 
 To reset local D1 state: `pnpm run dev:reset`.
 
@@ -80,7 +47,23 @@ To reset local D1 state: `pnpm run dev:reset`.
    - Screenshots or recordings for UI changes when helpful
    - Notes on database migrations if you changed `packages/db` schema
 
-### Database schema changes
+### Playbooks
+
+#### Add an API resource
+
+1. Handler in `apps/web/server/api/<name>.ts`: Zod body/query, `handleApiRoute` auth mode (`strict` unless public), `enforceRateLimit` with a `ROUTE_RATE_LIMITS` preset (`READ` / `MUTATION` / `BULK` / `SENSITIVE`).
+2. Scope every D1 query with `scopeToHousehold(…, session.householdId)`. Money fields are integer cents.
+3. Permissions: `canManageHousehold` / `canManageMembers` / `canTransferOwnership` from `apps/web/server/lib/permissions.ts` when the action is not member-safe.
+4. Thin route module `apps/web/app/routes/api.<name>.ts` that calls `handleApiRoute` (see `api.tags.ts`).
+5. Test with mocked `getAuth` / session (unit or `*.integration.test.ts`). Do not drive the Clerk UI.
+
+#### Add a page
+
+1. Route module under `apps/web/app/routes/` (loader/action + UI). Use `requireSession(context)` for authenticated pages.
+2. Load data in the loader with `scopeToHousehold()`. Keep mutations in `/api/*` handlers when the client already uses fetch + Clerk `getToken()`.
+3. Run `pnpm run typegen` so `./+types/…` stays in sync (included in `pnpm run typecheck`).
+
+#### Database schema changes
 
 1. Update schema under `packages/db`.
 2. Generate migrations: `pnpm run db:generate`

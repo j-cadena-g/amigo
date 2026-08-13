@@ -61,7 +61,18 @@ export function formatMissingAgenticNote(missingAgentic) {
     return null;
   }
 
-  return `note: agentic login keys not set (${missingAgentic.join(", ")}) — UI login will not attach to seed household data`;
+  const effects = [];
+  if (missingAgentic.includes("AGENT_LOGIN_EMAIL")) {
+    effects.push("seed household claim needs AGENT_LOGIN_EMAIL");
+  }
+  if (missingAgentic.includes("AGENT_LOGIN_PASSWORD")) {
+    effects.push(
+      "AGENT_LOGIN_PASSWORD is optional last-resort form fill (prefer pnpm run agent:signin-url)",
+    );
+  }
+
+  const suffix = effects.length > 0 ? ` — ${effects.join("; ")}` : "";
+  return `note: agentic login keys not set (${missingAgentic.join(", ")})${suffix}`;
 }
 
 /**

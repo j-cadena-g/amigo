@@ -16,6 +16,9 @@ importers:
 
   .:
     devDependencies:
+      '@clerk/backend':
+        specifier: ^3.16.0
+        version: 3.16.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.1(jiti@2.7.0))

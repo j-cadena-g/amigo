@@ -9,7 +9,7 @@
     "dev:verify": "pnpm --filter @amigo/web run dev:verify",
     "dev:setup": "pnpm run db:migrate:local && pnpm run db:seed:local",
     "dev:reset": "pnpm --filter @amigo/web run dev:reset",
-    "agent:signin-url": "bash ./scripts/run-with-1password-environment.sh -- pnpm --filter @amigo/web exec node ../../scripts/agent-signin-url.mjs",
+    "agent:signin-url": "bash ./scripts/run-with-1password-environment.sh -- node ./scripts/agent-signin-url.mjs",
     "build": "pnpm exec turbo run build --filter=@amigo/web",
     "wrangler:deploy-config": "pnpm --filter @amigo/web run wrangler:deploy-config",
     "deploy": "pnpm --filter @amigo/web run deploy",
@@ -30,6 +30,7 @@
     "test:watch": "pnpm --filter @amigo/web run test:watch"
   },
   "devDependencies": {
+    "@clerk/backend": "^3.16.0",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "eslint-plugin-react": "^7.37.5",

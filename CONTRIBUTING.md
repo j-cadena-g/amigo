@@ -19,7 +19,7 @@ If you run a modified version as a network service, AGPL obligations may apply t
 
 Follow [README Quick Start](./README.md#quick-start). You do **not** need a Cloudflare account, Workers Builds, Cursor Cloud Agent secrets, or a production Environment to contribute. Local Vite uses simulated D1/KV.
 
-If `pnpm run dev:verify` fails, set the **required** keys (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Missing `AGENT_LOGIN_*` is fine for humans; agents who need the UI should set them so first login claims the seeded Demo Household.
+If `pnpm run dev:verify` fails, set the **required** keys (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Missing `AGENT_LOGIN_EMAIL` means first login will not claim the seeded Demo Household. Missing `AGENT_LOGIN_PASSWORD` is fine; prefer `pnpm run agent:signin-url` for agent UI login.
 
 Invite **codes** and `/join/:code` work locally. Outbound invite email uses operator Email Routing and will not send without that domain — share the code manually instead.
 

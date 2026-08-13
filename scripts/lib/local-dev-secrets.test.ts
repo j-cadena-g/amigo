@@ -78,9 +78,21 @@ describe("formatMissingAgenticNote", () => {
     expect(formatMissingAgenticNote([])).toBeNull();
   });
 
-  it("warns that UI login will not attach to seed data", () => {
+  it("warns that seed claim needs email and password is optional form fill", () => {
     expect(formatMissingAgenticNote(AGENTIC_LOCAL_DEV_KEYS)).toBe(
-      "note: agentic login keys not set (AGENT_LOGIN_EMAIL, AGENT_LOGIN_PASSWORD) — UI login will not attach to seed household data"
+      "note: agentic login keys not set (AGENT_LOGIN_EMAIL, AGENT_LOGIN_PASSWORD) — seed household claim needs AGENT_LOGIN_EMAIL; AGENT_LOGIN_PASSWORD is optional last-resort form fill (prefer pnpm run agent:signin-url)",
+    );
+  });
+
+  it("warns only about seed claim when email is missing", () => {
+    expect(formatMissingAgenticNote(["AGENT_LOGIN_EMAIL"])).toBe(
+      "note: agentic login keys not set (AGENT_LOGIN_EMAIL) — seed household claim needs AGENT_LOGIN_EMAIL",
+    );
+  });
+
+  it("warns that password is optional last-resort form fill", () => {
+    expect(formatMissingAgenticNote(["AGENT_LOGIN_PASSWORD"])).toBe(
+      "note: agentic login keys not set (AGENT_LOGIN_PASSWORD) — AGENT_LOGIN_PASSWORD is optional last-resort form fill (prefer pnpm run agent:signin-url)",
     );
   });
 });

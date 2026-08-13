@@ -1,12 +1,12 @@
 ---
 description: Scope every application-layer D1 query to the session household
-globs: apps/web/server/**
+globs: apps/web/server/**,apps/web/app/routes/**
 alwaysApply: false
 ---
 
 # Household tenancy
 
-There is no database RLS. Every application-layer D1 read/write must filter with `scopeToHousehold()` from `@amigo/db`. Schema declarations, migrations, and seed SQL/TS do not use `scopeToHousehold()`.
+There is no database RLS. Every application-layer D1 read/write (API handlers and route loaders) must filter with `scopeToHousehold()` from `@amigo/db`. Schema declarations, migrations, and seed SQL/TS do not use `scopeToHousehold()`.
 
 ```ts
 // BAD

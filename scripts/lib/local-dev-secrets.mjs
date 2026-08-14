@@ -51,3 +51,37 @@ export function classifyLocalDevSecrets(manifestKeys, env = process.env) {
     presentAgentic,
   };
 }
+
+/**
+ * @param {string[]} missingAgentic
+ * @returns {string | null}
+ */
+export function formatMissingAgenticNote(missingAgentic) {
+  if (missingAgentic.length === 0) {
+    return null;
+  }
+
+  const effects = [];
+  if (missingAgentic.includes("AGENT_LOGIN_EMAIL")) {
+    effects.push("seed household claim needs AGENT_LOGIN_EMAIL");
+  }
+  if (missingAgentic.includes("AGENT_LOGIN_PASSWORD")) {
+    effects.push(
+      "AGENT_LOGIN_PASSWORD is optional last-resort form fill (prefer pnpm run agent:signin-url)",
+    );
+  }
+
+  const suffix = effects.length > 0 ? ` — ${effects.join("; ")}` : "";
+  return `note: agentic login keys not set (${missingAgentic.join(", ")})${suffix}`;
+}
+
+/**
+ * Env for the local Vite/Workers child. Forwards injected secrets except
+ * AGENT_LOGIN_PASSWORD, which is only for browser automation.
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ */
+export function envForLocalViteWorker(env = process.env) {
+  const next = { ...env, CLOUDFLARE_INCLUDE_PROCESS_ENV: "true" };
+  delete next.AGENT_LOGIN_PASSWORD;
+  return next;
+}

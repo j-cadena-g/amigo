@@ -37,6 +37,10 @@ export const appContextMiddleware: MiddlewareFunction<Response> = async (
       {
         email: identity.email,
         name: identity.name,
+      },
+      {
+        appEnv: env.APP_ENV,
+        agentLoginEmail: env.AGENT_LOGIN_EMAIL,
       }
     );
 

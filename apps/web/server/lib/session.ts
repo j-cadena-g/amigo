@@ -1,6 +1,17 @@
 import { createClerkClient } from "@clerk/backend";
 import type { AppSession } from "../env";
-import { getDb, users, households, eq, and, isNull } from "@amigo/db";
+import {
+  getDb,
+  users,
+  households,
+  eq,
+  and,
+  isNull,
+  LOCAL_SEED_USER_ID,
+  LOCAL_SEED_USER_AUTH_ID,
+  LOCAL_SEED_HOUSEHOLD_ID,
+  scopeToHousehold,
+} from "@amigo/db";
 import {
   parseClerkHouseholdMetadata,
   setClerkHouseholdMetadata,
@@ -16,6 +27,11 @@ type CachedSessionPayload = AppSession & { refreshedAt?: number };
 interface ClerkClaims {
   email?: string;
   name?: string;
+}
+
+export interface ResolveSessionOptions {
+  appEnv?: string;
+  agentLoginEmail?: string;
 }
 
 /**
@@ -86,6 +102,8 @@ async function fetchClerkProfile(
  * - Looks up the user by Clerk auth id in D1.
  * - If no active user exists, checks Clerk public metadata for a household tag
  *   and auto-creates a member when the household exists.
+ * - In development, a Clerk user whose email matches AGENT_LOGIN_EMAIL claims
+ *   the local seed user (`clerk_dev_user`) instead of going to setup.
  * - Uses KV caching with 24h TTL.
  */
 export async function resolveSession(
@@ -93,7 +111,8 @@ export async function resolveSession(
   d1: D1Database,
   kv: KVNamespace,
   clerkSecretKey: string,
-  claims?: ClerkClaims
+  claims?: ClerkClaims,
+  options?: ResolveSessionOptions
 ): Promise<SessionResult> {
   if (!clerkUserId) return { status: "unauthenticated" };
 
@@ -208,6 +227,20 @@ export async function resolveSession(
     claims
   );
 
+  if (shouldClaimLocalSeed(options, email)) {
+    const claimed = await tryClaimLocalSeedUser(
+      db,
+      clerk,
+      clerkUserId,
+      email,
+      name
+    );
+    if (claimed) {
+      await writeSessionCache(kv, cacheKey, claimed, clerkUserId);
+      return { status: "authenticated", session: claimed };
+    }
+  }
+
   if (metadata.householdId) {
     const household = await db
       .select({ id: households.id, name: households.name })
@@ -284,6 +317,108 @@ export async function resolveSession(
   }
 
   return { status: "needs_setup" };
+}
+
+function emailsMatch(left?: string, right?: string) {
+  const a = left?.trim().toLowerCase();
+  const b = right?.trim().toLowerCase();
+  return Boolean(a && b && a === b);
+}
+
+function shouldClaimLocalSeed(
+  options: ResolveSessionOptions | undefined,
+  email: string
+) {
+  return (
+    options?.appEnv === "development" &&
+    emailsMatch(options.agentLoginEmail, email)
+  );
+}
+
+async function tryClaimLocalSeedUser(
+  db: ReturnType<typeof getDb>,
+  clerk: ReturnType<typeof createClerkClient>,
+  clerkUserId: string,
+  email: string,
+  name: string | null
+): Promise<AppSession | null> {
+  const seedUser = await db
+    .select({
+      id: users.id,
+      householdId: users.householdId,
+      role: users.role,
+      email: users.email,
+      name: users.name,
+      deletedAt: users.deletedAt,
+      authId: users.authId,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, LOCAL_SEED_USER_ID),
+        scopeToHousehold(users.householdId, LOCAL_SEED_HOUSEHOLD_ID),
+        isNull(users.deletedAt)
+      )
+    )
+    .get();
+
+  if (
+    !seedUser ||
+    seedUser.deletedAt ||
+    seedUser.authId !== LOCAL_SEED_USER_AUTH_ID
+  ) {
+    return null;
+  }
+
+  const household = await db
+    .select({ id: households.id, name: households.name })
+    .from(households)
+    .where(
+      and(
+        eq(households.id, seedUser.householdId),
+        scopeToHousehold(households.id, LOCAL_SEED_HOUSEHOLD_ID)
+      )
+    )
+    .get();
+
+  const updated = await db
+    .update(users)
+    .set({
+      authId: clerkUserId,
+      email,
+      name,
+    })
+    .where(
+      and(
+        eq(users.id, LOCAL_SEED_USER_ID),
+        eq(users.authId, LOCAL_SEED_USER_AUTH_ID),
+        scopeToHousehold(users.householdId, LOCAL_SEED_HOUSEHOLD_ID),
+        isNull(users.deletedAt)
+      )
+    )
+    .returning()
+    .get();
+
+  if (!updated) {
+    return null;
+  }
+
+  if (household) {
+    try {
+      await setClerkHouseholdMetadata(clerk, clerkUserId, {
+        householdId: household.id,
+        householdName: household.name,
+      });
+    } catch (error) {
+      console.error("Failed to sync Clerk household metadata for seed claim", {
+        error,
+        clerkUserId,
+        householdId: household.id,
+      });
+    }
+  }
+
+  return buildSession(updated);
 }
 
 async function writeSessionCache(

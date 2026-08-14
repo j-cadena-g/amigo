@@ -27,6 +27,8 @@ function createArgs() {
           DB: "db",
           CACHE: "cache",
           CLERK_SECRET_KEY: "secret",
+          APP_ENV: "development",
+          AGENT_LOGIN_EMAIL: "agent@example.com",
         } as never,
         ctx: {} as ExecutionContext,
         caches: {} as CacheStorage,
@@ -67,6 +69,14 @@ describe("appContextMiddleware", () => {
     expect(getApp(args.context).sessionStatus).toBe("authenticated");
     expect(getApp(args.context).session).toEqual(
       expect.objectContaining({ userId: "user-1" })
+    );
+    expect(mocks.resolveSession).toHaveBeenCalledWith(
+      "clerk-user-1",
+      "db",
+      "cache",
+      "secret",
+      { email: "agent@example.com", name: "Agent" },
+      { appEnv: "development", agentLoginEmail: "agent@example.com" }
     );
   });
 

@@ -132,6 +132,10 @@ async function handleWebSocketUpgrade(request: Request, env: Env) {
     {
       email: identity.email,
       name: identity.name,
+    },
+    {
+      appEnv: env.APP_ENV,
+      agentLoginEmail: env.AGENT_LOGIN_EMAIL,
     }
   );
 

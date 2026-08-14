@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
+- `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work
 - **Household invites** — create/list/resend/revoke invite codes, email delivery, join link (`/join/:code`), and setup-page acceptance ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))
@@ -24,6 +26,8 @@ All notable changes to this project will be documented in this file.
 - Workspace migrated to **pnpm**; monorepo prep for a future iOS client ([#75](https://github.com/j-cadena-g/amigo/pull/75), [#76](https://github.com/j-cadena-g/amigo/pull/76))
 - API hygiene: normalize `{ error, code }`, shared Clerk auth options, audit grocery sync + membership/invite writes, soft-delete recurring rules, shared `zCurrencyCode` ([#121](https://github.com/j-cadena-g/amigo/pull/121))
 - Local onboarding: contributor-owned 1Password Environments; first-run requires only Clerk + `APP_*`; optional Cloudflare/VAPID; agentic `AGENT_LOGIN_*` via Environment ([#122](https://github.com/j-cadena-g/amigo/pull/122), [#123](https://github.com/j-cadena-g/amigo/pull/123))
+- README first-login copy: `/setup` unless local `AGENT_LOGIN_EMAIL` claims the seed household
+- Track committed `AGENTS.md` and `.cursor/rules/` (local `.cursor/` state stays ignored)
 - Household timezone handling for transaction and grocery calendar days
 - Recurring cron isolates per-rule failures so one household/FX error cannot abort the run ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
@@ -32,6 +36,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `pnpm run agent:signin-url` resolves `@clerk/backend` from the repo root (no longer depends on `pnpm --filter @amigo/web exec` for that import)
 - Grocery date picker centering on mobile Safari ([#107](https://github.com/j-cadena-g/amigo/pull/107), [#108](https://github.com/j-cadena-g/amigo/pull/108))
 - Grocery list toggle latency/reliability and offline conflict/tag handling
 - Production hydration blocked by CSP on stream scripts ([#57](https://github.com/j-cadena-g/amigo/pull/57))

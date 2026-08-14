@@ -18,9 +18,6 @@ build/
 .env.local
 .env.*.local
 
-# AI Agents
-AGENTS.md
-
 # IDE
 .idea/
 .vscode/
@@ -30,7 +27,10 @@ AGENTS.md
 .claude/
 .codex/
 
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
 .gemini/
 
 # OS

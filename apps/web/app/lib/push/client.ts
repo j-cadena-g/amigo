@@ -36,6 +36,24 @@ async function fetchPushConfig(): Promise<{ vapidPublicKey: string | null }> {
   return res.json() as Promise<{ vapidPublicKey: string | null }>;
 }
 
+async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return null;
+  }
+  return (await navigator.serviceWorker.getRegistration()) ?? null;
+}
+
+export async function hasPushRegistration(): Promise<boolean> {
+  return (await getPushRegistration()) !== null;
+}
+
+async function getActivePushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  const registration = await getPushRegistration();
+  if (!registration) return null;
+  if (registration.active) return registration;
+  return navigator.serviceWorker.ready;
+}
+
 export async function subscribeToPush(): Promise<void> {
   if (getNotificationPermissionStatus() === "unsupported") {
     throw new Error("Push notifications are not supported in this browser");
@@ -47,7 +65,10 @@ export async function subscribeToPush(): Promise<void> {
     throw new Error("Notification permission denied");
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await getActivePushRegistration();
+  if (!registration) {
+    throw new Error("Service worker is not available");
+  }
   const { vapidPublicKey } = await fetchPushConfig();
 
   if (!vapidPublicKey) {
@@ -97,7 +118,8 @@ export async function unsubscribeFromPush(): Promise<void> {
     return;
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await getPushRegistration();
+  if (!registration) return;
   const subscription = await registration.pushManager.getSubscription();
 
   if (!subscription) return;
@@ -130,10 +152,13 @@ export async function unsubscribeFromPush(): Promise<void> {
 }
 
 export async function isSubscribed(): Promise<boolean> {
-  if (!("serviceWorker" in navigator)) return false;
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return false;
+  }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getPushRegistration();
+    if (!registration) return false;
     const subscription = await registration.pushManager.getSubscription();
     return subscription !== null;
   } catch {

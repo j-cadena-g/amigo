@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Production web push: emit `sw.js` into Wrangler `build/client` assets (it was written to `dist/` and 404ed live), and stop hanging on `serviceWorker.ready` when none is registered
 - `pnpm run agent:signin-url` resolves `@clerk/backend` from the repo root (no longer depends on `pnpm --filter @amigo/web exec` for that import)
 - Grocery date picker centering on mobile Safari ([#107](https://github.com/j-cadena-g/amigo/pull/107), [#108](https://github.com/j-cadena-g/amigo/pull/108))
 - Grocery list toggle latency/reliability and offline conflict/tag handling

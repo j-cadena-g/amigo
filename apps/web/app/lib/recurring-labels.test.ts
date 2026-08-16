@@ -46,6 +46,14 @@ describe("getFrequencyLabel", () => {
         dayOfWeek: null,
       })
     ).toBe("Every 2 weeks");
+    expect(
+      getFrequencyLabel({
+        frequency: "WEEKLY",
+        interval: 1,
+        dayOfMonth: null,
+        dayOfWeek: null,
+      })
+    ).toBe("Weekly");
   });
 
   it("labels monthly rules with ordinal days", () => {
@@ -89,6 +97,22 @@ describe("getFrequencyLabel", () => {
         dayOfWeek: null,
       })
     ).toBe("15th every 3 months");
+    expect(
+      getFrequencyLabel({
+        frequency: "MONTHLY",
+        interval: 1,
+        dayOfMonth: null,
+        dayOfWeek: null,
+      })
+    ).toBe("Monthly");
+    expect(
+      getFrequencyLabel({
+        frequency: "MONTHLY",
+        interval: 3,
+        dayOfMonth: null,
+        dayOfWeek: null,
+      })
+    ).toBe("Every 3 months");
   });
 
   it("labels yearly rules", () => {

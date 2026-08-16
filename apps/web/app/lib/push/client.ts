@@ -43,6 +43,17 @@ async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> 
   return (await navigator.serviceWorker.getRegistration()) ?? null;
 }
 
+export async function hasPushRegistration(): Promise<boolean> {
+  return (await getPushRegistration()) !== null;
+}
+
+async function getActivePushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  const registration = await getPushRegistration();
+  if (!registration) return null;
+  if (registration.active) return registration;
+  return navigator.serviceWorker.ready;
+}
+
 export async function subscribeToPush(): Promise<void> {
   if (getNotificationPermissionStatus() === "unsupported") {
     throw new Error("Push notifications are not supported in this browser");
@@ -54,7 +65,7 @@ export async function subscribeToPush(): Promise<void> {
     throw new Error("Notification permission denied");
   }
 
-  const registration = await getPushRegistration();
+  const registration = await getActivePushRegistration();
   if (!registration) {
     throw new Error("Service worker is not available");
   }

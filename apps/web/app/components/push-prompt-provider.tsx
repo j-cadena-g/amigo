@@ -8,6 +8,7 @@ import {
 import { PushNotificationModal } from "./push-notification-modal";
 import {
   getNotificationPermissionStatus,
+  hasPushRegistration,
   isSubscribed,
 } from "@/app/lib/push/client";
 import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
@@ -56,6 +57,10 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
 
       const permission = getNotificationPermissionStatus();
       if (permission === "unsupported" || permission === "denied") {
+        return false;
+      }
+
+      if (!(await hasPushRegistration())) {
         return false;
       }
 

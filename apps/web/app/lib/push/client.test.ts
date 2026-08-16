@@ -1,5 +1,22 @@
-import { describe, expect, it } from "vitest";
-import { pushSubscriptionKeysMissing } from "./client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isSubscribed, pushSubscriptionKeysMissing } from "./client";
+
+describe("isSubscribed", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is false when no service worker is registered", async () => {
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        getRegistration: vi.fn().mockResolvedValue(undefined),
+        ready: new Promise(() => undefined),
+      },
+    });
+
+    await expect(isSubscribed()).resolves.toBe(false);
+  });
+});
 
 describe("pushSubscriptionKeysMissing", () => {
   it("is true when either crypto key is missing", () => {

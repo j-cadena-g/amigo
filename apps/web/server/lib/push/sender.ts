@@ -22,6 +22,7 @@ function ensureVapidConfigured(env: Env): boolean {
 
   const { VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = env;
   if (!VAPID_SUBJECT || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.warn("processPushBatch skipped: VAPID is not configured");
     return false;
   }
 

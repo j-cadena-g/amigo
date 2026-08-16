@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { createAmigoPwaOptions } from "./pwa.config";
 import { AMIGO_DEV_PORT } from "./server/lib/dev-origin";
 
 const optimizeDepsExcludes = [
@@ -95,46 +96,7 @@ export default defineConfig(({ command }) => {
         : null,
       tailwindcss(),
       reactRouter(),
-      VitePWA({
-        strategies: "injectManifest",
-        srcDir: "app",
-        filename: "sw.ts",
-        registerType: "autoUpdate",
-        injectManifest: {
-          globPatterns: ["**/*.{js,css,html,png,svg,ico,woff,woff2}"],
-        },
-        manifest: {
-          name: "amigo",
-          short_name: "amigo",
-          description:
-            "Household management for budgeting and grocery tracking",
-          start_url: "/",
-          display: "standalone",
-          background_color: "#f4f6f9",
-          theme_color: "#3B7BD5",
-          icons: [
-            {
-              src: "/icon-192.png",
-              sizes: "192x192",
-              type: "image/png",
-            },
-            {
-              src: "/icon-512.png",
-              sizes: "512x512",
-              type: "image/png",
-            },
-            {
-              src: "/icon-1024.png",
-              sizes: "1024x1024",
-              type: "image/png",
-            },
-          ],
-        },
-        devOptions: {
-          enabled: true,
-          type: "module",
-        },
-      }),
+      VitePWA(createAmigoPwaOptions()),
     ].filter(Boolean),
   };
 });

@@ -73,25 +73,25 @@ function RecurringRuleCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-lg border p-4",
+        "flex items-start gap-3 rounded-lg border px-4 py-3",
         !rule.isActive && "border-dashed opacity-70"
       )}
     >
-      <div className="flex items-start gap-3">
-        <Switch
-          className="mt-0.5"
-          checked={rule.isActive}
-          disabled={toggling}
-          onCheckedChange={onToggle}
-          aria-label={rule.isActive ? `Pause ${title}` : `Resume ${title}`}
-        />
+      <Switch
+        className="mt-1"
+        checked={rule.isActive}
+        disabled={toggling}
+        onCheckedChange={onToggle}
+        aria-label={rule.isActive ? `Pause ${title}` : `Resume ${title}`}
+      />
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <p className="min-w-0 font-medium break-words">{title}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-3">
+          <p className="min-w-0 flex-1 font-medium wrap-break-word">{title}</p>
+          <div className="flex shrink-0 items-center gap-0.5">
             <span
               className={cn(
-                "shrink-0 font-medium tabular-nums whitespace-nowrap",
+                "pr-1 font-medium tabular-nums whitespace-nowrap",
                 isIncome
                   ? "text-green-600 dark:text-green-400"
                   : "text-red-600 dark:text-red-400"
@@ -99,42 +99,35 @@ function RecurringRuleCard({
             >
               {amountLabel}
             </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 sm:h-9 sm:w-9"
+              onClick={onEdit}
+              aria-label={`Edit ${title}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 sm:h-9 sm:w-9"
+              onClick={onDelete}
+              aria-label={`Delete ${title}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-
-          <span className="mt-1 inline-block text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted capitalize">
-            {rule.category}
-          </span>
-
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {getFrequencyLabel(rule)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Next: {formatTransactionDate(rule.nextRunDate)}
-          </p>
         </div>
-      </div>
-
-      <div className="flex justify-end gap-1 pl-14">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11"
-          onClick={onEdit}
-          aria-label={`Edit ${title}`}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11"
-          onClick={onDelete}
-          aria-label={`Delete ${title}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          <span className="capitalize">{rule.category}</span>
+          {" · "}
+          {getFrequencyLabel(rule)}
+          {" · Next: "}
+          {formatTransactionDate(rule.nextRunDate)}
+        </p>
       </div>
     </div>
   );
@@ -204,7 +197,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
           description="Add a scheduled transaction to automate regular income or expenses."
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {rules.map((rule) => (
             <RecurringRuleCard
               key={rule.id}

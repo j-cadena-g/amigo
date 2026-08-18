@@ -3,6 +3,9 @@ import { useRevalidator } from "react-router";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
+import { formatTransactionDate } from "@/app/lib/format-dates";
+import { getFrequencyLabel } from "@/app/lib/recurring-labels";
+import { cn } from "@/app/lib/utils";
 import { EmptyState } from "@/app/components/empty-state";
 import { useToast } from "@/app/components/toast-provider";
 import { Switch } from "@/app/components/ui/switch";
@@ -50,69 +53,86 @@ interface RecurringListProps {
   homeCurrency: CurrencyCode;
 }
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+function RecurringRuleCard({
+  rule,
+  toggling,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  rule: RecurringRule;
+  toggling: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const isIncome = rule.type === "income";
+  const title = rule.description || rule.category;
+  const amountLabel = `${isIncome ? "+" : "-"}${formatCents(rule.amount, rule.currency)}`;
 
-function getFrequencyLabel(rule: RecurringRule): string {
-  const { frequency, interval, dayOfMonth, dayOfWeek } = rule;
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-lg border px-4 py-3",
+        !rule.isActive && "border-dashed opacity-70"
+      )}
+    >
+      <Switch
+        className="mt-1"
+        checked={rule.isActive}
+        disabled={toggling}
+        onCheckedChange={onToggle}
+        aria-label={rule.isActive ? `Pause ${title}` : `Resume ${title}`}
+      />
 
-  if (frequency === "DAILY") {
-    return interval === 1 ? "Daily" : `Every ${interval} days`;
-  }
-
-  if (frequency === "WEEKLY") {
-    const dayName =
-      dayOfWeek !== null && dayOfWeek !== undefined
-        ? DAY_NAMES[dayOfWeek]
-        : null;
-    if (interval === 1) {
-      return dayName ? `Every ${dayName}` : "Weekly";
-    }
-    return dayName
-      ? `Every ${interval} weeks on ${dayName}`
-      : `Every ${interval} weeks`;
-  }
-
-  if (frequency === "MONTHLY") {
-    const dayLabel =
-      dayOfMonth !== null && dayOfMonth !== undefined
-        ? ordinal(dayOfMonth)
-        : null;
-    if (interval === 1) {
-      return dayLabel ? `${dayLabel} of every month` : "Monthly";
-    }
-    return dayLabel
-      ? `${dayLabel} every ${interval} months`
-      : `Every ${interval} months`;
-  }
-
-  if (frequency === "YEARLY") {
-    return interval === 1 ? "Yearly" : `Every ${interval} years`;
-  }
-
-  return frequency;
-}
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0] ?? "th");
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-3">
+          <p className="min-w-0 flex-1 font-medium wrap-break-word">{title}</p>
+          <span
+            className={cn(
+              "shrink-0 font-medium tabular-nums whitespace-nowrap",
+              isIncome
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+            )}
+          >
+            {amountLabel}
+          </span>
+        </div>
+        <p className="mt-0.5 text-sm text-muted-foreground capitalize">
+          {rule.category}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {getFrequencyLabel(rule)}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Next: {formatTransactionDate(rule.nextRunDate)}
+        </p>
+        <div className="mt-1 flex justify-end gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 sm:h-9 sm:w-9"
+            onClick={onEdit}
+            aria-label={`Edit ${title}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 sm:h-9 sm:w-9"
+            onClick={onDelete}
+            aria-label={`Delete ${title}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
@@ -179,71 +199,17 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
           description="Add a scheduled transaction to automate regular income or expenses."
         />
       ) : (
-        <div className="space-y-3">
-          {rules.map((rule) => {
-            const isIncome = rule.type === "income";
-
-            return (
-              <div
-                key={rule.id}
-                className={`flex items-center gap-4 rounded-lg border p-4 ${
-                  !rule.isActive ? "border-dashed opacity-70" : ""
-                }`}
-              >
-                <Switch
-                  checked={rule.isActive}
-                  disabled={toggling === rule.id}
-                  onCheckedChange={() => handleToggle(rule)}
-                  aria-label={rule.isActive ? "Pause rule" : "Resume rule"}
-                />
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">
-                      {rule.description || rule.category}
-                    </span>
-                    <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted capitalize">
-                      {rule.category}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                    <span>{getFrequencyLabel(rule)}</span>
-                    <span>&middot;</span>
-                    <span>Next: {formatDate(rule.nextRunDate)}</span>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <span
-                    className={`font-medium ${isIncome ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                  >
-                    {isIncome ? "+" : "-"}
-                    {formatCents(rule.amount, rule.currency)}
-                  </span>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingRule(rule)}
-                  aria-label="Edit recurring transaction"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDeletingRule(rule)}
-                  aria-label="Delete recurring transaction"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            );
-          })}
+        <div className="space-y-2">
+          {rules.map((rule) => (
+            <RecurringRuleCard
+              key={rule.id}
+              rule={rule}
+              toggling={toggling === rule.id}
+              onToggle={() => handleToggle(rule)}
+              onEdit={() => setEditingRule(rule)}
+              onDelete={() => setDeletingRule(rule)}
+            />
+          ))}
         </div>
       )}
 

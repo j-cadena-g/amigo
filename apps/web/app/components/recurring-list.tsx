@@ -88,46 +88,48 @@ function RecurringRuleCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-3">
           <p className="min-w-0 flex-1 font-medium wrap-break-word">{title}</p>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <span
-              className={cn(
-                "pr-1 font-medium tabular-nums whitespace-nowrap",
-                isIncome
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              )}
-            >
-              {amountLabel}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 sm:h-9 sm:w-9"
-              onClick={onEdit}
-              aria-label={`Edit ${title}`}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 sm:h-9 sm:w-9"
-              onClick={onDelete}
-              aria-label={`Delete ${title}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <span
+            className={cn(
+              "shrink-0 font-medium tabular-nums whitespace-nowrap",
+              isIncome
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+            )}
+          >
+            {amountLabel}
+          </span>
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          <span className="capitalize">{rule.category}</span>
-          {" · "}
-          {getFrequencyLabel(rule)}
-          {" · Next: "}
-          {formatTransactionDate(rule.nextRunDate)}
+        <p className="mt-0.5 text-sm text-muted-foreground capitalize">
+          {rule.category}
         </p>
+        <p className="text-sm text-muted-foreground">
+          {getFrequencyLabel(rule)}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Next: {formatTransactionDate(rule.nextRunDate)}
+        </p>
+        <div className="mt-1 flex justify-end gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 sm:h-9 sm:w-9"
+            onClick={onEdit}
+            aria-label={`Edit ${title}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 sm:h-9 sm:w-9"
+            onClick={onDelete}
+            aria-label={`Delete ${title}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

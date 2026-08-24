@@ -30,7 +30,7 @@
     "test:watch": "pnpm --filter @amigo/web run test:watch"
   },
   "devDependencies": {
-    "@clerk/backend": "^3.16.5",
+    "@clerk/backend": "^3.16.10",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "eslint-plugin-react": "^7.37.5",

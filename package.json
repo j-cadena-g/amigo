@@ -36,9 +36,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "^17.11.0",
-"turbo": "^2.10.9",
+"turbo": "^2.10.11",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "react-router": "8.1.0",

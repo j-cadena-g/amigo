@@ -13,7 +13,7 @@ import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurring-processor";
-import { validateFinancialRefs } from "../lib/financial-refs";
+import { refsChangedFromExisting, validateFinancialRefs } from "../lib/financial-refs";
 import { assertSelectableFinancialCategory } from "../lib/financial-categories";
 import { getHomeCurrency } from "../lib/household-currency";
 import { withAudit } from "../lib/audit";
@@ -48,7 +48,7 @@ export const createRuleSchema = z.object({
   currency: zCurrencyCode.optional(),
 });
 
-const updateRuleSchema = z.object({
+export const updateRuleSchema = z.object({
   amount: z.number().positive().optional(),
   categoryId: z.string().uuid().optional(),
   description: z.string().max(500).nullable().optional(),
@@ -178,9 +178,6 @@ export const handleRecurringRequest: ApiHandler = async ({
     );
 
     const validated = updateRuleSchema.parse(await request.json());
-    await validateFinancialRefs(db, session!.householdId, session!.userId, {
-      budgetId: validated.budgetId,
-    });
     const existing = await db.query.recurringTransactions.findFirst({
       where: and(
         eq(recurringTransactions.id, id),
@@ -193,19 +190,33 @@ export const handleRecurringRequest: ApiHandler = async ({
     if (!existing) {
       throw new ActionError("Recurring rule not found", "NOT_FOUND");
     }
+    await validateFinancialRefs(
+      db,
+      session!.householdId,
+      session!.userId,
+      refsChangedFromExisting(validated, existing)
+    );
 
     const updateData: Record<string, unknown> = {};
 
     if (validated.amount !== undefined) updateData.amount = toCents(validated.amount);
     if (validated.categoryId !== undefined) {
-      const category = await assertSelectableFinancialCategory(
-        db,
-        session!.householdId,
-        validated.categoryId,
-        validated.type ?? existing.type
-      );
-      updateData.categoryId = category.id;
-      updateData.category = category.name;
+      const nextType = validated.type ?? existing.type;
+      const categoryUnchanged =
+        validated.categoryId === existing.categoryId && nextType === existing.type;
+      if (categoryUnchanged) {
+        updateData.categoryId = existing.categoryId;
+        updateData.category = existing.category;
+      } else {
+        const category = await assertSelectableFinancialCategory(
+          db,
+          session!.householdId,
+          validated.categoryId,
+          nextType
+        );
+        updateData.categoryId = category.id;
+        updateData.category = category.name;
+      }
     }
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
     if (validated.type !== undefined) {

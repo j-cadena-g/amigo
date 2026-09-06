@@ -26,6 +26,7 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import {
+  refsChangedFromExisting,
   validateFinancialRefs,
   validateImportBudgetAndAccountIds,
 } from "../lib/financial-refs";
@@ -471,10 +472,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
 
-    await validateFinancialRefs(db, session!.householdId, session!.userId, {
-      budgetId: validated.budgetId,
-      accountId: validated.accountId,
-    });
+    await validateFinancialRefs(
+      db,
+      session!.householdId,
+      session!.userId,
+      refsChangedFromExisting(validated, existing)
+    );
     const updateData: Record<string, unknown> = {};
 
     if (validated.amount !== undefined) {
@@ -484,14 +487,22 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.description = validated.description?.trim() || null;
     }
     if (validated.categoryId !== undefined) {
-      const category = await assertSelectableFinancialCategory(
-        db,
-        session!.householdId,
-        validated.categoryId,
-        validated.type ?? existing.type
-      );
-      updateData.categoryId = category.id;
-      updateData.category = category.name;
+      const nextType = validated.type ?? existing.type;
+      const categoryUnchanged =
+        validated.categoryId === existing.categoryId && nextType === existing.type;
+      if (categoryUnchanged) {
+        updateData.categoryId = existing.categoryId;
+        updateData.category = existing.category;
+      } else {
+        const category = await assertSelectableFinancialCategory(
+          db,
+          session!.householdId,
+          validated.categoryId,
+          nextType
+        );
+        updateData.categoryId = category.id;
+        updateData.category = category.name;
+      }
     }
     if (validated.type !== undefined) {
       if (validated.type !== existing.type) {

@@ -198,7 +198,9 @@ export function TransactionList({
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/transactions/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         toast(body?.error ?? "Failed to delete transaction", { variant: "error" });
@@ -254,7 +256,7 @@ export function TransactionList({
     if (!editingId) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/transactions/${editingId}`, {
+      const res = await fetch(`/api/transactions/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

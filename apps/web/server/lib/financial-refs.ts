@@ -12,6 +12,38 @@ import {
 } from "@amigo/db";
 import { ActionError } from "./errors";
 
+/** Only newly chosen refs need validation; keep an existing (possibly deleted) link. */
+export function refsChangedFromExisting(
+  validated: {
+    budgetId?: string | null;
+    accountId?: string | null;
+  },
+  existing: {
+    budgetId: string | null;
+    accountId?: string | null;
+  }
+): {
+  budgetId?: string | null;
+  accountId?: string | null;
+} {
+  const refs: {
+    budgetId?: string | null;
+    accountId?: string | null;
+  } = {};
+
+  if (validated.budgetId !== undefined && validated.budgetId !== existing.budgetId) {
+    refs.budgetId = validated.budgetId;
+  }
+  if (
+    validated.accountId !== undefined &&
+    validated.accountId !== (existing.accountId ?? null)
+  ) {
+    refs.accountId = validated.accountId;
+  }
+
+  return refs;
+}
+
 export async function validateFinancialRefs(
   db: DrizzleD1,
   householdId: string,

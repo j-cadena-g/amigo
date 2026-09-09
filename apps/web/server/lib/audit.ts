@@ -12,6 +12,63 @@ export const AUDIT_TABLES = [
 ] as const;
 export type AuditTableName = (typeof AUDIT_TABLES)[number];
 
+export type AuditFieldChange = { from: unknown; to: unknown };
+
+/**
+ * Normalize an audit snapshot from D1.
+ *
+ * `audit_logs.old_values` / `new_values` are json-mode text columns, so Drizzle
+ * stringifies on write and parses on read. Historical rows were also
+ * `JSON.stringify`'d before insert, so a read can still be a JSON string.
+ * Diffing that string with `Object.keys` produces character-index "fields"
+ * (`367: 5 → 6`) instead of real column changes.
+ */
+export function parseAuditSnapshot(
+  value: unknown
+): Record<string, unknown> | null {
+  let current = value;
+  for (let i = 0; i < 3 && typeof current === "string"; i++) {
+    try {
+      current = JSON.parse(current);
+    } catch {
+      return null;
+    }
+  }
+  if (current && typeof current === "object" && !Array.isArray(current)) {
+    return current as Record<string, unknown>;
+  }
+  return null;
+}
+
+export function snapshotCurrency(values: unknown): string | null {
+  const snapshot = parseAuditSnapshot(values);
+  if (!snapshot) return null;
+  return typeof snapshot.currency === "string" ? snapshot.currency : null;
+}
+
+export function diffAuditSnapshots(
+  oldValues: unknown,
+  newValues: unknown
+): Record<string, AuditFieldChange> | null {
+  const oldSnapshot = parseAuditSnapshot(oldValues);
+  const newSnapshot = parseAuditSnapshot(newValues);
+  if (!oldSnapshot || !newSnapshot) return null;
+
+  const changes: Record<string, AuditFieldChange> = {};
+  const changedKeys = new Set([
+    ...Object.keys(oldSnapshot),
+    ...Object.keys(newSnapshot),
+  ]);
+
+  for (const key of changedKeys) {
+    if (JSON.stringify(oldSnapshot[key]) !== JSON.stringify(newSnapshot[key])) {
+      changes[key] = { from: oldSnapshot[key], to: newSnapshot[key] };
+    }
+  }
+
+  return changes;
+}
+
 export function buildAuditHistoryFilter(
   householdId: string,
   recordId: string,
@@ -48,8 +105,8 @@ export async function insertManyAuditLogs(
         tableName: row.tableName,
         recordId: row.recordId,
         operation: row.operation,
-        oldValues: row.oldValues != null ? JSON.stringify(row.oldValues) : null,
-        newValues: row.newValues != null ? JSON.stringify(row.newValues) : null,
+        oldValues: row.oldValues ?? null,
+        newValues: row.newValues ?? null,
         changedBy: row.changedBy,
       }))
     );
@@ -93,8 +150,8 @@ export async function withAudit<T>(
       tableName: opts.tableName,
       recordId: opts.recordId,
       operation: opts.operation,
-      oldValues: oldValues != null ? JSON.stringify(oldValues) : null,
-      newValues: newValues != null ? JSON.stringify(newValues) : null,
+      oldValues: oldValues ?? null,
+      newValues: newValues ?? null,
       changedBy: opts.changedBy,
     });
   } catch (error) {

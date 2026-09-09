@@ -23,7 +23,12 @@ import {
 } from "@amigo/db";
 import { z } from "zod";
 import { ActionError } from "../lib/errors";
-import { AUDIT_TABLES, buildAuditHistoryFilter } from "../lib/audit";
+import {
+  AUDIT_TABLES,
+  buildAuditHistoryFilter,
+  diffAuditSnapshots,
+  snapshotCurrency,
+} from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 
@@ -35,12 +40,6 @@ interface AuditEntry {
   changes: Record<string, unknown> | null;
   /** Currency from full snapshots (present even when currency did not change). */
   recordCurrency: { from: string | null; to: string | null };
-}
-
-function snapshotCurrency(values: unknown): string | null {
-  if (!values || typeof values !== "object") return null;
-  const currency = (values as Record<string, unknown>).currency;
-  return typeof currency === "string" ? currency : null;
 }
 
 export const auditTableSchema = z.enum(AUDIT_TABLES);
@@ -215,23 +214,10 @@ export const handleAuditRequest: ApiHandler = async ({
   const history: AuditEntry[] = logs.map((log) => {
     const userName = log.changedBy ? userMap.get(log.changedBy) ?? null : null;
 
-    let changes: Record<string, unknown> | null = null;
-    if (log.operation === "UPDATE" && log.oldValues && log.newValues) {
-      const oldValues = log.oldValues as Record<string, unknown>;
-      const newValues = log.newValues as Record<string, unknown>;
-      changes = {};
-
-      const changedKeys = new Set([
-        ...Object.keys(oldValues),
-        ...Object.keys(newValues),
-      ]);
-
-      for (const key of changedKeys) {
-        if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
-          changes[key] = { from: oldValues[key], to: newValues[key] };
-        }
-      }
-    }
+    const changes =
+      log.operation === "UPDATE"
+        ? diffAuditSnapshots(log.oldValues, log.newValues)
+        : null;
 
     return {
       id: log.id,

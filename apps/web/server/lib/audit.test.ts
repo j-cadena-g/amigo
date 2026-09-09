@@ -10,7 +10,53 @@ vi.mock("@amigo/db", () => ({
   and: (...args: unknown[]) => ({ type: "and", args }),
 }));
 
-import { insertManyAuditLogs, withAudit } from "./audit";
+import {
+  diffAuditSnapshots,
+  insertManyAuditLogs,
+  parseAuditSnapshot,
+  snapshotCurrency,
+  withAudit,
+} from "./audit";
+
+describe("parseAuditSnapshot", () => {
+  it("returns objects as-is", () => {
+    expect(parseAuditSnapshot({ amount: 6191, currency: "CAD" })).toEqual({
+      amount: 6191,
+      currency: "CAD",
+    });
+  });
+
+  it("unwraps double-encoded JSON strings from historical writes", () => {
+    const snapshot = { amount: 5500, description: "Tenant insurance" };
+    expect(parseAuditSnapshot(JSON.stringify(snapshot))).toEqual(snapshot);
+    expect(parseAuditSnapshot(JSON.stringify(JSON.stringify(snapshot)))).toEqual(
+      snapshot
+    );
+  });
+
+  it("rejects arrays and invalid JSON so character-index diffs cannot form", () => {
+    expect(parseAuditSnapshot('{"amount":6191')).toBeNull();
+    expect(parseAuditSnapshot(["amount"])).toBeNull();
+    expect(parseAuditSnapshot(null)).toBeNull();
+  });
+});
+
+describe("diffAuditSnapshots", () => {
+  it("diffs object fields instead of JSON character indexes", () => {
+    expect(
+      diffAuditSnapshots(
+        JSON.stringify({ amount: 5500, description: "Tenant insurance" }),
+        JSON.stringify({ amount: 6191, description: "Tenant insurance" })
+      )
+    ).toEqual({
+      amount: { from: 5500, to: 6191 },
+    });
+  });
+
+  it("reads currency from encoded snapshots", () => {
+    expect(snapshotCurrency(JSON.stringify({ currency: "CAD" }))).toBe("CAD");
+  });
+});
 
 describe("insertManyAuditLogs", () => {
   beforeEach(() => {
@@ -56,7 +102,7 @@ describe("insertManyAuditLogs", () => {
         tableName: "grocery_items",
         recordId: "a",
         operation: "DELETE",
-        oldValues: JSON.stringify({ id: "a" }),
+        oldValues: { id: "a" },
         newValues: null,
         changedBy: "u1",
       },
@@ -65,7 +111,7 @@ describe("insertManyAuditLogs", () => {
         tableName: "grocery_items",
         recordId: "b",
         operation: "DELETE",
-        oldValues: JSON.stringify({ id: "b" }),
+        oldValues: { id: "b" },
         newValues: null,
         changedBy: "u1",
       },
@@ -157,5 +203,40 @@ describe("withAudit", () => {
     });
 
     consoleError.mockRestore();
+  });
+
+  it("passes snapshot objects through so Drizzle json mode stringifies once", async () => {
+    mocks.insertValues.mockResolvedValueOnce(undefined);
+    const db = {
+      insert: vi.fn(() => ({
+        values: mocks.insertValues,
+      })),
+    };
+    const existing = { id: "txn-1", amount: 5500 };
+    const updated = { id: "txn-1", amount: 6191 };
+
+    await withAudit(
+      db as never,
+      {
+        householdId: "house-1",
+        tableName: "transactions",
+        recordId: "txn-1",
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: (result) => result,
+        changedBy: "user-1",
+      },
+      async () => updated
+    );
+
+    expect(mocks.insertValues).toHaveBeenCalledWith({
+      householdId: "house-1",
+      tableName: "transactions",
+      recordId: "txn-1",
+      operation: "UPDATE",
+      oldValues: existing,
+      newValues: updated,
+      changedBy: "user-1",
+    });
   });
 });

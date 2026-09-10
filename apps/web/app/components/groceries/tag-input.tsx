@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
 import { tagColors, swatchColors, type TagColorKey } from "./constants";
 
@@ -20,6 +20,7 @@ export function TagInput({
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [newColor, setNewColor] = useState<TagColorKey>("blue");
   const [isCreating, setIsCreating] = useState(false);
+  const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,7 +144,7 @@ export function TagInput({
               <button
                 type="button"
                 onClick={() => removeTag(tag.id)}
-                className="ml-0.5 rounded-full hover:opacity-70"
+                className="relative ml-0.5 rounded-full before:absolute before:-inset-2 before:content-[''] hover:opacity-70"
                 aria-label={`Remove ${tag.name}`}
               >
                 &times;
@@ -159,6 +160,14 @@ export function TagInput({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-expanded={isOpen && options.length > 0}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            highlightIndex >= 0 ? `${listboxId}-option-${highlightIndex}` : undefined
+          }
+          aria-label="Search or create a tag"
           placeholder={
             selectedTags.length > 0 ? "Add tag..." : "Tags (optional)..."
           }
@@ -170,6 +179,8 @@ export function TagInput({
       {isOpen && options.length > 0 && (
         <div
           ref={dropdownRef}
+          id={listboxId}
+          role="listbox"
           className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg border border-border bg-popover shadow-lg"
         >
           <div className="max-h-48 overflow-y-auto p-1">
@@ -184,6 +195,9 @@ export function TagInput({
                   <button
                     key={tag.id}
                     type="button"
+                    id={`${listboxId}-option-${index}`}
+                    role="option"
+                    aria-selected={highlightIndex === index}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectExistingTag(tag)}
                     onMouseEnter={() => setHighlightIndex(index)}
@@ -206,6 +220,9 @@ export function TagInput({
               return (
                 <div
                   key="__create__"
+                  id={`${listboxId}-option-${index}`}
+                  role="option"
+                  aria-selected={highlightIndex === index}
                   onMouseEnter={() => setHighlightIndex(index)}
                   className={`rounded-md px-2 py-1.5 ${
                     highlightIndex === index ? "bg-accent" : ""
@@ -235,7 +252,9 @@ export function TagInput({
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => setNewColor(color)}
-                          className={`h-4 w-4 rounded-full ${swatchColors[color]} ${
+                          aria-label={`Color ${color}`}
+                          aria-pressed={newColor === color}
+                          className={`relative h-4 w-4 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
                             newColor === color
                               ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
                               : ""

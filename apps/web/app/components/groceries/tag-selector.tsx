@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { tagColors, swatchColors, type TagColorKey } from "./constants";
-import { TagIcon, CheckIcon, EditIcon, TrashIcon } from "./icons";
+import { Check, Pencil, Tag, Trash2 } from "lucide-react";
 
 interface TagSelectorProps {
   mode: "global" | "item";
@@ -37,6 +37,7 @@ export function TagSelector({
   const [editColor, setEditColor] = useState<TagColorKey>("blue");
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverId = useId();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -50,9 +51,19 @@ export function TagSelector({
         setEditingTag(null);
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        setEditingTag(null);
+      }
+    }
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
   }, [isOpen]);
 
@@ -110,15 +121,18 @@ export function TagSelector({
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={popoverId}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
       >
-        <TagIcon className="h-3.5 w-3.5" />
+        <Tag className="h-3.5 w-3.5" />
         {mode === "global" ? "Filter Tags" : "Tags"}
       </button>
 
       {isOpen && (
         <div
           ref={popoverRef}
+          id={popoverId}
           className="absolute left-0 z-50 mt-1 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
         >
           {editingTag ? (
@@ -128,6 +142,7 @@ export function TagSelector({
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
+                aria-label="Tag name"
                 className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
@@ -137,7 +152,9 @@ export function TagSelector({
                     key={color}
                     type="button"
                     onClick={() => setEditColor(color)}
-                    className={`h-6 w-6 rounded-full ${swatchColors[color]} ${
+                    aria-label={`Color ${color}`}
+                    aria-pressed={editColor === color}
+                    className={`relative h-6 w-6 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
                       editColor === color ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : ""
                     }`}
                   />
@@ -147,23 +164,23 @@ export function TagSelector({
                 <button
                   type="button"
                   onClick={() => handleDelete(editingTag.id)}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                  className="inline-flex min-h-9 items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
                 >
-                  <TrashIcon className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" />
                   Delete
                 </button>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEditingTag(null)}
-                    className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
+                    className="inline-flex min-h-9 items-center rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleEditSave}
-                    className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    className="inline-flex min-h-9 items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     Save
                   </button>
@@ -180,6 +197,7 @@ export function TagSelector({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && canCreate && !isCreating) handleCreate();
                 }}
+                aria-label="Search or create a tag"
                 className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
@@ -192,7 +210,9 @@ export function TagSelector({
                         key={color}
                         type="button"
                         onClick={() => setNewColor(color)}
-                        className={`h-5 w-5 rounded-full ${swatchColors[color]} ${
+                        aria-label={`Color ${color}`}
+                        aria-pressed={newColor === color}
+                        className={`relative h-5 w-5 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
                           newColor === color ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""
                         }`}
                       />
@@ -243,7 +263,7 @@ export function TagSelector({
                               : "border-input"
                           }`}
                         >
-                          {isSelected && <CheckIcon className="h-3 w-3 text-primary-foreground" />}
+                          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                         </span>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}>
                           {tag.name}
@@ -252,9 +272,10 @@ export function TagSelector({
                       <button
                         type="button"
                         onClick={() => startEdit(tag)}
-                        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label={`Edit tag ${tag.name}`}
+                        className="relative rounded p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-foreground"
                       >
-                        <EditIcon className="h-3.5 w-3.5" />
+                        <Pencil className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   );

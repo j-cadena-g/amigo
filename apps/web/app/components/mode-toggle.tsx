@@ -14,7 +14,7 @@ export function ModeToggle() {
   if (!isMounted) {
     return (
       <button
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-all duration-200 hover:text-foreground hover:bg-secondary/80"
+        className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-all duration-200 hover:text-foreground hover:bg-secondary/80"
         aria-label="Toggle theme"
       >
         <Monitor className="h-4 w-4" />
@@ -25,7 +25,7 @@ export function ModeToggle() {
   return (
     <button
       onClick={cycleTheme}
-      className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-all duration-200 hover:text-foreground hover:bg-secondary/80 active:scale-95"
+      className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-all duration-200 hover:text-foreground hover:bg-secondary/80 active:scale-95"
       aria-label={`Current theme: ${theme}. Click to change.`}
       title={`Theme: ${theme}`}
     >

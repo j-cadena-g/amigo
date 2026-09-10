@@ -25,11 +25,13 @@ export function SettingsThemeToggle() {
   ];
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2" role="radiogroup" aria-label="Theme">
       {options.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
           type="button"
+          role="radio"
+          aria-checked={theme === value}
           onClick={() => setTheme(value)}
           className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
             theme === value

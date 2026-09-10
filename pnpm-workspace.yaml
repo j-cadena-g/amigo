@@ -5,12 +5,16 @@ packages:
 overrides:
   esbuild: ">=0.25.0 <1.0.0"
   # Dependabot: brace-expansion DoS (GHSA advisories on 1.x and 5.x lines)
-  brace-expansion@1: 1.1.17
-  brace-expansion@5: 5.0.8
+  brace-expansion@1: 1.1.18
+  brace-expansion@5: 5.0.9
+  # Dependabot: sharp/libvips CVEs (libheif RCE in < 0.35.4)
+  sharp: ">=0.35.4"
+  # Dependabot: browserslist prototype write / crash via untrusted custom stats
+  browserslist: "4.28.9"
+  # Dependabot: baseline-browser-mapping process.exit() DoS on invalid input
+  baseline-browser-mapping: ">=2.11.0"
   # Dependabot: valibot flatten() inherited property names
   valibot: 1.4.2
-  # Dependabot: sharp/libvips CVEs
-  sharp: ">=0.35.0"
   # Dependabot: undici cache/cookie/CRLF issues (via miniflare)
   undici: 7.29.0
 
@@ -21,7 +25,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - eslint@10.6.0
-  - brace-expansion@1.1.17
+  - brace-expansion@1.1.18
 
 peerDependencyRules:
   allowedVersions:

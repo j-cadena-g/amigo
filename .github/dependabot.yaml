@@ -11,6 +11,12 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
+    # Vitest 5 breaks @cloudflare/vitest-pool-workers (cloudflare-pool SyntaxError).
+    ignore:
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
     groups:
       app-dependencies:
         dependency-type: "production"

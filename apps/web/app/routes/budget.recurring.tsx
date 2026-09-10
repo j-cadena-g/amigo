@@ -14,6 +14,7 @@ import {
 } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
 import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
+import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { CategoryManagementPanel } from "@/app/components/financial/category-management-panel";
 
 function dayOfWeekFromStartDate(startDate: string): number {
@@ -62,12 +63,10 @@ export default function Recurring() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">Recurring transactions</h2>
-        <p className="text-sm text-muted-foreground">
-          Set up scheduled income or expenses that post automatically.
-        </p>
-      </div>
+      <FinancialSectionHeader
+        title="Recurring transactions"
+        description="Set up scheduled income or expenses that post automatically."
+      />
 
       <FinancialCollapsiblePanel
         title="Manage categories"

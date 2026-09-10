@@ -11,7 +11,7 @@ export const ASSET_TYPE_COLORS = {
   // No semantic token for purple — INVESTMENT keeps hardcoded palette colors.
   INVESTMENT: { bg: "bg-purple-100 dark:bg-purple-900/40", text: "text-purple-700 dark:text-purple-300" },
   CASH: { bg: "bg-success/15", text: "text-success" },
-  PROPERTY: { bg: "bg-warning/15", text: "text-warning-foreground" },
+  PROPERTY: { bg: "bg-warning/15", text: "text-warning" },
 } as const;
 
 export interface Asset {

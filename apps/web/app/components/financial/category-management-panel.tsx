@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { useConfirm } from "@/app/components/confirm-provider";
 import {
   buildCategoryTree,
   useFinancialCategories,
@@ -12,6 +13,7 @@ export function CategoryManagementPanel() {
   const nameId = useId();
   const typeId = useId();
   const parentId = useId();
+  const confirm = useConfirm();
   const { categories, loading, error, reload } = useFinancialCategories({
     includeArchived: true,
   });
@@ -58,6 +60,13 @@ export function CategoryManagementPanel() {
   }
 
   async function handleArchive(categoryId: string) {
+    const confirmed = await confirm({
+      title: "Archive category?",
+      description:
+        "It and its subcategories will disappear from pickers. Existing transactions keep their category history.",
+      confirmText: "Archive",
+    });
+    if (!confirmed) return;
     setFeedback(null);
     try {
       const res = await fetch(`/api/categories/${categoryId}`, {
@@ -80,6 +89,14 @@ export function CategoryManagementPanel() {
   }
 
   async function handleDelete(categoryId: string) {
+    const confirmed = await confirm({
+      title: "Remove category?",
+      description:
+        "If it's used by transactions or recurring rules, it will be archived instead so history is preserved. Otherwise it and its subcategories are permanently removed.",
+      confirmText: "Remove",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
     setFeedback(null);
     try {
       const res = await fetch(`/api/categories/${categoryId}`, { method: "DELETE" });
@@ -158,7 +175,7 @@ export function CategoryManagementPanel() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading categories…</p>
       ) : error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-destructive" role="alert">{error}</p>
       ) : (
         <div className="space-y-3">
           {tree.length === 0 ? (
@@ -190,7 +207,7 @@ export function CategoryManagementPanel() {
         </div>
       )}
 
-      {feedback ? <p className="text-sm text-destructive">{feedback}</p> : null}
+      {feedback ? <p className="text-sm text-destructive" role="status">{feedback}</p> : null}
     </div>
   );
 }

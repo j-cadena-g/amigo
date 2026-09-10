@@ -12,6 +12,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import { Trash2 } from "lucide-react";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
@@ -35,18 +36,18 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   // Loan fields
   const [loanAmount, setLoanAmount] = useState(
-    debt.type === "LOAN" ? (debt.balanceInitial / 100).toFixed(2) : ""
+    debt.type === "LOAN" ? centsToInputString(debt.balanceInitial) : ""
   );
   const [totalPaid, setTotalPaid] = useState(
-    debt.type === "LOAN" ? (debt.balanceCurrent / 100).toFixed(2) : ""
+    debt.type === "LOAN" ? centsToInputString(debt.balanceCurrent) : ""
   );
 
   // Credit card fields
   const [creditLimit, setCreditLimit] = useState(
-    debt.type === "CREDIT_CARD" ? (debt.balanceInitial / 100).toFixed(2) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceInitial) : ""
   );
   const [availableCredit, setAvailableCredit] = useState(
-    debt.type === "CREDIT_CARD" ? (debt.balanceCurrent / 100).toFixed(2) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceCurrent) : ""
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -249,7 +250,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
           <AuditHistoryPanel recordId={debt.id} table="debts" />
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive" role="alert">{error}</p>
           )}
 
           <DialogFooter className="flex-row justify-between sm:justify-between">

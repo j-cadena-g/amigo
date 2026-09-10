@@ -275,7 +275,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive" role="alert">{error}</p>
             )}
 
             <DialogFooter>

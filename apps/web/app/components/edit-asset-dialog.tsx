@@ -12,6 +12,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import { ArrowRightLeft, Trash2 } from "lucide-react";
 import type { Asset } from "@/app/components/asset-cards";
 import type { CurrencyCode, FinancialAccount } from "@amigo/db";
@@ -40,7 +41,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const revalidator = useRevalidator();
   const [name, setName] = useState(asset.name);
   const [type, setType] = useState(asset.type);
-  const [balance, setBalance] = useState((asset.balance / 100).toFixed(2));
+  const [balance, setBalance] = useState(centsToInputString(asset.balance));
   const [currency, setCurrency] = useState<CurrencyCode>(asset.currency);
   const [isShared, setIsShared] = useState(asset.userId === null);
   const [accountType, setAccountType] = useState<FinancialAccount["type"]>(() =>
@@ -312,7 +313,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
             </p>
           ) : null}
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
             <div className="flex flex-wrap gap-2 sm:mr-auto">

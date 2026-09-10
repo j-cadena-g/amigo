@@ -14,9 +14,16 @@ interface Budget {
 interface BudgetSelectProps {
   value: string | null;
   onChange: (value: string | null) => void;
+  id?: string;
+  "aria-label"?: string;
 }
 
-export function BudgetSelect({ value, onChange }: BudgetSelectProps) {
+export function BudgetSelect({
+  value,
+  onChange,
+  id,
+  "aria-label": ariaLabel,
+}: BudgetSelectProps) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
   useEffect(() => {
@@ -31,6 +38,8 @@ export function BudgetSelect({ value, onChange }: BudgetSelectProps) {
 
   return (
     <select
+      id={id}
+      aria-label={ariaLabel}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

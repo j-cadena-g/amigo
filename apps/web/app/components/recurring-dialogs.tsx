@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -12,6 +12,7 @@ import { CurrencySelect } from "@/app/components/currency-select";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
@@ -134,6 +135,14 @@ function RecurringForm({
   const { categories } = useFinancialCategories();
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
   const budgetSuggestRequestSeq = useRef(0);
+  const amountId = useId();
+  const categoryFieldId = useId();
+  const descriptionId = useId();
+  const intervalId = useId();
+  const dayOfMonthId = useId();
+  const startDateId = useId();
+  const endDateId = useId();
+  const budgetFieldId = useId();
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
   useEffect(() => {
@@ -183,13 +192,15 @@ function RecurringForm({
   return (
     <div className="space-y-4">
       {/* Type toggle */}
-      <div className="flex rounded-md border">
+      <div className="flex rounded-md border" role="radiogroup" aria-label="Transaction type">
         <button
           type="button"
+          role="radio"
+          aria-checked={form.type === "expense"}
           onClick={() => setForm((f) => ({ ...f, type: "expense", categoryId: "", budgetId: f.budgetId }))}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
             form.type === "expense"
-              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-destructive/15 text-destructive"
               : "hover:bg-muted"
           }`}
         >
@@ -197,10 +208,12 @@ function RecurringForm({
         </button>
         <button
           type="button"
+          role="radio"
+          aria-checked={form.type === "income"}
           onClick={() => setForm((f) => ({ ...f, type: "income", categoryId: "", budgetId: null }))}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-md transition-colors ${
             form.type === "income"
-              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              ? "bg-success/15 text-success"
               : "hover:bg-muted"
           }`}
         >
@@ -211,8 +224,9 @@ function RecurringForm({
       {/* Amount + Currency */}
       <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-2">
         <div className="min-w-0">
-          <label className="text-sm font-medium">Amount</label>
+          <label htmlFor={amountId} className="text-sm font-medium">Amount</label>
           <Input
+            id={amountId}
             type="number"
             step="0.01"
             min="0"
@@ -233,8 +247,9 @@ function RecurringForm({
 
       {/* Category + Description */}
       <div>
-        <label className="text-sm font-medium">Category</label>
+        <label htmlFor={categoryFieldId} className="text-sm font-medium">Category</label>
         <CategorySelect
+          id={categoryFieldId}
           value={form.categoryId}
           onChange={(categoryId) => {
             setAllowBudgetSuggest(true);
@@ -245,8 +260,9 @@ function RecurringForm({
         />
       </div>
       <div>
-        <label className="text-sm font-medium">Description</label>
+        <label htmlFor={descriptionId} className="text-sm font-medium">Description</label>
         <Input
+          id={descriptionId}
           value={form.description}
           onChange={(e) =>
             setForm((f) => ({ ...f, description: e.target.value }))
@@ -310,8 +326,9 @@ function RecurringForm({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium">Every N intervals</label>
+            <label htmlFor={intervalId} className="text-sm font-medium">Every N intervals</label>
             <Input
+              id={intervalId}
               type="number"
               min="1"
               value={form.customInterval}
@@ -322,8 +339,9 @@ function RecurringForm({
           </div>
           {form.customFrequency === "MONTHLY" && (
             <div>
-              <label className="text-sm font-medium">Day of month</label>
+              <label htmlFor={dayOfMonthId} className="text-sm font-medium">Day of month</label>
               <Input
+                id={dayOfMonthId}
                 type="number"
                 min="1"
                 max="31"
@@ -340,8 +358,9 @@ function RecurringForm({
       {/* Dates */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium">Start date</label>
+          <label htmlFor={startDateId} className="text-sm font-medium">Start date</label>
           <Input
+            id={startDateId}
             type="date"
             value={form.startDate}
             onChange={(e) =>
@@ -350,8 +369,9 @@ function RecurringForm({
           />
         </div>
         <div>
-          <label className="text-sm font-medium">End date (optional)</label>
+          <label htmlFor={endDateId} className="text-sm font-medium">End date (optional)</label>
           <Input
+            id={endDateId}
             type="date"
             value={form.endDate}
             onChange={(e) =>
@@ -364,8 +384,9 @@ function RecurringForm({
       {/* Budget (expenses only) */}
       {form.type === "expense" && (
         <div>
-          <label className="text-sm font-medium">Budget</label>
+          <label htmlFor={budgetFieldId} className="text-sm font-medium">Budget</label>
           <BudgetSelect
+            id={budgetFieldId}
             value={form.budgetId}
             onChange={(v) => {
               setAllowBudgetSuggest(false);
@@ -498,7 +519,7 @@ function ruleToForm(rule: RecurringRule): RecurringFormData {
   const preset = ruleToPreset(rule);
   return {
     type: rule.type,
-    amount: (rule.amount / 100).toFixed(2),
+    amount: centsToInputString(rule.amount),
     currency: rule.currency,
     categoryId: rule.categoryId ?? "",
     description: rule.description ?? "",

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
+import { EmptyState } from "@/app/components/empty-state";
 import { formatCents } from "@/app/lib/currency";
-import { Pencil } from "lucide-react";
+import { Pencil, Wallet } from "lucide-react";
 import { EditAccountDialog } from "@/app/components/edit-account-dialog";
 import type { CurrencyCode } from "@amigo/db";
 import { accountTypeLabel } from "@/app/lib/financial-account-types";
@@ -92,10 +93,11 @@ export function AccountCards({ accounts }: AccountCardsProps) {
           </div>
         )}
         {accounts.length === 0 && (
-          <p className="text-center text-muted-foreground py-10 text-sm">
-            No accounts yet. Add a checking account, investment, or other holding to get
-            started.
-          </p>
+          <EmptyState
+            icon={Wallet}
+            title="No accounts yet"
+            description="Add your first account to start tracking balances."
+          />
         )}
       </div>
       {editing && (

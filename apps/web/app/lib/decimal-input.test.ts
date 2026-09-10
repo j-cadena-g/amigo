@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  centsToInputString,
   isPositiveDecimal,
   normalizeDecimalSeparators,
   parseDecimalInput,
@@ -54,5 +55,14 @@ describe("isPositiveDecimal", () => {
     expect(isPositiveDecimal("")).toBe(false);
     expect(isPositiveDecimal("1e2")).toBe(false);
     expect(isPositiveDecimal("1abc")).toBe(false);
+  });
+});
+
+describe("centsToInputString", () => {
+  it("formats integer cents with two decimal places", () => {
+    expect(centsToInputString(1050)).toBe("10.50");
+    expect(centsToInputString(0)).toBe("0.00");
+    expect(centsToInputString(5)).toBe("0.05");
+    expect(centsToInputString(123456)).toBe("1234.56");
   });
 });

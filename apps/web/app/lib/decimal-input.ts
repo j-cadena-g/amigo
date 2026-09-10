@@ -45,3 +45,8 @@ export function isPositiveDecimal(value: string): boolean {
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0;
 }
+
+/** Format integer cents as a decimal string for money inputs (e.g. 1050 → "10.50"). */
+export function centsToInputString(cents: number): string {
+  return (cents / 100).toFixed(2);
+}

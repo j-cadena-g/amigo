@@ -6,6 +6,7 @@ import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import {
   AddTransactionButton,
   AddTransactionForm,
@@ -217,7 +218,7 @@ export function TransactionList({
   const handleStartEdit = (t: TransactionDTO) => {
     setEditingId(t.id);
     setEditForm({
-      amount: String(t.amount / 100),
+      amount: centsToInputString(t.amount),
       description: t.description || "",
       categoryId: t.categoryId ?? "",
       type: t.type,
@@ -319,7 +320,7 @@ export function TransactionList({
             Import JSON
           </Button>
         </div>
-        {exportError && <p className="text-sm text-destructive">{exportError}</p>}
+        {exportError && <p className="text-sm text-destructive" role="alert">{exportError}</p>}
       </div>
 
       <TransactionImportDialog

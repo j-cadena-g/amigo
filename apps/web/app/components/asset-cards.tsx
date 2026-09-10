@@ -7,10 +7,11 @@ import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
 import type { CurrencyCode } from "@amigo/db";
 
 export const ASSET_TYPE_COLORS = {
-  BANK: { bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-700 dark:text-blue-300" },
+  BANK: { bg: "bg-info/15", text: "text-info" },
+  // No semantic token for purple — INVESTMENT keeps hardcoded palette colors.
   INVESTMENT: { bg: "bg-purple-100 dark:bg-purple-900/40", text: "text-purple-700 dark:text-purple-300" },
-  CASH: { bg: "bg-green-100 dark:bg-green-900/40", text: "text-green-700 dark:text-green-300" },
-  PROPERTY: { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-700 dark:text-orange-300" },
+  CASH: { bg: "bg-success/15", text: "text-success" },
+  PROPERTY: { bg: "bg-warning/15", text: "text-warning-foreground" },
 } as const;
 
 export interface Asset {

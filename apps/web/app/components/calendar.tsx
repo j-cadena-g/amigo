@@ -47,19 +47,17 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_COMPACT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 const EVENT_DOT_CLASSES: Record<CalendarEvent["color"], string> = {
-  green: "bg-emerald-500",
-  red: "bg-red-500",
-  orange: "bg-amber-500",
-  blue: "bg-blue-500",
+  green: "bg-success",
+  red: "bg-destructive",
+  orange: "bg-warning",
+  blue: "bg-info",
 };
 
 const EVENT_BADGE_CLASSES: Record<CalendarEvent["color"], string> = {
-  green:
-    "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
-  red: "bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300",
-  orange:
-    "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
-  blue: "bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  green: "bg-success/10 text-success",
+  red: "bg-destructive/10 text-destructive",
+  orange: "bg-warning/10 text-warning",
+  blue: "bg-info/10 text-info",
 };
 
 const EVENT_TYPE_LABELS: Record<CalendarEvent["type"], string> = {

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { formatCents } from "@/app/lib/currency";
-import { Pencil } from "lucide-react";
+import { CreditCard, Pencil } from "lucide-react";
 import { EditDebtDialog } from "@/app/components/edit-debt-dialog";
+import { EmptyState } from "@/app/components/empty-state";
 import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
 import { getCreditCardSummary } from "@/app/lib/credit-card-summary";
@@ -30,9 +31,9 @@ interface DebtCardsProps {
 }
 
 function getCreditCardUtilizationColor(utilization: number) {
-  if (utilization < 30) return "bg-green-500";
-  if (utilization <= 70) return "bg-orange-500";
-  return "bg-red-500";
+  if (utilization < 30) return "bg-success";
+  if (utilization <= 70) return "bg-warning";
+  return "bg-destructive";
 }
 
 export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsProps) {
@@ -78,6 +79,13 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
   return (
     <>
       <div className="space-y-6">
+        {debts.length === 0 && (
+          <EmptyState
+            icon={CreditCard}
+            title="No debts yet"
+            description="Add a loan or credit card to track payoff progress."
+          />
+        )}
         {creditCardSummary ? (
           <CreditCardSummary
             summary={creditCardSummary}
@@ -167,10 +175,10 @@ function LoanCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
 
   const barColor =
     percentage > 75
-      ? "bg-green-500"
+      ? "bg-success"
       : percentage >= 25
-        ? "bg-orange-500"
-        : "bg-red-500";
+        ? "bg-warning"
+        : "bg-destructive";
 
   return (
     <Card>

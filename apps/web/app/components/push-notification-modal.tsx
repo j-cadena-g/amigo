@@ -78,7 +78,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
         </DialogHeader>
 
         {needsIOSInstall && (
-          <div className="rounded-md bg-amber-100 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          <div className="rounded-md bg-warning/15 p-3 text-sm text-warning">
             <p className="font-medium">iOS requires app installation</p>
             <p className="mt-1">
               To receive notifications, first add amigo to your Home Screen:

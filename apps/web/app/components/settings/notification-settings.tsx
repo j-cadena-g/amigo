@@ -126,7 +126,7 @@ export function NotificationSettings() {
       ) : null}
 
       {needsIOSInstall && (
-        <div className="rounded-md bg-amber-100 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+        <div className="rounded-md bg-warning/15 p-3 text-sm text-warning">
           <p className="font-medium">iOS requires Home Screen install</p>
           <p className="mt-1">
             Add amigo to your Home Screen, open it from there, then enable

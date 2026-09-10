@@ -20,7 +20,7 @@ export function DashboardNetWorth({
 }: DashboardNetWorthProps) {
   return (
     <Card className="lg:col-span-2 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-indigo-500/5 dark:from-violet-500/10 dark:to-indigo-500/10 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-info/5 pointer-events-none" />
       <CardHeader className="relative pb-2">
         <CardTitle className="text-base">Net Worth</CardTitle>
       </CardHeader>
@@ -29,7 +29,7 @@ export function DashboardNetWorth({
           <div
             className={cn(
               "font-display text-3xl font-bold tracking-tight",
-              netWorthCents < 0 && "text-red-500 dark:text-red-400"
+              netWorthCents < 0 && "text-destructive"
             )}
           >
             {formatCents(netWorthCents, currency)}
@@ -43,13 +43,13 @@ export function DashboardNetWorth({
             className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50 group"
           >
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10 text-success">
                 <Landmark className="h-4 w-4" />
               </div>
               <span className="text-sm font-medium">Assets</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+              <span className="text-sm font-semibold tabular-nums text-success">
                 {formatCents(assetsCents, currency)}
               </span>
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -61,13 +61,13 @@ export function DashboardNetWorth({
             className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50 group"
           >
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
                 <CreditCard className="h-4 w-4" />
               </div>
               <span className="text-sm font-medium">Debts</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold tabular-nums text-red-500 dark:text-red-400">
+              <span className="text-sm font-semibold tabular-nums text-destructive">
                 {formatCents(debtsCents, currency)}
               </span>
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />

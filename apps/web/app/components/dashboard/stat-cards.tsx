@@ -32,13 +32,13 @@ export function DashboardStatCards({
     <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-stagger-in mb-6">
       <Link to="/financial?type=expense" className="block">
         <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-orange-500/10 dark:from-red-500/20 dark:to-orange-500/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 to-warning/10 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Spending
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-red-500 dark:text-red-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-destructive">
                 <ArrowDownRight className="h-4 w-4" />
               </div>
             </div>
@@ -52,13 +52,13 @@ export function DashboardStatCards({
 
       <Link to="/financial?type=income" className="block">
         <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-success/10 to-accent/10 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Income
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-emerald-600 dark:text-emerald-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-success">
                 <ArrowUpRight className="h-4 w-4" />
               </div>
             </div>
@@ -72,7 +72,7 @@ export function DashboardStatCards({
 
       <Link to="/financial" className="block">
         <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-info/10 to-primary/10 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -82,8 +82,8 @@ export function DashboardStatCards({
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-xl bg-background/80",
                   netCents >= 0
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-red-500 dark:text-red-400"
+                    ? "text-info"
+                    : "text-destructive"
                 )}
               >
                 {netCents >= 0 ? (
@@ -96,7 +96,7 @@ export function DashboardStatCards({
             <div
               className={cn(
                 "font-display text-xl font-bold tracking-tight md:text-2xl",
-                netCents < 0 && "text-red-500 dark:text-red-400"
+                netCents < 0 && "text-destructive"
               )}
             >
               {netCents >= 0 ? "+" : ""}
@@ -111,13 +111,13 @@ export function DashboardStatCards({
 
       <Link to="/groceries" className="block">
         <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-yellow-500/10 dark:from-amber-500/20 dark:to-yellow-500/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-warning/10 to-warning/5 pointer-events-none" />
           <CardContent className="relative p-4 md:p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Groceries
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-amber-600 dark:text-amber-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-warning">
                 <ShoppingCart className="h-4 w-4" />
               </div>
             </div>

@@ -169,7 +169,7 @@ export function MemberRoleManager({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={openRemoveDialog}
-            className="text-red-600 focus:text-red-600"
+            className="text-destructive focus:text-destructive/90"
           >
             Remove Member
           </DropdownMenuItem>

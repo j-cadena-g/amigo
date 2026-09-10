@@ -95,11 +95,11 @@ export function DashboardBudgetProgress({
                       className={cn(
                         "text-[10px] font-semibold uppercase tracking-wider",
                         isOver
-                          ? "text-red-500"
+                          ? "text-destructive"
                           : isCritical
-                            ? "text-red-500"
+                            ? "text-destructive"
                             : isWarn
-                              ? "text-amber-500"
+                              ? "text-warning"
                               : "text-muted-foreground"
                       )}
                     >
@@ -120,7 +120,7 @@ export function DashboardBudgetProgress({
                       Upcoming recurring (est.):{" "}
                       {formatCents(b.recurringImpactHomeCents, currency)}
                       {projectedPct > 100 && (
-                        <span className="text-amber-600 font-medium">
+                        <span className="text-warning font-medium">
                           {" "}
                           — with recurring, ~{projectedPct}% of limit
                         </span>

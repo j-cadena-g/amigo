@@ -37,6 +37,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Budgets · amigo" }];
+}
+
 export default function Budgets() {
   const { budgets: budgetsData, role, homeCurrency } = useLoaderData<typeof loader>();
 

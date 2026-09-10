@@ -25,6 +25,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   return null;
 }
 
+export function meta() {
+  return [{ title: "Restore account · amigo" }];
+}
+
 export default function RestoreAccount() {
   const navigate = useNavigate();
   const { signOut } = useClerk();

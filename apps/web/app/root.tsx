@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/react-router";
 import {
   isRouteErrorResponse,
+  Link,
   Links,
   Meta,
   Outlet,
@@ -13,6 +14,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { getCspNonce } from "@/app/lib/session.server";
 import { appContextMiddleware } from "@/server/middleware/app-context";
+import { ToastProvider } from "@/app/components/toast-provider";
 
 export const middleware: Route.MiddlewareFunction[] = [
   clerkMiddleware(),
@@ -33,7 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#3B7BD5" />
+        <meta name="theme-color" content="#397AD5" />
         <link rel="icon" href="/icon-1024.png" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -68,7 +70,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <ClerkProvider loaderData={loaderData}>
-      <Outlet />
+      <ToastProvider>
+        <Outlet />
+      </ToastProvider>
     </ClerkProvider>
   );
 }
@@ -97,6 +101,14 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         </div>
         <h1 className="font-display text-4xl font-bold tracking-tight mb-2">{message}</h1>
         <p className="text-muted-foreground">{details}</p>
+        <div className="mt-6">
+          <Link
+            to="/dashboard"
+            className="inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Back to dashboard
+          </Link>
+        </div>
         {stack && (
           <pre className="mt-6 w-full p-4 overflow-x-auto rounded-xl bg-secondary text-left text-xs">
             <code className="font-mono">{stack}</code>

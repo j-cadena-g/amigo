@@ -47,6 +47,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Settings · amigo" }];
+}
+
 export default function Settings() {
   const { household, members, session } = useLoaderData<typeof loader>();
   const canManageHousehold =

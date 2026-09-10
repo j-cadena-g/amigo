@@ -22,6 +22,10 @@ export function loader({ context, params }: LoaderFunctionArgs) {
   return { status, code };
 }
 
+export function meta() {
+  return [{ title: "Join household · amigo" }];
+}
+
 export default function JoinInvite() {
   const { status, code } = useLoaderData<typeof loader>();
   const navigate = useNavigate();

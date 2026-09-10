@@ -18,6 +18,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   return loadDashboardData(db, env, session);
 }
 
+export function meta() {
+  return [{ title: "Dashboard · amigo" }];
+}
+
 export default function Dashboard() {
   const {
     spendingCents,

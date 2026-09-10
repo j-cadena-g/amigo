@@ -96,6 +96,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Accounts · amigo" }];
+}
+
 export default function FinancialAccounts() {
   const { accounts, archivedAccounts, legacyAssets, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
@@ -112,13 +116,13 @@ export default function FinancialAccounts() {
           title="Holdings"
           description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, and cash. Use Debts for credit cards."
           action={
-            <button
+            <Button
               type="button"
               onClick={() => setAddOpen(true)}
-              className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 transition-all duration-200 active:scale-[0.97]"
+              className="shrink-0"
             >
               Add account
-            </button>
+            </Button>
           }
         />
 

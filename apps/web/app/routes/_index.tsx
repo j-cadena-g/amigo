@@ -30,6 +30,10 @@ function FullPageLoading() {
   );
 }
 
+export function meta() {
+  return [{ title: "amigo" }];
+}
+
 export default function Index() {
   const { isSignedIn, isLoaded, user } = useUser();
 

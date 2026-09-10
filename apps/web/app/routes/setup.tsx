@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
 import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import { acceptInvite } from "@/app/lib/accept-invite";
 import {
   buildTimezoneOptions,
@@ -25,6 +27,10 @@ export function loader({ context }: LoaderFunctionArgs) {
   }
 
   return null;
+}
+
+export function meta() {
+  return [{ title: "Set up your household · amigo" }];
 }
 
 export default function Setup() {
@@ -93,20 +99,21 @@ export default function Setup() {
     <main className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md mx-auto p-6">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome to amigo</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Welcome to amigo</h1>
           <p className="text-muted-foreground mt-2">
             Let&apos;s set up your household.
           </p>
         </div>
 
         <div className="mb-8 space-y-3">
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => setShowInviteCode((open) => !open)}
-            className="text-sm font-medium text-primary hover:underline"
+            className="h-auto p-0"
           >
             {showInviteCode ? "Hide invite code" : "Have an invite code?"}
-          </button>
+          </Button>
 
           {showInviteCode && (
             <form onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
@@ -114,12 +121,12 @@ export default function Setup() {
                 <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
                   Invite code
                 </label>
-                <input
+                <Input
                   id="inviteCode"
                   type="text"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border bg-background text-sm font-mono uppercase"
+                  className="font-mono uppercase"
                   placeholder="AMIGO-XXXXXXXXXXXXX"
                   autoComplete="off"
                   required
@@ -132,13 +139,13 @@ export default function Setup() {
                 </p>
               )}
 
-              <button
+              <Button
                 type="submit"
                 disabled={acceptingInvite || inviteCode.trim().length === 0}
-                className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                className="w-full"
               >
                 {acceptingInvite ? "Joining..." : "Join household"}
-              </button>
+              </Button>
             </form>
           )}
         </div>
@@ -148,12 +155,11 @@ export default function Setup() {
             <label htmlFor="householdName" className="block text-sm font-medium mb-1">
               Household name
             </label>
-            <input
+            <Input
               id="householdName"
               type="text"
               value={householdName}
               onChange={(e) => setHouseholdName(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
               required
               maxLength={100}
             />
@@ -207,13 +213,13 @@ export default function Setup() {
             </p>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={submitting || householdName.trim().length === 0}
-            className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+            className="w-full"
           >
             {submitting ? "Creating..." : "Create household"}
-          </button>
+          </Button>
         </form>
       </div>
     </main>

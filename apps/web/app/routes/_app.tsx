@@ -8,7 +8,6 @@ import {
 import { NavBar } from "@/app/components/layout/nav-bar";
 import { OfflineIndicator } from "@/app/components/offline-indicator";
 import { ConfirmProvider } from "@/app/components/confirm-provider";
-import { ToastProvider } from "@/app/components/toast-provider";
 import { PushPromptProvider } from "@/app/components/push-prompt-provider";
 import { ThemeProvider } from "@/app/components/theme-provider";
 import {
@@ -66,22 +65,20 @@ export default function AppLayout() {
 
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <PushPromptProvider>
-            <HouseholdRealtimeProvider userId={userId}>
-              <HouseholdRealtimeDefaults />
-              <div className="relative min-h-screen overflow-x-hidden bg-background">
-                <NavBar />
-                <OfflineIndicator />
-                <div className="page-enter relative z-10">
-                  <Outlet />
-                </div>
+      <ConfirmProvider>
+        <PushPromptProvider>
+          <HouseholdRealtimeProvider userId={userId}>
+            <HouseholdRealtimeDefaults />
+            <div className="relative min-h-screen overflow-x-hidden bg-background">
+              <NavBar />
+              <OfflineIndicator />
+              <div className="page-enter relative z-10">
+                <Outlet />
               </div>
-            </HouseholdRealtimeProvider>
-          </PushPromptProvider>
-        </ConfirmProvider>
-      </ToastProvider>
+            </div>
+          </HouseholdRealtimeProvider>
+        </PushPromptProvider>
+      </ConfirmProvider>
     </ThemeProvider>
   );
 }

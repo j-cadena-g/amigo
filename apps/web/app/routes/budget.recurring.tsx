@@ -53,6 +53,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Recurring · amigo" }];
+}
+
 export default function Recurring() {
   const { rules, homeCurrency } = useLoaderData<typeof loader>();
 

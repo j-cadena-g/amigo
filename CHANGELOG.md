@@ -32,10 +32,13 @@ All notable changes to this project will be documented in this file.
 - Recurring cron isolates per-rule failures so one household/FX error cannot abort the run ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
 - `CHANGELOG.md` moved to repository root
-- Dependency and GitHub Actions updates (including Dependabot security advisories)
+- Dependency and GitHub Actions updates (Clerk, react-router 8.3.1, zod, wrangler, ESLint 10.10, lucide-react, `pnpm/action-setup` 6.1.0)
+- pnpm overrides pin patched `browserslist` 4.28.9, `sharp` ≥0.35.4, and `baseline-browser-mapping` ≥2.11.0; Dependabot ignores Vitest majors until `@cloudflare/vitest-pool-workers` supports Vitest 5 ([#139](https://github.com/j-cadena-g/amigo/pull/139))
 
 ### Fixed
 
+- Transaction history shows field-level diffs instead of JSON character indexes ([#138](https://github.com/j-cadena-g/amigo/pull/138))
+- Recurring and transaction amount edits when a linked budget was later deleted ([#135](https://github.com/j-cadena-g/amigo/pull/135))
 - Production web push: emit `sw.js` into Wrangler `build/client` assets (it was written to `dist/` and 404ed live), and stop hanging on `serviceWorker.ready` when none is registered
 - `pnpm run agent:signin-url` resolves `@clerk/backend` from the repo root (no longer depends on `pnpm --filter @amigo/web exec` for that import)
 - Grocery date picker centering on mobile Safari ([#107](https://github.com/j-cadena-g/amigo/pull/107), [#108](https://github.com/j-cadena-g/amigo/pull/108))

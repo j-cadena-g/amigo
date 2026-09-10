@@ -79,10 +79,12 @@ function BudgetCard({
   budget,
   onEdit,
   onDelete,
+  deleting,
 }: {
   budget: BudgetWithSpending;
   onEdit: () => void;
   onDelete: () => void;
+  deleting: boolean;
 }) {
   const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
@@ -118,7 +120,7 @@ function BudgetCard({
             <Button variant="ghost" size="sm" onClick={onEdit}>
               Edit
             </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete}>
+            <Button variant="ghost" size="sm" onClick={onDelete} disabled={deleting}>
               Delete
             </Button>
           </div>
@@ -300,6 +302,7 @@ export function BudgetList({
   const [form, setForm] = useState<BudgetFormData>(() => emptyBudgetForm(homeCurrency));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const shared = budgets.filter((b) => b.isShared);
   const personal = budgets.filter((b) => !b.isShared);
@@ -378,15 +381,17 @@ export function BudgetList({
   }
 
   async function handleDelete(budget: BudgetWithSpending) {
-    const ok = await confirm({
-      title: "Delete Budget",
-      description: `Are you sure you want to delete "${budget.name}"? This action cannot be undone. Transactions linked to this budget will not be deleted but will no longer be tracked against it.`,
-      confirmText: "Delete",
-      variant: "destructive",
-    });
-    if (!ok) return;
-
+    if (deletingId) return;
+    setDeletingId(budget.id);
     try {
+      const ok = await confirm({
+        title: "Delete Budget",
+        description: `Are you sure you want to delete "${budget.name}"? This action cannot be undone. Transactions linked to this budget will not be deleted but will no longer be tracked against it.`,
+        confirmText: "Delete",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
       const res = await fetch(`/api/budgets/${budget.id}`, {
         method: "DELETE",
       });
@@ -397,6 +402,8 @@ export function BudgetList({
       await toastMutationFailure(toast, res, "Delete budget");
     } catch {
       await toastMutationFailure(toast, null, "Delete budget");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -420,6 +427,7 @@ export function BudgetList({
                 budget={b}
                 onEdit={() => openEdit(b)}
                 onDelete={() => void handleDelete(b)}
+                deleting={deletingId === b.id}
               />
             ))}
           </div>
@@ -438,6 +446,7 @@ export function BudgetList({
                 budget={b}
                 onEdit={() => openEdit(b)}
                 onDelete={() => void handleDelete(b)}
+                deleting={deletingId === b.id}
               />
             ))}
           </div>

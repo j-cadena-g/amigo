@@ -47,12 +47,14 @@ interface RecurringListProps {
 function RecurringRuleCard({
   rule,
   toggling,
+  deleting,
   onToggle,
   onEdit,
   onDelete,
 }: {
   rule: RecurringRule;
   toggling: boolean;
+  deleting: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -116,6 +118,7 @@ function RecurringRuleCard({
             size="icon"
             className="h-11 w-11 sm:h-9 sm:w-9"
             onClick={onDelete}
+            disabled={deleting}
             aria-label={`Delete ${title}`}
           >
             <Trash2 className="h-4 w-4" />
@@ -133,6 +136,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleToggle(rule: RecurringRule) {
     setToggling(rule.id);
@@ -153,15 +157,17 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
   }
 
   async function handleDelete(rule: RecurringRule) {
-    const ok = await confirm({
-      title: "Delete Recurring Transaction",
-      description: `Are you sure you want to delete this recurring ${rule.type}? Future transactions will no longer be generated. Past transactions are not affected.`,
-      confirmText: "Delete",
-      variant: "destructive",
-    });
-    if (!ok) return;
-
+    if (deleting) return;
+    setDeleting(rule.id);
     try {
+      const ok = await confirm({
+        title: "Delete Recurring Transaction",
+        description: `Are you sure you want to delete this recurring ${rule.type}? Future transactions will no longer be generated. Past transactions are not affected.`,
+        confirmText: "Delete",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
       const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "DELETE",
       });
@@ -172,6 +178,8 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
       await toastMutationFailure(toast, res, "Delete recurring rule");
     } catch {
       await toastMutationFailure(toast, null, "Delete recurring rule");
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -199,6 +207,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
               key={rule.id}
               rule={rule}
               toggling={toggling === rule.id}
+              deleting={deleting === rule.id}
               onToggle={() => handleToggle(rule)}
               onEdit={() => setEditingRule(rule)}
               onDelete={() => void handleDelete(rule)}

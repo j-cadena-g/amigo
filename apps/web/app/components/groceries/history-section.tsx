@@ -101,7 +101,7 @@ export function HistorySection({
                     <button
                       type="button"
                       onClick={() => onUpdatePurchaseDate(item.id)}
-                      className="relative shrink-0 rounded p-1 text-xs text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-foreground"
+                      className="relative shrink-0 rounded p-1 text-xs text-muted-foreground before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-accent hover:text-foreground"
                     >
                       Edit date
                     </button>
@@ -110,7 +110,7 @@ export function HistorySection({
                       type="button"
                       onClick={() => onDelete(item.id)}
                       aria-label={`Delete ${item.itemName}`}
-                      className="relative shrink-0 rounded p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-destructive"
+                      className="relative shrink-0 rounded p-1 text-muted-foreground before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-accent hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

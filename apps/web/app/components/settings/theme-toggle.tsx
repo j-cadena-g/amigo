@@ -1,9 +1,13 @@
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme, useIsMounted } from "@/app/components/theme-provider";
+import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
+
+const THEME_VALUES = ["light", "dark", "system"] as const;
 
 export function SettingsThemeToggle() {
   const { theme, setTheme } = useTheme();
   const isMounted = useIsMounted();
+  const getThemeRadioProps = useRovingRadioGroup(THEME_VALUES, theme, setTheme);
 
   if (!isMounted) {
     return (
@@ -33,6 +37,7 @@ export function SettingsThemeToggle() {
           role="radio"
           aria-checked={theme === value}
           onClick={() => setTheme(value)}
+          {...getThemeRadioProps(value)}
           className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
             theme === value
               ? "border-primary bg-primary text-primary-foreground"

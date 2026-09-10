@@ -8,8 +8,11 @@ import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
+import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+
+const TRANSACTION_TYPES = ["expense", "income"] as const;
 
 export interface TransactionFormState {
   amount: string;
@@ -48,6 +51,24 @@ export function AddTransactionForm({
   const budgetFieldId = useId();
   const { categories } = useFinancialCategories();
 
+  const selectType = (type: "income" | "expense") =>
+    onChange((prev) => ({
+      ...prev,
+      type,
+      categoryId: "",
+      budgetId:
+        type === "income"
+          ? null
+          : prev.type === "income"
+            ? lastExpenseBudgetIdRef.current
+            : prev.budgetId,
+    }));
+  const getTypeRadioProps = useRovingRadioGroup(
+    TRANSACTION_TYPES,
+    form.type,
+    selectType,
+  );
+
   useEffect(() => {
     if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
     const ac = new AbortController();
@@ -84,17 +105,8 @@ export function AddTransactionForm({
           type="button"
           role="radio"
           aria-checked={form.type === "expense"}
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "expense",
-              categoryId: "",
-              budgetId:
-                prev.type === "income"
-                  ? lastExpenseBudgetIdRef.current
-                  : prev.budgetId,
-            }))
-          }
+          onClick={() => selectType("expense")}
+          {...getTypeRadioProps("expense")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "expense"
               ? "bg-destructive/10 text-destructive"
@@ -107,14 +119,8 @@ export function AddTransactionForm({
           type="button"
           role="radio"
           aria-checked={form.type === "income"}
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "income",
-              categoryId: "",
-              budgetId: null,
-            }))
-          }
+          onClick={() => selectType("income")}
+          {...getTypeRadioProps("income")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "income"
               ? "bg-success/10 text-success"
@@ -262,6 +268,24 @@ export function EditTransactionForm({
   const budgetFieldId = useId();
   const { categories } = useFinancialCategories();
 
+  const selectType = (type: "income" | "expense") =>
+    onChange((prev) => ({
+      ...prev,
+      type,
+      categoryId: "",
+      budgetId:
+        type === "income"
+          ? null
+          : prev.type === "income"
+            ? lastExpenseBudgetIdRef.current
+            : prev.budgetId,
+    }));
+  const getTypeRadioProps = useRovingRadioGroup(
+    TRANSACTION_TYPES,
+    form.type,
+    selectType,
+  );
+
   return (
     <form onSubmit={onSubmit} className="p-4 space-y-3">
       <div className="flex gap-2" role="radiogroup" aria-label="Transaction type">
@@ -269,17 +293,8 @@ export function EditTransactionForm({
           type="button"
           role="radio"
           aria-checked={form.type === "expense"}
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "expense",
-              categoryId: "",
-              budgetId:
-                prev.type === "income"
-                  ? lastExpenseBudgetIdRef.current
-                  : prev.budgetId,
-            }))
-          }
+          onClick={() => selectType("expense")}
+          {...getTypeRadioProps("expense")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "expense"
               ? "bg-destructive/10 text-destructive"
@@ -292,14 +307,8 @@ export function EditTransactionForm({
           type="button"
           role="radio"
           aria-checked={form.type === "income"}
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "income",
-              categoryId: "",
-              budgetId: null,
-            }))
-          }
+          onClick={() => selectType("income")}
+          {...getTypeRadioProps("income")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "income"
               ? "bg-success/10 text-success"

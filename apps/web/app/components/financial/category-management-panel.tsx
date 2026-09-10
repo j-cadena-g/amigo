@@ -207,7 +207,7 @@ export function CategoryManagementPanel() {
         </div>
       )}
 
-      {feedback ? <p className="text-sm text-destructive" role="status">{feedback}</p> : null}
+      {feedback ? <p className="text-sm text-destructive" role="alert">{feedback}</p> : null}
     </div>
   );
 }

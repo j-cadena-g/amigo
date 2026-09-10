@@ -13,8 +13,11 @@ import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { centsToInputString } from "@/app/lib/decimal-input";
+import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+
+const TRANSACTION_TYPES = ["expense", "income"] as const;
 
 type SchedulePreset =
   | "daily"
@@ -145,6 +148,19 @@ function RecurringForm({
   const budgetFieldId = useId();
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
+  const selectType = (type: "income" | "expense") =>
+    setForm((f) => ({
+      ...f,
+      type,
+      categoryId: "",
+      budgetId: type === "expense" ? f.budgetId : null,
+    }));
+  const getTypeRadioProps = useRovingRadioGroup(
+    TRANSACTION_TYPES,
+    form.type,
+    selectType,
+  );
+
   useEffect(() => {
     setAllowBudgetSuggest(initialBudgetSuggest);
   }, [initialBudgetSuggest]);
@@ -197,7 +213,8 @@ function RecurringForm({
           type="button"
           role="radio"
           aria-checked={form.type === "expense"}
-          onClick={() => setForm((f) => ({ ...f, type: "expense", categoryId: "", budgetId: f.budgetId }))}
+          onClick={() => selectType("expense")}
+          {...getTypeRadioProps("expense")}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
             form.type === "expense"
               ? "bg-destructive/15 text-destructive"
@@ -210,7 +227,8 @@ function RecurringForm({
           type="button"
           role="radio"
           aria-checked={form.type === "income"}
-          onClick={() => setForm((f) => ({ ...f, type: "income", categoryId: "", budgetId: null }))}
+          onClick={() => selectType("income")}
+          {...getTypeRadioProps("income")}
           className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-md transition-colors ${
             form.type === "income"
               ? "bg-success/15 text-success"

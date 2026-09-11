@@ -37,12 +37,9 @@ export function TagInput({
       (t) => t.name.toLowerCase() === search.trim().toLowerCase()
     );
 
-  const options = [
-    ...filteredTags.map((tag) => ({ type: "existing" as const, tag })),
-    ...(canCreate
-      ? [{ type: "create" as const, name: search.trim() }]
-      : []),
-  ];
+  // Only real tags are listbox options; the create-tag controls live
+  // outside the listbox and are not part of highlight navigation.
+  const options = filteredTags;
 
   // Reset highlight when options change
   useEffect(() => {
@@ -88,27 +85,24 @@ export function TagInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!isOpen || options.length === 0) return;
+    if (!isOpen || (options.length === 0 && !canCreate)) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      if (options.length === 0) return;
       setHighlightIndex((prev) =>
         prev < options.length - 1 ? prev + 1 : 0
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      if (options.length === 0) return;
       setHighlightIndex((prev) =>
         prev > 0 ? prev - 1 : options.length - 1
       );
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (highlightIndex >= 0 && highlightIndex < options.length) {
-        const option = options[highlightIndex]!;
-        if (option.type === "existing") {
-          selectExistingTag(option.tag);
-        } else {
-          handleCreate();
-        }
+        selectExistingTag(options[highlightIndex]!);
       } else if (canCreate) {
         handleCreate();
       }
@@ -161,7 +155,7 @@ export function TagInput({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           role="combobox"
-          aria-expanded={isOpen && options.length > 0}
+          aria-expanded={isOpen && (options.length > 0 || canCreate)}
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={
@@ -176,17 +170,18 @@ export function TagInput({
       </div>
 
       {/* Autocomplete dropdown */}
-      {isOpen && options.length > 0 && (
+      {isOpen && (options.length > 0 || canCreate) && (
         <div
           ref={dropdownRef}
-          id={listboxId}
-          role="listbox"
-          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg border border-border bg-popover shadow-lg"
+          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg"
         >
-          <div className="max-h-48 overflow-y-auto p-1">
-            {options.map((option, index) => {
-              if (option.type === "existing") {
-                const tag = option.tag;
+          {options.length > 0 && (
+            <div
+              id={listboxId}
+              role="listbox"
+              className="max-h-48 overflow-y-auto"
+            >
+              {options.map((tag, index) => {
                 const colorKey = (
                   tag.color in tagColors ? tag.color : "gray"
                 ) as TagColorKey;
@@ -214,59 +209,50 @@ export function TagInput({
                     </span>
                   </button>
                 );
-              }
+              })}
+            </div>
+          )}
 
-              // Create option
-              return (
-                <div
-                  key="__create__"
-                  id={`${listboxId}-option-${index}`}
-                  role="option"
-                  aria-selected={highlightIndex === index}
-                  onMouseEnter={() => setHighlightIndex(index)}
-                  className={`rounded-md px-2 py-1.5 ${
-                    highlightIndex === index ? "bg-accent" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={handleCreate}
-                    disabled={isCreating}
-                    className="flex w-full items-center gap-2 text-left text-sm disabled:opacity-50"
-                  >
-                    {isCreating ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                    ) : (
-                      <span className="text-muted-foreground">+</span>
-                    )}
-                    <span>
-                      Create &ldquo;{option.name}&rdquo;
-                    </span>
-                  </button>
-                  <div className="mt-1 flex flex-wrap gap-1 pl-6">
-                    {(Object.keys(swatchColors) as TagColorKey[]).map(
-                      (color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => setNewColor(color)}
-                          aria-label={`Color ${color}`}
-                          aria-pressed={newColor === color}
-                          className={`relative h-4 w-4 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
-                            newColor === color
-                              ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
-                              : ""
-                          }`}
-                        />
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Create-tag controls: outside the listbox, plain buttons */}
+          {canCreate && (
+            <div className="rounded-md px-2 py-1.5 hover:bg-accent">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleCreate}
+                disabled={isCreating}
+                className="flex w-full items-center gap-2 text-left text-sm disabled:opacity-50"
+              >
+                {isCreating ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                ) : (
+                  <span className="text-muted-foreground">+</span>
+                )}
+                <span>
+                  Create &ldquo;{search.trim()}&rdquo;
+                </span>
+              </button>
+              <div className="mt-1 flex flex-wrap gap-1 pl-6">
+                {(Object.keys(swatchColors) as TagColorKey[]).map(
+                  (color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setNewColor(color)}
+                      aria-label={`Color ${color}`}
+                      aria-pressed={newColor === color}
+                      className={`relative h-4 w-4 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
+                        newColor === color
+                          ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                          : ""
+                      }`}
+                    />
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

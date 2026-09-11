@@ -149,12 +149,15 @@ function RecurringForm({
   const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
   const selectType = (type: "income" | "expense") =>
-    setForm((f) => ({
-      ...f,
-      type,
-      categoryId: "",
-      budgetId: type === "expense" ? f.budgetId : null,
-    }));
+    setForm((f) => {
+      if (type === f.type) return f;
+      return {
+        ...f,
+        type,
+        categoryId: "",
+        budgetId: type === "expense" ? f.budgetId : null,
+      };
+    });
   const getTypeRadioProps = useRovingRadioGroup(
     TRANSACTION_TYPES,
     form.type,

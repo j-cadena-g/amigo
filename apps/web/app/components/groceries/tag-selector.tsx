@@ -55,6 +55,7 @@ export function TagSelector({
       if (e.key === "Escape") {
         setIsOpen(false);
         setEditingTag(null);
+        buttonRef.current?.focus();
       }
     }
     if (isOpen) {

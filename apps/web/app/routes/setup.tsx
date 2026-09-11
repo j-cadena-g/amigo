@@ -110,13 +110,15 @@ export default function Setup() {
             type="button"
             variant="link"
             onClick={() => setShowInviteCode((open) => !open)}
+            aria-expanded={showInviteCode}
+            aria-controls="invite-code-form"
             className="h-auto p-0"
           >
             {showInviteCode ? "Hide invite code" : "Have an invite code?"}
           </Button>
 
           {showInviteCode && (
-            <form onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
+            <form id="invite-code-form" onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
               <div>
                 <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
                   Invite code

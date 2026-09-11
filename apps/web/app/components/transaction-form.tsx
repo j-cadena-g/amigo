@@ -52,17 +52,20 @@ export function AddTransactionForm({
   const { categories } = useFinancialCategories();
 
   const selectType = (type: "income" | "expense") =>
-    onChange((prev) => ({
-      ...prev,
-      type,
-      categoryId: "",
-      budgetId:
-        type === "income"
-          ? null
-          : prev.type === "income"
-            ? lastExpenseBudgetIdRef.current
-            : prev.budgetId,
-    }));
+    onChange((prev) => {
+      if (type === prev.type) return prev;
+      return {
+        ...prev,
+        type,
+        categoryId: "",
+        budgetId:
+          type === "income"
+            ? null
+            : prev.type === "income"
+              ? lastExpenseBudgetIdRef.current
+              : prev.budgetId,
+      };
+    });
   const getTypeRadioProps = useRovingRadioGroup(
     TRANSACTION_TYPES,
     form.type,
@@ -269,17 +272,20 @@ export function EditTransactionForm({
   const { categories } = useFinancialCategories();
 
   const selectType = (type: "income" | "expense") =>
-    onChange((prev) => ({
-      ...prev,
-      type,
-      categoryId: "",
-      budgetId:
-        type === "income"
-          ? null
-          : prev.type === "income"
-            ? lastExpenseBudgetIdRef.current
-            : prev.budgetId,
-    }));
+    onChange((prev) => {
+      if (type === prev.type) return prev;
+      return {
+        ...prev,
+        type,
+        categoryId: "",
+        budgetId:
+          type === "income"
+            ? null
+            : prev.type === "income"
+              ? lastExpenseBudgetIdRef.current
+              : prev.budgetId,
+      };
+    });
   const getTypeRadioProps = useRovingRadioGroup(
     TRANSACTION_TYPES,
     form.type,

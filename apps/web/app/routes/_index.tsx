@@ -1,5 +1,11 @@
+import { useEffect, useRef } from "react";
 import { SignIn, useUser } from "@clerk/react-router";
-import { redirect, type LoaderFunctionArgs } from "react-router";
+import { redirect, useRevalidator, type LoaderFunctionArgs } from "react-router";
+import { Button } from "@/app/components/ui/button";
+import {
+  POST_SIGN_IN_CONTINUE_PATH,
+  SIGN_IN_REDIRECT_PROPS,
+} from "@/app/lib/post-sign-in";
 import { getSessionStatus } from "@/app/lib/session.server";
 
 export function loader({ context }: LoaderFunctionArgs) {
@@ -34,36 +40,44 @@ export function meta() {
   return [{ title: "amigo" }];
 }
 
+function SignedInContinue() {
+  const revalidator = useRevalidator();
+  const didRevalidate = useRef(false);
+
+  useEffect(() => {
+    if (didRevalidate.current) {
+      return;
+    }
+    didRevalidate.current = true;
+    void revalidator.revalidate();
+  }, [revalidator]);
+
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-md mx-auto p-6 text-center">
+        <h1 className="font-display text-3xl font-bold tracking-tight">
+          Welcome back
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Taking you to your household…
+        </p>
+        <Button asChild className="mt-6 w-full">
+          <a href={POST_SIGN_IN_CONTINUE_PATH}>Continue</a>
+        </Button>
+      </div>
+    </main>
+  );
+}
+
 export default function Index() {
-  const { isSignedIn, isLoaded, user } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
 
   if (!isLoaded) {
     return <FullPageLoading />;
   }
 
   if (isSignedIn) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-full max-w-md mx-auto p-6 text-center">
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Welcome back
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {user?.primaryEmailAddress?.emailAddress ?? "Your account"} is signed in.
-          </p>
-          <p className="mt-4 text-sm text-muted-foreground">
-            The local server has not attached this Clerk session to an amigo household yet.
-            Continue by setting up a household.
-          </p>
-          <a
-            href="/setup"
-            className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
-            Set up household
-          </a>
-        </div>
-      </main>
-    );
+    return <SignedInContinue />;
   }
 
   return (
@@ -93,7 +107,7 @@ export default function Index() {
 
         {/* Clerk sign-in */}
         <div className="animate-slide-in" style={{ animationDelay: "150ms" }}>
-          <SignIn routing="hash" />
+          <SignIn routing="hash" {...SIGN_IN_REDIRECT_PROPS} />
         </div>
       </div>
     </main>

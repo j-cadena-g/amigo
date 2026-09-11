@@ -185,6 +185,10 @@ export async function clientLoader({
 
 clientLoader.hydrate = true;
 
+export function meta() {
+  return [{ title: "Groceries · amigo" }];
+}
+
 export default function Groceries() {
   const { items, tags, userId, fromOffline } = useLoaderData<typeof loader>();
 
@@ -199,7 +203,7 @@ export default function Groceries() {
             Your household shopping list
           </p>
           {fromOffline && (
-            <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+            <p className="mt-2 text-sm text-warning">
               Showing offline data — changes will sync when you&apos;re back online.
             </p>
           )}

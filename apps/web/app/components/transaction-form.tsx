@@ -1,13 +1,18 @@
 import { useEffect, useId, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
 import { Link } from "react-router";
 import { Plus } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
+import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+
+const TRANSACTION_TYPES = ["expense", "income"] as const;
 
 export interface TransactionFormState {
   amount: string;
@@ -43,7 +48,29 @@ export function AddTransactionForm({
   onSubmit,
 }: AddTransactionFormProps) {
   const categoryFieldId = useId();
+  const budgetFieldId = useId();
   const { categories } = useFinancialCategories();
+
+  const selectType = (type: "income" | "expense") =>
+    onChange((prev) => {
+      if (type === prev.type) return prev;
+      return {
+        ...prev,
+        type,
+        categoryId: "",
+        budgetId:
+          type === "income"
+            ? null
+            : prev.type === "income"
+              ? lastExpenseBudgetIdRef.current
+              : prev.budgetId,
+      };
+    });
+  const getTypeRadioProps = useRovingRadioGroup(
+    TRANSACTION_TYPES,
+    form.type,
+    selectType,
+  );
 
   useEffect(() => {
     if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
@@ -76,23 +103,16 @@ export function AddTransactionForm({
       onSubmit={onSubmit}
       className="rounded-lg border bg-card p-4 space-y-3"
     >
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="radiogroup" aria-label="Transaction type">
         <button
           type="button"
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "expense",
-              categoryId: "",
-              budgetId:
-                prev.type === "income"
-                  ? lastExpenseBudgetIdRef.current
-                  : prev.budgetId,
-            }))
-          }
+          role="radio"
+          aria-checked={form.type === "expense"}
+          onClick={() => selectType("expense")}
+          {...getTypeRadioProps("expense")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "expense"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
+              ? "bg-destructive/10 text-destructive"
               : "bg-secondary text-muted-foreground"
           }`}
         >
@@ -100,17 +120,13 @@ export function AddTransactionForm({
         </button>
         <button
           type="button"
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "income",
-              categoryId: "",
-              budgetId: null,
-            }))
-          }
+          role="radio"
+          aria-checked={form.type === "income"}
+          onClick={() => selectType("income")}
+          {...getTypeRadioProps("income")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "income"
-              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              ? "bg-success/10 text-success"
               : "bg-secondary text-muted-foreground"
           }`}
         >
@@ -119,7 +135,7 @@ export function AddTransactionForm({
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        <input
+        <Input
           type="text"
           inputMode="decimal"
           placeholder="Amount"
@@ -131,7 +147,7 @@ export function AddTransactionForm({
               amount: parseDecimalInput(e.target.value),
             }))
           }
-          className="col-span-2 min-w-0 rounded-md border border-input bg-background px-3 py-2"
+          className="col-span-2 min-w-0"
           required
         />
         <CurrencySelect
@@ -141,7 +157,7 @@ export function AddTransactionForm({
             onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
           }
         />
-        <input
+        <Input
           type="date"
           aria-label="Date"
           value={form.date}
@@ -151,14 +167,14 @@ export function AddTransactionForm({
               date: e.target.value,
             }))
           }
-          className="rounded-md border border-input bg-background px-3 py-2"
           required
         />
       </div>
 
-      <input
+      <Input
         type="text"
         placeholder="Description"
+        aria-label="Description"
         value={form.description}
         onChange={(e) =>
           onChange((prev) => ({
@@ -166,7 +182,6 @@ export function AddTransactionForm({
             description: e.target.value,
           }))
         }
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
       />
 
       <div>
@@ -187,10 +202,11 @@ export function AddTransactionForm({
 
       {form.type === "expense" && (
         <div>
-          <label className="text-sm text-muted-foreground mb-1 block">
+          <label htmlFor={budgetFieldId} className="text-sm text-muted-foreground mb-1 block">
             Budget (optional)
           </label>
           <BudgetSelect
+            id={budgetFieldId}
             value={form.budgetId}
             onChange={(budgetId) => {
               onAllowBudgetSuggestChange(false);
@@ -200,7 +216,7 @@ export function AddTransactionForm({
         </div>
       )}
 
-      {formError && <p className="text-sm text-destructive">{formError}</p>}
+      {formError && <p className="text-sm text-destructive" role="alert">{formError}</p>}
 
       <p className="text-sm text-muted-foreground">
         Need this on a schedule?{" "}
@@ -210,22 +226,23 @@ export function AddTransactionForm({
       </p>
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={onCancel}
-          className="flex-1 rounded-md border border-input px-3 py-2 text-muted-foreground hover:bg-accent"
+          className="flex-1 text-muted-foreground"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={
             isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
           }
-          className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="flex-1"
         >
           {isSubmitting ? "Adding..." : "Add"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -251,27 +268,42 @@ export function EditTransactionForm({
   recordId,
 }: EditTransactionFormProps) {
   const categoryFieldId = useId();
+  const budgetFieldId = useId();
   const { categories } = useFinancialCategories();
+
+  const selectType = (type: "income" | "expense") =>
+    onChange((prev) => {
+      if (type === prev.type) return prev;
+      return {
+        ...prev,
+        type,
+        categoryId: "",
+        budgetId:
+          type === "income"
+            ? null
+            : prev.type === "income"
+              ? lastExpenseBudgetIdRef.current
+              : prev.budgetId,
+      };
+    });
+  const getTypeRadioProps = useRovingRadioGroup(
+    TRANSACTION_TYPES,
+    form.type,
+    selectType,
+  );
 
   return (
     <form onSubmit={onSubmit} className="p-4 space-y-3">
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="radiogroup" aria-label="Transaction type">
         <button
           type="button"
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "expense",
-              categoryId: "",
-              budgetId:
-                prev.type === "income"
-                  ? lastExpenseBudgetIdRef.current
-                  : prev.budgetId,
-            }))
-          }
+          role="radio"
+          aria-checked={form.type === "expense"}
+          onClick={() => selectType("expense")}
+          {...getTypeRadioProps("expense")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "expense"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
+              ? "bg-destructive/10 text-destructive"
               : "bg-secondary text-muted-foreground"
           }`}
         >
@@ -279,17 +311,13 @@ export function EditTransactionForm({
         </button>
         <button
           type="button"
-          onClick={() =>
-            onChange((prev) => ({
-              ...prev,
-              type: "income",
-              categoryId: "",
-              budgetId: null,
-            }))
-          }
+          role="radio"
+          aria-checked={form.type === "income"}
+          onClick={() => selectType("income")}
+          {...getTypeRadioProps("income")}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
             form.type === "income"
-              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              ? "bg-success/10 text-success"
               : "bg-secondary text-muted-foreground"
           }`}
         >
@@ -298,7 +326,7 @@ export function EditTransactionForm({
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        <input
+        <Input
           type="text"
           inputMode="decimal"
           placeholder="Amount"
@@ -310,7 +338,7 @@ export function EditTransactionForm({
               amount: parseDecimalInput(e.target.value),
             }))
           }
-          className="col-span-2 rounded-md border border-input bg-background px-3 py-2"
+          className="col-span-2"
           required
         />
         <CurrencySelect
@@ -319,7 +347,7 @@ export function EditTransactionForm({
             onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
           }
         />
-        <input
+        <Input
           type="date"
           aria-label="Date"
           value={form.date}
@@ -329,14 +357,14 @@ export function EditTransactionForm({
               date: e.target.value,
             }))
           }
-          className="rounded-md border border-input bg-background px-3 py-2"
           required
         />
       </div>
 
-      <input
+      <Input
         type="text"
         placeholder="Description"
+        aria-label="Description"
         value={form.description}
         onChange={(e) =>
           onChange((prev) => ({
@@ -344,7 +372,6 @@ export function EditTransactionForm({
             description: e.target.value,
           }))
         }
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
       />
 
       <div>
@@ -362,10 +389,11 @@ export function EditTransactionForm({
 
       {form.type === "expense" && (
         <div>
-          <label className="text-sm text-muted-foreground mb-1 block">
+          <label htmlFor={budgetFieldId} className="text-sm text-muted-foreground mb-1 block">
             Budget (optional)
           </label>
           <BudgetSelect
+            id={budgetFieldId}
             value={form.budgetId}
             onChange={(budgetId) => onChange((prev) => ({ ...prev, budgetId }))}
           />
@@ -377,22 +405,23 @@ export function EditTransactionForm({
       ) : null}
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={onCancel}
-          className="flex-1 rounded-md border border-input px-3 py-2 text-muted-foreground hover:bg-accent"
+          className="flex-1 text-muted-foreground"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={
             isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
           }
-          className="flex-1 rounded-md bg-primary px-3 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="flex-1"
         >
           {isSubmitting ? "Saving..." : "Save"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -404,13 +433,14 @@ interface AddTransactionButtonProps {
 
 export function AddTransactionButton({ onClick }: AddTransactionButtonProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onClick}
-      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:text-foreground"
+      className="h-auto w-full border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:bg-transparent hover:text-foreground"
     >
       <Plus className="h-5 w-5" />
       Add Transaction
-    </button>
+    </Button>
   );
 }

@@ -153,25 +153,6 @@
   }
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
 @keyframes pulse-soft {
   0%,
   100% {
@@ -218,21 +199,6 @@
 
 .animate-slide-in {
   animation: slide-in-from-bottom 0.5s ease-out both;
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--color-muted) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* ---- Page transition ---- */
@@ -365,29 +331,42 @@
   }
 
   progress.budget-list-progress--ok::-webkit-progress-value {
-    background-color: hsl(142 71% 45%);
+    background-color: var(--color-primary);
   }
 
   progress.budget-list-progress--warn::-webkit-progress-value {
-    background-color: hsl(45 93% 47%);
+    background-color: var(--color-warning);
   }
 
   progress.budget-list-progress--danger::-webkit-progress-value {
-    background-color: hsl(0 84% 60%);
+    background-color: var(--color-destructive);
   }
 
   progress.budget-list-progress--ok::-moz-progress-bar {
-    background-color: hsl(142 71% 45%);
+    background-color: var(--color-primary);
     border-radius: 9999px;
   }
 
   progress.budget-list-progress--warn::-moz-progress-bar {
-    background-color: hsl(45 93% 47%);
+    background-color: var(--color-warning);
     border-radius: 9999px;
   }
 
   progress.budget-list-progress--danger::-moz-progress-bar {
-    background-color: hsl(0 84% 60%);
+    background-color: var(--color-destructive);
     border-radius: 9999px;
+  }
+}
+
+/* ---- Reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

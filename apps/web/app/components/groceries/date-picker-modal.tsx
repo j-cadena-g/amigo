@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
+import { Button } from "@/app/components/ui/button";
 import type { GroceryItemWithTags } from "./types";
 import { toDateInputValue } from "./constants";
 
@@ -63,20 +64,12 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
         </div>
 
         <DialogFooter>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
-          >
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
+          </Button>
+          <Button type="button" onClick={handleConfirm}>
             Confirm
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

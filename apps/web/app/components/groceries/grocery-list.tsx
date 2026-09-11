@@ -8,6 +8,7 @@ import { GroceryItem } from "./grocery-item";
 import { HistorySection } from "./history-section";
 import { DatePickerModal } from "./date-picker-modal";
 import { EmptyState } from "@/app/components/empty-state";
+import { Button } from "@/app/components/ui/button";
 
 interface GroceryListProps {
   items: GroceryItemWithTags[];
@@ -92,15 +93,12 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
             placeholder="Add an item..."
+            aria-label="Add a grocery item"
             className="flex-1 rounded-lg border border-input bg-background px-4 py-2.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <button
-            type="submit"
-            disabled={!newItemName.trim()}
-            className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button type="submit" disabled={!newItemName.trim()}>
             Add
-          </button>
+          </Button>
         </div>
         <div className="mt-2">
           <TagInput
@@ -125,13 +123,15 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
           onEditTag={editTag}
         />
         {filterTagIds.length > 0 && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => filterTagIds.forEach(toggleFilterTag)}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground"
           >
             Clear filters
-          </button>
+          </Button>
         )}
       </div>
 

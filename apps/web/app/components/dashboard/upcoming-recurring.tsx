@@ -47,8 +47,8 @@ export function DashboardUpcomingRecurring({
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold shrink-0",
                     r.type === "income"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                      : "bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400"
+                      ? "bg-success/10 text-success"
+                      : "bg-destructive/10 text-destructive"
                   )}
                 >
                   <CalendarClock className="h-4 w-4" />
@@ -66,7 +66,7 @@ export function DashboardUpcomingRecurring({
                   className={cn(
                     "text-sm font-semibold tabular-nums whitespace-nowrap",
                     r.type === "income"
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-success"
                       : "text-foreground"
                   )}
                 >

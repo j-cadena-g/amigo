@@ -7,19 +7,10 @@ import { formatTransactionDate } from "@/app/lib/format-dates";
 import { getFrequencyLabel } from "@/app/lib/recurring-labels";
 import { cn } from "@/app/lib/utils";
 import { EmptyState } from "@/app/components/empty-state";
+import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Switch } from "@/app/components/ui/switch";
 import { Button } from "@/app/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/app/components/ui/alert-dialog";
 import {
   AddRecurringDialog,
   EditRecurringDialog,
@@ -56,12 +47,14 @@ interface RecurringListProps {
 function RecurringRuleCard({
   rule,
   toggling,
+  deleting,
   onToggle,
   onEdit,
   onDelete,
 }: {
   rule: RecurringRule;
   toggling: boolean;
+  deleting: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -92,8 +85,8 @@ function RecurringRuleCard({
             className={cn(
               "shrink-0 font-medium tabular-nums whitespace-nowrap",
               isIncome
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
+                ? "text-success"
+                : "text-destructive"
             )}
           >
             {amountLabel}
@@ -125,6 +118,7 @@ function RecurringRuleCard({
             size="icon"
             className="h-11 w-11 sm:h-9 sm:w-9"
             onClick={onDelete}
+            disabled={deleting}
             aria-label={`Delete ${title}`}
           >
             <Trash2 className="h-4 w-4" />
@@ -137,12 +131,12 @@ function RecurringRuleCard({
 
 export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
   const revalidator = useRevalidator();
+  const confirm = useConfirm();
   const toast = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [deletingRule, setDeletingRule] = useState<RecurringRule | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleToggle(rule: RecurringRule) {
     setToggling(rule.id);
@@ -162,15 +156,22 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
     }
   }
 
-  async function handleDelete() {
-    if (!deletingRule) return;
-    setDeleting(true);
+  async function handleDelete(rule: RecurringRule) {
+    if (deleting) return;
+    setDeleting(rule.id);
     try {
-      const res = await fetch(`/api/recurring/${deletingRule.id}`, {
+      const ok = await confirm({
+        title: "Delete Recurring Transaction",
+        description: `Are you sure you want to delete this recurring ${rule.type}? Future transactions will no longer be generated. Past transactions are not affected.`,
+        confirmText: "Delete",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
+      const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        setDeletingRule(null);
         revalidator.revalidate();
         return;
       }
@@ -178,20 +179,21 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
     } catch {
       await toastMutationFailure(toast, null, "Delete recurring rule");
     } finally {
-      setDeleting(false);
+      setDeleting(null);
     }
   }
 
   return (
     <div className="space-y-4">
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => setShowAddDialog(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:text-foreground"
+        className="h-auto w-full border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:bg-transparent hover:text-foreground"
       >
         <Plus className="h-5 w-5" />
         Add Recurring Transaction
-      </button>
+      </Button>
 
       {rules.length === 0 ? (
         <EmptyState
@@ -205,9 +207,10 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
               key={rule.id}
               rule={rule}
               toggling={toggling === rule.id}
+              deleting={deleting === rule.id}
               onToggle={() => handleToggle(rule)}
               onEdit={() => setEditingRule(rule)}
-              onDelete={() => setDeletingRule(rule)}
+              onDelete={() => void handleDelete(rule)}
             />
           ))}
         </div>
@@ -226,30 +229,6 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         }}
         rule={editingRule}
       />
-
-      <AlertDialog
-        open={deletingRule !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeletingRule(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Recurring Transaction</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this recurring{" "}
-              {deletingRule?.type}? Future transactions will no longer be
-              generated. Past transactions are not affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

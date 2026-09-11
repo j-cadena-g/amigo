@@ -62,6 +62,10 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Transactions · amigo" }];
+}
+
 export default function Transactions() {
   const {
     transactions: initialTransactions,

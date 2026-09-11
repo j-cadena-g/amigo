@@ -3,7 +3,7 @@ import type { GroceryTag } from "@amigo/db";
 import type { GroceryItemWithTags } from "./types";
 import { TagBadge } from "./tag-badge";
 import { TagSelector } from "./tag-selector";
-import { TrashIcon } from "./icons";
+import { Trash2 } from "lucide-react";
 
 interface GroceryItemProps {
   item: GroceryItemWithTags;
@@ -105,7 +105,7 @@ function GroceryItemComponent({
         onPointerUp={clearLongPressTimer}
         onPointerLeave={clearLongPressTimer}
         onPointerCancel={clearLongPressTimer}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-input hover:border-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-input before:absolute before:-inset-2.5 before:content-[''] hover:border-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label={`Mark ${item.itemName} as purchased`}
       />
 
@@ -154,9 +154,9 @@ function GroceryItemComponent({
         type="button"
         onClick={() => onDelete(item.id)}
         aria-label={`Delete ${item.itemName}`}
-        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+        className="relative shrink-0 rounded p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-destructive"
       >
-        <TrashIcon className="h-4 w-4" />
+        <Trash2 className="h-4 w-4" />
       </button>
     </div>
   );

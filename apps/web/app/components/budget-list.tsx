@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
+import { PiggyBank } from "lucide-react";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
+import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
+import { EmptyState } from "@/app/components/empty-state";
+import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
 import { CategoryBudgetMappingPanel } from "@/app/components/financial/category-budget-mapping-panel";
 import { Button } from "@/app/components/ui/button";
@@ -17,16 +22,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/app/components/ui/alert-dialog";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
@@ -84,10 +79,12 @@ function BudgetCard({
   budget,
   onEdit,
   onDelete,
+  deleting,
 }: {
   budget: BudgetWithSpending;
   onEdit: () => void;
   onDelete: () => void;
+  deleting: boolean;
 }) {
   const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
@@ -105,10 +102,10 @@ function BudgetCard({
                 className={cn(
                   "text-[10px] font-semibold uppercase shrink-0 px-1.5 py-0.5 rounded",
                   budget.alertLevel === "over"
-                    ? "bg-red-500/15 text-red-600"
+                    ? "bg-destructive/15 text-destructive"
                     : budget.alertLevel === "critical"
-                      ? "bg-red-500/10 text-red-600"
-                      : "bg-amber-500/15 text-amber-700"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-warning/15 text-warning"
                 )}
               >
                 {budget.alertLevel === "over"
@@ -123,7 +120,7 @@ function BudgetCard({
             <Button variant="ghost" size="sm" onClick={onEdit}>
               Edit
             </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete}>
+            <Button variant="ghost" size="sm" onClick={onDelete} disabled={deleting}>
               Delete
             </Button>
           </div>
@@ -156,7 +153,7 @@ function BudgetCard({
             aria-label={`${budget.name}: ${clampedPercent}% of budget used`}
           />
           {isOverBudget ? (
-            <p className="text-sm font-medium text-red-500">
+            <p className="text-sm font-medium text-destructive">
               Over budget by{" "}
               {formatCents(Math.abs(budget.remainingHomeCents), budget.homeCurrency)}
             </p>
@@ -194,6 +191,8 @@ function BudgetFormDialog({
   recordId?: string;
   homeCurrency: CurrencyCode;
 }) {
+  const nameId = useId();
+  const limitId = useId();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
@@ -202,8 +201,9 @@ function BudgetFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Name</label>
+            <label htmlFor={nameId} className="text-sm font-medium">Name</label>
             <Input
+              id={nameId}
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Groceries"
@@ -211,8 +211,9 @@ function BudgetFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium">Limit</label>
+              <label htmlFor={limitId} className="text-sm font-medium">Limit</label>
               <Input
+                id={limitId}
                 type="number"
                 step="0.01"
                 min="0"
@@ -270,7 +271,7 @@ function BudgetFormDialog({
             />
           ) : null}
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter>
           <Button
             variant="outline"
@@ -294,13 +295,14 @@ export function BudgetList({
   homeCurrency,
 }: BudgetListProps) {
   const revalidator = useRevalidator();
+  const confirm = useConfirm();
   const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
-  const [deletingBudget, setDeletingBudget] = useState<BudgetWithSpending | null>(null);
   const [form, setForm] = useState<BudgetFormData>(() => emptyBudgetForm(homeCurrency));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const shared = budgets.filter((b) => b.isShared);
   const personal = budgets.filter((b) => !b.isShared);
@@ -314,7 +316,7 @@ export function BudgetList({
   function openEdit(budget: BudgetWithSpending) {
     setForm({
       name: budget.name,
-      limitAmount: (budget.limitAmount / 100).toFixed(2),
+      limitAmount: centsToInputString(budget.limitAmount),
       currency: budget.currency,
       period: budget.period,
       isShared: budget.isShared,
@@ -378,15 +380,22 @@ export function BudgetList({
     }
   }
 
-  async function handleDelete() {
-    if (!deletingBudget) return;
-    setSubmitting(true);
+  async function handleDelete(budget: BudgetWithSpending) {
+    if (deletingId) return;
+    setDeletingId(budget.id);
     try {
-      const res = await fetch(`/api/budgets/${deletingBudget.id}`, {
+      const ok = await confirm({
+        title: "Delete Budget",
+        description: `Are you sure you want to delete "${budget.name}"? This action cannot be undone. Transactions linked to this budget will not be deleted but will no longer be tracked against it.`,
+        confirmText: "Delete",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
+      const res = await fetch(`/api/budgets/${budget.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        setDeletingBudget(null);
         revalidator.revalidate();
         return;
       }
@@ -394,16 +403,17 @@ export function BudgetList({
     } catch {
       await toastMutationFailure(toast, null, "Delete budget");
     } finally {
-      setSubmitting(false);
+      setDeletingId(null);
     }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Budgets</h2>
-        <Button onClick={openAdd}>Add Budget</Button>
-      </div>
+      <FinancialSectionHeader
+        title="Budgets"
+        description="Track spending against category limits."
+        action={<Button onClick={openAdd}>Add Budget</Button>}
+      />
 
       {shared.length > 0 && (
         <div className="space-y-3">
@@ -416,7 +426,8 @@ export function BudgetList({
                 key={b.id}
                 budget={b}
                 onEdit={() => openEdit(b)}
-                onDelete={() => setDeletingBudget(b)}
+                onDelete={() => void handleDelete(b)}
+                deleting={deletingId === b.id}
               />
             ))}
           </div>
@@ -434,7 +445,8 @@ export function BudgetList({
                 key={b.id}
                 budget={b}
                 onEdit={() => openEdit(b)}
-                onDelete={() => setDeletingBudget(b)}
+                onDelete={() => void handleDelete(b)}
+                deleting={deletingId === b.id}
               />
             ))}
           </div>
@@ -442,9 +454,11 @@ export function BudgetList({
       )}
 
       {budgets.length === 0 && (
-        <p className="text-center text-muted-foreground py-8">
-          No budgets yet. Create one to start tracking your spending.
-        </p>
+        <EmptyState
+          icon={PiggyBank}
+          title="No budgets yet"
+          description="Create one to start tracking your spending."
+        />
       )}
 
       <FinancialCollapsiblePanel
@@ -482,31 +496,6 @@ export function BudgetList({
         recordId={editingBudget?.id}
         homeCurrency={homeCurrency}
       />
-
-      {/* Delete confirmation */}
-      <AlertDialog
-        open={deletingBudget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeletingBudget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deletingBudget?.name}&quot;?
-              This action cannot be undone. Transactions linked to this budget
-              will not be deleted but will no longer be tracked against it.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={submitting}>
-              {submitting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

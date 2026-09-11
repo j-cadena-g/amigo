@@ -144,6 +144,7 @@ export function CategoryBudgetMappingPanel() {
 
       {feedback ? (
         <p
+          role="status"
           className={`text-sm ${
             feedback === "Mappings saved." ? "text-muted-foreground" : "text-destructive"
           }`}

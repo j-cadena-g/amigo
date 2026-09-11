@@ -9,6 +9,10 @@ const tabs = [
   { href: "/financial/debts", label: "Debts" },
 ];
 
+export function meta() {
+  return [{ title: "Financial · amigo" }];
+}
+
 export default function FinancialLayout() {
   const location = useLocation();
 

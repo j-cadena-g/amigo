@@ -12,6 +12,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import type { AccountRow } from "@/app/components/account-cards";
 import type { CurrencyCode } from "@amigo/db";
@@ -33,7 +34,7 @@ export function EditAccountDialog({
   const revalidator = useRevalidator();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
-  const [balance, setBalance] = useState((account.balance / 100).toFixed(2));
+  const [balance, setBalance] = useState(centsToInputString(account.balance));
   const [currency, setCurrency] = useState<CurrencyCode>(account.currency as CurrencyCode);
   const [isShared, setIsShared] = useState(account.userId === null);
   const [loading, setLoading] = useState(false);
@@ -229,7 +230,7 @@ export function EditAccountDialog({
 
           <AuditHistoryPanel recordId={account.id} table="financial_accounts" />
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
             <div className="flex flex-wrap gap-2 sm:mr-auto">
               <Button

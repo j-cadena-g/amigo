@@ -16,6 +16,7 @@ import {
 import { DebtCards } from "@/app/components/debt-cards";
 import { AddDebtDialog } from "@/app/components/add-debt-dialog";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
+import { Button } from "@/app/components/ui/button";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -44,6 +45,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
+export function meta() {
+  return [{ title: "Debts · amigo" }];
+}
+
 export default function FinancialDebts() {
   const { debts: debtData, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
@@ -55,13 +60,13 @@ export default function FinancialDebts() {
         title="Debts"
         description="Loans and credit cards."
         action={
-          <button
+          <Button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 transition-all duration-200 active:scale-[0.97]"
+            className="shrink-0"
           >
             Add debt
-          </button>
+          </Button>
         }
       />
       <DebtCards

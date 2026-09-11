@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useUser, useClerk } from "@clerk/react-router";
 import {
@@ -46,6 +46,23 @@ export function NavBar() {
   const location = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // While the mobile menu is open: move focus to the first nav link, and let
+  // Escape close the menu and return focus to the toggle button.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    mobileMenuRef.current?.querySelector<HTMLElement>("a")?.focus();
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen]);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -102,6 +119,7 @@ export function NavBar() {
             variant="ghost"
             size="icon"
             onClick={() => signOut()}
+            aria-label="Sign out"
             className="text-muted-foreground hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
@@ -110,10 +128,13 @@ export function NavBar() {
 
         {/* Mobile toggle */}
         <Button
+          ref={mobileToggleRef}
           variant="ghost"
           size="icon"
           className="md:hidden ml-auto"
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? (
             <X className="h-5 w-5" />
@@ -125,7 +146,10 @@ export function NavBar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pb-4 pt-2 animate-fade-in">
+        <div
+          ref={mobileMenuRef}
+          className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pb-4 pt-2 animate-fade-in"
+        >
           <div className="space-y-1">
             {navLinks.map((link) => {
               const Icon = link.icon;

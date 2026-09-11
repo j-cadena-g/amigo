@@ -31,8 +31,7 @@ export function useToast(): ToastFn {
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
   default: "bg-foreground text-background",
-  success:
-    "bg-green-600 text-white dark:bg-green-500 dark:text-black",
+  success: "bg-success text-success-foreground",
   error: "bg-destructive text-destructive-foreground",
 };
 

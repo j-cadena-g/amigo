@@ -60,7 +60,7 @@ export function DashboardRecentTransactions({
                   className={cn(
                     "text-sm font-semibold tabular-nums whitespace-nowrap",
                     t.type === "income"
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-success"
                       : "text-foreground"
                   )}
                 >

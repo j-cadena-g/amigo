@@ -6,6 +6,7 @@ import { buildTimezoneOptions } from "@/app/lib/timezones";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 
 interface HouseholdSettingsFormProps {
   name: string;
@@ -94,12 +95,11 @@ export function HouseholdSettingsForm({
         <label htmlFor="household-name" className="text-sm font-medium">
           Name
         </label>
-        <input
+        <Input
           id="household-name"
           type="text"
           value={nameValue}
           onChange={(e) => setNameValue(e.target.value)}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           maxLength={80}
           disabled={!canEdit || saving}
           required

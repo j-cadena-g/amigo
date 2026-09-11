@@ -34,12 +34,14 @@ interface BudgetChartsProps {
   currency?: CurrencyCode;
 }
 
-// Palette that complements the blue/teal theme
+// First four entries reference design tokens; the remaining four are
+// categorical chart colors with no semantic token equivalents.
 const CHART_COLORS = [
-  "hsl(215, 65%, 53%)",  // blue (primary)
-  "hsl(174, 50%, 38%)",  // teal green
-  "hsl(37, 91%, 55%)",   // amber
-  "hsl(210, 85%, 52%)",  // blue
+  "var(--color-primary)",
+  "var(--color-success)",
+  "var(--color-warning)",
+  "var(--color-info)",
+  // Categorical chart colors (no design-token equivalents)
   "hsl(280, 60%, 55%)",  // violet
   "hsl(180, 50%, 42%)",  // teal
   "hsl(340, 65%, 52%)",  // rose
@@ -228,13 +230,13 @@ export function BudgetCharts({
                   <Bar
                     dataKey="thisMonth"
                     name={thisMonthName}
-                    fill="hsl(215, 65%, 53%)"
+                    fill="var(--color-primary)"
                     radius={[0, 4, 4, 0]}
                   />
                   <Bar
                     dataKey="lastMonth"
                     name={lastMonthName}
-                    fill="hsl(174, 50%, 38%)"
+                    fill="var(--color-success)"
                     radius={[0, 4, 4, 0]}
                     opacity={0.6}
                   />
@@ -272,7 +274,7 @@ export function BudgetCharts({
                   />
                   <Bar
                     dataKey="amount"
-                    fill="hsl(215, 65%, 53%)"
+                    fill="var(--color-primary)"
                     radius={[0, 4, 4, 0]}
                   />
                 </BarChart>
@@ -285,7 +287,7 @@ export function BudgetCharts({
               <div className="flex items-center gap-1.5">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: "hsl(215, 65%, 53%)" }}
+                  style={{ backgroundColor: "var(--color-primary)" }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {thisMonthName}
@@ -294,7 +296,7 @@ export function BudgetCharts({
               <div className="flex items-center gap-1.5">
                 <span
                   className="h-2.5 w-2.5 rounded-full opacity-60"
-                  style={{ backgroundColor: "hsl(174, 50%, 38%)" }}
+                  style={{ backgroundColor: "var(--color-success)" }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {lastMonthName}

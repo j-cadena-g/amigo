@@ -161,10 +161,11 @@ export function TransactionImportDialog({
           </label>
           {importFeedback && (
             <p
+              role="status"
               className={`text-sm ${
                 importFeedback.startsWith("Import complete") ||
                 importFeedback.startsWith("Dry run OK")
-                  ? "text-green-600 dark:text-green-400"
+                  ? "text-success"
                   : "text-destructive"
               }`}
             >

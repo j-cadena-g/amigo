@@ -101,14 +101,14 @@ export function TransactionRow({
           <div
             className={`shrink-0 rounded-full p-2 ${
               transaction.type === "income"
-                ? "bg-green-500/10"
-                : "bg-red-500/10"
+                ? "bg-success/10"
+                : "bg-destructive/10"
             }`}
           >
             {transaction.type === "income" ? (
-              <ArrowUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <ArrowUp className="h-4 w-4 text-success" />
             ) : (
-              <ArrowDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <ArrowDown className="h-4 w-4 text-destructive" />
             )}
           </div>
           <div className="overflow-hidden">
@@ -124,8 +124,8 @@ export function TransactionRow({
           <span
             className={`font-semibold whitespace-nowrap ${
               transaction.type === "income"
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
+                ? "text-success"
+                : "text-destructive"
             }`}
           >
             {transaction.type === "income" ? "+" : "-"}

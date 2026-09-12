@@ -48,7 +48,7 @@ if (presentListed.length > 0) {
 if (missingRequired.length > 0) {
   console.error(`FAIL: missing or empty required keys: ${missingRequired.join(", ")}`);
   console.error(
-    "hint: set APP_ENV, APP_ORIGIN, CLERK_SECRET_KEY, and CLERK_PUBLISHABLE_KEY in your personal Environment (or export them in the shell). Prefer OP_ENVIRONMENT_ID in apps/web/.op/refs.env + op sign-in; cloud agents — OP_SERVICE_ACCOUNT_TOKEN + OP_ENVIRONMENT_ID.",
+    "hint: set APP_ENV, APP_ORIGIN, CLERK_SECRET_KEY, and CLERK_PUBLISHABLE_KEY in your personal Environment (or export them in the shell). Prefer OP_ENVIRONMENT_ID in apps/web/.op/refs.env + op sign-in; cloud agents — AMIGO_OP_SERVICE_ACCOUNT_TOKEN + AMIGO_OP_ENVIRONMENT_ID.",
   );
   process.exit(1);
 }

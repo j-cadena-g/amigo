@@ -45,3 +45,4 @@ Prefer `pnpm run test:unit` (and `test:integration` when touching Workers/D1/DO)
 - Invite **codes** work locally; outbound invite email does not without operator Email Routing — share the code.
 - `/calendar` redirects to `/dashboard`.
 - Seed groceries/budgets are invisible unless the claim above succeeds (`pnpm run dev:setup` first). After a local D1 wipe, run `pnpm run dev:reset` so claim can run again.
+- Cursor Cloud secrets must be `AMIGO_OP_SERVICE_ACCOUNT_TOKEN` and `AMIGO_OP_ENVIRONMENT_ID` (Cursor names are global across repos). App keys stay in 1Password, not Cursor.

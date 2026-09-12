@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Cursor Cloud Agent secrets use `AMIGO_OP_SERVICE_ACCOUNT_TOKEN` and `AMIGO_OP_ENVIRONMENT_ID` so names stay unique in Cursor's shared secret store; `op` still receives the unprefixed names
 - Unified Budget and Financial navigation/sections ([#63](https://github.com/j-cadena-g/amigo/pull/63))
 - React Router v8 / `createContext` migration and worker↔server load-context fixes ([#73](https://github.com/j-cadena-g/amigo/pull/73), [#74](https://github.com/j-cadena-g/amigo/pull/74))
 - Workspace migrated to **pnpm**; monorepo prep for a future iOS client ([#75](https://github.com/j-cadena-g/amigo/pull/75), [#76](https://github.com/j-cadena-g/amigo/pull/76))

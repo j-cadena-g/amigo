@@ -36,9 +36,9 @@ if [[ "\${1:-}" == "run" && "\${2:-}" == "--environment" ]]; then
   if [[ "\${1:-}" == "--" ]]; then
     shift
   fi
-  exec "\$@"
+  exec "$@"
 fi
-printf 'unexpected: %s\\n' "\$*" >&2
+printf 'unexpected: %s\\n' "$*" >&2
 exit 1
 `,
   );

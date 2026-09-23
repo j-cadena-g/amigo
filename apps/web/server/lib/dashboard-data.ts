@@ -37,6 +37,7 @@ import { getExchangeRateForRecord } from "./exchange-rates";
 import { getBudgetsWithSpending } from "./budget-spending";
 import { monthBoundsInTz, todayInTz, startOfIsoDayInTz, endOfIsoDayInTz, toISODateInTz } from "./dates";
 import { getHouseholdTimezone } from "./household-timezone";
+import { getRecurringOccurrences } from "../api/calendar";
 import type { Env } from "../env";
 
 export interface BudgetWithSpending {
@@ -74,13 +75,15 @@ export interface UpcomingRecurring {
 export interface DashboardCalendarEvent {
   id: string;
   date: string;
-  type: "transaction" | "grocery_purchase";
+  type: "transaction" | "grocery_purchase" | "recurring";
   title: string;
-  color: "green" | "red" | "orange";
+  subtitle?: string;
+  color: "green" | "red" | "orange" | "blue";
   metadata?: {
     amount?: number;
     currency?: string;
     transactionType?: "income" | "expense";
+    frequency?: string;
     itemCount?: number;
   };
 }
@@ -160,6 +163,7 @@ export async function loadDashboardData(
     lastMonthCategoryRows,
     calendarMonthTxns,
     calendarGroceriesPurchasedAt,
+    calendarRecurringRules,
   ] = await Promise.all([
     db
       .select({ total: sql<number>`COALESCE(SUM(${txnHome}), 0)` })
@@ -310,6 +314,17 @@ export async function loadDashboardData(
           lte(groceryItems.purchasedAt, monthEndInstant)
         )
       ),
+    db.query.recurringTransactions.findMany({
+      where: and(
+        scopeToHousehold(
+          recurringTransactions.householdId,
+          session.householdId
+        ),
+        visibleRecurringRulesCondition(session.userId),
+        eq(recurringTransactions.active, true),
+        isNull(recurringTransactions.deletedAt)
+      ),
+    }),
   ]);
 
   const groceryCountsByDate = new Map<string, number>();
@@ -348,6 +363,32 @@ export async function loadDashboardData(
         itemCount: g.count,
       },
     });
+  }
+  const recurringMonthStart = new Date(`${monthStart}T00:00:00Z`);
+  const recurringMonthEnd = new Date(`${monthEnd}T00:00:00Z`);
+  for (const rule of calendarRecurringRules) {
+    calendarEvents.push(
+      ...getRecurringOccurrences(
+        {
+          id: rule.id,
+          category: rule.category,
+          description: rule.description,
+          amount: rule.amount,
+          currency: rule.currency,
+          type: rule.type,
+          frequency: rule.frequency,
+          interval: rule.interval,
+          startDate: rule.startDate,
+          endDate: rule.endDate,
+          nextRunDate: rule.nextRunDate,
+          lastRunDate: rule.lastRunDate,
+          dayOfMonth: rule.dayOfMonth,
+          active: rule.active,
+        },
+        recurringMonthStart,
+        recurringMonthEnd
+      )
+    );
   }
   const calendarMonth = monthStart.slice(0, 7);
   const dashboardYear = Number(monthStart.slice(0, 4));

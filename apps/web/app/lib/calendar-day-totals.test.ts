@@ -83,10 +83,10 @@ describe("transactionTotalsForDay", () => {
 });
 
 describe("calendar day cells", () => {
-  it("does not print the daily net on the date", () => {
+  it("does not print amounts on the date", () => {
     const html = renderToStaticMarkup(
       React.createElement(Calendar, {
-        compact: true,
+        compact: false,
         initialMonth: "2026-09",
         initialEvents: [
           {
@@ -117,7 +117,9 @@ describe("calendar day cells", () => {
       })
     );
 
-    expect(html).not.toContain(formatDayTotal(1550, "CAD", { compact: true }));
+    expect(html).not.toContain(formatDayTotal(1550, "CAD"));
+    expect(html).not.toContain(formatCents(450, "CAD", { compact: true }));
+    expect(html).not.toContain(formatCents(2000, "CAD", { compact: true }));
     expect(html).not.toContain("net ");
   });
 });

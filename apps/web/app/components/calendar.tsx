@@ -297,8 +297,6 @@ export function Calendar({
                 cell.dateStr ? eventsByDate[cell.dateStr] ?? [] : [];
               const isToday = cell.dateStr === todayStr;
               const hasEvents = dayEvents.length > 0;
-              const previewEvents = dayEvents.slice(0, 2);
-              const moreCount = dayEvents.length - 2;
 
               return (
                 <button
@@ -327,34 +325,11 @@ export function Calendar({
                     {cell.day}
                   </span>
 
-                  {hasEvents && !compact && (
-                    <div className="hidden md:flex flex-col gap-0.5 mt-1">
-                      {previewEvents.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className={cn(
-                            "text-[10px] font-medium leading-tight px-1 py-0.5 rounded truncate",
-                            EVENT_BADGE_CLASSES[ev.color]
-                          )}
-                        >
-                          {ev.metadata?.amount != null
-                            ? `${ev.metadata.transactionType === "income" ? "+" : "-"}${formatCents(ev.metadata.amount, (ev.metadata.currency ?? "CAD") as CurrencyCode, { compact: true })}`
-                            : ev.title}
-                        </div>
-                      ))}
-                      {moreCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground px-1">
-                          +{moreCount} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-
                   {hasEvents && (
                     <div
                       className={cn(
                         "flex gap-0.5 flex-wrap",
-                        compact ? "mt-0" : "mt-1 md:hidden"
+                        compact ? "mt-0" : "mt-1"
                       )}
                     >
                       {Array.from(

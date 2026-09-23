@@ -14,6 +14,10 @@ import {
   DialogDescription,
 } from "@/app/components/ui/dialog";
 import { toastMutationFailure } from "@/app/lib/api-error";
+import {
+  formatDayTotal,
+  transactionTotalsForDay,
+} from "@/app/lib/calendar-day-totals";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { useToast } from "@/app/components/toast-provider";
@@ -202,6 +206,7 @@ export function Calendar({
   });
 
   const selectedEvents = selectedDay ? eventsByDate[selectedDay] ?? [] : [];
+  const selectedTotals = transactionTotalsForDay(selectedEvents);
   const weekdayLabels = compact ? WEEKDAYS_COMPACT : WEEKDAYS;
   const cellMinHeight = compact
     ? "min-h-[2.5rem] md:min-h-[2.75rem]"
@@ -440,10 +445,30 @@ export function Calendar({
                 )}
             </DialogTitle>
             <DialogDescription>
-              {selectedEvents.length} event
-              {selectedEvents.length !== 1 ? "s" : ""}
+              {selectedEvents.length === 1
+                ? "1 event"
+                : `${selectedEvents.length} events`}
             </DialogDescription>
           </DialogHeader>
+
+          {selectedTotals.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {selectedTotals.map((total) => (
+                <p key={total.currency} className="text-sm">
+                  <span className="text-muted-foreground">Net </span>
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums",
+                      total.netCents > 0 && "text-success",
+                      total.netCents < 0 && "text-destructive"
+                    )}
+                  >
+                    {formatDayTotal(total.netCents, total.currency)}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {selectedEvents.map((event) => (

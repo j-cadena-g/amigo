@@ -54,6 +54,10 @@ const BANNED: BannedPattern[] = [
     ),
   },
   {
+    reason: "hex colors instead of theme tokens",
+    test: matches(/\b[a-z-]+-\[#[0-9a-fA-F]{3,8}\]/),
+  },
+  {
     reason: "text smaller than 12px",
     test: matches(/\btext-\[(?:[0-9]|1[01])px\]/),
   },
@@ -88,6 +92,8 @@ describe("design guard", () => {
     "card-interactive",
     "active:scale-[0.97]",
     "bg-blue-100 text-blue-700",
+    "bg-[#ffd400] text-[#151515]",
+    "border-[#E2E2DD]",
     "text-[10px]",
   ])("flags %s", (line) => {
     expect(isBanned(line)).toBe(true);
@@ -101,6 +107,7 @@ describe("design guard", () => {
     "animate-spin",
     "bg-(--tag-blue)",
     "bg-tag text-tag-foreground",
+    'content="#ffffff"',
     "text-xs",
   ])("allows %s", (line) => {
     expect(isBanned(line)).toBe(false);

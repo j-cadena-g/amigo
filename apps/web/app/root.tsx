@@ -127,7 +127,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       message = "Page not found";
       details = "This page doesn't exist or has moved.";
     } else if (error.statusText) {
-      details = error.statusText;
+      details = `${error.statusText}. Reload the page to try again.`;
     }
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;

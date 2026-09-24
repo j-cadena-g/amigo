@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import type { CurrencyCode } from "@amigo/db";
 import { formatSignedCents } from "@/app/lib/currency";
-import { cn } from "@/app/lib/utils";
 import { LedgerSection } from "@/app/components/ledger";
 
 interface DashboardNetWorthProps {
@@ -49,12 +48,7 @@ export function DashboardNetWorth({
     <LedgerSection
       title="Net worth"
       aside={
-        <span
-          className={cn(
-            "font-mono text-heading font-medium",
-            netWorthCents < 0 && "text-destructive"
-          )}
-        >
+        <span className="font-mono text-heading font-medium">
           {formatSignedCents(netWorthCents, currency)}
         </span>
       }

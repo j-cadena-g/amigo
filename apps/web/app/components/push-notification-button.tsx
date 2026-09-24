@@ -68,11 +68,9 @@ export function PushNotificationButton() {
 
   if (status === "denied") {
     return (
-      <p
-        className="flex h-10 shrink-0 items-center text-sm text-muted-foreground"
-        title="Allow notifications for this site in your browser settings"
-      >
-        Alerts blocked
+      <p className="max-w-56 shrink-0 text-sm text-muted-foreground">
+        Alerts are blocked. Allow notifications for this site in your browser
+        settings.
       </p>
     );
   }

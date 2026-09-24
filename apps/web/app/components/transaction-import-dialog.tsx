@@ -186,7 +186,9 @@ export function TransactionImportDialog({
               role={importFeedback.tone === "error" ? "alert" : "status"}
               className={cn(
                 "text-sm",
-                importFeedback.tone === "success" ? "text-success" : "text-destructive"
+                importFeedback.tone === "success"
+                  ? "text-muted-foreground"
+                  : "text-destructive"
               )}
             >
               {importFeedback.message}

@@ -77,7 +77,6 @@ type ProgressVariant =
 
 function getProgressVariant(percent: number, remaining: number): ProgressVariant {
   if (remaining < 0 || percent >= 100) return "budget-list-progress--danger";
-  if (percent >= 90) return "budget-list-progress--danger";
   if (percent >= 75) return "budget-list-progress--warn";
   return "budget-list-progress--ok";
 }
@@ -127,7 +126,7 @@ function BudgetRow({
               <span
                 className={cn(
                   "shrink-0 text-xs font-semibold",
-                  budget.alertLevel === "warn" ? "text-warning" : "text-destructive"
+                  budget.alertLevel === "over" ? "text-destructive" : "text-warning"
                 )}
               >
                 {alert}
@@ -150,7 +149,7 @@ function BudgetRow({
           }
         />
         <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
-          <span className={cn("font-mono", PROGRESS_TEXT[variant])}>
+          <span className={cn("font-mono font-medium", PROGRESS_TEXT[variant])}>
             {isOverBudget
               ? `${formatCents(-budget.remainingHomeCents, budget.homeCurrency)} over`
               : `${formatCents(budget.remainingHomeCents, budget.homeCurrency)} left`}
@@ -160,7 +159,7 @@ function BudgetRow({
         {showBudgetCurrency && (
           <p className="mt-1 text-xs text-muted-foreground">
             Limit in budget currency:{" "}
-            <span className="font-mono">
+            <span className="font-mono font-medium">
               {formatCents(budget.limitAmount, budget.currency)}
             </span>
           </p>

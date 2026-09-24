@@ -61,7 +61,7 @@ export function HistorySection({
           onClick={() => setIsExpanded(!isExpanded)}
           aria-expanded={isExpanded}
           aria-controls={listId}
-          className="-ml-1 flex min-h-10 items-center gap-1.5 pr-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+          className="-ml-1 flex min-h-10 items-center gap-1.5 pr-2 text-heading font-semibold"
         >
           {isExpanded ? (
             <ChevronDown className="h-4 w-4" aria-hidden="true" />

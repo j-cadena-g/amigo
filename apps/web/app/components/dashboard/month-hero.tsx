@@ -4,7 +4,6 @@ import type { CurrencyCode } from "@amigo/db";
 import { PriceTag } from "@/app/components/price-tag";
 import { Button } from "@/app/components/ui/button";
 import { formatCents, formatSignedCents } from "@/app/lib/currency";
-import { cn } from "@/app/lib/utils";
 
 interface MonthHeroProps {
   monthName: string;
@@ -52,16 +51,11 @@ export function MonthHero({
             spent so far · {daysLeftLabel(todayStr)}
           </p>
           <p className="text-muted-foreground">
-            <span className="font-mono text-foreground">
+            <span className="font-mono font-medium text-foreground">
               {formatCents(incomeCents, currency)}
             </span>{" "}
             in ·{" "}
-            <span
-              className={cn(
-                "font-mono",
-                netCents < 0 ? "text-destructive" : "text-foreground"
-              )}
-            >
+            <span className="font-mono font-medium text-foreground">
               {formatSignedCents(netCents, currency, { showPlus: true })}
             </span>{" "}
             net ·{" "}

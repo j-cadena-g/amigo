@@ -36,7 +36,7 @@ interface DebtCardsProps {
 type MeterTone = "default" | "warn" | "danger";
 
 function utilizationTone(utilization: number): MeterTone {
-  if (utilization > 70) return "danger";
+  if (utilization > 100) return "danger";
   if (utilization > 30) return "warn";
   return "default";
 }
@@ -198,7 +198,7 @@ function DebtRowLayout({
         </div>
         {meter}
         <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 text-sm text-muted-foreground">
-          <span className="font-mono">{details[0]}</span>
+          <span className="font-mono font-medium">{details[0]}</span>
           <span>{details[1]}</span>
         </div>
       </div>

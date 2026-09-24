@@ -65,7 +65,7 @@ export function OfflineIndicator() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-(--toast-bottom) left-4 z-50 rounded-md bg-warning px-3 py-2 text-sm font-semibold text-warning-foreground shadow-lg"
+      className="fixed bottom-(--toast-bottom) left-4 z-50 rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background shadow-lg"
     >
       {label}
     </div>

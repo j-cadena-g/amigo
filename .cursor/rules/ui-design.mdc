@@ -11,21 +11,21 @@ Ink on paper with one price-tag yellow. Tokens live in `apps/web/app/app.css`; u
 ## Color
 
 - `background`/`card`/`popover`: paper. `foreground`/`primary`: ink. `muted-foreground`: secondary text.
-- `success` = money in, `warning` = near a limit, `destructive` = over a limit or delete.
+- `success` = money in, `warning` = near a limit (including 90%+), `destructive` = over a limit or delete. A negative net or balance stays ink; its "−" sign carries the meaning. Status messages (offline, saved, imported) use foreground or `muted-foreground`.
 - `tag` (yellow) is a fill only, always with `text-tag-foreground`. It appears in three places: the nav wordmark, the dashboard hero price tag, and today's marker. Don't add more.
 - Grocery tag colors: stored names map to `--tag-*` dots via `components/groceries/constants.ts`.
 
 ## Type
 
 - `type-display` (Archivo, condensed, 800): page titles (`text-title-sm md:text-title`), hero figures, the wordmark. Nothing else.
-- Body (Atkinson Hyperlegible Next): 400 and 600. Section headings use `text-heading font-semibold`.
-- Figures: every amount in rows and forms uses `font-mono font-medium` (Atkinson Hyperlegible Mono), as do invite codes and ledger dates.
+- Body (Atkinson Hyperlegible Next): 400 and 600. Section headings use `text-heading font-semibold`; subgroup labels inside a section (Shared/Personal, a date within a list) and popover titles use `text-sm font-semibold text-muted-foreground`.
+- Figures: every amount in rows and forms uses `font-mono font-medium` (Atkinson Hyperlegible Mono). Ledger dates and invite codes use `font-mono` at regular weight.
 - Hero amounts use `PriceTag`, never a bare big number.
 - No uppercase letter-spaced labels, no text below 12px.
 
 ## Shape and motion
 
-- `rounded-md` (6px) for controls, `rounded-xl` (10px) for panels and dialogs. 1px `border-border` rules.
+- `rounded-md` (6px) for buttons, inputs, and selects; `rounded-xl` (10px) for panels and dialogs. Checkboxes, color swatches, and tag dots stay square (`rounded-sm` or smaller). 1px `border-border` rules.
 - Shadows only on dialogs, popovers, menus, and toasts (`shadow-lg`). No blur, gradients, or colored shadows.
 - No load, stagger, hover-lift, press-scale, or pulse animation. Overlays may use `animate-appear`.
 - Icons only on controls (add, edit, delete, nav, disclosure). No icons in tinted tiles, no emoji.
@@ -37,4 +37,4 @@ Ink on paper with one price-tag yellow. Tokens live in `apps/web/app/app.css`; u
 - Empty states say what's missing here and offer the action. Errors say what failed and what to do; never "Something went wrong" alone, never "Oops".
 - "…" (one character) for in-progress labels; U+2212 "−" for negative amounts.
 
-`apps/web/app/design-guard.test.ts` fails the unit suite on the banned patterns above.
+`apps/web/app/design-guard.test.ts` fails the unit suite on the banned patterns above, including palette classes and hex colors in classes.

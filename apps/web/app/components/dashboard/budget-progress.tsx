@@ -34,9 +34,8 @@ export function DashboardBudgetProgress({
                   : 0;
             const pct = Math.min(100, Math.round(ratio));
             const remaining = b.limitHomeCents - b.spentHomeCents;
-            const isOver = remaining < 0;
-            const isCritical = !isOver && ratio >= 90;
-            const isNear = !isOver && !isCritical && ratio >= 75;
+            const isOver = remaining < 0 || ratio >= 100;
+            const isNear = !isOver && ratio >= 75;
             const budgetCur = b.budgetCurrency as CurrencyCode;
             const projectedPct =
               b.limitHomeCents > 0
@@ -49,7 +48,7 @@ export function DashboardBudgetProgress({
               <li key={b.id} className="py-3">
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="truncate font-semibold">{b.name}</span>
-                  <span className="shrink-0 font-mono text-sm text-muted-foreground">
+                  <span className="shrink-0 font-mono text-sm font-medium text-muted-foreground">
                     {formatCents(b.spentHomeCents, currency)} of{" "}
                     {formatCents(b.limitHomeCents, currency)}
                   </span>
@@ -57,7 +56,7 @@ export function DashboardBudgetProgress({
                 <progress
                   className={cn(
                     "budget-progress mt-2",
-                    isOver || isCritical
+                    isOver
                       ? "budget-progress--danger"
                       : isNear
                         ? "budget-progress--warn"
@@ -72,8 +71,8 @@ export function DashboardBudgetProgress({
                 <p className="mt-1.5 flex justify-between gap-4 text-sm">
                   <span
                     className={cn(
-                      "font-mono",
-                      isOver || isCritical
+                      "font-mono font-medium",
+                      isOver
                         ? "text-destructive"
                         : isNear
                           ? "text-warning"
@@ -88,13 +87,16 @@ export function DashboardBudgetProgress({
                 </p>
                 {budgetCur !== currency && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Limit in budget currency: {formatCents(b.limitOriginalCents, budgetCur)}
+                    Limit in budget currency:{" "}
+                    <span className="font-mono font-medium">
+                      {formatCents(b.limitOriginalCents, budgetCur)}
+                    </span>
                   </p>
                 )}
                 {b.recurringImpactHomeCents > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Upcoming recurring (est.):{" "}
-                    <span className="font-mono">
+                    <span className="font-mono font-medium">
                       {formatCents(b.recurringImpactHomeCents, currency)}
                     </span>
                     {projectedPct > 100 && (

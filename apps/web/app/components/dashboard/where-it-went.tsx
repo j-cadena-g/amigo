@@ -81,7 +81,7 @@ export function WhereItWent({
                 {formatCents(row.amount, currency)}
               </span>
               {monthlyComparison && (
-                <span className="hidden w-24 shrink-0 text-right font-mono text-muted-foreground sm:inline">
+                <span className="hidden w-24 shrink-0 text-right font-mono font-medium text-muted-foreground sm:inline">
                   {formatCents(previous, currency)}
                 </span>
               )}

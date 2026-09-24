@@ -69,7 +69,7 @@ export default function AppLayout() {
         <PushPromptProvider>
           <HouseholdRealtimeProvider userId={userId}>
             <HouseholdRealtimeDefaults />
-            <div className="relative min-h-screen overflow-x-hidden bg-background">
+            <div className="relative min-h-screen overflow-x-clip bg-background">
               <NavBar />
               <OfflineIndicator />
               <div className="relative z-10 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">

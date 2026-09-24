@@ -26,15 +26,17 @@ export function DashboardBudgetProgress({
       ) : (
         <ul className="divide-y divide-border">
           {budgets.map((b) => {
-            const pct =
+            const ratio =
               b.limitHomeCents > 0
-                ? Math.min(100, Math.round((b.spentHomeCents / b.limitHomeCents) * 100))
+                ? (b.spentHomeCents / b.limitHomeCents) * 100
                 : b.spentHomeCents > 0
                   ? 100
                   : 0;
+            const pct = Math.min(100, Math.round(ratio));
             const remaining = b.limitHomeCents - b.spentHomeCents;
             const isOver = remaining < 0;
-            const isNear = !isOver && pct >= 75;
+            const isCritical = !isOver && ratio >= 90;
+            const isNear = !isOver && !isCritical && ratio >= 75;
             const budgetCur = b.budgetCurrency as CurrencyCode;
             const projectedPct =
               b.limitHomeCents > 0
@@ -55,7 +57,7 @@ export function DashboardBudgetProgress({
                 <progress
                   className={cn(
                     "budget-progress mt-2",
-                    isOver || pct >= 90
+                    isOver || isCritical
                       ? "budget-progress--danger"
                       : isNear
                         ? "budget-progress--warn"
@@ -71,7 +73,7 @@ export function DashboardBudgetProgress({
                   <span
                     className={cn(
                       "font-mono",
-                      isOver || pct >= 90
+                      isOver || isCritical
                         ? "text-destructive"
                         : isNear
                           ? "text-warning"

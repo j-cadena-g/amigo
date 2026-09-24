@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import {
   Dialog,
@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
+import { cn } from "@/app/lib/utils";
 
 interface TransactionImportDialogProps {
   open: boolean;
@@ -15,15 +16,22 @@ interface TransactionImportDialogProps {
   onImported: () => void;
 }
 
+type ImportFeedback = { tone: "success" | "error"; message: string };
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 export function TransactionImportDialog({
   open,
   onOpenChange,
   onImported,
 }: TransactionImportDialogProps) {
+  const dryRunId = useId();
   const [importText, setImportText] = useState("");
   const [importDryRun, setImportDryRun] = useState(true);
   const [importBusy, setImportBusy] = useState(false);
-  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const [importFeedback, setImportFeedback] = useState<ImportFeedback | null>(null);
   const importCloseTimeoutRef = useRef<number | null>(null);
   const importAbortRef = useRef<AbortController | null>(null);
 
@@ -58,6 +66,8 @@ export function TransactionImportDialog({
     onOpenChange(nextOpen);
   };
 
+  const fail = (message: string) => setImportFeedback({ tone: "error", message });
+
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setImportBusy(true);
@@ -70,16 +80,16 @@ export function TransactionImportDialog({
       try {
         parsed = JSON.parse(importText) as unknown;
       } catch {
-        setImportFeedback("Invalid JSON.");
+        fail("That isn't valid JSON. Check for a missing comma, quote, or bracket.");
         return;
       }
       if (typeof parsed !== "object" || parsed === null || !("rows" in parsed)) {
-        setImportFeedback('JSON must be an object with a "rows" array.');
+        fail('JSON must be an object with a "rows" array.');
         return;
       }
       const rows = (parsed as { rows: unknown }).rows;
       if (!Array.isArray(rows) || rows.length === 0) {
-        setImportFeedback('"rows" must be a non-empty array.');
+        fail('"rows" needs at least one transaction.');
         return;
       }
       const res = await fetch("/api/transactions/import", {
@@ -96,14 +106,21 @@ export function TransactionImportDialog({
         message?: string;
       } | null;
       if (!res.ok) {
-        setImportFeedback(data?.error ?? data?.message ?? `Import failed (${res.status}).`);
+        fail(data?.error ?? data?.message ?? "Couldn't import the transactions. Try again.");
         return;
       }
       if (importDryRun) {
-        setImportFeedback(`Dry run OK — ${data?.count ?? rows.length} row(s) valid.`);
+        const count = data?.count ?? rows.length;
+        setImportFeedback({
+          tone: "success",
+          message: `${plural(count, "row", "rows")} ready. Turn off dry run to import.`,
+        });
         return;
       }
-      setImportFeedback(`Import complete — ${data?.inserted ?? 0} transaction(s) added.`);
+      setImportFeedback({
+        tone: "success",
+        message: `Imported ${plural(data?.inserted ?? 0, "transaction", "transactions")}.`,
+      });
       onImported();
       if (importCloseTimeoutRef.current != null) {
         clearTimeout(importCloseTimeoutRef.current);
@@ -116,7 +133,7 @@ export function TransactionImportDialog({
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
       }
-      setImportFeedback("Import failed — check your connection.");
+      fail("Couldn't import the transactions. Check your connection and try again.");
     } finally {
       if (importAbortRef.current === controller) {
         importAbortRef.current = null;
@@ -124,6 +141,8 @@ export function TransactionImportDialog({
       setImportBusy(false);
     }
   };
+
+  const busyLabel = importDryRun ? "Checking…" : "Importing…";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -140,36 +159,37 @@ export function TransactionImportDialog({
             <code className="text-xs">externalId</code>. Maximum 200 rows per request.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleImportSubmit} className="space-y-3">
+        <form onSubmit={handleImportSubmit} className="space-y-4">
           <textarea
             aria-label="Import transactions JSON"
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             rows={10}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder={`{\n  "rows": [\n    {\n      "date": "2026-01-15",\n      "type": "expense",\n      "category": "Groceries",\n      "amount": 12.34\n    }\n  ]\n}`}
             required
           />
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <div className="flex items-center gap-2">
             <input
+              id={dryRunId}
               type="checkbox"
               checked={importDryRun}
               onChange={(e) => setImportDryRun(e.target.checked)}
-              className="rounded border-input"
+              className="h-4 w-4 shrink-0 accent-primary"
             />
-            Dry run (validate only, no writes)
-          </label>
+            <label htmlFor={dryRunId} className="text-sm font-semibold">
+              Dry run (check the rows without importing)
+            </label>
+          </div>
           {importFeedback && (
             <p
-              role="status"
-              className={`text-sm ${
-                importFeedback.startsWith("Import complete") ||
-                importFeedback.startsWith("Dry run OK")
-                  ? "text-success"
-                  : "text-destructive"
-              }`}
+              role={importFeedback.tone === "error" ? "alert" : "status"}
+              className={cn(
+                "text-sm",
+                importFeedback.tone === "success" ? "text-success" : "text-destructive"
+              )}
             >
-              {importFeedback}
+              {importFeedback.message}
             </p>
           )}
           <DialogFooter>
@@ -177,7 +197,7 @@ export function TransactionImportDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={importBusy || !importText.trim()}>
-              {importBusy ? "Sending…" : importDryRun ? "Validate" : "Import"}
+              {importBusy ? busyLabel : importDryRun ? "Check rows" : "Import transactions"}
             </Button>
           </DialogFooter>
         </form>

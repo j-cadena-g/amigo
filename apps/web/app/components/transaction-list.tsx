@@ -1,20 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useRevalidator, useSearchParams } from "react-router";
-import { Loader2, Download, Upload } from "lucide-react";
-import { EmptyState } from "@/app/components/empty-state";
+import { useRevalidator, useSearchParams } from "react-router";
+import { Download, Loader2, Plus, Upload } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
+import { EmptyState } from "@/app/components/empty-state";
+import { SectionLink } from "@/app/components/ledger";
 import { Button } from "@/app/components/ui/button";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
+import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
+import { formatSignedCents } from "@/app/lib/currency";
 import { centsToInputString } from "@/app/lib/decimal-input";
 import {
-  AddTransactionButton,
+  groupTransactionsByMonth,
+  type MonthTotals,
+} from "@/app/lib/transaction-month-groups";
+import { cn } from "@/app/lib/utils";
+import {
   AddTransactionForm,
   type TransactionFormState,
 } from "@/app/components/transaction-form";
 import { TransactionImportDialog } from "@/app/components/transaction-import-dialog";
+import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
 import { CategoryManagementPanel } from "@/app/components/financial/category-management-panel";
+import { LedgerGroup } from "@/app/components/financial/ledger-group";
 import {
   TransactionRow,
   type TransactionDTO,
@@ -22,12 +31,62 @@ import {
 
 export type { TransactionDTO };
 
+const FILTER_LABELS: Record<"income" | "expense", string> = {
+  income: "income",
+  expense: "expenses",
+};
+
 interface TransactionListProps {
   initialTransactions: TransactionDTO[];
   currentUserId: string;
   typeFilter?: "income" | "expense" | null;
   homeCurrency: CurrencyCode;
   todayStr: string;
+}
+
+function MonthTotalsLine({
+  totals,
+  currency,
+  typeFilter,
+}: {
+  totals: MonthTotals;
+  currency: CurrencyCode;
+  typeFilter?: "income" | "expense" | null;
+}) {
+  const showOut = typeFilter !== "income";
+  const showIn = typeFilter !== "expense";
+
+  return (
+    <p className="text-sm text-muted-foreground sm:text-right">
+      <span className="font-mono">
+        {showOut && (
+          <>
+            <span className="font-medium text-foreground">
+              {formatSignedCents(-totals.outCents, currency)}
+            </span>{" "}
+            out
+          </>
+        )}
+        {showOut && showIn && " · "}
+        {showIn && (
+          <>
+            <span
+              className={cn(
+                "font-medium",
+                totals.inCents > 0 ? "text-success" : "text-foreground"
+              )}
+            >
+              {formatSignedCents(totals.inCents, currency, { showPlus: true })}
+            </span>{" "}
+            in
+          </>
+        )}
+      </span>
+      {totals.hasOtherCurrencies && (
+        <span className="block text-xs">Other currencies not included</span>
+      )}
+    </p>
+  );
 }
 
 export function TransactionList({
@@ -54,6 +113,7 @@ export function TransactionList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const addAmountRef = useRef<HTMLInputElement>(null);
   const lastExpenseBudgetIdRef = useRef<string | null>(null);
   const lastEditExpenseBudgetIdRef = useRef<string | null>(null);
 
@@ -121,6 +181,10 @@ export function TransactionList({
   }, [editingId, editForm.type, editForm.budgetId]);
 
   const handleOpenAddForm = () => {
+    if (showAddForm) {
+      addAmountRef.current?.focus();
+      return;
+    }
     lastExpenseBudgetIdRef.current = null;
     setAllowBudgetSuggest(true);
     setNewTransaction((prev) => ({
@@ -178,15 +242,13 @@ export function TransactionList({
         setFormError(null);
         revalidator.revalidate();
       } else {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        console.error("Failed to add transaction:", res.status, err);
-        setFormError(
-          (err as { error?: string }).error ?? "Something went wrong. Please try again."
-        );
+        const message = await readApiErrorMessage(res);
+        console.error("Failed to add transaction:", res.status, message);
+        setFormError(message ?? "Couldn't add the transaction. Try again.");
       }
     } catch (err) {
       console.error("Transaction request failed:", err);
-      setFormError("Network error — could not reach the server.");
+      setFormError("Couldn't add the transaction. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -195,7 +257,7 @@ export function TransactionList({
   const handleDelete = async (id: string) => {
     const ok = await confirm({
       title: "Delete transaction?",
-      description: "This cannot be undone.",
+      description: "This can't be undone.",
       confirmText: "Delete",
       variant: "destructive",
     });
@@ -206,15 +268,12 @@ export function TransactionList({
         method: "DELETE",
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        toast(body?.error ?? "Failed to delete transaction", { variant: "error" });
+        await toastMutationFailure(toast, res, "Delete transaction");
         return;
       }
       revalidator.revalidate();
     } catch {
-      toast("Failed to delete transaction — check your connection", {
-        variant: "error",
-      });
+      await toastMutationFailure(toast, null, "Delete transaction");
     }
   };
 
@@ -240,7 +299,9 @@ export function TransactionList({
     try {
       const res = await fetch("/api/transactions/export");
       if (!res.ok) {
-        setExportError(`Export failed (${res.status}). Try again or check your connection.`);
+        setExportError(
+          (await readApiErrorMessage(res)) ?? "Couldn't export transactions. Try again."
+        );
         return;
       }
       const blob = await res.blob();
@@ -251,7 +312,7 @@ export function TransactionList({
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setExportError("Export failed — could not reach the server.");
+      setExportError("Couldn't export transactions. Check your connection and try again.");
     }
   };
 
@@ -277,62 +338,55 @@ export function TransactionList({
         handleCancelEdit();
         revalidator.revalidate();
       } else {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        toast(body?.error ?? "Failed to save changes", { variant: "error" });
+        await toastMutationFailure(toast, res, "Save transaction");
       }
     } catch {
-      toast("Failed to save changes — check your connection", { variant: "error" });
+      await toastMutationFailure(toast, null, "Save transaction");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <FinancialCollapsiblePanel
-        title="Manage categories"
-        description="Add, archive, and organize income and expense categories."
-      >
-        <CategoryManagementPanel />
-      </FinancialCollapsiblePanel>
+  const groups = groupTransactionsByMonth(allTransactions, { homeCurrency, hasMore });
 
-      {typeFilter && (
-        <div className="flex items-center justify-between rounded-lg bg-secondary/50 px-4 py-2">
-          <span className="text-sm text-muted-foreground">
-            Showing: <span className="font-medium text-foreground capitalize">{typeFilter}</span>
-          </span>
-          <Link to="/financial" className="text-sm font-medium text-primary hover:text-primary/80">
-            Clear filter
-          </Link>
-        </div>
+  return (
+    <div className="space-y-6">
+      <FinancialSectionHeader
+        title="Transactions"
+        action={
+          <>
+            <Button type="button" onClick={handleOpenAddForm}>
+              <Plus />
+              Add transaction
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleExportCsv()}
+            >
+              <Download />
+              Export CSV
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload />
+              Import JSON
+            </Button>
+          </>
+        }
+      />
+      {exportError && (
+        <p className="text-sm text-destructive" role="alert">
+          {exportError}
+        </p>
       )}
 
-      <div className="flex flex-col items-end gap-2">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => void handleExportCsv()}>
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setImportOpen(true)}
-          >
-            <Upload className="h-4 w-4" />
-            Import JSON
-          </Button>
-        </div>
-        {exportError && <p className="text-sm text-destructive" role="alert">{exportError}</p>}
-      </div>
-
-      <TransactionImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={() => revalidator.revalidate()}
-      />
-
-      {showAddForm ? (
+      {showAddForm && (
         <AddTransactionForm
           form={newTransaction}
           isSubmitting={isSubmitting}
@@ -346,48 +400,95 @@ export function TransactionList({
             setFormError(null);
           }}
           onSubmit={handleAddTransaction}
+          amountRef={addAmountRef}
         />
-      ) : (
-        <AddTransactionButton onClick={handleOpenAddForm} />
+      )}
+
+      <FinancialCollapsiblePanel title="Manage categories">
+        <CategoryManagementPanel />
+      </FinancialCollapsiblePanel>
+
+      {typeFilter && (
+        <p className="text-sm text-muted-foreground">
+          Showing {FILTER_LABELS[typeFilter]} only ·{" "}
+          <SectionLink to="/financial">Clear filter</SectionLink>
+        </p>
       )}
 
       {allTransactions.length === 0 ? (
-        <EmptyState message="No transactions yet. Add one above or import a file." />
+        <EmptyState
+          message={
+            typeFilter
+              ? `No ${typeFilter} transactions yet.`
+              : "No transactions yet. Add one, or import a JSON file."
+          }
+          action={
+            <Button type="button" onClick={handleOpenAddForm}>
+              <Plus />
+              Add transaction
+            </Button>
+          }
+        />
       ) : (
-        <div className="divide-y divide-border rounded-lg border bg-card">
-          {allTransactions.map((transaction) => (
-            <div key={transaction.id}>
-              <TransactionRow
-                transaction={transaction}
-                todayStr={todayStr}
-                expanded={expandedId === transaction.id}
-                isEditing={editingId === transaction.id}
-                isSubmitting={isSubmitting}
-                homeCurrency={homeCurrency}
-                lastEditExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
-                onToggleExpand={() =>
-                  setExpandedId(expandedId === transaction.id ? null : transaction.id)
-                }
-                onStartEdit={() => handleStartEdit(transaction)}
-                onCancelEdit={handleCancelEdit}
-                onSaveEdit={handleSaveEdit}
-                onDelete={() => void handleDelete(transaction.id)}
-                editForm={editForm}
-                onEditFormChange={setEditForm}
-              />
-            </div>
+        <div className="space-y-8">
+          {groups.map((group) => (
+            <LedgerGroup
+              key={group.month}
+              title={group.label}
+              aside={
+                group.totals ? (
+                  <MonthTotalsLine
+                    totals={group.totals}
+                    currency={homeCurrency}
+                    typeFilter={typeFilter}
+                  />
+                ) : undefined
+              }
+            >
+              <ul className="divide-y divide-border">
+                {group.transactions.map((transaction) => (
+                  <TransactionRow
+                    key={transaction.id}
+                    transaction={transaction}
+                    homeCurrency={homeCurrency}
+                    expanded={expandedId === transaction.id}
+                    isEditing={editingId === transaction.id}
+                    isSubmitting={isSubmitting}
+                    lastEditExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
+                    onToggleExpand={() =>
+                      setExpandedId(expandedId === transaction.id ? null : transaction.id)
+                    }
+                    onStartEdit={() => handleStartEdit(transaction)}
+                    onCancelEdit={handleCancelEdit}
+                    onSaveEdit={handleSaveEdit}
+                    onDelete={() => void handleDelete(transaction.id)}
+                    editForm={editForm}
+                    onEditFormChange={setEditForm}
+                  />
+                ))}
+              </ul>
+            </LedgerGroup>
           ))}
         </div>
       )}
 
       <div ref={sentinelRef} className="flex justify-center py-4">
         {isLoadingMore && (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <>
+            <Loader2 aria-hidden className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading more transactions…</span>
+          </>
         )}
         {!hasMore && allTransactions.length > 0 && (
-          <p className="text-sm text-muted-foreground">No more transactions</p>
+          <p className="text-sm text-muted-foreground">{"That's everything."}</p>
         )}
       </div>
+
+      <TransactionImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => revalidator.revalidate()}
+      />
     </div>
   );
 }

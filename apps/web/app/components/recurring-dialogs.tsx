@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
@@ -12,12 +14,17 @@ import { CurrencySelect } from "@/app/components/currency-select";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
+import { DeleteButton, NativeSelect } from "@/app/components/financial/form-controls";
+import { TypeToggle } from "@/app/components/type-toggle";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString } from "@/app/lib/decimal-input";
-import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
-const TRANSACTION_TYPES = ["expense", "income"] as const;
+const TRANSACTION_TYPE_OPTIONS = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+] as const;
 
 type SchedulePreset =
   | "daily"
@@ -29,6 +36,12 @@ type SchedulePreset =
   | "monthly-same"
   | "yearly"
   | "custom";
+
+const INTERVAL_UNITS: Record<RecurringFormData["customFrequency"], string> = {
+  DAILY: "days",
+  WEEKLY: "weeks",
+  MONTHLY: "months",
+};
 
 interface RecurringFormData {
   type: "income" | "expense";
@@ -83,6 +96,10 @@ function emptyForm(currency: CurrencyCode): RecurringFormData {
   };
 }
 
+function canSubmit(form: RecurringFormData): boolean {
+  return Boolean(form.amount && form.categoryId && form.startDate);
+}
+
 function presetToSchedule(preset: SchedulePreset, form: RecurringFormData) {
   switch (preset) {
     case "daily":
@@ -116,20 +133,14 @@ function presetToSchedule(preset: SchedulePreset, form: RecurringFormData) {
   }
 }
 
-function RecurringForm({
+function RecurringFields({
   form,
   setForm,
-  onSubmit,
-  submitting,
-  submitLabel,
   initialBudgetSuggest = true,
   budgetSuggestScopeRef,
 }: {
   form: RecurringFormData;
   setForm: React.Dispatch<React.SetStateAction<RecurringFormData>>;
-  onSubmit: () => void;
-  submitting: boolean;
-  submitLabel: string;
   /** When false, category changes won't overwrite an existing budget until the user picks a category. */
   initialBudgetSuggest?: boolean;
   /** When set, budget suggestions are ignored after this ref's value changes (e.g. edit dialog rule switch). */
@@ -139,14 +150,17 @@ function RecurringForm({
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
   const budgetSuggestRequestSeq = useRef(0);
   const amountId = useId();
+  const currencyId = useId();
   const categoryFieldId = useId();
   const descriptionId = useId();
+  const scheduleId = useId();
+  const frequencyId = useId();
   const intervalId = useId();
+  const intervalUnitId = useId();
   const dayOfMonthId = useId();
   const startDateId = useId();
   const endDateId = useId();
   const budgetFieldId = useId();
-  const canSubmit = form.amount && form.categoryId && form.startDate && !submitting;
 
   const selectType = (type: "income" | "expense") =>
     setForm((f) => {
@@ -158,11 +172,6 @@ function RecurringForm({
         budgetId: type === "expense" ? f.budgetId : null,
       };
     });
-  const getTypeRadioProps = useRovingRadioGroup(
-    TRANSACTION_TYPES,
-    form.type,
-    selectType,
-  );
 
   useEffect(() => {
     setAllowBudgetSuggest(initialBudgetSuggest);
@@ -209,43 +218,19 @@ function RecurringForm({
   }, [form.categoryId, form.type, allowBudgetSuggest, setForm, budgetSuggestScopeRef]);
 
   return (
-    <div className="space-y-4">
-      {/* Type toggle */}
-      <div className="flex rounded-md border" role="radiogroup" aria-label="Transaction type">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "expense"}
-          onClick={() => selectType("expense")}
-          {...getTypeRadioProps("expense")}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
-            form.type === "expense"
-              ? "bg-destructive/15 text-destructive"
-              : "hover:bg-muted"
-          }`}
-        >
-          Expense
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "income"}
-          onClick={() => selectType("income")}
-          {...getTypeRadioProps("income")}
-          className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-md transition-colors ${
-            form.type === "income"
-              ? "bg-success/15 text-success"
-              : "hover:bg-muted"
-          }`}
-        >
-          Income
-        </button>
-      </div>
+    <>
+      <TypeToggle
+        label="Transaction type"
+        options={TRANSACTION_TYPE_OPTIONS}
+        value={form.type}
+        onChange={selectType}
+      />
 
-      {/* Amount + Currency */}
-      <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-2">
-        <div className="min-w-0">
-          <label htmlFor={amountId} className="text-sm font-medium">Amount</label>
+      <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor={amountId} className="text-sm font-semibold">
+            Amount
+          </label>
           <Input
             id={amountId}
             type="number"
@@ -254,11 +239,15 @@ function RecurringForm({
             value={form.amount}
             onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
             placeholder="0.00"
+            className="font-mono font-medium"
           />
         </div>
-        <div>
-          <label className="text-sm font-medium">Currency</label>
+        <div className="space-y-1.5">
+          <label htmlFor={currencyId} className="text-sm font-semibold">
+            Currency
+          </label>
           <CurrencySelect
+            id={currencyId}
             compact
             value={form.currency}
             onChange={(v) => setForm((f) => ({ ...f, currency: v }))}
@@ -266,9 +255,10 @@ function RecurringForm({
         </div>
       </div>
 
-      {/* Category + Description */}
-      <div>
-        <label htmlFor={categoryFieldId} className="text-sm font-medium">Category</label>
+      <div className="space-y-1.5">
+        <label htmlFor={categoryFieldId} className="text-sm font-semibold">
+          Category
+        </label>
         <CategorySelect
           id={categoryFieldId}
           value={form.categoryId}
@@ -280,25 +270,25 @@ function RecurringForm({
           categories={categories}
         />
       </div>
-      <div>
-        <label htmlFor={descriptionId} className="text-sm font-medium">Description</label>
+      <div className="space-y-1.5">
+        <label htmlFor={descriptionId} className="text-sm font-semibold">
+          Description (optional)
+        </label>
         <Input
           id={descriptionId}
           value={form.description}
           onChange={(e) =>
             setForm((f) => ({ ...f, description: e.target.value }))
           }
-          placeholder="Optional description"
         />
       </div>
 
-      {/* Schedule preset */}
-      <div>
-        <label htmlFor="recurring-schedule" className="text-sm font-medium">
+      <div className="space-y-1.5">
+        <label htmlFor={scheduleId} className="text-sm font-semibold">
           Schedule
         </label>
-        <select
-          id="recurring-schedule"
+        <NativeSelect
+          id={scheduleId}
           value={form.schedulePreset}
           onChange={(e) =>
             setForm((f) => ({
@@ -306,32 +296,27 @@ function RecurringForm({
               schedulePreset: e.target.value as SchedulePreset,
             }))
           }
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
         >
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
-          <option value="biweekly">Biweekly</option>
-          <option value="monthly-1">Monthly (1st)</option>
-          <option value="monthly-15">Monthly (15th)</option>
-          <option value="monthly-last">Monthly (last day)</option>
-          <option value="monthly-same">Monthly (same day as start)</option>
+          <option value="biweekly">Every 2 weeks</option>
+          <option value="monthly-1">Monthly on the 1st</option>
+          <option value="monthly-15">Monthly on the 15th</option>
+          <option value="monthly-last">Monthly on the last day</option>
+          <option value="monthly-same">Monthly, same day as the start date</option>
           <option value="yearly">Yearly</option>
           <option value="custom">Custom</option>
-        </select>
+        </NativeSelect>
       </div>
 
-      {/* Custom schedule fields */}
       {form.schedulePreset === "custom" && (
-        <div className="space-y-3 rounded-md border p-3">
-          <div>
-            <label
-              htmlFor="recurring-custom-frequency"
-              className="text-sm font-medium"
-            >
+        <div className="space-y-3 rounded-xl border border-border p-3">
+          <div className="space-y-1.5">
+            <label htmlFor={frequencyId} className="text-sm font-semibold">
               Frequency
             </label>
-            <select
-              id="recurring-custom-frequency"
+            <NativeSelect
+              id={frequencyId}
               value={form.customFrequency}
               onChange={(e) =>
                 setForm((f) => ({
@@ -339,28 +324,38 @@ function RecurringForm({
                   customFrequency: e.target.value as "DAILY" | "WEEKLY" | "MONTHLY",
                 }))
               }
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
             >
               <option value="DAILY">Daily</option>
               <option value="WEEKLY">Weekly</option>
               <option value="MONTHLY">Monthly</option>
-            </select>
+            </NativeSelect>
           </div>
-          <div>
-            <label htmlFor={intervalId} className="text-sm font-medium">Every N intervals</label>
-            <Input
-              id={intervalId}
-              type="number"
-              min="1"
-              value={form.customInterval}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, customInterval: e.target.value }))
-              }
-            />
+          <div className="space-y-1.5">
+            <label htmlFor={intervalId} className="text-sm font-semibold">
+              Repeat every
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                id={intervalId}
+                type="number"
+                min="1"
+                value={form.customInterval}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, customInterval: e.target.value }))
+                }
+                aria-describedby={intervalUnitId}
+                className="w-24"
+              />
+              <span id={intervalUnitId} className="text-sm text-muted-foreground">
+                {INTERVAL_UNITS[form.customFrequency]}
+              </span>
+            </div>
           </div>
           {form.customFrequency === "MONTHLY" && (
-            <div>
-              <label htmlFor={dayOfMonthId} className="text-sm font-medium">Day of month</label>
+            <div className="space-y-1.5">
+              <label htmlFor={dayOfMonthId} className="text-sm font-semibold">
+                Day of month
+              </label>
               <Input
                 id={dayOfMonthId}
                 type="number"
@@ -376,10 +371,11 @@ function RecurringForm({
         </div>
       )}
 
-      {/* Dates */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor={startDateId} className="text-sm font-medium">Start date</label>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label htmlFor={startDateId} className="text-sm font-semibold">
+            Start date
+          </label>
           <Input
             id={startDateId}
             type="date"
@@ -389,8 +385,10 @@ function RecurringForm({
             }
           />
         </div>
-        <div>
-          <label htmlFor={endDateId} className="text-sm font-medium">End date (optional)</label>
+        <div className="space-y-1.5">
+          <label htmlFor={endDateId} className="text-sm font-semibold">
+            End date (optional)
+          </label>
           <Input
             id={endDateId}
             type="date"
@@ -402,10 +400,11 @@ function RecurringForm({
         </div>
       </div>
 
-      {/* Budget (expenses only) */}
       {form.type === "expense" && (
-        <div>
-          <label htmlFor={budgetFieldId} className="text-sm font-medium">Budget</label>
+        <div className="space-y-1.5">
+          <label htmlFor={budgetFieldId} className="text-sm font-semibold">
+            Budget (optional)
+          </label>
           <BudgetSelect
             id={budgetFieldId}
             value={form.budgetId}
@@ -417,12 +416,27 @@ function RecurringForm({
           />
         </div>
       )}
-
-      <Button onClick={onSubmit} disabled={!canSubmit} className="w-full">
-        {submitting ? "Saving..." : submitLabel}
-      </Button>
-    </div>
+    </>
   );
+}
+
+function requestBody(form: RecurringFormData) {
+  const schedule = presetToSchedule(form.schedulePreset, form);
+  return {
+    type: form.type,
+    // API expects dollars; server applies toCents() (same contract as transactions).
+    amount: parseFloat(form.amount),
+    currency: form.currency,
+    categoryId: form.categoryId,
+    description: form.description || null,
+    frequency: schedule.frequency,
+    interval: schedule.interval,
+    dayOfMonth: schedule.dayOfMonth,
+    dayOfWeek: schedule.dayOfWeek,
+    startDate: form.startDate,
+    endDate: form.endDate || null,
+    budgetId: form.type === "expense" ? form.budgetId : null,
+  };
 }
 
 // ── Add Dialog ──────────────────────────────────────────────────────────────
@@ -443,72 +457,75 @@ export function AddRecurringDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      setForm(emptyForm(defaultCurrency));
+      setError(null);
+    }
+    onOpenChange(next);
+  }
+
   async function handleSubmit() {
     setSubmitting(true);
     setError(null);
     try {
-      const schedule = presetToSchedule(form.schedulePreset, form);
       const res = await fetch("/api/recurring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: form.type,
-          // API expects dollars; server applies toCents() (same contract as transactions).
-          amount: parseFloat(form.amount),
-          currency: form.currency,
-          categoryId: form.categoryId,
-          description: form.description || null,
-          frequency: schedule.frequency,
-          interval: schedule.interval,
-          dayOfMonth: schedule.dayOfMonth,
-          dayOfWeek: schedule.dayOfWeek,
-          startDate: form.startDate,
-          endDate: form.endDate || null,
-          budgetId: form.type === "expense" ? form.budgetId : null,
-        }),
+        body: JSON.stringify(requestBody(form)),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? "Failed to add recurring transaction");
+        setError(
+          (await readApiErrorMessage(res)) ??
+            "Couldn't add the recurring transaction. Try again."
+        );
+        return;
       }
       setForm(emptyForm(defaultCurrency));
       onOpenChange(false);
       revalidator.revalidate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(
+        "Couldn't add the recurring transaction. Check your connection and try again."
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog
-      key={defaultCurrency}
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) {
-          setForm(emptyForm(defaultCurrency));
-          setError(null);
-        }
-        onOpenChange(v);
-      }}
-    >
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+    <Dialog key={defaultCurrency} open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Add Recurring Transaction</DialogTitle>
+          <DialogTitle>Add recurring transaction</DialogTitle>
         </DialogHeader>
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-        <RecurringForm
-          form={form}
-          setForm={setForm}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          submitLabel="Add"
-        />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <RecurringFields form={form} setForm={setForm} />
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting || !canSubmit(form)}>
+              {submitting ? "Adding…" : "Add recurring"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -520,6 +537,8 @@ interface EditRecurringDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rule: RecurringRule | null;
+  onDelete: () => void;
+  deleting: boolean;
 }
 
 function ruleToPreset(rule: RecurringRule): SchedulePreset {
@@ -558,6 +577,8 @@ export function EditRecurringDialog({
   open,
   onOpenChange,
   rule,
+  onDelete,
+  deleting,
 }: EditRecurringDialogProps) {
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() =>
@@ -572,45 +593,38 @@ export function EditRecurringDialog({
   // Sync form state when the rule changes
   if (rule && initialized !== rule.id) {
     setForm(ruleToForm(rule));
+    setError(null);
     setInitialized(rule.id);
   }
   if (!rule && initialized !== null) {
     setInitialized(null);
   }
 
+  const busy = submitting || deleting;
+
   async function handleSubmit() {
     if (!rule) return;
     setSubmitting(true);
     setError(null);
     try {
-      const schedule = presetToSchedule(form.schedulePreset, form);
       const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: form.type,
-          // API expects dollars; server applies toCents() (same contract as transactions).
-          amount: parseFloat(form.amount),
-          currency: form.currency,
-          categoryId: form.categoryId,
-          description: form.description || null,
-          frequency: schedule.frequency,
-          interval: schedule.interval,
-          dayOfMonth: schedule.dayOfMonth,
-          dayOfWeek: schedule.dayOfWeek,
-          startDate: form.startDate,
-          endDate: form.endDate || null,
-          budgetId: form.type === "expense" ? form.budgetId : null,
-        }),
+        body: JSON.stringify(requestBody(form)),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? "Failed to update recurring transaction");
+        setError(
+          (await readApiErrorMessage(res)) ??
+            "Couldn't save the recurring transaction. Try again."
+        );
+        return;
       }
       onOpenChange(false);
       revalidator.revalidate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(
+        "Couldn't save the recurring transaction. Check your connection and try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -618,31 +632,53 @@ export function EditRecurringDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Edit Recurring Transaction</DialogTitle>
+          <DialogTitle>Edit recurring transaction</DialogTitle>
         </DialogHeader>
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-        <RecurringForm
-          key={rule?.id ?? "none"}
-          form={form}
-          setForm={setForm}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          submitLabel="Save Changes"
-          initialBudgetSuggest={false}
-          budgetSuggestScopeRef={budgetSuggestScopeRef}
-        />
-        {rule ? (
-          <AuditHistoryPanel
-            recordId={rule.id}
-            table="recurring_transactions"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <RecurringFields
+            key={rule?.id ?? "none"}
+            form={form}
+            setForm={setForm}
+            initialBudgetSuggest={false}
+            budgetSuggestScopeRef={budgetSuggestScopeRef}
           />
-        ) : null}
+          {rule ? (
+            <AuditHistoryPanel
+              recordId={rule.id}
+              table="recurring_transactions"
+            />
+          ) : null}
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <DeleteButton onClick={onDelete} disabled={busy} className="sm:mr-auto">
+              <Trash2 />
+              {deleting ? "Deleting…" : "Delete"}
+            </DeleteButton>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !canSubmit(form)}>
+              {submitting ? "Saving…" : "Save recurring"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

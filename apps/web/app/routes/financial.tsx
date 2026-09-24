@@ -10,41 +10,49 @@ const tabs = [
 ];
 
 export function meta() {
-  return [{ title: "Financial · amigo" }];
+  return [{ title: "Money · amigo" }];
 }
 
 export default function FinancialLayout() {
   const location = useLocation();
 
   return (
-    <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <h1 className="type-display mb-6 text-title-sm md:text-title">Financial</h1>
+    <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+      <h1 className="type-display mb-6 text-title-sm md:text-title">Money</h1>
 
-      <div className="flex gap-1 mb-6 overflow-x-auto scrollbar-none">
-        {tabs.map((tab) => {
-          const active =
-            "exact" in tab && tab.exact
-              ? location.pathname === tab.href
-              : location.pathname.startsWith(tab.href);
-          return (
-            <Link
-              key={tab.href}
-              to={tab.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-              )}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
+      {/* The padding keeps focus outlines inside the scroll container's clip. */}
+      <nav
+        aria-label="Money"
+        className="-mx-1 mb-5 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div className="flex w-max min-w-full gap-6 border-b border-border">
+          {tabs.map((tab) => {
+            const active =
+              "exact" in tab && tab.exact
+                ? location.pathname === tab.href
+                : location.pathname.startsWith(tab.href);
+            return (
+              <Link
+                key={tab.href}
+                to={tab.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative shrink-0 whitespace-nowrap py-2.5 text-sm font-semibold transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5",
+                  active
+                    ? "text-foreground after:bg-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div className="max-w-3xl">
+        <Outlet />
       </div>
-
-      <Outlet />
     </main>
   );
 }

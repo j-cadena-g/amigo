@@ -1,19 +1,24 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
+import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { CurrencySelect } from "@/app/components/currency-select";
+import {
+  DeleteButton,
+  NativeSelect,
+  SharedCheckbox,
+} from "@/app/components/financial/form-controls";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString } from "@/app/lib/decimal-input";
-import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import type { AccountRow } from "@/app/components/account-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { getAccountTypeSelectOptions } from "@/app/lib/financial-account-types";
@@ -32,6 +37,10 @@ export function EditAccountDialog({
 }: EditAccountDialogProps) {
   const confirm = useConfirm();
   const revalidator = useRevalidator();
+  const nameId = useId();
+  const typeId = useId();
+  const balanceId = useId();
+  const currencyId = useId();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
   const [balance, setBalance] = useState(centsToInputString(account.balance));
@@ -49,7 +58,7 @@ export function EditAccountDialog({
     if (trimmed === "") return 0;
     const parsed = parseFloat(trimmed);
     if (!Number.isFinite(parsed)) {
-      setError("Enter a valid balance.");
+      setError("Enter the balance as a number, like 1250.00.");
       return null;
     }
     return parsed;
@@ -75,13 +84,13 @@ export function EditAccountDialog({
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to update account");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't save the account. Try again.");
+        return;
       }
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("Couldn't save the account. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -90,15 +99,15 @@ export function EditAccountDialog({
   async function handleArchiveToggle() {
     const nextArchived = !isArchived;
     const ok = await confirm({
-      title: nextArchived ? "Archive account" : "Restore account",
+      title: nextArchived ? "Archive account?" : "Restore account?",
       description: nextArchived
-        ? "Archive this account? It will disappear from lists but stay available for history and can be restored later."
-        : "Restore this account to your active holdings list?",
+        ? "It leaves your lists but stays in history. You can restore it later."
+        : "It goes back to your active accounts.",
       confirmText: nextArchived ? "Archive" : "Restore",
-      variant: nextArchived ? "destructive" : "default",
     });
     if (!ok) return;
 
+    const verb = nextArchived ? "archive" : "restore";
     setArchiving(true);
     setError(null);
     try {
@@ -108,13 +117,13 @@ export function EditAccountDialog({
         body: JSON.stringify({ archived: nextArchived }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to update archive status");
+        setError((await readApiErrorMessage(res)) ?? `Couldn't ${verb} the account. Try again.`);
+        return;
       }
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(`Couldn't ${verb} the account. Check your connection and try again.`);
     } finally {
       setArchiving(false);
     }
@@ -122,9 +131,9 @@ export function EditAccountDialog({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: "Delete account",
+      title: "Delete account?",
       description:
-        "Remove this account? Linked transaction references are kept but the account will no longer appear in lists.",
+        "Linked transactions keep their reference, but the account won't appear in lists anymore.",
       confirmText: "Delete",
       variant: "destructive",
     });
@@ -134,147 +143,118 @@ export function EditAccountDialog({
     try {
       const res = await fetch(`/api/accounts/${account.id}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to delete account");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't delete the account. Try again.");
+        return;
       }
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("Couldn't delete the account. Check your connection and try again.");
     } finally {
       setDeleting(false);
     }
   }
 
   const busy = deleting || loading || archiving;
+  const archiveLabel = archiving
+    ? isArchived
+      ? "Restoring…"
+      : "Archiving…"
+    : isArchived
+      ? "Restore"
+      : "Archive";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Edit account</DialogTitle>
-          <DialogDescription>
-            Update balance, type, or sharing for this account.
-            {isArchived ? " This account is archived." : ""}
-          </DialogDescription>
+          <DialogTitle>{isArchived ? "Edit archived account" : "Edit account"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="edit-acct-name">
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold" htmlFor={nameId}>
               Name
             </label>
             <Input
-              id="edit-acct-name"
+              id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="edit-acct-type">
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold" htmlFor={typeId}>
               Type
             </label>
-            <select
-              id="edit-acct-type"
+            <NativeSelect
+              id={typeId}
               value={type}
               onChange={(e) => setType(e.target.value as typeof type)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {typeOptions.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="edit-acct-bal">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold" htmlFor={balanceId}>
                 Balance
               </label>
               <Input
-                id="edit-acct-bal"
+                id={balanceId}
                 type="number"
                 step="0.01"
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
+                className="font-mono font-medium"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="edit-acct-cur">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold" htmlFor={currencyId}>
                 Currency
               </label>
-              <select
-                id="edit-acct-cur"
+              <CurrencySelect
+                id={currencyId}
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {SUPPORTED_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setCurrency(v as CurrencyCode)}
+              />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isShared}
-              onChange={(e) => setIsShared(e.target.checked)}
-              className="rounded border-input"
-            />
-            Shared (household-wide)
-          </label>
+          <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
           <AuditHistoryPanel recordId={account.id} table="financial_accounts" />
 
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-            <div className="flex flex-wrap gap-2 sm:mr-auto">
+          <DialogFooter>
+            <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
+              <DeleteButton disabled={busy} onClick={() => void handleDelete()}>
+                <Trash2 />
+                {deleting ? "Deleting…" : "Delete"}
+              </DeleteButton>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 disabled={busy}
                 onClick={() => void handleArchiveToggle()}
               >
-                {isArchived ? (
-                  <ArchiveRestore className="mr-1 inline h-4 w-4" />
-                ) : (
-                  <Archive className="mr-1 inline h-4 w-4" />
-                )}
-                {archiving
-                  ? isArchived
-                    ? "Restoring…"
-                    : "Archiving…"
-                  : isArchived
-                    ? "Restore"
-                    : "Archive"}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={busy}
-                onClick={() => void handleDelete()}
-              >
-                <Trash2 className="mr-1 inline h-4 w-4" />
-                {deleting ? "Deleting…" : "Delete"}
+                {isArchived ? <ArchiveRestore /> : <Archive />}
+                {archiveLabel}
               </Button>
             </div>
-            <div className="flex w-full justify-end gap-2 sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={busy}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy || !name.trim()}>
-                {loading ? "Saving…" : "Save"}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !name.trim()}>
+              {loading ? "Saving…" : "Save account"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

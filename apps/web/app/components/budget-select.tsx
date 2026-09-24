@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { formatCents } from "@/app/lib/currency";
+import { NativeSelect } from "@/app/components/financial/form-controls";
 import type { CurrencyCode } from "@amigo/db";
 
 interface Budget {
@@ -37,12 +38,11 @@ export function BudgetSelect({
   const personal = budgets.filter((b) => !b.isShared);
 
   return (
-    <select
+    <NativeSelect
       id={id}
       aria-label={ariaLabel}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
-      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
     >
       <option value="">No budget</option>
       {shared.length > 0 && (
@@ -63,6 +63,6 @@ export function BudgetSelect({
           ))}
         </optgroup>
       )}
-    </select>
+    </NativeSelect>
   );
 }

@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Button } from "@/app/components/ui/button";
-import { formatCents } from "@/app/lib/currency";
 import { Pencil } from "lucide-react";
-import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
 import type { CurrencyCode } from "@amigo/db";
+import { formatSignedCents } from "@/app/lib/currency";
+import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
+import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
 
 export interface Asset {
   id: string;
@@ -20,59 +19,44 @@ export interface Asset {
 
 interface AssetCardsProps {
   assets: Asset[];
+  homeCurrency: CurrencyCode;
   session: { userId: string; role: string };
 }
 
-export function AssetCards({ assets, session: _session }: AssetCardsProps) {
+const TYPE_ORDER: Asset["type"][] = ["BANK", "INVESTMENT", "CASH", "PROPERTY"];
+
+function byTypeOrder(a: Asset, b: Asset): number {
+  return TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type);
+}
+
+function assetTypeLabel(type: Asset["type"]): string {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
+
+export function AssetCards({ assets, homeCurrency, session: _session }: AssetCardsProps) {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
-  const shared = assets.filter((a) => a.isShared);
-  const personal = assets.filter((a) => !a.isShared);
+  const shared = assets.filter((a) => a.isShared).sort(byTypeOrder);
+  const personal = assets.filter((a) => !a.isShared).sort(byTypeOrder);
 
-  const typeOrder: Asset["type"][] = ["BANK", "INVESTMENT", "CASH", "PROPERTY"];
-
-  function renderAssetGroup(items: Asset[]) {
-    const grouped = items.reduce<Record<string, Asset[]>>((acc, asset) => {
-      const key = asset.type;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(asset);
-      return acc;
-    }, {});
-
-    return typeOrder.map((type) => {
-      const group = grouped[type];
-      if (!group || group.length === 0) return null;
-      return (
-        <div key={type}>
-          <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-            {assetTypeLabel(type)} ({group.length})
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} onEdit={() => setEditingAsset(asset)} />
-            ))}
-          </div>
-        </div>
-      );
-    });
-  }
+  const renderRows = (items: Asset[]) =>
+    items.map((asset) => (
+      <AssetRow
+        key={asset.id}
+        asset={asset}
+        homeCurrency={homeCurrency}
+        onEdit={() => setEditingAsset(asset)}
+      />
+    ));
 
   return (
     <>
-      <div className="space-y-6">
-        {shared.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground">Shared</h2>
-            {renderAssetGroup(shared)}
-          </div>
-        )}
-        {personal.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground">Personal</h2>
-            {renderAssetGroup(personal)}
-          </div>
-        )}
-      </div>
+      {shared.length > 0 && (
+        <LedgerSubgroup title="Shared">{renderRows(shared)}</LedgerSubgroup>
+      )}
+      {personal.length > 0 && (
+        <LedgerSubgroup title="Personal">{renderRows(personal)}</LedgerSubgroup>
+      )}
 
       {editingAsset && (
         <EditAssetDialog
@@ -87,34 +71,41 @@ export function AssetCards({ assets, session: _session }: AssetCardsProps) {
   );
 }
 
-function assetTypeLabel(type: Asset["type"]): string {
-  return type.charAt(0) + type.slice(1).toLowerCase();
-}
+function AssetRow({
+  asset,
+  homeCurrency,
+  onEdit,
+}: {
+  asset: Asset;
+  homeCurrency: CurrencyCode;
+  onEdit: () => void;
+}) {
+  const meta = [
+    assetTypeLabel(asset.type),
+    asset.isShared ? "Shared" : "Personal",
+    asset.currency !== homeCurrency ? asset.currency : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-function AssetCard({ asset, onEdit }: { asset: Asset; onEdit: () => void }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-base">{asset.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {assetTypeLabel(asset.type)}
-              {asset.isShared ? " · Shared" : ""}
-            </p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Button>
+    <li className="flex items-center gap-2 py-2.5">
+      <div className="flex min-w-0 flex-1 items-baseline gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{asset.name}</p>
+          <p className="truncate text-sm text-muted-foreground">{meta}</p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold tabular-nums">
-          {formatCents(asset.balance, asset.currency)}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">{asset.currency}</p>
-      </CardContent>
-    </Card>
+        <span className="shrink-0 font-mono font-medium">
+          {formatSignedCents(asset.balance, asset.currency)}
+        </span>
+      </div>
+      <RowIconButton
+        className="-mr-2"
+        onClick={onEdit}
+        aria-label={`Edit asset ${asset.name}`}
+      >
+        <Pencil />
+      </RowIconButton>
+    </li>
   );
 }

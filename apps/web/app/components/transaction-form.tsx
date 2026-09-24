@@ -1,18 +1,28 @@
-import { useEffect, useId, type Dispatch, type FormEvent, type MutableRefObject, type SetStateAction } from "react";
-import { Link } from "react-router";
-import { Plus } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  type Dispatch,
+  type FormEvent,
+  type MutableRefObject,
+  type Ref,
+  type SetStateAction,
+} from "react";
+import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { CurrencySelect } from "@/app/components/currency-select";
-import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
-import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
-import type { CurrencyCode } from "@amigo/db";
+import { SectionLink } from "@/app/components/ledger";
+import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
 
-const TRANSACTION_TYPES = ["expense", "income"] as const;
+const TRANSACTION_TYPE_OPTIONS = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+] as const;
 
 export interface TransactionFormState {
   amount: string;
@@ -24,29 +34,27 @@ export interface TransactionFormState {
   currency: CurrencyCode;
 }
 
-interface AddTransactionFormProps {
+interface TransactionFieldsProps {
   form: TransactionFormState;
-  isSubmitting: boolean;
-  formError: string | null;
-  allowBudgetSuggest: boolean;
   lastExpenseBudgetIdRef: MutableRefObject<string | null>;
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
-  onAllowBudgetSuggestChange: (allow: boolean) => void;
-  onCancel: () => void;
-  onSubmit: (e: FormEvent) => void;
+  onCategoryChange: (categoryId: string) => void;
+  onBudgetChange: (budgetId: string | null) => void;
+  amountRef?: Ref<HTMLInputElement>;
 }
 
-export function AddTransactionForm({
+function TransactionFields({
   form,
-  isSubmitting,
-  formError,
-  allowBudgetSuggest,
   lastExpenseBudgetIdRef,
   onChange,
-  onAllowBudgetSuggestChange,
-  onCancel,
-  onSubmit,
-}: AddTransactionFormProps) {
+  onCategoryChange,
+  onBudgetChange,
+  amountRef,
+}: TransactionFieldsProps) {
+  const amountId = useId();
+  const currencyId = useId();
+  const dateId = useId();
+  const descriptionId = useId();
   const categoryFieldId = useId();
   const budgetFieldId = useId();
   const { categories } = useFinancialCategories();
@@ -66,12 +74,165 @@ export function AddTransactionForm({
               : prev.budgetId,
       };
     });
-  const getTypeRadioProps = useRovingRadioGroup(
-    TRANSACTION_TYPES,
-    form.type,
-    selectType,
-  );
 
+  return (
+    <>
+      <TypeToggle
+        label="Transaction type"
+        options={TRANSACTION_TYPE_OPTIONS}
+        value={form.type}
+        onChange={selectType}
+      />
+
+      <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3 sm:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,11rem)]">
+        <div className="space-y-1.5">
+          <label htmlFor={amountId} className="text-sm font-semibold">
+            Amount
+          </label>
+          <Input
+            id={amountId}
+            ref={amountRef}
+            autoFocus
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={form.amount}
+            onChange={(e) =>
+              onChange((prev) => ({
+                ...prev,
+                amount: parseDecimalInput(e.target.value),
+              }))
+            }
+            className="font-mono font-medium"
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={currencyId} className="text-sm font-semibold">
+            Currency
+          </label>
+          <CurrencySelect
+            id={currencyId}
+            compact
+            value={form.currency}
+            onChange={(v) =>
+              onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
+            }
+          />
+        </div>
+        <div className="col-span-2 space-y-1.5 sm:col-span-1">
+          <label htmlFor={dateId} className="text-sm font-semibold">
+            Date
+          </label>
+          <Input
+            id={dateId}
+            type="date"
+            value={form.date}
+            onChange={(e) =>
+              onChange((prev) => ({
+                ...prev,
+                date: e.target.value,
+              }))
+            }
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor={descriptionId} className="text-sm font-semibold">
+          Description (optional)
+        </label>
+        <Input
+          id={descriptionId}
+          type="text"
+          value={form.description}
+          onChange={(e) =>
+            onChange((prev) => ({
+              ...prev,
+              description: e.target.value,
+            }))
+          }
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label htmlFor={categoryFieldId} className="text-sm font-semibold">
+            Category
+          </label>
+          <CategorySelect
+            id={categoryFieldId}
+            value={form.categoryId}
+            onChange={onCategoryChange}
+            type={form.type}
+            categories={categories}
+          />
+        </div>
+
+        {form.type === "expense" && (
+          <div className="space-y-1.5">
+            <label htmlFor={budgetFieldId} className="text-sm font-semibold">
+              Budget (optional)
+            </label>
+            <BudgetSelect
+              id={budgetFieldId}
+              value={form.budgetId}
+              onChange={onBudgetChange}
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function FormActions({
+  onCancel,
+  submitDisabled,
+  submitLabel,
+}: {
+  onCancel: () => void;
+  submitDisabled: boolean;
+  submitLabel: string;
+}) {
+  return (
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" disabled={submitDisabled}>
+        {submitLabel}
+      </Button>
+    </div>
+  );
+}
+
+interface AddTransactionFormProps {
+  form: TransactionFormState;
+  isSubmitting: boolean;
+  formError: string | null;
+  allowBudgetSuggest: boolean;
+  lastExpenseBudgetIdRef: MutableRefObject<string | null>;
+  onChange: Dispatch<SetStateAction<TransactionFormState>>;
+  onAllowBudgetSuggestChange: (allow: boolean) => void;
+  onCancel: () => void;
+  onSubmit: (e: FormEvent) => void;
+  amountRef?: Ref<HTMLInputElement>;
+}
+
+export function AddTransactionForm({
+  form,
+  isSubmitting,
+  formError,
+  allowBudgetSuggest,
+  lastExpenseBudgetIdRef,
+  onChange,
+  onAllowBudgetSuggestChange,
+  onCancel,
+  onSubmit,
+  amountRef,
+}: AddTransactionFormProps) {
   useEffect(() => {
     if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
     const ac = new AbortController();
@@ -99,151 +260,40 @@ export function AddTransactionForm({
   }, [form.categoryId, form.type, allowBudgetSuggest, onChange]);
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-lg border bg-card p-4 space-y-3"
-    >
-      <div className="flex gap-2" role="radiogroup" aria-label="Transaction type">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "expense"}
-          onClick={() => selectType("expense")}
-          {...getTypeRadioProps("expense")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-            form.type === "expense"
-              ? "bg-destructive/10 text-destructive"
-              : "bg-secondary text-muted-foreground"
-          }`}
-        >
-          Expense
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "income"}
-          onClick={() => selectType("income")}
-          {...getTypeRadioProps("income")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-            form.type === "income"
-              ? "bg-success/10 text-success"
-              : "bg-secondary text-muted-foreground"
-          }`}
-        >
-          Income
-        </button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <Input
-          type="text"
-          inputMode="decimal"
-          placeholder="Amount"
-          aria-label="Amount"
-          value={form.amount}
-          onChange={(e) =>
-            onChange((prev) => ({
-              ...prev,
-              amount: parseDecimalInput(e.target.value),
-            }))
-          }
-          className="col-span-2 min-w-0"
-          required
-        />
-        <CurrencySelect
-          compact
-          value={form.currency}
-          onChange={(v) =>
-            onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
-          }
-        />
-        <Input
-          type="date"
-          aria-label="Date"
-          value={form.date}
-          onChange={(e) =>
-            onChange((prev) => ({
-              ...prev,
-              date: e.target.value,
-            }))
-          }
-          required
-        />
-      </div>
-
-      <Input
-        type="text"
-        placeholder="Description"
-        aria-label="Description"
-        value={form.description}
-        onChange={(e) =>
-          onChange((prev) => ({
-            ...prev,
-            description: e.target.value,
-          }))
-        }
+    <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border p-4">
+      <TransactionFields
+        form={form}
+        lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
+        onChange={onChange}
+        onCategoryChange={(categoryId) => {
+          onAllowBudgetSuggestChange(true);
+          onChange((prev) => ({ ...prev, categoryId }));
+        }}
+        onBudgetChange={(budgetId) => {
+          onAllowBudgetSuggestChange(false);
+          onChange((prev) => ({ ...prev, budgetId }));
+        }}
+        amountRef={amountRef}
       />
 
-      <div>
-        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
-          Category
-        </label>
-        <CategorySelect
-          id={categoryFieldId}
-          value={form.categoryId}
-          onChange={(categoryId) => {
-            onAllowBudgetSuggestChange(true);
-            onChange((prev) => ({ ...prev, categoryId }));
-          }}
-          type={form.type}
-          categories={categories}
-        />
-      </div>
-
-      {form.type === "expense" && (
-        <div>
-          <label htmlFor={budgetFieldId} className="text-sm text-muted-foreground mb-1 block">
-            Budget (optional)
-          </label>
-          <BudgetSelect
-            id={budgetFieldId}
-            value={form.budgetId}
-            onChange={(budgetId) => {
-              onAllowBudgetSuggestChange(false);
-              onChange((prev) => ({ ...prev, budgetId }));
-            }}
-          />
-        </div>
+      {formError && (
+        <p className="text-sm text-destructive" role="alert">
+          {formError}
+        </p>
       )}
-
-      {formError && <p className="text-sm text-destructive" role="alert">{formError}</p>}
 
       <p className="text-sm text-muted-foreground">
         Need this on a schedule?{" "}
-        <Link to="/financial/recurring" className="font-medium text-primary hover:underline">
-          Set up a recurring transaction
-        </Link>
+        <SectionLink to="/financial/recurring">Set up a recurring transaction</SectionLink>
       </p>
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          className="flex-1 text-muted-foreground"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={
-            isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
-          }
-          className="flex-1"
-        >
-          {isSubmitting ? "Adding..." : "Add"}
-        </Button>
-      </div>
+      <FormActions
+        onCancel={onCancel}
+        submitDisabled={
+          isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+        }
+        submitLabel={isSubmitting ? "Adding…" : "Add transaction"}
+      />
     </form>
   );
 }
@@ -267,180 +317,27 @@ export function EditTransactionForm({
   onSubmit,
   recordId,
 }: EditTransactionFormProps) {
-  const categoryFieldId = useId();
-  const budgetFieldId = useId();
-  const { categories } = useFinancialCategories();
-
-  const selectType = (type: "income" | "expense") =>
-    onChange((prev) => {
-      if (type === prev.type) return prev;
-      return {
-        ...prev,
-        type,
-        categoryId: "",
-        budgetId:
-          type === "income"
-            ? null
-            : prev.type === "income"
-              ? lastExpenseBudgetIdRef.current
-              : prev.budgetId,
-      };
-    });
-  const getTypeRadioProps = useRovingRadioGroup(
-    TRANSACTION_TYPES,
-    form.type,
-    selectType,
-  );
-
   return (
-    <form onSubmit={onSubmit} className="p-4 space-y-3">
-      <div className="flex gap-2" role="radiogroup" aria-label="Transaction type">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "expense"}
-          onClick={() => selectType("expense")}
-          {...getTypeRadioProps("expense")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-            form.type === "expense"
-              ? "bg-destructive/10 text-destructive"
-              : "bg-secondary text-muted-foreground"
-          }`}
-        >
-          Expense
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={form.type === "income"}
-          onClick={() => selectType("income")}
-          {...getTypeRadioProps("income")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-            form.type === "income"
-              ? "bg-success/10 text-success"
-              : "bg-secondary text-muted-foreground"
-          }`}
-        >
-          Income
-        </button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <Input
-          type="text"
-          inputMode="decimal"
-          placeholder="Amount"
-          aria-label="Amount"
-          value={form.amount}
-          onChange={(e) =>
-            onChange((prev) => ({
-              ...prev,
-              amount: parseDecimalInput(e.target.value),
-            }))
-          }
-          className="col-span-2"
-          required
-        />
-        <CurrencySelect
-          value={form.currency}
-          onChange={(v) =>
-            onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
-          }
-        />
-        <Input
-          type="date"
-          aria-label="Date"
-          value={form.date}
-          onChange={(e) =>
-            onChange((prev) => ({
-              ...prev,
-              date: e.target.value,
-            }))
-          }
-          required
-        />
-      </div>
-
-      <Input
-        type="text"
-        placeholder="Description"
-        aria-label="Description"
-        value={form.description}
-        onChange={(e) =>
-          onChange((prev) => ({
-            ...prev,
-            description: e.target.value,
-          }))
-        }
+    <form onSubmit={onSubmit} className="my-3 space-y-4 rounded-xl border border-border p-4">
+      <TransactionFields
+        form={form}
+        lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
+        onChange={onChange}
+        onCategoryChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
+        onBudgetChange={(budgetId) => onChange((prev) => ({ ...prev, budgetId }))}
       />
-
-      <div>
-        <label htmlFor={categoryFieldId} className="text-sm text-muted-foreground mb-1 block">
-          Category
-        </label>
-        <CategorySelect
-          id={categoryFieldId}
-          value={form.categoryId}
-          onChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
-          type={form.type}
-          categories={categories}
-        />
-      </div>
-
-      {form.type === "expense" && (
-        <div>
-          <label htmlFor={budgetFieldId} className="text-sm text-muted-foreground mb-1 block">
-            Budget (optional)
-          </label>
-          <BudgetSelect
-            id={budgetFieldId}
-            value={form.budgetId}
-            onChange={(budgetId) => onChange((prev) => ({ ...prev, budgetId }))}
-          />
-        </div>
-      )}
 
       {recordId ? (
         <AuditHistoryPanel recordId={recordId} table="transactions" />
       ) : null}
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          className="flex-1 text-muted-foreground"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={
-            isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
-          }
-          className="flex-1"
-        >
-          {isSubmitting ? "Saving..." : "Save"}
-        </Button>
-      </div>
+      <FormActions
+        onCancel={onCancel}
+        submitDisabled={
+          isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+        }
+        submitLabel={isSubmitting ? "Saving…" : "Save transaction"}
+      />
     </form>
-  );
-}
-
-interface AddTransactionButtonProps {
-  onClick: () => void;
-}
-
-export function AddTransactionButton({ onClick }: AddTransactionButtonProps) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={onClick}
-      className="h-auto w-full border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:bg-transparent hover:text-foreground"
-    >
-      <Plus className="h-5 w-5" />
-      Add Transaction
-    </Button>
   );
 }

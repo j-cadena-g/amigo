@@ -1,43 +1,67 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { CurrencySelect } from "@/app/components/currency-select";
+import { SharedCheckbox } from "@/app/components/financial/form-controls";
+import { TypeToggle } from "@/app/components/type-toggle";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 import type { CurrencyCode } from "@amigo/db";
+
+type DebtKind = "LOAN" | "CREDIT_CARD";
+
+const DEBT_KIND_OPTIONS = [
+  { value: "LOAN", label: "Loan" },
+  { value: "CREDIT_CARD", label: "Credit card" },
+] as const;
+
+const DEBT_KIND_NOUNS: Record<DebtKind, string> = {
+  LOAN: "loan",
+  CREDIT_CARD: "credit card",
+};
 
 interface AddDebtDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultCurrency?: CurrencyCode;
 }
 
-export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
+export function AddDebtDialog({
+  open,
+  onOpenChange,
+  defaultCurrency = "CAD",
+}: AddDebtDialogProps) {
   const revalidator = useRevalidator();
-  const [tab, setTab] = useState<"LOAN" | "CREDIT_CARD">("LOAN");
+  const nameId = useId();
+  const currencyId = useId();
+  const firstAmountId = useId();
+  const secondAmountId = useId();
+  const [kind, setKind] = useState<DebtKind>("LOAN");
 
   // Loan fields
   const [loanName, setLoanName] = useState("");
-  const [loanCurrency, setLoanCurrency] = useState<CurrencyCode>("CAD");
+  const [loanCurrency, setLoanCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [loanAmount, setLoanAmount] = useState("");
   const [totalPaid, setTotalPaid] = useState("");
 
   // Credit card fields
   const [ccName, setCcName] = useState("");
-  const [ccCurrency, setCcCurrency] = useState<CurrencyCode>("CAD");
+  const [ccCurrency, setCcCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [creditLimit, setCreditLimit] = useState("");
   const [availableCredit, setAvailableCredit] = useState("");
 
   const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const noun = DEBT_KIND_NOUNS[kind];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +70,7 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
 
     try {
       const body =
-        tab === "LOAN"
+        kind === "LOAN"
           ? {
               type: "LOAN" as const,
               name: loanName,
@@ -71,15 +95,15 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to add debt");
+        setError((await readApiErrorMessage(res)) ?? `Couldn't add the ${noun}. Try again.`);
+        return;
       }
 
       revalidator.revalidate();
       resetForm();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(`Couldn't add the ${noun}. Check your connection and try again.`);
     } finally {
       setLoading(false);
     }
@@ -87,103 +111,103 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
 
   function resetForm() {
     setLoanName("");
-    setLoanCurrency("CAD");
+    setLoanCurrency(defaultCurrency);
     setLoanAmount("");
     setTotalPaid("");
     setCcName("");
-    setCcCurrency("CAD");
+    setCcCurrency(defaultCurrency);
     setCreditLimit("");
     setAvailableCredit("");
     setIsShared(false);
     setError(null);
   }
 
-  const currentName = tab === "LOAN" ? loanName : ccName;
+  function handleOpenChange(next: boolean) {
+    if (!next) resetForm();
+    onOpenChange(next);
+  }
+
+  const currentName = kind === "LOAN" ? loanName : ccName;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) resetForm();
-        onOpenChange(v);
-      }}
-    >
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Add Debt</DialogTitle>
-          <DialogDescription>
-            Track a loan or credit card to monitor your payoff progress.
-          </DialogDescription>
+          <DialogTitle>Add debt</DialogTitle>
         </DialogHeader>
 
-        <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as "LOAN" | "CREDIT_CARD")}
-        >
-          <TabsList className="w-full">
-            <TabsTrigger value="LOAN" className="flex-1">
-              Loan
-            </TabsTrigger>
-            <TabsTrigger value="CREDIT_CARD" className="flex-1">
-              Credit Card
-            </TabsTrigger>
-          </TabsList>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <TypeToggle
+            label="Debt type"
+            options={DEBT_KIND_OPTIONS}
+            value={kind}
+            onChange={setKind}
+          />
 
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            <TabsContent value="LOAN" className="mt-0 space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="loan-name" className="text-sm font-medium">
-                  Name
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-sm font-semibold">
+              Name
+            </label>
+            {kind === "LOAN" ? (
+              <Input
+                key="loan-name"
+                id={nameId}
+                value={loanName}
+                onChange={(e) => setLoanName(e.target.value)}
+                placeholder="e.g. Car loan"
+                required
+              />
+            ) : (
+              <Input
+                key="cc-name"
+                id={nameId}
+                value={ccName}
+                onChange={(e) => setCcName(e.target.value)}
+                placeholder="e.g. Visa"
+                required
+              />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor={currencyId} className="text-sm font-semibold">
+              Currency
+            </label>
+            <CurrencySelect
+              id={currencyId}
+              value={kind === "LOAN" ? loanCurrency : ccCurrency}
+              onChange={(v) =>
+                kind === "LOAN"
+                  ? setLoanCurrency(v as CurrencyCode)
+                  : setCcCurrency(v as CurrencyCode)
+              }
+            />
+          </div>
+
+          {kind === "LOAN" ? (
+            <div key="loan-amounts" className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor={firstAmountId} className="text-sm font-semibold">
+                  Loan amount
                 </label>
                 <Input
-                  id="loan-name"
-                  value={loanName}
-                  onChange={(e) => setLoanName(e.target.value)}
-                  placeholder="e.g. Car Loan"
-                  required={tab === "LOAN"}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="loan-currency" className="text-sm font-medium">
-                  Currency
-                </label>
-                <select
-                  id="loan-currency"
-                  value={loanCurrency}
-                  onChange={(e) => setLoanCurrency(e.target.value as CurrencyCode)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {SUPPORTED_CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="loan-amount" className="text-sm font-medium">
-                  Loan Amount
-                </label>
-                <Input
-                  id="loan-amount"
+                  id={firstAmountId}
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={loanAmount}
                   onChange={(e) => setLoanAmount(e.target.value)}
                   placeholder="0.00"
-                  required={tab === "LOAN"}
+                  className="font-mono font-medium"
+                  required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="total-paid" className="text-sm font-medium">
-                  Total Paid
+              <div className="space-y-1.5">
+                <label htmlFor={secondAmountId} className="text-sm font-semibold">
+                  Total paid
                 </label>
                 <Input
-                  id="total-paid"
+                  id={secondAmountId}
                   type="number"
                   step="0.01"
                   min="0"
@@ -191,108 +215,68 @@ export function AddDebtDialog({ open, onOpenChange }: AddDebtDialogProps) {
                   value={totalPaid}
                   onChange={(e) => setTotalPaid(e.target.value)}
                   placeholder="0.00"
-                  required={tab === "LOAN"}
+                  className="font-mono font-medium"
+                  required
                 />
               </div>
-            </TabsContent>
-
-            <TabsContent value="CREDIT_CARD" className="mt-0 space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="cc-name" className="text-sm font-medium">
-                  Name
+            </div>
+          ) : (
+            <div key="cc-amounts" className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor={firstAmountId} className="text-sm font-semibold">
+                  Credit limit
                 </label>
                 <Input
-                  id="cc-name"
-                  value={ccName}
-                  onChange={(e) => setCcName(e.target.value)}
-                  placeholder="e.g. Visa Platinum"
-                  required={tab === "CREDIT_CARD"}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="cc-currency" className="text-sm font-medium">
-                  Currency
-                </label>
-                <select
-                  id="cc-currency"
-                  value={ccCurrency}
-                  onChange={(e) => setCcCurrency(e.target.value as CurrencyCode)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {SUPPORTED_CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="credit-limit" className="text-sm font-medium">
-                  Credit Limit
-                </label>
-                <Input
-                  id="credit-limit"
+                  id={firstAmountId}
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={creditLimit}
                   onChange={(e) => setCreditLimit(e.target.value)}
                   placeholder="0.00"
-                  required={tab === "CREDIT_CARD"}
+                  className="font-mono font-medium"
+                  required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="available-credit" className="text-sm font-medium">
-                  Available Credit
+              <div className="space-y-1.5">
+                <label htmlFor={secondAmountId} className="text-sm font-semibold">
+                  Available credit
                 </label>
                 <Input
-                  id="available-credit"
+                  id={secondAmountId}
                   type="number"
                   step="0.01"
                   min="0"
                   value={availableCredit}
                   onChange={(e) => setAvailableCredit(e.target.value)}
                   placeholder="0.00"
-                  required={tab === "CREDIT_CARD"}
+                  className="font-mono font-medium"
+                  required
                 />
               </div>
-            </TabsContent>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="debt-shared"
-                checked={isShared}
-                onChange={(e) => setIsShared(e.target.checked)}
-                className="h-4 w-4 rounded border-input"
-              />
-              <label htmlFor="debt-shared" className="text-sm font-medium">
-                Shared (household-wide)
-              </label>
             </div>
+          )}
 
-            {error && (
-              <p className="text-sm text-destructive" role="alert">{error}</p>
-            )}
+          <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || !currentName.trim()}>
-                {loading ? "Adding..." : "Add Debt"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Tabs>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">{error}</p>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading || !currentName.trim()}>
+              {loading ? "Adding…" : kind === "LOAN" ? "Add loan" : "Add credit card"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

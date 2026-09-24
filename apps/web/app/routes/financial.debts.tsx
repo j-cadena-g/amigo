@@ -13,8 +13,10 @@ import {
   isNull,
   parseHomeCurrency,
 } from "@amigo/db";
+import { Plus } from "lucide-react";
 import { DebtCards } from "@/app/components/debt-cards";
 import { AddDebtDialog } from "@/app/components/add-debt-dialog";
+import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { Button } from "@/app/components/ui/button";
 
@@ -53,28 +55,41 @@ export default function FinancialDebts() {
   const { debts: debtData, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
+  const openAdd = () => setAddOpen(true);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <FinancialSectionHeader
         title="Debts"
-        description="Loans and credit cards."
         action={
-          <Button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="shrink-0"
-          >
+          <Button type="button" onClick={openAdd}>
+            <Plus />
             Add debt
           </Button>
         }
       />
-      <DebtCards
-        debts={debtData}
-        homeCurrency={homeCurrency}
-        session={{ userId, role }}
+      {debtData.length === 0 ? (
+        <EmptyState
+          message="No debts yet. Add a loan or credit card to track what's left to pay."
+          action={
+            <Button type="button" onClick={openAdd}>
+              <Plus />
+              Add debt
+            </Button>
+          }
+        />
+      ) : (
+        <DebtCards
+          debts={debtData}
+          homeCurrency={homeCurrency}
+          session={{ userId, role }}
+        />
+      )}
+      <AddDebtDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        defaultCurrency={homeCurrency}
       />
-      <AddDebtDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

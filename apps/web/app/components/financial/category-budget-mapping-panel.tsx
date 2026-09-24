@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/app/components/ui/button";
+import { NativeSelect } from "@/app/components/financial/form-controls";
 import {
   buildCategoryTree,
   useFinancialCategories,
 } from "@/app/components/financial/use-financial-categories";
 import type { CategoryBudgetMappingRow } from "@/app/lib/financial-category-types";
 import { parseApiError } from "@/app/lib/parse-api-error";
+import { cn } from "@/app/lib/utils";
 
 interface BudgetOption {
   id: string;
@@ -13,13 +15,15 @@ interface BudgetOption {
   isShared: boolean;
 }
 
+type Feedback = { tone: "success" | "error"; message: string };
+
 export function CategoryBudgetMappingPanel() {
   const { categories, loading: categoriesLoading } = useFinancialCategories();
   const [budgets, setBudgets] = useState<BudgetOption[]>([]);
   const [mappings, setMappings] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const expenseTree = useMemo(
     () =>
@@ -53,7 +57,12 @@ export function CategoryBudgetMappingPanel() {
           )
         );
       } catch {
-        if (!cancelled) setFeedback("Could not load category mappings");
+        if (!cancelled) {
+          setFeedback({
+            tone: "error",
+            message: "Couldn't load budget links. Reload the page to try again.",
+          });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -86,32 +95,40 @@ export function CategoryBudgetMappingPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Failed to save mappings"));
+        setFeedback({
+          tone: "error",
+          message: parseApiError(body, "Couldn't save the links. Try again."),
+        });
         return;
       }
-      setFeedback("Mappings saved.");
+      setFeedback({ tone: "success", message: "Links saved." });
     } catch {
-      setFeedback("Network error — could not save mappings");
+      setFeedback({
+        tone: "error",
+        message: "Couldn't save the links. Check your connection and try again.",
+      });
     } finally {
       setSubmitting(false);
     }
   }
 
   if (loading || categoriesLoading) {
-    return <p className="text-sm text-muted-foreground">Loading mappings…</p>;
+    return <p className="text-sm text-muted-foreground">Loading budget links…</p>;
   }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Choose which budget auto-selects when you log an expense in each category.
         Subcategories override their parent when set.
       </p>
 
-      <div className="space-y-2">
-        {expenseTree.map((row) => (
-          <div key={row.parent.id} className="space-y-2">
+      {expenseTree.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No expense categories yet.</p>
+      ) : (
+        <ul className="divide-y divide-border border-t border-border">
+          {expenseTree.flatMap((row) => [
             <MappingRow
+              key={row.parent.id}
               label={row.parent.name}
               categoryId={row.parent.id}
               budgetId={mappings[row.parent.id] ?? null}
@@ -119,11 +136,11 @@ export function CategoryBudgetMappingPanel() {
               onChange={setMapping}
               hint={
                 row.children.length > 0
-                  ? "Default for unmapped subcategories"
+                  ? "Default for unlinked subcategories"
                   : undefined
               }
-            />
-            {row.children.map((child) => (
+            />,
+            ...row.children.map((child) => (
               <MappingRow
                 key={child.id}
                 label={child.name}
@@ -133,23 +150,24 @@ export function CategoryBudgetMappingPanel() {
                 onChange={setMapping}
                 nested
               />
-            ))}
-          </div>
-        ))}
-      </div>
+            )),
+          ])}
+        </ul>
+      )}
 
       <Button type="button" size="sm" disabled={submitting} onClick={() => void handleSave()}>
-        Save mappings
+        {submitting ? "Saving…" : "Save links"}
       </Button>
 
       {feedback ? (
         <p
-          role="status"
-          className={`text-sm ${
-            feedback === "Mappings saved." ? "text-muted-foreground" : "text-destructive"
-          }`}
+          role={feedback.tone === "error" ? "alert" : "status"}
+          className={cn(
+            "text-sm",
+            feedback.tone === "success" ? "text-muted-foreground" : "text-destructive"
+          )}
         >
-          {feedback}
+          {feedback.message}
         </p>
       ) : null}
     </div>
@@ -176,18 +194,22 @@ function MappingRow({
   const selectId = `budget-mapping-${categoryId}`;
 
   return (
-    <div className={`grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] ${nested ? "ml-4" : ""}`}>
+    <li
+      className={cn(
+        "grid items-center gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]",
+        nested && "pl-5"
+      )}
+    >
       <div>
-        <label htmlFor={selectId} className="text-sm font-medium">
+        <label htmlFor={selectId} className="text-sm font-semibold">
           {label}
         </label>
         {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       </div>
-      <select
+      <NativeSelect
         id={selectId}
         value={budgetId ?? ""}
         onChange={(e) => onChange(categoryId, e.target.value || null)}
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
       >
         <option value="">No budget</option>
         {budgets.map((budget) => (
@@ -196,7 +218,7 @@ function MappingRow({
             {budget.isShared ? " (shared)" : ""}
           </option>
         ))}
-      </select>
-    </div>
+      </NativeSelect>
+    </li>
   );
 }

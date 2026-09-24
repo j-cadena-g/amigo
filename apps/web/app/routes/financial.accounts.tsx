@@ -15,10 +15,13 @@ import {
   isNull,
   parseHomeCurrency,
 } from "@amigo/db";
+import { Plus } from "lucide-react";
 import { AccountCards } from "@/app/components/account-cards";
 import { AssetCards } from "@/app/components/asset-cards";
 import { AddAccountDialog } from "@/app/components/add-account-dialog";
+import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
+import { LedgerGroup } from "@/app/components/financial/ledger-group";
 import {
   isAssetHoldingType,
   isTransactionalAccountType,
@@ -108,75 +111,84 @@ export default function FinancialAccounts() {
 
   const transactional = accounts.filter((a) => isTransactionalAccountType(a.type));
   const holdings = accounts.filter((a) => isAssetHoldingType(a.type));
+  const openAdd = () => setAddOpen(true);
 
   return (
     <div className="space-y-8">
-      <div className="space-y-6">
-        <FinancialSectionHeader
-          title="Holdings"
-          description="Bank accounts, investments, and property. Link transactions and imports to checking, savings, and cash. Use Debts for credit cards."
+      <FinancialSectionHeader
+        title="Holdings"
+        description="Credit cards are under Debts."
+        action={
+          <Button type="button" onClick={openAdd}>
+            <Plus />
+            Add account
+          </Button>
+        }
+      />
+
+      {accounts.length === 0 && (
+        <EmptyState
+          message="No accounts yet. Add a bank account, investment, or property to track its balance here."
           action={
-            <Button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="shrink-0"
-            >
+            <Button type="button" onClick={openAdd}>
+              <Plus />
               Add account
             </Button>
           }
         />
+      )}
 
-        {transactional.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-heading font-semibold">Accounts</h2>
-            <AccountCards accounts={transactional} />
-          </div>
-        )}
+      {transactional.length > 0 && (
+        <LedgerGroup title="Accounts">
+          <AccountCards accounts={transactional} homeCurrency={homeCurrency} />
+        </LedgerGroup>
+      )}
 
-        {holdings.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-heading font-semibold">Investments & property</h2>
-            <AccountCards accounts={holdings} />
-          </div>
-        )}
+      {holdings.length > 0 && (
+        <LedgerGroup title="Investments & property">
+          <AccountCards accounts={holdings} homeCurrency={homeCurrency} />
+        </LedgerGroup>
+      )}
 
-        {accounts.length === 0 && <AccountCards accounts={[]} />}
-
-        {archivedAccounts.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-heading font-semibold">Archived</h2>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowArchived((value) => !value)}
-              >
-                {showArchived
-                  ? "Hide"
-                  : `Show (${archivedAccounts.length})`}
-              </Button>
-            </div>
-            {showArchived ? <AccountCards accounts={archivedAccounts} /> : null}
-          </div>
-        )}
-
-        <AddAccountDialog
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          defaultCurrency={homeCurrency}
-        />
-      </div>
+      {archivedAccounts.length > 0 && (
+        <LedgerGroup
+          title="Archived"
+          aside={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={showArchived}
+              onClick={() => setShowArchived((value) => !value)}
+            >
+              {showArchived ? "Hide" : `Show (${archivedAccounts.length})`}
+            </Button>
+          }
+        >
+          {showArchived ? (
+            <AccountCards accounts={archivedAccounts} homeCurrency={homeCurrency} />
+          ) : null}
+        </LedgerGroup>
+      )}
 
       {legacyAssets.length > 0 && (
-        <div className="space-y-4">
-          <FinancialSectionHeader
-            title="Legacy assets"
-            description="Older asset entries. Convert each to an account, or delete when no longer needed."
+        <LedgerGroup title="Legacy assets">
+          <p className="pt-3 text-sm text-muted-foreground">
+            Older entries from before accounts. Convert each one to an account, or delete it.
+          </p>
+          <AssetCards
+            assets={legacyAssets}
+            homeCurrency={homeCurrency}
+            session={{ userId, role }}
           />
-          <AssetCards assets={legacyAssets} session={{ userId, role }} />
-        </div>
+        </LedgerGroup>
       )}
+
+      <AddAccountDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        defaultCurrency={homeCurrency}
+      />
     </div>
   );
 }

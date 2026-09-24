@@ -1,19 +1,24 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
+import { ArrowRightLeft, Trash2 } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { CurrencySelect } from "@/app/components/currency-select";
+import {
+  DeleteButton,
+  NativeSelect,
+  SharedCheckbox,
+} from "@/app/components/financial/form-controls";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString } from "@/app/lib/decimal-input";
-import { ArrowRightLeft, Trash2 } from "lucide-react";
 import type { Asset } from "@/app/components/asset-cards";
 import type { CurrencyCode, FinancialAccount } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
@@ -24,7 +29,7 @@ import {
 } from "@/app/lib/legacy-asset-migration";
 
 const ASSET_TYPES = [
-  { value: "BANK", label: "Bank Account" },
+  { value: "BANK", label: "Bank account" },
   { value: "INVESTMENT", label: "Investment" },
   { value: "CASH", label: "Cash" },
   { value: "PROPERTY", label: "Property" },
@@ -39,6 +44,11 @@ interface EditAssetDialogProps {
 export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogProps) {
   const confirm = useConfirm();
   const revalidator = useRevalidator();
+  const nameId = useId();
+  const typeId = useId();
+  const convertTypeId = useId();
+  const balanceId = useId();
+  const currencyId = useId();
   const [name, setName] = useState(asset.name);
   const [type, setType] = useState(asset.type);
   const [balance, setBalance] = useState(centsToInputString(asset.balance));
@@ -69,7 +79,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     e.preventDefault();
     if (busy) return;
     if (hasInvalidBalance) {
-      setError("Enter a non-negative amount with at most two decimal places.");
+      setError("Enter a balance of 0 or more, with up to two decimal places.");
       return;
     }
     setError(null);
@@ -89,14 +99,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to update asset");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't save the asset. Try again.");
+        return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("Couldn't save the asset. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -113,9 +123,9 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     setError(null);
 
     const ok = await confirm({
-      title: "Convert to account",
+      title: "Convert to account?",
       description:
-        "Create a matching account from this legacy asset, then delete the legacy entry. Balances are copied; transactions were never linked to legacy assets.",
+        "This creates an account with the same balance and removes the legacy entry. Transactions were never linked to legacy assets, so none move.",
       confirmText: "Convert",
     });
     if (!ok) {
@@ -137,16 +147,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(data?.message ?? "Failed to convert asset");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't convert the asset. Try again.");
+        return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("Couldn't convert the asset. Check your connection and try again.");
     } finally {
       setConverting(false);
     }
@@ -159,8 +167,8 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     setError(null);
 
     const ok = await confirm({
-      title: "Delete Asset",
-      description: "Are you sure you want to delete this asset? This action cannot be undone.",
+      title: "Delete asset?",
+      description: "This can't be undone.",
       confirmText: "Delete",
       variant: "destructive",
     });
@@ -175,14 +183,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to delete asset");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't delete the asset. Try again.");
+        return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError("Couldn't delete the asset. Check your connection and try again.");
     } finally {
       setDeleting(false);
     }
@@ -190,56 +198,55 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-xl"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
-          <DialogTitle>Edit Asset</DialogTitle>
-          <DialogDescription>
-            Update this legacy asset, convert it to an account, or delete it.
-          </DialogDescription>
+          <DialogTitle>Edit legacy asset</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="edit-asset-name" className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-sm font-semibold">
               Name
             </label>
             <Input
-              id="edit-asset-name"
+              id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="edit-asset-type" className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={typeId} className="text-sm font-semibold">
               Type
             </label>
-            <select
-              id="edit-asset-type"
+            <NativeSelect
+              id={typeId}
               value={type}
               onChange={(e) => {
                 const next = e.target.value as typeof type;
                 setType(next);
                 setAccountType(mapLegacyAssetTypeToAccountType(next as LegacyAssetType));
               }}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {ASSET_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           {type === "BANK" && (
-            <div className="space-y-2">
-              <label htmlFor="convert-account-type" className="text-sm font-medium">
+            <div className="space-y-1.5">
+              <label htmlFor={convertTypeId} className="text-sm font-semibold">
                 Convert as
               </label>
-              <select
-                id="convert-account-type"
+              <NativeSelect
+                id={convertTypeId}
                 value={accountType}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -248,62 +255,45 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                   );
                   if (match) setAccountType(match.value);
                 }}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {BANK_CONVERSION_ACCOUNT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
           )}
 
-          <div className="space-y-2">
-            <label htmlFor="edit-asset-balance" className="text-sm font-medium">
-              Balance
-            </label>
-            <Input
-              id="edit-asset-balance"
-              type="number"
-              step="0.01"
-              min="0"
-              value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              required
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor={balanceId} className="text-sm font-semibold">
+                Balance
+              </label>
+              <Input
+                id={balanceId}
+                type="number"
+                step="0.01"
+                min="0"
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+                className="font-mono font-medium"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor={currencyId} className="text-sm font-semibold">
+                Currency
+              </label>
+              <CurrencySelect
+                id={currencyId}
+                value={currency}
+                onChange={(v) => setCurrency(v as CurrencyCode)}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="edit-asset-currency" className="text-sm font-medium">
-              Currency
-            </label>
-            <select
-              id="edit-asset-currency"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {SUPPORTED_CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="edit-asset-shared"
-              checked={isShared}
-              onChange={(e) => setIsShared(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <label htmlFor="edit-asset-shared" className="text-sm font-medium">
-              Shared (household-wide)
-            </label>
-          </div>
+          <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
           <AuditHistoryPanel recordId={asset.id} table="assets" />
 
@@ -315,40 +305,33 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-            <div className="flex flex-wrap gap-2 sm:mr-auto">
+          <DialogFooter>
+            <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
+              <DeleteButton onClick={() => void handleDelete()} disabled={busy}>
+                <Trash2 />
+                {deleting ? "Deleting…" : "Delete"}
+              </DeleteButton>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => void handleConvert()}
                 disabled={busy || !name.trim() || hasUnsavedChanges}
               >
-                <ArrowRightLeft className="mr-1 h-4 w-4" />
+                <ArrowRightLeft />
                 {converting ? "Converting…" : "Convert to account"}
               </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => void handleDelete()}
-                disabled={busy}
-              >
-                <Trash2 className="mr-1 h-4 w-4" />
-                {deleting ? "Deleting…" : "Delete"}
-              </Button>
             </div>
-            <div className="flex gap-2 justify-end w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={busy}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy || !name.trim() || hasInvalidBalance}>
-                {loading ? "Saving…" : "Save"}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !name.trim() || hasInvalidBalance}>
+              {loading ? "Saving…" : "Save asset"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -120,6 +120,39 @@ describe("parseTransactionsListQuery", () => {
     });
   });
 
+  it("parses reviewed=true and reviewed=false filters", () => {
+    expect(
+      parseTransactionsListQuery({ page: "1", limit: "10", reviewed: "true" })
+    ).toEqual({ page: 1, limit: 10, type: undefined, reviewed: true });
+
+    expect(
+      parseTransactionsListQuery({ page: "1", limit: "10", reviewed: "false" })
+    ).toEqual({ page: 1, limit: 10, type: undefined, reviewed: false });
+  });
+
+  it("treats an empty or missing reviewed query as absent", () => {
+    expect(
+      parseTransactionsListQuery({ page: "1", limit: "10", reviewed: "" })
+    ).toEqual({ page: 1, limit: 10, type: undefined, reviewed: undefined });
+
+    expect(
+      parseTransactionsListQuery({ page: "1", limit: "10" })
+    ).toEqual({ page: 1, limit: 10, type: undefined, reviewed: undefined });
+  });
+
+  it("rejects invalid reviewed filters", () => {
+    try {
+      parseTransactionsListQuery({ page: "1", limit: "10", reviewed: "yes" });
+      throw new Error("Expected parseTransactionsListQuery to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ActionError);
+      expect(error).toMatchObject({
+        message: 'Invalid reviewed filter; expected "true" or "false".',
+        code: "VALIDATION_ERROR",
+      } satisfies Partial<ActionError>);
+    }
+  });
+
   it("accepts minimum and maximum supported pagination boundaries", () => {
     expect(
       parseTransactionsListQuery({

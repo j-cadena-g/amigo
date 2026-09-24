@@ -5,6 +5,8 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("join/:code", "routes/join.$code.tsx"),
   route("api/health", "routes/api.health.ts"),
+  route("api/me", "routes/api.me.ts"),
+  route("api/dashboard", "routes/api.dashboard.ts"),
   route("api/setup", "routes/api.setup.ts"),
   route("api/invites/accept", "routes/api.invites.accept.ts"),
   route("api/invites", "routes/api.invites.ts", { id: "api-invites" }),

@@ -83,6 +83,7 @@ const updateTransactionSchema = z.object({
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
+  reviewed: z.boolean().optional(),
 });
 
 const importRowSchema = z.object({
@@ -234,10 +235,11 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     const url = new URL(request.url);
-    const { page, limit, type } = parseTransactionsListQuery({
+    const { page, limit, type, reviewed } = parseTransactionsListQuery({
       page: url.searchParams.get("page") ?? undefined,
       limit: url.searchParams.get("limit") ?? undefined,
       type: url.searchParams.get("type") ?? undefined,
+      reviewed: url.searchParams.get("reviewed") ?? undefined,
     });
     const offset = (page - 1) * limit;
 
@@ -249,6 +251,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
     if (type) {
       conditions.push(eq(transactions.type, type));
+    }
+
+    if (reviewed !== undefined) {
+      conditions.push(eq(transactions.reviewed, reviewed));
     }
 
     const items = await db.query.transactions.findMany({
@@ -540,6 +546,9 @@ export const handleTransactionsRequest: ApiHandler = async ({
         validated.currency,
         homeCurrency
       );
+    }
+    if (validated.reviewed !== undefined) {
+      updateData.reviewed = validated.reviewed;
     }
 
     await assertCanWriteTransaction(db, session!, existing, "modify");

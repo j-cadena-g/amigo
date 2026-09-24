@@ -30,14 +30,35 @@ function clampInt(
 const transactionsTypeSchema = z.enum(["income", "expense"]);
 type TransactionsListType = z.infer<typeof transactionsTypeSchema>;
 
+function parseBooleanFilter(
+  value: string | undefined,
+  label: string
+): boolean | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  throw new ActionError(
+    `Invalid ${label} filter; expected "true" or "false".`,
+    "VALIDATION_ERROR"
+  );
+}
+
 export function parseTransactionsListQuery(query: {
   page?: string;
   limit?: string;
   type?: string;
+  reviewed?: string;
 }): {
   page: number;
   limit: number;
   type?: TransactionsListType;
+  reviewed?: boolean;
 } {
   let type: TransactionsListType | undefined;
   if (query.type !== undefined && query.type !== "") {
@@ -50,6 +71,8 @@ export function parseTransactionsListQuery(query: {
     }
     type = parsed.data;
   }
+
+  const reviewed = parseBooleanFilter(query.reviewed, "reviewed");
 
   return {
     page: clampInt(
@@ -65,6 +88,7 @@ export function parseTransactionsListQuery(query: {
       MAX_TRANSACTIONS_LIMIT
     ),
     type,
+    reviewed,
   };
 }
 

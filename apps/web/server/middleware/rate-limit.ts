@@ -42,6 +42,12 @@ export const ROUTE_RATE_LIMITS = {
   calendar: {
     list: RATE_LIMIT_PRESETS.READ,
   },
+  dashboard: {
+    get: RATE_LIMIT_PRESETS.READ,
+  },
+  me: {
+    get: RATE_LIMIT_PRESETS.READ,
+  },
   debts: {
     list: RATE_LIMIT_PRESETS.READ,
     create: RATE_LIMIT_PRESETS.MUTATION,

@@ -34,7 +34,7 @@ export function DashboardBudgetProgress({
                   : 0;
             const pct = Math.min(100, Math.round(ratio));
             const remaining = b.limitHomeCents - b.spentHomeCents;
-            const isOver = remaining < 0 || ratio >= 100;
+            const isOver = remaining < 0;
             const isNear = !isOver && ratio >= 75;
             const budgetCur = b.budgetCurrency as CurrencyCode;
             const projectedPct =

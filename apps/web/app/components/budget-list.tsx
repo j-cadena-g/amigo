@@ -76,7 +76,7 @@ type ProgressVariant =
   | "budget-list-progress--danger";
 
 function getProgressVariant(percent: number, remaining: number): ProgressVariant {
-  if (remaining < 0 || percent >= 100) return "budget-list-progress--danger";
+  if (remaining < 0) return "budget-list-progress--danger";
   if (percent >= 75) return "budget-list-progress--warn";
   return "budget-list-progress--ok";
 }

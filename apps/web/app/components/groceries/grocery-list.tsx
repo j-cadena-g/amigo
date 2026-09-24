@@ -111,7 +111,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
         <PushNotificationButton />
       </div>
       {fromOffline && (
-        <p className="mt-2 text-sm font-semibold">
+        <p role="status" aria-live="polite" className="mt-2 text-sm font-semibold">
           You&apos;re offline, so this is the last saved list. New items, check-offs,
           deletions, and tag changes will sync when you reconnect.
         </p>

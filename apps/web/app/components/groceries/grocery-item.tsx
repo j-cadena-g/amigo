@@ -144,7 +144,7 @@ function GroceryItemComponent({
               if (e.key === "Escape") setIsEditing(false);
             }}
             aria-label={`Edit name for ${item.itemName}`}
-            className="-ml-1 block w-full rounded-md border border-foreground bg-background px-1 text-base text-foreground focus:outline-none"
+            className="-ml-1 block w-full rounded-md border border-foreground bg-background px-1 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         ) : (
           <button

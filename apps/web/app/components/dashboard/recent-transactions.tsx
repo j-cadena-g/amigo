@@ -1,12 +1,11 @@
 import { Link } from "react-router";
-import { Receipt, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
 import type { RecentTransaction } from "@/server/lib/dashboard-data";
 import { formatRelativeDate } from "@/app/lib/format-dates";
-import { getCategoryIcon } from "./utils";
 
 interface DashboardRecentTransactionsProps {
   transactions: RecentTransaction[];
@@ -33,20 +32,16 @@ export function DashboardRecentTransactions({
       </CardHeader>
       <CardContent>
         {transactions.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            No transactions yet
-          </div>
+          <p className="py-4 text-sm text-muted-foreground">
+            No transactions yet.
+          </p>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-border">
             {transactions.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50"
+                className="flex items-center gap-3 py-2.5"
               >
-                <span className="text-lg leading-none shrink-0">
-                  {getCategoryIcon(t.category)}
-                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
                     {t.description || t.category}

@@ -99,7 +99,7 @@ export default function Setup() {
     <main className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md mx-auto p-6">
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold tracking-tight">Welcome to amigo</h1>
+          <h1 className="type-display text-title-sm">Welcome to amigo</h1>
           <p className="text-muted-foreground mt-2">
             Let&apos;s set up your household.
           </p>

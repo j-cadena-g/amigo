@@ -128,18 +128,14 @@ export default function FinancialAccounts() {
 
         {transactional.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Accounts
-            </h2>
+            <h2 className="text-heading font-semibold">Accounts</h2>
             <AccountCards accounts={transactional} />
           </div>
         )}
 
         {holdings.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Investments & property
-            </h2>
+            <h2 className="text-heading font-semibold">Investments & property</h2>
             <AccountCards accounts={holdings} />
           </div>
         )}
@@ -149,9 +145,7 @@ export default function FinancialAccounts() {
         {archivedAccounts.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Archived
-              </h2>
+              <h2 className="text-heading font-semibold">Archived</h2>
               <Button
                 type="button"
                 variant="ghost"

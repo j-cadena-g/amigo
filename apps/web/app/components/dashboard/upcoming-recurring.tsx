@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { CalendarClock, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
@@ -32,27 +32,16 @@ export function DashboardUpcomingRecurring({
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <CalendarClock className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            No upcoming recurring transactions
-          </div>
+          <p className="py-4 text-sm text-muted-foreground">
+            No recurring bills or pay scheduled.
+          </p>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-border">
             {items.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/50"
+                className="flex items-center gap-3 py-2.5"
               >
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold shrink-0",
-                    r.type === "income"
-                      ? "bg-success/10 text-success"
-                      : "bg-destructive/10 text-destructive"
-                  )}
-                >
-                  <CalendarClock className="h-4 w-4" />
-                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
                     {r.description || r.category}

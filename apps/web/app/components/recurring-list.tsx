@@ -196,10 +196,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
       </Button>
 
       {rules.length === 0 ? (
-        <EmptyState
-          title="No recurring transactions yet"
-          description="Add a scheduled transaction to automate regular income or expenses."
-        />
+        <EmptyState message="No recurring transactions yet. Add rent, pay, or a subscription and it will post on schedule." />
       ) : (
         <div className="space-y-2">
           {rules.map((rule) => (

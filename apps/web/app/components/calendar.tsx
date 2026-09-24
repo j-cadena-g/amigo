@@ -256,8 +256,8 @@ export function Calendar({
         </CardHeader>
         <CardContent className={compact ? "px-4 pb-4 pt-0" : undefined}>
           {loading && (
-            <div className="text-center text-sm text-muted-foreground py-2 animate-pulse-soft">
-              Loading events...
+            <div className="py-2 text-center text-sm text-muted-foreground">
+              Loading…
             </div>
           )}
 
@@ -267,8 +267,8 @@ export function Calendar({
               <div
                 key={`${day}-${i}`}
                 className={cn(
-                  "text-center font-semibold text-muted-foreground uppercase tracking-wider",
-                  compact ? "text-[10px] py-0.5" : "text-xs py-2"
+                  "text-center text-xs font-semibold text-muted-foreground",
+                  compact ? "py-0.5" : "py-2"
                 )}
               >
                 {day}
@@ -317,9 +317,8 @@ export function Calendar({
                   <span
                     className={cn(
                       "inline-flex items-center justify-center rounded-full font-medium",
-                      compact ? "h-5 w-5 text-[11px]" : "h-6 w-6 text-sm",
-                      isToday &&
-                        "bg-primary text-primary-foreground font-bold shadow-sm"
+                      compact ? "h-5 w-5 text-xs" : "h-6 w-6 text-sm",
+                      isToday && "bg-tag font-bold text-tag-foreground"
                     )}
                   >
                     {cell.day}
@@ -347,8 +346,8 @@ export function Calendar({
                       {dayEvents.length > 3 && (
                         <span
                           className={cn(
-                            "leading-none text-muted-foreground",
-                            compact ? "text-[8px]" : "text-[9px] ml-0.5"
+                            "text-xs leading-none text-muted-foreground",
+                            !compact && "ml-0.5"
                           )}
                         >
                           {dayEvents.length}
@@ -384,12 +383,7 @@ export function Calendar({
                     EVENT_DOT_CLASSES[color]
                   )}
                 />
-                <span
-                  className={cn(
-                    "text-muted-foreground",
-                    compact ? "text-[10px]" : "text-xs"
-                  )}
-                >
+                <span className="text-xs text-muted-foreground">
                   {label}
                 </span>
               </div>
@@ -468,7 +462,7 @@ export function Calendar({
                     <p className="text-xs opacity-75">{event.subtitle}</p>
                   )}
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-60">
+                    <span className="text-xs font-semibold opacity-70">
                       {EVENT_TYPE_LABELS[event.type]}
                     </span>
                     {event.metadata?.amount != null && (

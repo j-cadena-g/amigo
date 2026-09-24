@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
 import { useConfirm } from "@/app/components/confirm-provider";
-import { tagColors, swatchColors, type TagColorKey } from "./constants";
+import { cn } from "@/app/lib/utils";
+import { tagColorKey, tagColors, type TagColorKey } from "./constants";
+import { TagBadge } from "./tag-badge";
 import { Check, Pencil, Tag, Trash2 } from "lucide-react";
 
 interface TagSelectorProps {
@@ -113,7 +115,7 @@ export function TagSelector({
   function startEdit(tag: GroceryTag) {
     setEditingTag(tag);
     setEditName(tag.name);
-    setEditColor((tag.color as TagColorKey) || "gray");
+    setEditColor(tagColorKey(tag.color));
   }
 
   return (
@@ -134,7 +136,7 @@ export function TagSelector({
         <div
           ref={popoverRef}
           id={popoverId}
-          className="absolute left-0 z-50 mt-1 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
+          className="absolute left-0 z-50 mt-1 w-64 rounded-xl border border-border bg-popover p-3 shadow-lg"
         >
           {editingTag ? (
             <div className="space-y-3">
@@ -148,16 +150,19 @@ export function TagSelector({
                 autoFocus
               />
               <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(swatchColors) as TagColorKey[]).map((color) => (
+                {(Object.keys(tagColors) as TagColorKey[]).map((color) => (
                   <button
                     key={color}
                     type="button"
                     onClick={() => setEditColor(color)}
                     aria-label={`Color ${color}`}
                     aria-pressed={editColor === color}
-                    className={`relative h-6 w-6 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
-                      editColor === color ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : ""
-                    }`}
+                    className={cn(
+                      "relative h-6 w-6 rounded-sm before:absolute before:-inset-2 before:content-['']",
+                      tagColors[color],
+                      editColor === color &&
+                        "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                    )}
                   />
                 ))}
               </div>
@@ -206,16 +211,19 @@ export function TagSelector({
               {canCreate && (
                 <div className="mt-2 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
-                    {(Object.keys(swatchColors) as TagColorKey[]).map((color) => (
+                    {(Object.keys(tagColors) as TagColorKey[]).map((color) => (
                       <button
                         key={color}
                         type="button"
                         onClick={() => setNewColor(color)}
                         aria-label={`Color ${color}`}
                         aria-pressed={newColor === color}
-                        className={`relative h-5 w-5 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
-                          newColor === color ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : ""
-                        }`}
+                        className={cn(
+                          "relative h-5 w-5 rounded-sm before:absolute before:-inset-2 before:content-['']",
+                          tagColors[color],
+                          newColor === color &&
+                            "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                        )}
                       />
                     ))}
                   </div>
@@ -238,9 +246,6 @@ export function TagSelector({
                   const isSelected = mode === "item"
                     ? selectedTagIds.includes(tag.id)
                     : filterTagIds?.includes(tag.id);
-                  const colorKey = (tag.color in tagColors ? tag.color : "gray") as TagColorKey;
-                  const colors = tagColors[colorKey];
-
                   return (
                     <div
                       key={tag.id}
@@ -266,9 +271,7 @@ export function TagSelector({
                         >
                           {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                         </span>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}>
-                          {tag.name}
-                        </span>
+                        <TagBadge tag={tag} />
                       </button>
                       <button
                         type="button"

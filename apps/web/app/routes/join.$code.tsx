@@ -74,9 +74,7 @@ export default function JoinInvite() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
         <div className="text-center mb-6">
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Join household
-          </h1>
+          <h1 className="type-display text-title-sm">Join household</h1>
           <p className="mt-2 text-muted-foreground">
             Sign in to accept your invitation.
           </p>

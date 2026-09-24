@@ -349,10 +349,7 @@ export function TransactionList({
       )}
 
       {allTransactions.length === 0 ? (
-        <EmptyState
-          title="No transactions yet"
-          description="Add your first transaction to start tracking."
-        />
+        <EmptyState message="No transactions yet. Add one above or import a file." />
       ) : (
         <div className="divide-y divide-border rounded-lg border bg-card">
           {allTransactions.map((transaction) => (

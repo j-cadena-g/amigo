@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/ca
 import { Button } from "@/app/components/ui/button";
 import { EmptyState } from "@/app/components/empty-state";
 import { formatCents } from "@/app/lib/currency";
-import { Pencil, Wallet } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { EditAccountDialog } from "@/app/components/edit-account-dialog";
 import type { CurrencyCode } from "@amigo/db";
 import { accountTypeLabel } from "@/app/lib/financial-account-types";
@@ -70,7 +70,7 @@ export function AccountCards({ accounts }: AccountCardsProps) {
       <div className="space-y-6">
         {shared.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-muted-foreground">
               Shared
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -82,7 +82,7 @@ export function AccountCards({ accounts }: AccountCardsProps) {
         )}
         {personal.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-muted-foreground">
               Personal
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -93,11 +93,7 @@ export function AccountCards({ accounts }: AccountCardsProps) {
           </div>
         )}
         {accounts.length === 0 && (
-          <EmptyState
-            icon={Wallet}
-            title="No accounts yet"
-            description="Add your first account to start tracking balances."
-          />
+          <EmptyState message="No accounts yet. Add a bank account, investment, or property to track its balance here." />
         )}
       </div>
       {editing && (

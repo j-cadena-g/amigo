@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { formatCents } from "@/app/lib/currency";
-import { CreditCard, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { EditDebtDialog } from "@/app/components/edit-debt-dialog";
 import { EmptyState } from "@/app/components/empty-state";
 import { cn } from "@/app/lib/utils";
@@ -50,7 +50,7 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
       <>
         {loans.length > 0 && (
           <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
               Loans ({loans.length})
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -62,8 +62,8 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
         )}
         {creditCards.length > 0 && (
           <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Credit Cards ({creditCards.length})
+            <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+              Credit cards ({creditCards.length})
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {creditCards.map((debt) => (
@@ -80,11 +80,7 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
     <>
       <div className="space-y-6">
         {debts.length === 0 && (
-          <EmptyState
-            icon={CreditCard}
-            title="No debts yet"
-            description="Add a loan or credit card to track payoff progress."
-          />
+          <EmptyState message="No debts yet. Add a loan or credit card to track what's left to pay." />
         )}
         {creditCardSummary ? (
           <CreditCardSummary
@@ -94,13 +90,13 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
         ) : null}
         {shared.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Shared</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Shared</h2>
             {renderDebtGroup(shared)}
           </div>
         )}
         {personal.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Personal</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Personal</h2>
             {renderDebtGroup(personal)}
           </div>
         )}
@@ -138,7 +134,7 @@ function CreditCardSummary({
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Total available</p>
-            <p className="font-display text-2xl font-bold tracking-tight tabular-nums">
+            <p className="font-mono text-2xl font-medium">
               {formatCents(summary.availableCreditCents, homeCurrency)}
             </p>
           </div>

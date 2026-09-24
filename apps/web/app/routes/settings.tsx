@@ -58,15 +58,8 @@ export default function Settings() {
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 animate-fade-in">
-        <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Settings
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage your household preferences
-        </p>
-      </div>
-      <div className="grid gap-4 max-w-2xl animate-stagger-in">
+      <h1 className="type-display mb-6 text-title-sm md:text-title">Settings</h1>
+      <div className="grid gap-4 max-w-2xl">
         {/* Appearance */}
         <Card>
           <CardHeader>

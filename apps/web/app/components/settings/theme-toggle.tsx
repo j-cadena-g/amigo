@@ -15,7 +15,7 @@ export function SettingsThemeToggle() {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="h-10 w-24 animate-pulse rounded-md bg-muted"
+            className="h-10 w-24 rounded-md bg-muted"
           />
         ))}
       </div>

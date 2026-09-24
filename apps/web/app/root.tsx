@@ -35,19 +35,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#397AD5" />
+        <meta
+          name="theme-color"
+          content="#ffffff"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#161615"
+          media="(prefers-color-scheme: dark)"
+        />
         <link rel="icon" href="/icon-1024.png" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
         <Meta />
         <Links nonce={cspNonce} />
       </head>
@@ -95,11 +94,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="text-center max-w-md animate-fade-in">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
-          <span className="font-display text-3xl font-bold text-destructive">{message === "404" ? "?" : "!"}</span>
-        </div>
-        <h1 className="font-display text-4xl font-bold tracking-tight mb-2">{message}</h1>
+      <div className="text-center max-w-md">
+        <h1 className="type-display mb-2 text-title">{message}</h1>
         <p className="text-muted-foreground">{details}</p>
         <div className="mt-6">
           <Link

@@ -20,8 +20,8 @@ export function createAmigoPwaOptions(): Partial<VitePWAOptions> {
       description: "Household management for budgeting and grocery tracking",
       start_url: "/",
       display: "standalone",
-      background_color: "#f4f6f9",
-      theme_color: "#3B7BD5",
+      background_color: "#ffffff",
+      theme_color: "#ffffff",
       icons: [
         {
           src: "/icon-192.png",

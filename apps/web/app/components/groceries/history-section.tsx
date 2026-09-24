@@ -71,7 +71,7 @@ export function HistorySection({
         <div className="mt-2 space-y-4">
           {groups.map((group) => (
             <div key={group.sortKey}>
-              <h4 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h4 className="mb-2 px-3 text-sm font-semibold text-muted-foreground">
                 {group.label}
               </h4>
               <div className="space-y-1">

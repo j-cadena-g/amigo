@@ -194,14 +194,9 @@ export default function Groceries() {
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 flex animate-fade-in items-start justify-between gap-4">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-            Groceries
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Your household shopping list
-          </p>
+          <h1 className="type-display text-title-sm md:text-title">Groceries</h1>
           {fromOffline && (
             <p className="mt-2 text-sm text-warning">
               Showing offline data — changes will sync when you&apos;re back online.

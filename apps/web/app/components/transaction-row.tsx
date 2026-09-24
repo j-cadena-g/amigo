@@ -1,11 +1,5 @@
 import type { Dispatch, FormEvent, MutableRefObject, SetStateAction } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { formatCents } from "@/app/lib/currency";
 import { formatRelativeDate, formatTransactionDate } from "@/app/lib/format-dates";
 import type { CurrencyCode } from "@amigo/db";
@@ -98,19 +92,6 @@ export function TransactionRow({
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent/50 transition-colors"
       >
         <div className="flex items-center gap-3 overflow-hidden">
-          <div
-            className={`shrink-0 rounded-full p-2 ${
-              transaction.type === "income"
-                ? "bg-success/10"
-                : "bg-destructive/10"
-            }`}
-          >
-            {transaction.type === "income" ? (
-              <ArrowUp className="h-4 w-4 text-success" />
-            ) : (
-              <ArrowDown className="h-4 w-4 text-destructive" />
-            )}
-          </div>
           <div className="overflow-hidden">
             <p className="font-medium truncate">
               {transaction.description || transaction.category}

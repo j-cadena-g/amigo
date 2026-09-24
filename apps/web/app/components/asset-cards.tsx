@@ -6,14 +6,6 @@ import { Pencil } from "lucide-react";
 import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
 import type { CurrencyCode } from "@amigo/db";
 
-export const ASSET_TYPE_COLORS = {
-  BANK: { bg: "bg-info/15", text: "text-info" },
-  // No semantic token for purple — INVESTMENT keeps hardcoded palette colors.
-  INVESTMENT: { bg: "bg-purple-100 dark:bg-purple-900/40", text: "text-purple-700 dark:text-purple-300" },
-  CASH: { bg: "bg-success/15", text: "text-success" },
-  PROPERTY: { bg: "bg-warning/15", text: "text-warning" },
-} as const;
-
 export interface Asset {
   id: string;
   name: string;
@@ -52,8 +44,8 @@ export function AssetCards({ assets, session: _session }: AssetCardsProps) {
       if (!group || group.length === 0) return null;
       return (
         <div key={type}>
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {type.charAt(0) + type.slice(1).toLowerCase()} ({group.length})
+          <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+            {assetTypeLabel(type)} ({group.length})
           </h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {group.map((asset) => (
@@ -70,13 +62,13 @@ export function AssetCards({ assets, session: _session }: AssetCardsProps) {
       <div className="space-y-6">
         {shared.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Shared</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Shared</h2>
             {renderAssetGroup(shared)}
           </div>
         )}
         {personal.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Personal</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Personal</h2>
             {renderAssetGroup(personal)}
           </div>
         )}
@@ -95,27 +87,21 @@ export function AssetCards({ assets, session: _session }: AssetCardsProps) {
   );
 }
 
-function AssetCard({ asset, onEdit }: { asset: Asset; onEdit: () => void }) {
-  const colors = ASSET_TYPE_COLORS[asset.type];
+function assetTypeLabel(type: Asset["type"]): string {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
 
+function AssetCard({ asset, onEdit }: { asset: Asset; onEdit: () => void }) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <CardTitle className="text-base">{asset.name}</CardTitle>
-            <div className="flex gap-1.5">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
-              >
-                {asset.type.charAt(0) + asset.type.slice(1).toLowerCase()}
-              </span>
-              {asset.isShared && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-                  Shared
-                </span>
-              )}
-            </div>
+            <p className="text-sm text-muted-foreground">
+              {assetTypeLabel(asset.type)}
+              {asset.isShared ? " · Shared" : ""}
+            </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
             <Pencil className="h-4 w-4" />

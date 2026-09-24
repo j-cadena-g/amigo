@@ -46,14 +46,9 @@ export default function Dashboard() {
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 animate-fade-in">
-        <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {monthName} {year} — your household at a glance
-        </p>
-      </div>
+      <h1 className="type-display mb-6 text-title-sm md:text-title">
+        {monthName} {year}
+      </h1>
 
       <DashboardStatCards
         spendingCents={spendingCents}
@@ -64,7 +59,7 @@ export default function Dashboard() {
         monthName={monthName}
       />
 
-      <section className="mb-6 animate-fade-in" aria-label="Monthly activity">
+      <section className="mb-6" aria-label="Monthly activity">
         <Calendar
           compact
           initialEvents={calendarEvents}
@@ -72,7 +67,7 @@ export default function Dashboard() {
         />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-5 animate-stagger-in">
+      <div className="grid gap-4 lg:grid-cols-5">
         <DashboardRecentTransactions
           transactions={recentTransactions}
           todayStr={todayStr}
@@ -83,7 +78,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5 mt-4 animate-stagger-in">
+      <div className="grid gap-4 lg:grid-cols-5 mt-4">
         <DashboardUpcomingRecurring items={upcomingRecurring} todayStr={todayStr} />
         <DashboardNetWorth
           netWorthCents={netWorthCents}
@@ -94,7 +89,7 @@ export default function Dashboard() {
       </div>
 
       {categoryData.length > 0 && (
-        <div className="mt-4 animate-fade-in">
+        <div className="mt-4">
           <BudgetCharts
             categoryData={categoryData}
             monthlyComparison={monthlyComparison}

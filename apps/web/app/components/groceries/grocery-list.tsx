@@ -137,15 +137,9 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
 
       {/* Active items */}
       {!hasAnyItems ? (
-        <EmptyState
-          title="No grocery items"
-          description="Add your first item above to get started."
-        />
+        <EmptyState message="The list is empty. Add what you need above." />
       ) : activeItems.length === 0 && filterTagIds.length > 0 ? (
-        <EmptyState
-          title="No matching items"
-          description="No unpurchased items match the selected tags."
-        />
+        <EmptyState message="Nothing left to buy has these tags." />
       ) : (
         <div className="space-y-1">
           {activeItems.map((item) => (

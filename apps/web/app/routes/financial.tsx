@@ -18,14 +18,7 @@ export default function FinancialLayout() {
 
   return (
     <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 animate-fade-in">
-        <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Financial
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Transactions, budgets, accounts, and debts for your household
-        </p>
-      </div>
+      <h1 className="type-display mb-6 text-title-sm md:text-title">Financial</h1>
 
       <div className="flex gap-1 mb-6 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {

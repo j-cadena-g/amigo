@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { PiggyBank, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
@@ -31,10 +31,9 @@ export function DashboardBudgetProgress({
       </CardHeader>
       <CardContent>
         {budgets.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <PiggyBank className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            No budgets set up
-          </div>
+          <p className="py-4 text-sm text-muted-foreground">
+            No budgets yet.
+          </p>
         ) : (
           <div className="space-y-3">
             {budgets.map((b) => {
@@ -68,7 +67,7 @@ export function DashboardBudgetProgress({
                     </span>
                   </div>
                   {showOriginal && (
-                    <p className="text-[10px] text-muted-foreground mb-1">
+                    <p className="text-xs text-muted-foreground mb-1">
                       Limit in budget currency:{" "}
                       {formatCents(b.limitOriginalCents, budgetCur)}
                     </p>
@@ -93,7 +92,7 @@ export function DashboardBudgetProgress({
                   <div className="flex items-center justify-between mt-1">
                     <span
                       className={cn(
-                        "text-[10px] font-semibold uppercase tracking-wider",
+                        "text-xs font-semibold",
                         isOver
                           ? "text-destructive"
                           : isCritical
@@ -111,12 +110,12 @@ export function DashboardBudgetProgress({
                             ? "75%+ used"
                             : `${pct}% used`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground capitalize">
+                    <span className="text-xs text-muted-foreground capitalize">
                       {b.period}
                     </span>
                   </div>
                   {b.recurringImpactHomeCents > 0 && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Upcoming recurring (est.):{" "}
                       {formatCents(b.recurringImpactHomeCents, currency)}
                       {projectedPct > 100 && (

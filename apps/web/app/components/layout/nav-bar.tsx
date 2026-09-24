@@ -65,7 +65,7 @@ export function NavBar() {
   }, [mobileOpen]);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+    <nav className="sticky top-0 z-50 border-b border-border bg-background">
       <div className="container mx-auto flex h-16 items-center px-4 md:px-6">
         {/* Brand */}
         <Link
@@ -75,9 +75,9 @@ export function NavBar() {
           <img
             src="/icon-1024.png"
             alt="amigo"
-            className="h-8 w-8 rounded-lg shadow-sm shadow-primary/20 transition-transform group-hover:scale-105"
+            className="h-8 w-8 rounded-md"
           />
-          <span className="font-display font-bold text-xl tracking-tight">
+          <span className="type-display text-xl">
             amigo
           </span>
         </Link>
@@ -148,7 +148,7 @@ export function NavBar() {
       {mobileOpen && (
         <div
           ref={mobileMenuRef}
-          className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pb-4 pt-2 animate-fade-in"
+          className="md:hidden border-t border-border bg-background px-4 pb-4 pt-2"
         >
           <div className="space-y-1">
             {navLinks.map((link) => {

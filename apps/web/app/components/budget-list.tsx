@@ -1,6 +1,5 @@
 import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
-import { PiggyBank } from "lucide-react";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { centsToInputString } from "@/app/lib/decimal-input";
@@ -100,19 +99,17 @@ function BudgetCard({
             {budget.alertLevel !== "ok" && (
               <span
                 className={cn(
-                  "text-[10px] font-semibold uppercase shrink-0 px-1.5 py-0.5 rounded",
-                  budget.alertLevel === "over"
-                    ? "bg-destructive/15 text-destructive"
-                    : budget.alertLevel === "critical"
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-warning/15 text-warning"
+                  "shrink-0 text-xs font-semibold",
+                  budget.alertLevel === "warn"
+                    ? "text-warning"
+                    : "text-destructive"
                 )}
               >
                 {budget.alertLevel === "over"
                   ? "Over"
                   : budget.alertLevel === "critical"
-                    ? "90%+"
-                    : "75%+"}
+                    ? "90%+ used"
+                    : "75%+ used"}
               </span>
             )}
           </div>
@@ -417,7 +414,7 @@ export function BudgetList({
 
       {shared.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-muted-foreground">
             Shared
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -436,7 +433,7 @@ export function BudgetList({
 
       {personal.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-muted-foreground">
             Personal
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -454,11 +451,7 @@ export function BudgetList({
       )}
 
       {budgets.length === 0 && (
-        <EmptyState
-          icon={PiggyBank}
-          title="No budgets yet"
-          description="Create one to start tracking your spending."
-        />
+        <EmptyState message="No budgets yet. Set a monthly limit for a category, like groceries." />
       )}
 
       <FinancialCollapsiblePanel

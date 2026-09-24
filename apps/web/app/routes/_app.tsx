@@ -72,7 +72,7 @@ export default function AppLayout() {
             <div className="relative min-h-screen overflow-x-hidden bg-background">
               <NavBar />
               <OfflineIndicator />
-              <div className="page-enter relative z-10">
+              <div className="relative z-10">
                 <Outlet />
               </div>
             </div>

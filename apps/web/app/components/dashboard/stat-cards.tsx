@@ -1,11 +1,4 @@
 import { Link } from "react-router";
-import {
-  TrendingUp,
-  TrendingDown,
-  ShoppingCart,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
@@ -20,6 +13,31 @@ interface DashboardStatCardsProps {
   monthName: string;
 }
 
+function StatCard({
+  to,
+  label,
+  value,
+  valueClassName,
+}: {
+  to: string;
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <Link to={to} className="block">
+      <Card className="transition-colors hover:bg-secondary">
+        <CardContent className="p-4 md:p-5">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className={cn("mt-1 font-mono text-xl font-medium md:text-2xl", valueClassName)}>
+            {value}
+          </p>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 export function DashboardStatCards({
   spendingCents,
   incomeCents,
@@ -29,105 +47,29 @@ export function DashboardStatCards({
   monthName,
 }: DashboardStatCardsProps) {
   return (
-    <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-stagger-in mb-6">
-      <Link to="/financial?type=expense" className="block">
-        <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 to-warning/10 pointer-events-none" />
-          <CardContent className="relative p-4 md:p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Spending
-              </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-destructive">
-                <ArrowDownRight className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="font-display text-xl font-bold tracking-tight md:text-2xl">
-              {formatCents(spendingCents, currency)}
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">{monthName}</p>
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Link to="/financial?type=income" className="block">
-        <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-success/10 to-accent/10 pointer-events-none" />
-          <CardContent className="relative p-4 md:p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Income
-              </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-success">
-                <ArrowUpRight className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="font-display text-xl font-bold tracking-tight md:text-2xl">
-              {formatCents(incomeCents, currency)}
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">{monthName}</p>
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Link to="/financial" className="block">
-        <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-info/10 to-primary/10 pointer-events-none" />
-          <CardContent className="relative p-4 md:p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Net
-              </span>
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-xl bg-background/80",
-                  netCents >= 0
-                    ? "text-info"
-                    : "text-destructive"
-                )}
-              >
-                {netCents >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-              </div>
-            </div>
-            <div
-              className={cn(
-                "font-display text-xl font-bold tracking-tight md:text-2xl",
-                netCents < 0 && "text-destructive"
-              )}
-            >
-              {netCents >= 0 ? "+" : ""}
-              {formatCents(netCents, currency)}
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {netCents >= 0 ? "Looking good" : "In the red"}
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Link to="/groceries" className="block">
-        <Card className="card-interactive overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-warning/10 to-warning/5 pointer-events-none" />
-          <CardContent className="relative p-4 md:p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Groceries
-              </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/80 text-warning">
-                <ShoppingCart className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="font-display text-xl font-bold tracking-tight md:text-2xl">
-              {groceryCount}
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">Active items</p>
-          </CardContent>
-        </Card>
-      </Link>
+    <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard
+        to="/financial?type=expense"
+        label={`Spent in ${monthName}`}
+        value={formatCents(spendingCents, currency)}
+      />
+      <StatCard
+        to="/financial?type=income"
+        label={`Received in ${monthName}`}
+        value={formatCents(incomeCents, currency)}
+        valueClassName="text-success"
+      />
+      <StatCard
+        to="/financial"
+        label="Net"
+        value={`${netCents >= 0 ? "+" : ""}${formatCents(netCents, currency)}`}
+        valueClassName={netCents < 0 ? "text-destructive" : undefined}
+      />
+      <StatCard
+        to="/groceries"
+        label="On the grocery list"
+        value={String(groceryCount)}
+      />
     </div>
   );
 }

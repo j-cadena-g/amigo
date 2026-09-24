@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
-import { tagColors, swatchColors, type TagColorKey } from "./constants";
+import { cn } from "@/app/lib/utils";
+import { tagColors, type TagColorKey } from "./constants";
+import { TagBadge, TagDot } from "./tag-badge";
 
 interface TagInputProps {
   allTags: GroceryTag[];
@@ -124,28 +126,23 @@ export function TagInput({
     <div className="relative">
       {/* Tag chips + input row */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {selectedTags.map((tag) => {
-          const colorKey = (
-            tag.color in tagColors ? tag.color : "gray"
-          ) as TagColorKey;
-          const colors = tagColors[colorKey];
-          return (
-            <span
-              key={tag.id}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+        {selectedTags.map((tag) => (
+          <span
+            key={tag.id}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs font-semibold"
+          >
+            <TagDot color={tag.color} />
+            {tag.name}
+            <button
+              type="button"
+              onClick={() => removeTag(tag.id)}
+              className="relative ml-0.5 rounded-xs text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
+              aria-label={`Remove ${tag.name}`}
             >
-              {tag.name}
-              <button
-                type="button"
-                onClick={() => removeTag(tag.id)}
-                className="relative ml-0.5 rounded-full before:absolute before:-inset-2 before:content-[''] hover:opacity-70"
-                aria-label={`Remove ${tag.name}`}
-              >
-                &times;
-              </button>
-            </span>
-          );
-        })}
+              &times;
+            </button>
+          </span>
+        ))}
         <input
           ref={inputRef}
           type="text"
@@ -163,7 +160,7 @@ export function TagInput({
           }
           aria-label="Search or create a tag"
           placeholder={
-            selectedTags.length > 0 ? "Add tag..." : "Tags (optional)..."
+            selectedTags.length > 0 ? "Add a tag" : "Tags (optional)"
           }
           className="min-w-[100px] flex-1 bg-transparent py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
         />
@@ -173,7 +170,7 @@ export function TagInput({
       {isOpen && (options.length > 0 || canCreate) && (
         <div
           ref={dropdownRef}
-          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg"
+          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-xl border border-border bg-popover p-1 shadow-lg"
         >
           {options.length > 0 && (
             <div
@@ -181,35 +178,24 @@ export function TagInput({
               role="listbox"
               className="max-h-48 overflow-y-auto"
             >
-              {options.map((tag, index) => {
-                const colorKey = (
-                  tag.color in tagColors ? tag.color : "gray"
-                ) as TagColorKey;
-                const colors = tagColors[colorKey];
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    id={`${listboxId}-option-${index}`}
-                    role="option"
-                    aria-selected={highlightIndex === index}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectExistingTag(tag)}
-                    onMouseEnter={() => setHighlightIndex(index)}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
-                      highlightIndex === index
-                        ? "bg-accent"
-                        : "hover:bg-accent"
-                    }`}
-                  >
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
-                    >
-                      {tag.name}
-                    </span>
-                  </button>
-                );
-              })}
+              {options.map((tag, index) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  id={`${listboxId}-option-${index}`}
+                  role="option"
+                  aria-selected={highlightIndex === index}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectExistingTag(tag)}
+                  onMouseEnter={() => setHighlightIndex(index)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+                    highlightIndex === index ? "bg-accent" : "hover:bg-accent"
+                  )}
+                >
+                  <TagBadge tag={tag} />
+                </button>
+              ))}
             </div>
           )}
 
@@ -233,7 +219,7 @@ export function TagInput({
                 </span>
               </button>
               <div className="mt-1 flex flex-wrap gap-1 pl-6">
-                {(Object.keys(swatchColors) as TagColorKey[]).map(
+                {(Object.keys(tagColors) as TagColorKey[]).map(
                   (color) => (
                     <button
                       key={color}
@@ -242,11 +228,12 @@ export function TagInput({
                       onClick={() => setNewColor(color)}
                       aria-label={`Color ${color}`}
                       aria-pressed={newColor === color}
-                      className={`relative h-4 w-4 rounded-full before:absolute before:-inset-2 before:content-[''] ${swatchColors[color]} ${
-                        newColor === color
-                          ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
-                          : ""
-                      }`}
+                      className={cn(
+                        "relative h-4 w-4 rounded-xs before:absolute before:-inset-2 before:content-['']",
+                        tagColors[color],
+                        newColor === color &&
+                          "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                      )}
                     />
                   )
                 )}

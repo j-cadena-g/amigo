@@ -14,6 +14,10 @@ import {
   DialogDescription,
 } from "@/app/components/ui/dialog";
 import { toastMutationFailure } from "@/app/lib/api-error";
+import {
+  formatDayTotal,
+  transactionTotalsForDay,
+} from "@/app/lib/calendar-day-totals";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { useToast } from "@/app/components/toast-provider";
@@ -202,6 +206,7 @@ export function Calendar({
   });
 
   const selectedEvents = selectedDay ? eventsByDate[selectedDay] ?? [] : [];
+  const selectedTotals = transactionTotalsForDay(selectedEvents);
   const weekdayLabels = compact ? WEEKDAYS_COMPACT : WEEKDAYS;
   const cellMinHeight = compact
     ? "min-h-[2.5rem] md:min-h-[2.75rem]"
@@ -292,8 +297,6 @@ export function Calendar({
                 cell.dateStr ? eventsByDate[cell.dateStr] ?? [] : [];
               const isToday = cell.dateStr === todayStr;
               const hasEvents = dayEvents.length > 0;
-              const previewEvents = dayEvents.slice(0, 2);
-              const moreCount = dayEvents.length - 2;
 
               return (
                 <button
@@ -322,34 +325,11 @@ export function Calendar({
                     {cell.day}
                   </span>
 
-                  {hasEvents && !compact && (
-                    <div className="hidden md:flex flex-col gap-0.5 mt-1">
-                      {previewEvents.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className={cn(
-                            "text-[10px] font-medium leading-tight px-1 py-0.5 rounded truncate",
-                            EVENT_BADGE_CLASSES[ev.color]
-                          )}
-                        >
-                          {ev.metadata?.amount != null
-                            ? `${ev.metadata.transactionType === "income" ? "+" : "-"}${formatCents(ev.metadata.amount, (ev.metadata.currency ?? "CAD") as CurrencyCode, { compact: true })}`
-                            : ev.title}
-                        </div>
-                      ))}
-                      {moreCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground px-1">
-                          +{moreCount} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-
                   {hasEvents && (
                     <div
                       className={cn(
                         "flex gap-0.5 flex-wrap",
-                        compact ? "mt-0" : "mt-1 md:hidden"
+                        compact ? "mt-0" : "mt-1"
                       )}
                     >
                       {Array.from(
@@ -440,10 +420,30 @@ export function Calendar({
                 )}
             </DialogTitle>
             <DialogDescription>
-              {selectedEvents.length} event
-              {selectedEvents.length !== 1 ? "s" : ""}
+              {selectedEvents.length === 1
+                ? "1 event"
+                : `${selectedEvents.length} events`}
             </DialogDescription>
           </DialogHeader>
+
+          {selectedTotals.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {selectedTotals.map((total) => (
+                <p key={total.currency} className="text-sm">
+                  <span className="text-muted-foreground">Net </span>
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums",
+                      total.netCents > 0 && "text-success",
+                      total.netCents < 0 && "text-destructive"
+                    )}
+                  >
+                    {formatDayTotal(total.netCents, total.currency)}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {selectedEvents.map((event) => (

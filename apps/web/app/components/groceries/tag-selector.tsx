@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
+import { Check, Pencil, Tag } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import { cn } from "@/app/lib/utils";
-import { tagColorKey, tagColors, type TagColorKey } from "./constants";
+import { tagColorKey, type TagColorKey } from "./constants";
 import { TagBadge } from "./tag-badge";
-import { Check, Pencil, Tag, Trash2 } from "lucide-react";
+import { TagColorPicker } from "./tag-color-picker";
 
 interface TagSelectorProps {
   mode: "global" | "item";
@@ -16,6 +19,8 @@ interface TagSelectorProps {
   onEditTag: (tagId: string, name: string, color: string) => Promise<void>;
   filterTagIds?: string[];
   onFilterToggle?: (tagId: string) => void;
+  /** Names the icon-only trigger in item mode. */
+  itemName?: string;
 }
 
 export function TagSelector({
@@ -28,6 +33,7 @@ export function TagSelector({
   onEditTag,
   filterTagIds,
   onFilterToggle,
+  itemName,
 }: TagSelectorProps) {
   const confirm = useConfirm();
   const [isOpen, setIsOpen] = useState(false);
@@ -78,6 +84,8 @@ export function TagSelector({
     search.trim().length > 0 &&
     !allTags.some((t) => t.name.toLowerCase() === search.trim().toLowerCase());
 
+  const activeFilterCount = filterTagIds?.length ?? 0;
+
   async function handleCreate() {
     const name = search.trim();
     if (!name || isCreating) return;
@@ -95,10 +103,11 @@ export function TagSelector({
 
   async function handleDelete(tagId: string) {
     const ok = await confirm({
-      title: "Delete Tag",
-      description: "This will remove the tag from all grocery items. Are you sure?",
-      confirmText: "Delete",
+      title: "Delete this tag?",
+      description: "It will be removed from every item on the list.",
+      confirmText: "Delete tag",
       cancelText: "Cancel",
+      variant: "destructive",
     });
     if (ok) {
       await onDeleteTag(tagId);
@@ -120,136 +129,126 @@ export function TagSelector({
 
   return (
     <div className="relative inline-block">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        aria-controls={popoverId}
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
-      >
-        <Tag className="h-3.5 w-3.5" />
-        {mode === "global" ? "Filter Tags" : "Tags"}
-      </button>
+      {mode === "global" ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          aria-controls={popoverId}
+          className="-ml-2 inline-flex h-10 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
+          <Tag className="h-4 w-4" aria-hidden="true" />
+          Filter by tag
+          {activeFilterCount > 0 && (
+            <span className="font-mono text-foreground">({activeFilterCount})</span>
+          )}
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          aria-controls={popoverId}
+          aria-label={itemName ? `Tags for ${itemName}` : "Tags"}
+          className="relative flex rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-foreground"
+        >
+          <Tag className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
 
       {isOpen && (
         <div
           ref={popoverRef}
           id={popoverId}
-          className="absolute left-0 z-50 mt-1 w-64 rounded-xl border border-border bg-popover p-3 shadow-lg"
+          className={cn(
+            "absolute z-50 mt-1 w-72 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg",
+            mode === "item" ? "right-0" : "left-0"
+          )}
         >
           {editingTag ? (
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-popover-foreground">Edit Tag</h4>
-              <input
+              <h4 className="font-semibold">Edit tag</h4>
+              <Input
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 aria-label="Tag name"
-                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
-              <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(tagColors) as TagColorKey[]).map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setEditColor(color)}
-                    aria-label={`Color ${color}`}
-                    aria-pressed={editColor === color}
-                    className={cn(
-                      "relative h-6 w-6 rounded-sm before:absolute before:-inset-2 before:content-['']",
-                      tagColors[color],
-                      editColor === color &&
-                        "ring-2 ring-ring ring-offset-2 ring-offset-background"
-                    )}
-                  />
-                ))}
-              </div>
-              <div className="flex justify-between">
-                <button
+              <TagColorPicker value={editColor} onChange={setEditColor} />
+              <div className="flex items-center justify-between gap-2">
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleDelete(editingTag.id)}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                  className="-ml-3 text-destructive hover:text-destructive"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
                   Delete
-                </button>
+                </Button>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setEditingTag(null)}
-                    className="inline-flex min-h-9 items-center rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={handleEditSave}
-                    className="inline-flex min-h-9 items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    disabled={!editName.trim()}
                   >
-                    Save
-                  </button>
+                    Save tag
+                  </Button>
                 </div>
               </div>
             </div>
           ) : (
             <>
-              <input
+              <Input
                 type="text"
-                placeholder="Search or create tag..."
+                placeholder="Search or create a tag"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && canCreate && !isCreating) handleCreate();
                 }}
                 aria-label="Search or create a tag"
-                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
 
               {canCreate && (
-                <div className="mt-2 space-y-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    {(Object.keys(tagColors) as TagColorKey[]).map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setNewColor(color)}
-                        aria-label={`Color ${color}`}
-                        aria-pressed={newColor === color}
-                        className={cn(
-                          "relative h-5 w-5 rounded-sm before:absolute before:-inset-2 before:content-['']",
-                          tagColors[color],
-                          newColor === color &&
-                            "ring-2 ring-ring ring-offset-1 ring-offset-background"
-                        )}
-                      />
-                    ))}
-                  </div>
-                  <button
+                <div className="mt-3 space-y-3">
+                  <TagColorPicker value={newColor} onChange={setNewColor} />
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={handleCreate}
                     disabled={isCreating}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    className="w-full"
                   >
-                    {isCreating && (
-                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                    )}
-                    Create &quot;{search.trim()}&quot;
-                  </button>
+                    <span className="min-w-0 truncate">
+                      {isCreating ? "Creating…" : <>Create &ldquo;{search.trim()}&rdquo;</>}
+                    </span>
+                  </Button>
                 </div>
               )}
 
-              <div className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
+              <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
                 {filteredTags.map((tag) => {
-                  const isSelected = mode === "item"
-                    ? selectedTagIds.includes(tag.id)
-                    : filterTagIds?.includes(tag.id);
+                  const isSelected =
+                    mode === "item"
+                      ? selectedTagIds.includes(tag.id)
+                      : Boolean(filterTagIds?.includes(tag.id));
                   return (
-                    <div
+                    <li
                       key={tag.id}
-                      className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent"
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-secondary"
                     >
                       <button
                         type="button"
@@ -260,16 +259,20 @@ export function TagSelector({
                             onFilterToggle(tag.id);
                           }
                         }}
-                        className="flex flex-1 items-center gap-2"
+                        aria-pressed={isSelected}
+                        className="flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left"
                       >
                         <span
-                          className={`flex h-4 w-4 items-center justify-center rounded border ${
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
                             isSelected
-                              ? "border-primary bg-primary"
+                              ? "border-foreground bg-foreground text-background"
                               : "border-input"
-                          }`}
+                          )}
                         >
-                          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                          {isSelected && (
+                            <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                          )}
                         </span>
                         <TagBadge tag={tag} />
                       </button>
@@ -277,19 +280,19 @@ export function TagSelector({
                         type="button"
                         onClick={() => startEdit(tag)}
                         aria-label={`Edit tag ${tag.name}`}
-                        className="relative rounded p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-foreground"
+                        className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-background hover:text-foreground"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
-                    </div>
+                    </li>
                   );
                 })}
-                {filteredTags.length === 0 && !canCreate && (
-                  <p className="py-2 text-center text-xs text-muted-foreground">
-                    No tags found
-                  </p>
-                )}
-              </div>
+              </ul>
+              {filteredTags.length === 0 && !canCreate && (
+                <p className="py-2 text-sm text-muted-foreground">
+                  No tags yet. Type a name to create one.
+                </p>
+              )}
             </>
           )}
         </div>

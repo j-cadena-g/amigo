@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import type { GroceryItemWithTags } from "./types";
 import { formatHistoryDate } from "./constants";
+import { CheckButton } from "./check-button";
 import { TagBadge } from "./tag-badge";
-import { Check, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 
 interface HistorySectionProps {
   items: GroceryItemWithTags[];
@@ -24,6 +25,7 @@ export function HistorySection({
   onUpdatePurchaseDate,
 }: HistorySectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const listId = useId();
 
   const groups = useMemo(() => {
     const groupMap = new Map<string, DateGroup>();
@@ -52,75 +54,84 @@ export function HistorySection({
   if (items.length === 0) return null;
 
   return (
-    <div className="mt-6">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-        Purchased ({items.length})
-      </button>
+    <section className="mt-8">
+      <h2>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          aria-controls={listId}
+          className="-ml-1 flex min-h-10 items-center gap-1.5 pr-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          )}
+          Bought ({items.length})
+        </button>
+      </h2>
 
       {isExpanded && (
-        <div className="mt-2 space-y-4">
+        <div id={listId} className="mt-2 space-y-6">
           {groups.map((group) => (
             <div key={group.sortKey}>
-              <h4 className="mb-2 px-3 text-sm font-semibold text-muted-foreground">
+              <h3 className="text-sm font-semibold text-muted-foreground">
                 {group.label}
-              </h4>
-              <div className="space-y-1">
+              </h3>
+              <ul className="mt-1 divide-y divide-border border-y border-border">
                 {group.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-accent"
-                  >
-                    <button
-                      type="button"
+                  <li key={item.id} className="flex items-start gap-3 py-2.5">
+                    <CheckButton
+                      checked
                       onClick={() => onToggle(item.id)}
-                      aria-label={`Mark ${item.itemName} as not purchased`}
-                      className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-success bg-success text-success-foreground before:absolute before:-inset-2.5 before:content-['']"
-                    >
-                      <Check className="h-3 w-3" />
-                    </button>
+                      className="mt-0.5"
+                      aria-label={`Mark ${item.itemName} as not bought`}
+                    />
 
-                    <div className="flex flex-1 items-center gap-2 overflow-hidden">
-                      <span className="truncate text-sm text-muted-foreground line-through">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-muted-foreground line-through">
                         {item.itemName}
-                      </span>
-                      {item.groceryItemTags.map((git) => (
-                        <TagBadge key={git.groceryTag.id} tag={git.groceryTag} />
-                      ))}
+                      </p>
+                      {item.groceryItemTags.length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                          {item.groceryItemTags.map((git) => (
+                            <TagBadge
+                              key={git.groceryTag.id}
+                              tag={git.groceryTag}
+                              className="text-muted-foreground"
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onUpdatePurchaseDate(item.id)}
-                      className="relative shrink-0 rounded p-1 text-xs text-muted-foreground before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-accent hover:text-foreground"
-                    >
-                      Edit date
-                    </button>
+                    <div className="flex h-6 shrink-0 items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => onUpdatePurchaseDate(item.id)}
+                        aria-label={`Edit date for ${item.itemName}`}
+                        className="relative text-sm text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] hover:text-foreground hover:decoration-foreground"
+                      >
+                        Edit date
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => onDelete(item.id)}
-                      aria-label={`Delete ${item.itemName}`}
-                      className="relative shrink-0 rounded p-1 text-muted-foreground before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-accent hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(item.id)}
+                        aria-label={`Delete ${item.itemName}`}
+                        className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

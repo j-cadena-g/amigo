@@ -8,6 +8,9 @@ import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 
+const SELECT_CLASS =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base disabled:cursor-not-allowed disabled:opacity-50";
+
 interface HouseholdSettingsFormProps {
   name: string;
   homeCurrency: CurrencyCode;
@@ -75,13 +78,13 @@ export function HouseholdSettingsForm({
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Update household settings");
+        await toastMutationFailure(toast, res, "Save household settings");
         return;
       }
-      toast("Household settings updated");
+      toast("Household settings saved");
       revalidator.revalidate();
     } catch {
-      await toastMutationFailure(toast, null, "Update household settings");
+      await toastMutationFailure(toast, null, "Save household settings");
     } finally {
       setSaving(false);
     }
@@ -90,9 +93,21 @@ export function HouseholdSettingsForm({
   const timezoneOptions = buildTimezoneOptions(timezoneValue);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <label htmlFor="household-name" className="text-sm font-medium">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void handleSave();
+      }}
+      className="space-y-5"
+    >
+      {!canEdit && (
+        <p className="text-sm text-muted-foreground">
+          Only the owner or an admin can change these.
+        </p>
+      )}
+
+      <div>
+        <label htmlFor="household-name" className="block text-sm font-semibold">
           Name
         </label>
         <Input
@@ -103,20 +118,28 @@ export function HouseholdSettingsForm({
           maxLength={80}
           disabled={!canEdit || saving}
           required
+          className="mt-1.5"
         />
       </div>
 
-      <div className="space-y-3">
-        <label htmlFor="household-home-currency" className="text-sm font-medium">
+      <div>
+        <label
+          htmlFor="household-home-currency"
+          className="block text-sm font-semibold"
+        >
           Home currency
         </label>
-        <p className="text-sm text-muted-foreground">
+        <p
+          id="household-home-currency-hint"
+          className="text-sm text-muted-foreground"
+        >
           Used for household totals. Changing it refreshes conversion rates; native
           amounts stay the same.
         </p>
         <select
           id="household-home-currency"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          aria-describedby="household-home-currency-hint"
+          className={`mt-1.5 ${SELECT_CLASS}`}
           value={currencyValue}
           onChange={(e) => setCurrencyValue(e.target.value as CurrencyCode)}
           disabled={!canEdit || saving}
@@ -129,17 +152,18 @@ export function HouseholdSettingsForm({
         </select>
       </div>
 
-      <div className="space-y-3">
-        <label htmlFor="household-timezone" className="text-sm font-medium">
+      <div>
+        <label htmlFor="household-timezone" className="block text-sm font-semibold">
           Timezone
         </label>
-        <p className="text-sm text-muted-foreground">
+        <p id="household-timezone-hint" className="text-sm text-muted-foreground">
           Budget periods and transaction dates use your household&apos;s local
           calendar day.
         </p>
         <select
           id="household-timezone"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          aria-describedby="household-timezone-hint"
+          className={`mt-1.5 ${SELECT_CLASS}`}
           value={timezoneValue}
           onChange={(e) => setTimezoneValue(e.target.value)}
           disabled={!canEdit || saving}
@@ -153,10 +177,10 @@ export function HouseholdSettingsForm({
       </div>
 
       {canEdit && (
-        <Button type="button" size="sm" onClick={handleSave} disabled={!canSave}>
+        <Button type="submit" disabled={!canSave}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
       )}
-    </div>
+    </form>
   );
 }

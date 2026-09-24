@@ -11,7 +11,12 @@ import {
 import { useHouseholdRealtime } from "@/app/components/realtime/household-realtime-provider";
 import { useToast } from "@/app/components/toast-provider";
 import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
-import { readApiErrorMessage } from "@/app/lib/api-error";
+import {
+  connectionFailedMessage,
+  RATE_LIMIT_MESSAGE,
+  readApiErrorMessage,
+  requestFailedMessage,
+} from "@/app/lib/api-error";
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
@@ -184,13 +189,9 @@ export function useGroceryLogic({
 
         if (result.discarded > 0) {
           toast(
-            `${result.discarded} offline change${
-              result.discarded === 1 ? "" : "s"
-            } could not sync and ${
-              result.discarded === 1 ? "was" : "were"
-            } discarded — please re-apply ${
-              result.discarded === 1 ? "it" : "them"
-            }`,
+            result.discarded === 1
+              ? "1 offline change couldn't sync and was dropped. Make that change again."
+              : `${result.discarded} offline changes couldn't sync and were dropped. Make those changes again.`,
             { variant: "error", duration: 8000 }
           );
           revalidator.revalidate();
@@ -263,13 +264,11 @@ export function useGroceryLogic({
 
           dropOverlay();
           if (res.status === 429) {
-            toast("You're doing that a bit fast — give it a second", {
-              variant: "error",
-            });
+            toast(RATE_LIMIT_MESSAGE, { variant: "error" });
             return;
           }
           const message = await readApiErrorMessage(res);
-          toast(message ?? `${label} failed`, { variant: "error" });
+          toast(message ?? requestFailedMessage(label), { variant: "error" });
         } catch {
           // Network failure (likely offline). Queue supported operations so
           // they replay on reconnect, and keep the optimistic change visible.
@@ -282,14 +281,14 @@ export function useGroceryLogic({
               await queueMutation(queued);
               setBaseItems((prev) => applyOptimisticAction(prev, action));
               dropOverlay();
-              toast("Saved offline — will sync when you're back online");
+              toast("Saved offline. It will sync when you're back online.");
               return;
             } catch {
               // Couldn't queue; fall through to revert.
             }
           }
           dropOverlay();
-          toast(`${label} failed — check your connection`, { variant: "error" });
+          toast(connectionFailedMessage(label), { variant: "error" });
         }
       })();
     },
@@ -437,16 +436,14 @@ export function useGroceryLogic({
           body: JSON.stringify({ name, color }),
         });
         if (!res.ok) {
-          toast("Couldn't create tag", { variant: "error" });
+          toast(requestFailedMessage("Create tag"), { variant: "error" });
           return undefined;
         }
         const tag = (await res.json()) as GroceryTag;
         revalidator.revalidate();
         return tag;
       } catch {
-        toast("Couldn't create tag — check your connection", {
-          variant: "error",
-        });
+        toast(connectionFailedMessage("Create tag"), { variant: "error" });
         return undefined;
       }
     },
@@ -458,14 +455,12 @@ export function useGroceryLogic({
       try {
         const res = await fetch(`/api/tags/${tagId}`, { method: "DELETE" });
         if (!res.ok) {
-          toast("Couldn't delete tag", { variant: "error" });
+          toast(requestFailedMessage("Delete tag"), { variant: "error" });
           return;
         }
         revalidator.revalidate();
       } catch {
-        toast("Couldn't delete tag — check your connection", {
-          variant: "error",
-        });
+        toast(connectionFailedMessage("Delete tag"), { variant: "error" });
       }
     },
     [revalidator, toast]
@@ -480,14 +475,12 @@ export function useGroceryLogic({
           body: JSON.stringify({ name, color }),
         });
         if (!res.ok) {
-          toast("Couldn't update tag", { variant: "error" });
+          toast(requestFailedMessage("Update tag"), { variant: "error" });
           return;
         }
         revalidator.revalidate();
       } catch {
-        toast("Couldn't update tag — check your connection", {
-          variant: "error",
-        });
+        toast(connectionFailedMessage("Update tag"), { variant: "error" });
       }
     },
     [revalidator, toast]

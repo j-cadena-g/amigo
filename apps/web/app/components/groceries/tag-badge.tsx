@@ -17,11 +17,17 @@ export function TagDot({ color, className }: { color: string; className?: string
 
 interface TagBadgeProps {
   tag: GroceryTag;
+  className?: string;
 }
 
-export function TagBadge({ tag }: TagBadgeProps) {
+export function TagBadge({ tag, className }: TagBadgeProps) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-semibold text-foreground",
+        className
+      )}
+    >
       <TagDot color={tag.color} />
       {tag.name}
     </span>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
 import { Switch } from "@/app/components/ui/switch";
 import { Button } from "@/app/components/ui/button";
 import { usePushPrompt } from "@/app/components/push-prompt-provider";
@@ -57,7 +56,9 @@ export function NotificationSettings() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update notifications"
+        err instanceof Error
+          ? `Couldn't update notifications: ${err.message}`
+          : "Couldn't update notifications. Try again."
       );
       await refreshStatus();
     } finally {
@@ -73,25 +74,20 @@ export function NotificationSettings() {
 
   if (status === "unsupported" && !needsIOSInstall) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Push notifications are not supported in this browser.
+      <p className="text-muted-foreground">
+        This browser doesn&apos;t support notifications.
       </p>
     );
   }
 
   if (status === "denied") {
     return (
-      <div className="space-y-2">
-        <div className="flex items-start gap-3">
-          <BellOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Notifications blocked</p>
-            <p className="text-sm text-muted-foreground">
-              Your browser blocked notifications for this site. Update site
-              permissions in browser settings to re-enable them.
-            </p>
-          </div>
-        </div>
+      <div>
+        <p className="font-semibold">Notifications are blocked</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your browser blocked notifications for amigo. Allow them in your
+          browser&apos;s site settings to turn them back on.
+        </p>
       </div>
     );
   }
@@ -102,41 +98,40 @@ export function NotificationSettings() {
   return (
     <div className="space-y-4">
       {showToggle ? (
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            {enabled ? (
-              <Bell className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            ) : (
-              <BellOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Grocery updates</p>
-              <p className="text-sm text-muted-foreground">
-                Notify when household members add items or mark them purchased.
-              </p>
-            </div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <label htmlFor="grocery-notifications" className="font-semibold">
+              Grocery list changes
+            </label>
+            <p
+              id="grocery-notifications-hint"
+              className="text-sm text-muted-foreground"
+            >
+              Get a notification when someone else adds an item or marks one as
+              bought.
+            </p>
           </div>
           <Switch
+            id="grocery-notifications"
+            aria-describedby="grocery-notifications-hint"
             checked={enabled}
             disabled={toggling || needsIOSInstall}
             onCheckedChange={(checked) => void handleToggle(checked)}
-            aria-label="Toggle grocery push notifications"
           />
         </div>
       ) : null}
 
       {needsIOSInstall && (
-        <div className="rounded-md bg-warning/15 p-3 text-sm text-warning">
-          <p className="font-medium">iOS requires Home Screen install</p>
-          <p className="mt-1">
-            Add amigo to your Home Screen, open it from there, then enable
-            notifications.
+        <div>
+          <p className="text-sm">
+            On iPhone and iPad, notifications only work after you add amigo to your
+            Home Screen and open it from there.
           </p>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="mt-2"
+            className="mt-3"
             onClick={() => showPrompt()}
           >
             Show install steps

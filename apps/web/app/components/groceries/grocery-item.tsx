@@ -1,9 +1,12 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import type { GroceryTag } from "@amigo/db";
+import { Trash2 } from "lucide-react";
+import { cn } from "@/app/lib/utils";
 import type { GroceryItemWithTags } from "./types";
+import { CheckButton } from "./check-button";
+import { checkOffDelayMs, prefersReducedMotion } from "./check-off";
 import { TagBadge } from "./tag-badge";
 import { TagSelector } from "./tag-selector";
-import { Trash2 } from "lucide-react";
 
 interface GroceryItemProps {
   item: GroceryItemWithTags;
@@ -32,16 +35,21 @@ function GroceryItemComponent({
 }: GroceryItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(item.itemName);
+  const [isCheckingOff, setIsCheckingOff] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkOffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
 
-  // Clean up long-press timer if component unmounts mid-press
+  // Clean up timers if the component unmounts mid-press
   // (e.g. item deleted by another user via WebSocket)
   useEffect(() => {
     return () => {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
+      }
+      if (checkOffTimerRef.current) {
+        clearTimeout(checkOffTimerRef.current);
       }
     };
   }, []);
@@ -87,29 +95,43 @@ function GroceryItemComponent({
 
   // The primary toggle runs on click, so it works for mouse, touch, and
   // keyboard (Enter/Space dispatch a click on a native button). When a
-  // long-press already fired, swallow the trailing click.
+  // long-press already fired, swallow the trailing click. The name is struck
+  // through first, then the item moves to the bought list.
   const handleCheckboxClick = useCallback(() => {
     if (isLongPressRef.current) {
       isLongPressRef.current = false;
       return;
     }
-    onToggle(item.id);
+    if (checkOffTimerRef.current) return;
+
+    const delay = checkOffDelayMs(prefersReducedMotion());
+    if (delay === 0) {
+      onToggle(item.id);
+      return;
+    }
+
+    setIsCheckingOff(true);
+    checkOffTimerRef.current = setTimeout(() => {
+      checkOffTimerRef.current = null;
+      setIsCheckingOff(false);
+      onToggle(item.id);
+    }, delay);
   }, [item.id, onToggle]);
 
   return (
-    <div className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-accent">
-      <button
-        type="button"
+    <li className="flex items-start gap-3 py-2.5">
+      <CheckButton
+        checked={isCheckingOff}
         onClick={handleCheckboxClick}
         onPointerDown={handleCheckboxPointerDown}
         onPointerUp={clearLongPressTimer}
         onPointerLeave={clearLongPressTimer}
         onPointerCancel={clearLongPressTimer}
-        className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-input before:absolute before:-inset-2.5 before:content-[''] hover:border-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-label={`Mark ${item.itemName} as purchased`}
+        className="mt-0.5"
+        aria-label={`Mark ${item.itemName} as bought`}
       />
 
-      <div className="flex flex-1 items-center gap-2 overflow-hidden">
+      <div className="min-w-0 flex-1">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -122,43 +144,53 @@ function GroceryItemComponent({
               if (e.key === "Escape") setIsEditing(false);
             }}
             aria-label={`Edit name for ${item.itemName}`}
-            className="flex-1 rounded border border-primary bg-transparent px-1 py-0.5 text-sm text-foreground focus:outline-none"
+            className="-ml-1 block w-full rounded-sm border border-foreground bg-background px-1 text-base text-foreground focus:outline-none"
           />
         ) : (
           <button
             type="button"
             onClick={handleStartEdit}
-            className="truncate text-left text-sm text-foreground"
+            className={cn(
+              "relative block max-w-full truncate text-left text-base text-foreground",
+              "after:absolute after:inset-x-0 after:top-1/2 after:-mt-px after:h-0.5 after:origin-left after:bg-foreground after:transition-transform after:duration-150 after:ease-out after:content-['']",
+              isCheckingOff ? "after:scale-x-100" : "after:scale-x-0"
+            )}
           >
             {item.itemName}
           </button>
         )}
 
-        {!isEditing &&
-          item.groceryItemTags.map((git) => (
-            <TagBadge key={git.groceryTag.id} tag={git.groceryTag} />
-          ))}
+        {item.groceryItemTags.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+            {item.groceryItemTags.map((git) => (
+              <TagBadge key={git.groceryTag.id} tag={git.groceryTag} />
+            ))}
+          </div>
+        )}
       </div>
 
-      <TagSelector
-        mode="item"
-        allTags={allTags}
-        selectedTagIds={selectedTagIds}
-        onToggleTag={handleToggleTag}
-        onCreateTag={onCreateTag}
-        onDeleteTag={onDeleteTag}
-        onEditTag={onEditTag}
-      />
+      <div className="flex h-6 shrink-0 items-center gap-4">
+        <TagSelector
+          mode="item"
+          itemName={item.itemName}
+          allTags={allTags}
+          selectedTagIds={selectedTagIds}
+          onToggleTag={handleToggleTag}
+          onCreateTag={onCreateTag}
+          onDeleteTag={onDeleteTag}
+          onEditTag={onEditTag}
+        />
 
-      <button
-        type="button"
-        onClick={() => onDelete(item.id)}
-        aria-label={`Delete ${item.itemName}`}
-        className="relative shrink-0 rounded p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-accent hover:text-destructive"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
-    </div>
+        <button
+          type="button"
+          onClick={() => onDelete(item.id)}
+          aria-label={`Delete ${item.itemName}`}
+          className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </li>
   );
 }
 

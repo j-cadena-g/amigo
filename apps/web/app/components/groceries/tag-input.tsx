@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useId } from "react";
 import type { GroceryTag } from "@amigo/db";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/app/lib/utils";
-import { tagColors, type TagColorKey } from "./constants";
+import type { TagColorKey } from "./constants";
 import { TagBadge, TagDot } from "./tag-badge";
+import { TagColorPicker } from "./tag-color-picker";
 
 interface TagInputProps {
   allTags: GroceryTag[];
@@ -129,17 +131,17 @@ export function TagInput({
         {selectedTags.map((tag) => (
           <span
             key={tag.id}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border py-0.5 pl-2 pr-1 text-xs font-semibold"
           >
             <TagDot color={tag.color} />
             {tag.name}
             <button
               type="button"
               onClick={() => removeTag(tag.id)}
-              className="relative ml-0.5 rounded-xs text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
+              className="relative rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
               aria-label={`Remove ${tag.name}`}
             >
-              &times;
+              <X className="h-3 w-3" aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -162,7 +164,7 @@ export function TagInput({
           placeholder={
             selectedTags.length > 0 ? "Add a tag" : "Tags (optional)"
           }
-          className="min-w-[100px] flex-1 bg-transparent py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="min-w-[100px] flex-1 border-b border-transparent bg-transparent py-1 text-base text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
         />
       </div>
 
@@ -170,7 +172,7 @@ export function TagInput({
       {isOpen && (options.length > 0 || canCreate) && (
         <div
           ref={dropdownRef}
-          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-xl border border-border bg-popover p-1 shadow-lg"
+          className="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg"
         >
           {options.length > 0 && (
             <div
@@ -189,8 +191,8 @@ export function TagInput({
                   onClick={() => selectExistingTag(tag)}
                   onMouseEnter={() => setHighlightIndex(index)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                    highlightIndex === index ? "bg-accent" : "hover:bg-accent"
+                    "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm",
+                    highlightIndex === index ? "bg-secondary" : "hover:bg-secondary"
                   )}
                 >
                   <TagBadge tag={tag} />
@@ -201,43 +203,24 @@ export function TagInput({
 
           {/* Create-tag controls: outside the listbox, plain buttons */}
           {canCreate && (
-            <div className="rounded-md px-2 py-1.5 hover:bg-accent">
+            <div className="px-2 py-2">
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleCreate}
                 disabled={isCreating}
-                className="flex w-full items-center gap-2 text-left text-sm disabled:opacity-50"
+                className="flex w-full min-w-0 items-center gap-2 text-left text-sm font-semibold disabled:opacity-50"
               >
-                {isCreating ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                ) : (
-                  <span className="text-muted-foreground">+</span>
-                )}
-                <span>
-                  Create &ldquo;{search.trim()}&rdquo;
+                <Plus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">
+                  {isCreating ? "Creating…" : <>Create &ldquo;{search.trim()}&rdquo;</>}
                 </span>
               </button>
-              <div className="mt-1 flex flex-wrap gap-1 pl-6">
-                {(Object.keys(tagColors) as TagColorKey[]).map(
-                  (color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setNewColor(color)}
-                      aria-label={`Color ${color}`}
-                      aria-pressed={newColor === color}
-                      className={cn(
-                        "relative h-4 w-4 rounded-xs before:absolute before:-inset-2 before:content-['']",
-                        tagColors[color],
-                        newColor === color &&
-                          "ring-2 ring-ring ring-offset-1 ring-offset-background"
-                      )}
-                    />
-                  )
-                )}
-              </div>
+              <TagColorPicker
+                value={newColor}
+                onChange={setNewColor}
+                className="mt-3 pl-6"
+              />
             </div>
           )}
         </div>

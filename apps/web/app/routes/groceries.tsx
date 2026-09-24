@@ -3,7 +3,6 @@ import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, groceryItems, groceryTags, scopeToHousehold, and, isNull } from "@amigo/db";
 import { GroceryList } from "@/app/components/groceries/grocery-list";
-import { PushNotificationButton } from "@/app/components/push-notification-button";
 import {
   hydrateFromServer,
   getOfflineItems,
@@ -193,19 +192,13 @@ export default function Groceries() {
   const { items, tags, userId, fromOffline } = useLoaderData<typeof loader>();
 
   return (
-    <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="type-display text-title-sm md:text-title">Groceries</h1>
-          {fromOffline && (
-            <p className="mt-2 text-sm text-warning">
-              Showing offline data — changes will sync when you&apos;re back online.
-            </p>
-          )}
-        </div>
-        <PushNotificationButton />
-      </div>
-      <GroceryList items={items} allTags={tags} userId={userId} />
+    <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+      <GroceryList
+        items={items}
+        allTags={tags}
+        userId={userId}
+        fromOffline={fromOffline}
+      />
     </main>
   );
 }

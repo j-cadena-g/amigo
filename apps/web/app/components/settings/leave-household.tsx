@@ -16,9 +16,9 @@ export function LeaveHousehold({ role }: LeaveHouseholdProps) {
 
   async function handleLeave() {
     const confirmed = await confirm({
-      title: "Leave household",
+      title: "Leave this household?",
       description:
-        "Are you sure you want to leave this household? You can restore access within 14 days if an invite or restore window remains available.",
+        "You'll lose access right away. Sign back in within 14 days to restore your access.",
       confirmText: "Leave household",
       variant: "destructive",
     });
@@ -39,29 +39,29 @@ export function LeaveHousehold({ role }: LeaveHouseholdProps) {
     }
   }
 
+  if (isOwner) {
+    return (
+      <p className="text-muted-foreground">
+        You own this household, so you can&apos;t leave it yet. First choose Manage
+        next to another member, then Transfer ownership.
+      </p>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="font-medium">Leave household</p>
-        <p className="text-sm text-muted-foreground">
-          {isOwner
-            ? "Transfer ownership to another member before you can leave."
-            : "Leave this household. You may restore within the grace window."}
-        </p>
-      </div>
-      {isOwner ? (
-        <p className="text-sm text-muted-foreground">
-          Use Manage → Transfer Ownership on another member first.
-        </p>
-      ) : (
-        <Button
-          variant="destructive"
-          disabled={leaving}
-          onClick={handleLeave}
-        >
-          {leaving ? "Leaving..." : "Leave household"}
-        </Button>
-      )}
+    <div>
+      <p className="text-muted-foreground">
+        You&apos;ll lose access to the household&apos;s lists and money right away.
+        You can restore your access within 14 days.
+      </p>
+      <Button
+        variant="destructive"
+        className="mt-4"
+        disabled={leaving}
+        onClick={handleLeave}
+      >
+        {leaving ? "Leaving…" : "Leave household"}
+      </Button>
     </div>
   );
 }

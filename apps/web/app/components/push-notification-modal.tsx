@@ -42,7 +42,9 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
       onClose();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to enable notifications"
+        err instanceof Error
+          ? `Couldn't turn on notifications: ${err.message}`
+          : "Couldn't turn on notifications. Try again."
       );
     } finally {
       setIsLoading(false);
@@ -70,47 +72,42 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Stay updated</DialogTitle>
+          <DialogTitle className="pr-6">
+            Get a notification when the grocery list changes
+          </DialogTitle>
           <DialogDescription>
-            Get notified when your household member adds items to the grocery
-            list or marks items as purchased.
+            You&apos;ll get one when someone else in your household adds an item or
+            marks one as bought.
           </DialogDescription>
         </DialogHeader>
 
         {needsIOSInstall && (
-          <div className="rounded-md bg-warning/15 p-3 text-sm text-warning">
-            <p className="font-medium">iOS requires app installation</p>
-            <p className="mt-1">
-              To receive notifications, first add amigo to your Home Screen:
+          <div className="text-sm">
+            <p className="font-semibold">
+              On iPhone and iPad, add amigo to your Home Screen first:
             </p>
-            <ol className="mt-2 list-inside list-decimal space-y-1">
-              <li>Tap the Share button in Safari</li>
-              <li>Select &quot;Add to Home Screen&quot;</li>
-              <li>Open the app from your Home Screen</li>
+            <ol className="mt-2 list-inside list-decimal space-y-1 text-muted-foreground">
+              <li>Tap the Share button in Safari.</li>
+              <li>Choose &ldquo;Add to Home Screen&rdquo;.</li>
+              <li>Open amigo from your Home Screen and turn on notifications.</li>
             </ol>
           </div>
         )}
 
         {isDenied && (
-          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            <p className="font-medium">Notifications blocked</p>
-            <p className="mt-1">
-              You previously blocked notifications. To enable them, update your
-              browser settings for this site.
-            </p>
-          </div>
+          <p className="text-sm">
+            Notifications are blocked for amigo in this browser. Allow them in your
+            browser&apos;s site settings, then try again.
+          </p>
         )}
 
         {error && (
-          <div
-            className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-            role="alert"
-          >
+          <p className="text-sm text-destructive" role="alert">
             {error}
-          </div>
+          </p>
         )}
 
-        <DialogFooter className="sm:justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={handleSkip}>
             Not now
           </Button>
@@ -119,7 +116,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
             onClick={() => void handleEnable()}
             disabled={isLoading || isDenied || needsIOSInstall}
           >
-            {isLoading ? "Enabling…" : "Enable notifications"}
+            {isLoading ? "Turning on…" : "Turn on notifications"}
           </Button>
         </DialogFooter>
       </DialogContent>

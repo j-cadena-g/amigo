@@ -68,6 +68,16 @@ describe("transactions reviewed flag", () => {
     const db = getDb(env.DB);
     const session = testSession({ userId: ownerId, householdId });
 
+    // Second transaction stays unreviewed so reviewed=false has a positive hit.
+    const unreviewedTxnId = crypto.randomUUID();
+    await seedExpenseTransaction(db, {
+      id: unreviewedTxnId,
+      householdId,
+      userId: ownerId,
+      amount: 2500,
+      category: "Groceries",
+    });
+
     await db
       .update(transactions)
       .set({ reviewed: true })
@@ -84,7 +94,9 @@ describe("transactions reviewed flag", () => {
     const reviewedBody = (await reviewedResponse.json()) as {
       data: { id: string }[];
     };
-    expect(reviewedBody.data.map((t) => t.id)).toContain(txnId);
+    const reviewedIds = reviewedBody.data.map((t) => t.id);
+    expect(reviewedIds).toContain(txnId);
+    expect(reviewedIds).not.toContain(unreviewedTxnId);
 
     const unreviewedResponse = await handleTransactionsRequest({
       env,
@@ -97,7 +109,9 @@ describe("transactions reviewed flag", () => {
     const unreviewedBody = (await unreviewedResponse.json()) as {
       data: { id: string }[];
     };
-    expect(unreviewedBody.data.map((t) => t.id)).not.toContain(txnId);
+    const unreviewedIds = unreviewedBody.data.map((t) => t.id);
+    expect(unreviewedIds).toContain(unreviewedTxnId);
+    expect(unreviewedIds).not.toContain(txnId);
   });
 
   it("rejects an invalid reviewed query filter", async () => {

@@ -30,12 +30,16 @@ describe("dashboard integration", () => {
     const db = createTestDb(env.DB);
     const session = testSession({ userId: ownerId, householdId });
 
+    // loadDashboardData sums spending for the month containing "now", so seed
+    // the expense in the current month to make the assertion meaningful.
+    const currentMonthDate = new Date().toISOString().slice(0, 10);
     await seedExpenseTransaction(db, {
       id: crypto.randomUUID(),
       householdId,
       userId: ownerId,
       amount: 12345,
       category: "Dining",
+      date: currentMonthDate,
     });
 
     const response = await handleDashboardRequest({
@@ -54,7 +58,7 @@ describe("dashboard integration", () => {
       calendarEvents: unknown[];
     };
     expect(body).toMatchObject({
-      spendingCents: expect.any(Number),
+      spendingCents: 12345,
       incomeCents: expect.any(Number),
       netCents: expect.any(Number),
       netWorthCents: expect.any(Number),

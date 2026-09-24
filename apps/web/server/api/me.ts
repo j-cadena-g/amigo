@@ -1,4 +1,4 @@
-import { eq, getDb, households } from "@amigo/db";
+import { getDb, households, scopeToHousehold } from "@amigo/db";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 
@@ -23,7 +23,7 @@ export const handleMeRequest: ApiHandler = async ({ env, request, session }) => 
 
   const db = getDb(env.DB);
   const household = await db.query.households.findFirst({
-    where: eq(households.id, session!.householdId),
+    where: scopeToHousehold(households.id, session!.householdId),
   });
 
   return Response.json({

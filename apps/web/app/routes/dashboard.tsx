@@ -2,13 +2,13 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb } from "@amigo/db";
-import { BudgetCharts } from "@/app/components/budget-charts";
-import { Calendar } from "@/app/components/calendar";
-import { DashboardStatCards } from "@/app/components/dashboard/stat-cards";
+import { MonthHero } from "@/app/components/dashboard/month-hero";
+import { MonthStrip } from "@/app/components/dashboard/month-strip";
 import { DashboardRecentTransactions } from "@/app/components/dashboard/recent-transactions";
 import { DashboardBudgetProgress } from "@/app/components/dashboard/budget-progress";
 import { DashboardUpcomingRecurring } from "@/app/components/dashboard/upcoming-recurring";
 import { DashboardNetWorth } from "@/app/components/dashboard/net-worth";
+import { WhereItWent } from "@/app/components/dashboard/where-it-went";
 import { loadDashboardData } from "@/server/lib/dashboard-data";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -19,7 +19,15 @@ export async function loader({ context }: LoaderFunctionArgs) {
 }
 
 export function meta() {
-  return [{ title: "Dashboard · amigo" }];
+  return [{ title: "Home · amigo" }];
+}
+
+function shortMonth(calendarMonth: string, offset: number): string {
+  const [year, month] = calendarMonth.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(year, month - 1 + offset, 1)).toLocaleDateString("en-US", {
+    month: "short",
+    timeZone: "UTC",
+  });
 }
 
 export default function Dashboard() {
@@ -30,7 +38,6 @@ export default function Dashboard() {
     groceryCount,
     currency,
     monthName,
-    year,
     recentTransactions,
     budgetsWithSpending,
     upcomingRecurring,
@@ -45,41 +52,29 @@ export default function Dashboard() {
   } = useLoaderData<typeof loader>();
 
   return (
-    <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <h1 className="type-display mb-6 text-title-sm md:text-title">
-        {monthName} {year}
-      </h1>
-
-      <DashboardStatCards
+    <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+      <MonthHero
+        monthName={monthName}
+        todayStr={todayStr}
         spendingCents={spendingCents}
         incomeCents={incomeCents}
         netCents={netCents}
         groceryCount={groceryCount}
         currency={currency}
-        monthName={monthName}
       />
 
-      <section className="mb-6" aria-label="Monthly activity">
-        <Calendar
-          compact
-          initialEvents={calendarEvents}
-          initialMonth={calendarMonth}
-        />
-      </section>
+      <MonthStrip
+        events={calendarEvents}
+        month={calendarMonth}
+        todayStr={todayStr}
+        currency={currency}
+        className="mt-8"
+      />
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <DashboardRecentTransactions
-          transactions={recentTransactions}
-          todayStr={todayStr}
-        />
-        <DashboardBudgetProgress
-          budgets={budgetsWithSpending}
-          currency={currency}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-5 mt-4">
-        <DashboardUpcomingRecurring items={upcomingRecurring} todayStr={todayStr} />
+      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-2">
+        <DashboardUpcomingRecurring items={upcomingRecurring} />
+        <DashboardBudgetProgress budgets={budgetsWithSpending} currency={currency} />
+        <DashboardRecentTransactions transactions={recentTransactions} />
         <DashboardNetWorth
           netWorthCents={netWorthCents}
           assetsCents={assetsCents}
@@ -89,13 +84,14 @@ export default function Dashboard() {
       </div>
 
       {categoryData.length > 0 && (
-        <div className="mt-4">
-          <BudgetCharts
-            categoryData={categoryData}
-            monthlyComparison={monthlyComparison}
-            currency={currency}
-          />
-        </div>
+        <WhereItWent
+          categoryData={categoryData}
+          monthlyComparison={monthlyComparison}
+          currency={currency}
+          monthShort={shortMonth(calendarMonth, 0)}
+          lastMonthShort={shortMonth(calendarMonth, -1)}
+          className="mt-10"
+        />
       )}
     </main>
   );

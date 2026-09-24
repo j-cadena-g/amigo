@@ -1,5 +1,4 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
-import { WifiOff } from "lucide-react";
 import { getPendingCount, isOfflineSupported } from "@/app/lib/offline";
 
 function subscribeOnlineStatus(onStoreChange: () => void) {
@@ -66,9 +65,8 @@ export function OfflineIndicator() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-50 flex items-center gap-2 rounded-lg bg-warning/90 px-4 py-2 text-sm font-medium text-warning-foreground shadow-lg"
+      className="fixed bottom-(--toast-bottom) left-4 z-50 rounded-md bg-warning px-3 py-2 text-sm font-semibold text-warning-foreground shadow-lg"
     >
-      <WifiOff className="h-4 w-4" />
       {label}
     </div>
   );

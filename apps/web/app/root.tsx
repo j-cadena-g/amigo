@@ -15,6 +15,7 @@ import "./app.css";
 import { getCspNonce } from "@/app/lib/session.server";
 import { appContextMiddleware } from "@/server/middleware/app-context";
 import { ToastProvider } from "@/app/components/toast-provider";
+import { buttonVariants } from "@/app/components/ui/button";
 
 export const middleware: Route.MiddlewareFunction[] = [
   clerkMiddleware(),
@@ -66,9 +67,49 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Clerk reads these through its own CSS variables, so sign-in follows the theme. */
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "var(--color-primary)",
+    colorPrimaryForeground: "var(--color-primary-foreground)",
+    colorBackground: "var(--color-card)",
+    colorForeground: "var(--color-foreground)",
+    colorMuted: "var(--color-muted)",
+    colorMutedForeground: "var(--color-muted-foreground)",
+    colorNeutral: "var(--color-foreground)",
+    colorInput: "var(--color-background)",
+    colorInputForeground: "var(--color-foreground)",
+    colorBorder: "var(--color-border)",
+    colorRing: "var(--color-ring)",
+    colorDanger: "var(--color-destructive)",
+    colorSuccess: "var(--color-success)",
+    colorWarning: "var(--color-warning)",
+    colorModalBackdrop: "rgb(0 0 0 / 0.5)",
+    fontFamily: "var(--font-sans)",
+    fontFamilyButtons: "var(--font-sans)",
+    fontFamilyMono: "var(--font-mono)",
+    fontSize: "0.9375rem",
+    borderRadius: "0.375rem",
+  },
+  elements: {
+    cardBox: { boxShadow: "none", border: "1px solid var(--color-border)" },
+    logoBox: { display: "none" },
+  },
+};
+
+const clerkLocalization = {
+  signIn: {
+    start: { subtitle: "Use the email you signed up with." },
+  },
+};
+
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
-    <ClerkProvider loaderData={loaderData}>
+    <ClerkProvider
+      loaderData={loaderData}
+      appearance={clerkAppearance}
+      localization={clerkLocalization}
+    >
       <ToastProvider>
         <Outlet />
       </ToastProvider>
@@ -77,36 +118,34 @@ export default function App({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  let message = "This page didn't load";
+  let details = "Reload the page to try again.";
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
+    if (error.status === 404) {
+      message = "Page not found";
+      details = "This page doesn't exist or has moved.";
+    } else if (error.statusText) {
+      details = error.statusText;
+    }
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="text-center max-w-md">
-        <h1 className="type-display mb-2 text-title">{message}</h1>
-        <p className="text-muted-foreground">{details}</p>
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+        <h1 className="type-display text-title-sm md:text-title">{message}</h1>
+        <p className="mt-2 text-muted-foreground">{details}</p>
         <div className="mt-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Back to dashboard
+          <Link to="/dashboard" className={buttonVariants()}>
+            Go to Home
           </Link>
         </div>
         {stack && (
-          <pre className="mt-6 w-full p-4 overflow-x-auto rounded-xl bg-secondary text-left text-xs">
+          <pre className="mt-6 w-full overflow-x-auto rounded-xl bg-secondary p-4 text-left text-xs">
             <code className="font-mono">{stack}</code>
           </pre>
         )}

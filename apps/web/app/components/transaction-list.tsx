@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useRevalidator } from "react-router";
+import { Link, useRevalidator, useSearchParams } from "react-router";
 import { Loader2, Download, Upload } from "lucide-react";
 import { EmptyState } from "@/app/components/empty-state";
 import type { CurrencyCode } from "@amigo/db";
@@ -40,12 +40,15 @@ export function TransactionList({
   const revalidator = useRevalidator();
   const confirm = useConfirm();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [allTransactions, setAllTransactions] =
     useState<TransactionDTO[]>(initialTransactions);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialTransactions.length >= 20);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(
+    () => searchParams.get("new") === "1"
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,7 +65,7 @@ export function TransactionList({
     description: "",
     categoryId: "",
     type: "expense",
-    date: "",
+    date: todayStr,
     budgetId: null,
     currency: homeCurrency,
   });

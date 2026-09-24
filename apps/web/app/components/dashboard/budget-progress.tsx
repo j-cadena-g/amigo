@@ -1,137 +1,113 @@
-import { Link } from "react-router";
-import { ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { formatCents } from "@/app/lib/currency";
-import { cn } from "@/app/lib/utils";
 import type { CurrencyCode } from "@amigo/db";
 import type { BudgetWithSpending } from "@/server/lib/dashboard-data";
+import { formatCents } from "@/app/lib/currency";
+import { cn } from "@/app/lib/utils";
+import { LedgerSection, SectionLink } from "@/app/components/ledger";
 
 interface DashboardBudgetProgressProps {
   budgets: BudgetWithSpending[];
   currency: CurrencyCode;
+  className?: string;
 }
 
 export function DashboardBudgetProgress({
   budgets,
   currency,
+  className,
 }: DashboardBudgetProgressProps) {
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Budget Progress</CardTitle>
-          <Link
-            to="/financial/budgets"
-            className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
-          >
-            Manage
-            <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {budgets.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">
-            No budgets yet.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {budgets.map((b) => {
-              const pct =
-                b.limitHomeCents > 0
-                  ? Math.min(
-                      100,
-                      Math.round((b.spentHomeCents / b.limitHomeCents) * 100)
-                    )
-                  : b.spentHomeCents > 0
-                    ? 100
-                    : 0;
-              const isOver = b.spentHomeCents > b.limitHomeCents;
-              const isCritical = !isOver && pct >= 90;
-              const isWarn = !isOver && pct >= 75 && pct < 90;
-              const budgetCur = b.budgetCurrency as CurrencyCode;
-              const showOriginal = budgetCur !== currency;
-              const projectedSpend = b.spentHomeCents + b.recurringImpactHomeCents;
-              const projectedPct =
-                b.limitHomeCents > 0
-                  ? Math.round((projectedSpend / b.limitHomeCents) * 100)
+    <LedgerSection
+      title="Budgets"
+      aside={<SectionLink to="/financial/budgets">Manage</SectionLink>}
+      className={className}
+    >
+      {budgets.length === 0 ? (
+        <p className="py-4 text-sm text-muted-foreground">No budgets yet.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {budgets.map((b) => {
+            const pct =
+              b.limitHomeCents > 0
+                ? Math.min(100, Math.round((b.spentHomeCents / b.limitHomeCents) * 100))
+                : b.spentHomeCents > 0
+                  ? 100
                   : 0;
+            const remaining = b.limitHomeCents - b.spentHomeCents;
+            const isOver = remaining < 0;
+            const isNear = !isOver && pct >= 75;
+            const budgetCur = b.budgetCurrency as CurrencyCode;
+            const projectedPct =
+              b.limitHomeCents > 0
+                ? Math.round(
+                    ((b.spentHomeCents + b.recurringImpactHomeCents) / b.limitHomeCents) * 100
+                  )
+                : 0;
 
-              return (
-                <div key={b.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium truncate">{b.name}</span>
-                    <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap ml-2">
-                      {formatCents(b.spentHomeCents, currency)} /{" "}
-                      {formatCents(b.limitHomeCents, currency)}
-                    </span>
-                  </div>
-                  {showOriginal && (
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Limit in budget currency:{" "}
-                      {formatCents(b.limitOriginalCents, budgetCur)}
-                    </p>
-                  )}
-                  <progress
-                    className={cn(
-                      "budget-progress",
-                      isOver || isCritical
-                        ? "budget-progress--danger"
-                        : isWarn
-                          ? "budget-progress--warn"
-                          : "budget-progress--default"
-                    )}
-                    value={Math.min(pct, 100)}
-                    max={100}
-                    aria-label={
-                      isOver
-                        ? `${b.name}: over budget`
-                        : `${b.name}: ${pct}% of budget used`
-                    }
-                  />
-                  <div className="flex items-center justify-between mt-1">
-                    <span
-                      className={cn(
-                        "text-xs font-semibold",
-                        isOver
-                          ? "text-destructive"
-                          : isCritical
-                            ? "text-destructive"
-                            : isWarn
-                              ? "text-warning"
-                              : "text-muted-foreground"
-                      )}
-                    >
-                      {isOver
-                        ? "Over budget"
-                        : isCritical
-                          ? "90%+ used"
-                          : isWarn
-                            ? "75%+ used"
-                            : `${pct}% used`}
-                    </span>
-                    <span className="text-xs text-muted-foreground capitalize">
-                      {b.period}
-                    </span>
-                  </div>
-                  {b.recurringImpactHomeCents > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Upcoming recurring (est.):{" "}
-                      {formatCents(b.recurringImpactHomeCents, currency)}
-                      {projectedPct > 100 && (
-                        <span className="text-warning font-medium">
-                          {" "}
-                          — with recurring, ~{projectedPct}% of limit
-                        </span>
-                      )}
-                    </p>
-                  )}
+            return (
+              <li key={b.id} className="py-3">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="truncate font-semibold">{b.name}</span>
+                  <span className="shrink-0 font-mono text-sm text-muted-foreground">
+                    {formatCents(b.spentHomeCents, currency)} of{" "}
+                    {formatCents(b.limitHomeCents, currency)}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                <progress
+                  className={cn(
+                    "budget-progress mt-2",
+                    isOver || pct >= 90
+                      ? "budget-progress--danger"
+                      : isNear
+                        ? "budget-progress--warn"
+                        : "budget-progress--default"
+                  )}
+                  value={Math.min(pct, 100)}
+                  max={100}
+                  aria-label={
+                    isOver ? `${b.name}: over budget` : `${b.name}: ${pct}% of budget used`
+                  }
+                />
+                <p className="mt-1.5 flex justify-between gap-4 text-sm">
+                  <span
+                    className={cn(
+                      "font-mono",
+                      isOver || pct >= 90
+                        ? "text-destructive"
+                        : isNear
+                          ? "text-warning"
+                          : "text-muted-foreground"
+                    )}
+                  >
+                    {isOver
+                      ? `${formatCents(-remaining, currency)} over`
+                      : `${formatCents(remaining, currency)} left`}
+                  </span>
+                  <span className="text-muted-foreground capitalize">{b.period}</span>
+                </p>
+                {budgetCur !== currency && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Limit in budget currency: {formatCents(b.limitOriginalCents, budgetCur)}
+                  </p>
+                )}
+                {b.recurringImpactHomeCents > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Upcoming recurring (est.):{" "}
+                    <span className="font-mono">
+                      {formatCents(b.recurringImpactHomeCents, currency)}
+                    </span>
+                    {projectedPct > 100 && (
+                      <span className="font-semibold text-warning">
+                        {" "}
+                        — with recurring, ~{projectedPct}% of limit
+                      </span>
+                    )}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </LedgerSection>
   );
 }

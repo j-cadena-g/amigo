@@ -84,6 +84,8 @@
   }
 
   :root {
+    --toast-bottom: max(1rem, env(safe-area-inset-bottom));
+
     --tag-blue: #2f6fd6;
     --tag-green: #2e9a5e;
     --tag-red: #d6453b;
@@ -153,6 +155,13 @@
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+  }
+
+  /* Toasts and the offline notice sit above the mobile tab bar. */
+  @media (width < 48rem) {
+    :root:has([data-bottom-bar]) {
+      --toast-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+    }
   }
 }
 

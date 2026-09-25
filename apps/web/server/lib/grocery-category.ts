@@ -138,7 +138,10 @@ function choiceFromJev(response: unknown): string | null {
   const body = field(response, "result") ?? response;
   const aisle = field(field(body, "answers"), "aisle");
   if (!aisle || typeof aisle !== "object") {
-    logFallback("unrecognized_response", { state: field(response, "state") });
+    // Field names only: values could echo the request, which holds the item name.
+    const keys =
+      response && typeof response === "object" ? Object.keys(response) : [];
+    logFallback("unrecognized_response", { keys: keys.slice(0, 10) });
     return null;
   }
   const choice = field(aisle, "choice");

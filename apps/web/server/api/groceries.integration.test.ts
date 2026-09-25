@@ -161,6 +161,68 @@ describe("grocery categorization integration", () => {
     expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy" });
   });
 
+  // A Jev call that stays pending until the test answers it, so another
+  // rename can land on the row while this one waits.
+  function pendingJev() {
+    const jev = {} as {
+      resolve: (value: unknown) => void;
+      reject: (error: Error) => void;
+    };
+    const run = vi.fn(
+      () =>
+        new Promise((resolve, reject) => {
+          jev.resolve = resolve;
+          jev.reject = reject;
+        })
+    );
+    return { run, jev };
+  }
+
+  async function landOverlappingRename(id: string) {
+    await db
+      .update(groceryItems)
+      .set({ itemName: "helado", category: "Frozen" })
+      .where(eq(groceryItems.id, id));
+  }
+
+  it("keeps an overlapping rename's aisle when Jev fails", async () => {
+    const id = await seedItem("leche", "Dairy");
+    const { run, jev } = pendingJev();
+
+    const rename = callGroceries(envWithAi(run), "PATCH", id, {
+      name: "leche 2%",
+    });
+    await vi.waitFor(() => expect(run).toHaveBeenCalled());
+    await landOverlappingRename(id);
+    jev.reject(new Error("upstream"));
+
+    expect((await rename).status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({ itemName: "leche 2%", category: "Frozen" });
+  });
+
+  it("stores Jev's aisle even when it matches the one read before an overlapping rename", async () => {
+    const id = await seedItem("leche", "Dairy");
+    const { run, jev } = pendingJev();
+
+    const rename = callGroceries(envWithAi(run), "PATCH", id, {
+      name: "leche 2%",
+    });
+    await vi.waitFor(() => expect(run).toHaveBeenCalled());
+    await landOverlappingRename(id);
+    jev.resolve(jevResponse("Dairy"));
+
+    expect((await rename).status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy" });
+  });
+
   it("stores Jev's aisle for an offline sync add", async () => {
     const run = vi.fn().mockResolvedValue(jevResponse("Produce"));
 

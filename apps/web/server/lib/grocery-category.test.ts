@@ -89,6 +89,22 @@ describe("categorizeGroceryItem", () => {
     expect(unknownLine).not.toContain("Deli");
   });
 
+  it("logs only field names for a response that echoes the item name", async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValue({ state: "jabón líquido", questions: {} });
+
+    await expect(
+      categorizeGroceryItem({ run }, "jabón líquido")
+    ).resolves.toEqual({ category: "General", decided: false });
+    const line = String(vi.mocked(console.warn).mock.calls[0]?.[0]);
+    expect(JSON.parse(line)).toMatchObject({
+      reason: "unrecognized_response",
+      keys: ["state", "questions"],
+    });
+    expect(line).not.toContain("jabón");
+  });
+
   it("stores General and logs the error, without the item name, when run throws", async () => {
     const run = vi
       .fn()

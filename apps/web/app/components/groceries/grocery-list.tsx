@@ -110,12 +110,15 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
         </h1>
         <PushNotificationButton />
       </div>
-      {fromOffline && (
-        <p role="status" aria-live="polite" className="mt-2 text-sm font-semibold">
-          You&apos;re offline, so this is the last saved list. New items, check-offs,
-          deletions, and tag changes will sync when you reconnect.
-        </p>
-      )}
+      <p
+        role="status"
+        aria-live="polite"
+        className={fromOffline ? "mt-2 text-sm font-semibold" : "sr-only"}
+      >
+        {fromOffline
+          ? "You're offline, so this is the last saved list. New items, check-offs, deletions, and tag changes will sync when you reconnect."
+          : ""}
+      </p>
 
       <form onSubmit={handleSubmit} className="mt-6">
         <div className="flex gap-2">

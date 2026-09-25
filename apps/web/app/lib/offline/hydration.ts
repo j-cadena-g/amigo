@@ -158,7 +158,10 @@ async function incrementalSync(
     });
 
     if (!hasConflict) {
+      // No queued mutation edits category, and a server-side rename (such as
+      // migration 0020) leaves updatedAt alone, so take the server's aisle.
       await db.groceryItems.update(serverItem.id, {
+        category: serverItem.category,
         _serverVersion: serverItem.updatedAt,
       });
       continue;

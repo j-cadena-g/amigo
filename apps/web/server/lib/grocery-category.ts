@@ -56,10 +56,16 @@ function logFallback(reason: FallbackReason, meta?: Record<string, unknown>) {
   );
 }
 
+export interface GroceryCategoryDecision {
+  category: string | null;
+  /** False when `category` is the fallback because Jev did not choose an aisle. */
+  decided: boolean;
+}
+
 /**
  * Returns the supplied category when it is allowlisted, otherwise Jev's
- * confident choice. When Jev can't decide, returns `fallback` (General unless
- * the caller passes something else, such as an item's current category).
+ * confident choice. When Jev can't decide, `decided` is false and `category`
+ * is `fallback` (General unless the caller passes something else).
  */
 export async function categorizeGroceryItem(
   ai: GroceryCategoryAi | undefined,
@@ -68,14 +74,14 @@ export async function categorizeGroceryItem(
     supplied,
     fallback = DEFAULT_GROCERY_CATEGORY,
   }: { supplied?: string | null; fallback?: string | null } = {}
-): Promise<string | null> {
+): Promise<GroceryCategoryDecision> {
   const explicit = supplied?.trim();
   if (explicit && isGroceryCategory(explicit)) {
-    return explicit;
+    return { category: explicit, decided: true };
   }
   if (!ai) {
     logFallback("no_binding");
-    return fallback;
+    return { category: fallback, decided: false };
   }
 
   const controller = new AbortController();
@@ -108,7 +114,11 @@ export async function categorizeGroceryItem(
         }, GROCERY_CATEGORY_TIMEOUT_MS);
       }),
     ]);
-    return choiceFromJev(response) ?? fallback;
+    const choice = choiceFromJev(response);
+    if (choice === null) {
+      return { category: fallback, decided: false };
+    }
+    return { category: choice, decided: true };
   } catch (error) {
     controller.abort();
     if (timedOut) {
@@ -116,7 +126,7 @@ export async function categorizeGroceryItem(
     } else {
       logFallback("error", { error: String(error) });
     }
-    return fallback;
+    return { category: fallback, decided: false };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }

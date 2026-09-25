@@ -229,9 +229,13 @@ async function processMutation(
       }
 
       const itemName = name.trim().slice(0, 255);
-      const resolvedCategory = await categorizeGroceryItem(ai, itemName, {
-        supplied: typeof category === "string" ? category : undefined,
-      });
+      const { category: resolvedCategory } = await categorizeGroceryItem(
+        ai,
+        itemName,
+        {
+          supplied: typeof category === "string" ? category : undefined,
+        }
+      );
       const newItemId = crypto.randomUUID();
       const writes = [
         db.insert(groceryItems).values({

@@ -145,7 +145,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     const itemId = crypto.randomUUID();
-    const category = await categorizeGroceryItem(
+    const { category } = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
       { supplied: validated.category }
@@ -300,8 +300,9 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     // If Jev can't decide, leave the aisle column alone so a rename that
-    // finished while this one was waiting is not overwritten.
-    const category = await categorizeGroceryItem(
+    // finished while this one was waiting is not overwritten. A confident
+    // choice is written even when it matches the aisle we read earlier.
+    const { category, decided } = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
       { fallback: existing.category }
@@ -323,7 +324,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
           .update(groceryItems)
           .set({
             itemName: validated.name.trim(),
-            ...(category !== existing.category ? { category } : {}),
+            ...(decided ? { category } : {}),
             updatedAt: new Date(),
           })
           .where(

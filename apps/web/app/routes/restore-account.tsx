@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { redirect, useNavigate } from "react-router";
 import { useClerk } from "@clerk/react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
+import { Wordmark } from "@/app/components/wordmark";
 import { useToast } from "@/app/components/toast-provider";
-import { RotateCcw, Sparkles, LogOut } from "lucide-react";
 import { getSessionStatus } from "@/app/lib/session.server";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -26,14 +25,14 @@ export async function loader({ context }: LoaderFunctionArgs) {
 }
 
 export function meta() {
-  return [{ title: "Restore account · amigo" }];
+  return [{ title: "Restore your household · amigo" }];
 }
 
 export default function RestoreAccount() {
   const navigate = useNavigate();
   const { signOut } = useClerk();
   const toast = useToast();
-  const [isLoading, setIsLoading] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<"restore" | "fresh" | null>(null);
   const [householdName, setHouseholdName] = useState<string | null>(null);
   const [checkedPending, setCheckedPending] = useState(false);
 
@@ -57,7 +56,10 @@ export default function RestoreAccount() {
         setHouseholdName(data.householdName ?? null);
       } catch {
         if (!cancelled) {
-          toast("Couldn't check restore status", { variant: "error" });
+          toast(
+            "Couldn't check whether your household can be restored. Reload to try again.",
+            { variant: "error" }
+          );
         }
       } finally {
         if (!cancelled) {
@@ -79,9 +81,11 @@ export default function RestoreAccount() {
         return;
       }
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast(body?.error ?? "Failed to restore account", { variant: "error" });
+      toast(body?.error ?? "Couldn't restore your access. Try again.", {
+        variant: "error",
+      });
     } catch {
-      toast("Failed to restore account — check your connection", {
+      toast("Couldn't restore your access. Check your connection and try again.", {
         variant: "error",
       });
     } finally {
@@ -98,9 +102,13 @@ export default function RestoreAccount() {
         return;
       }
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast(body?.error ?? "Failed to start fresh", { variant: "error" });
+      toast(body?.error ?? "Couldn't rejoin the household. Try again.", {
+        variant: "error",
+      });
     } catch {
-      toast("Failed to start fresh — check your connection", { variant: "error" });
+      toast("Couldn't rejoin the household. Check your connection and try again.", {
+        variant: "error",
+      });
     } finally {
       setIsLoading(null);
     }
@@ -108,65 +116,59 @@ export default function RestoreAccount() {
 
   if (!checkedPending) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+      <main className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-muted-foreground">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle>Welcome Back</CardTitle>
-          <p className="text-sm text-muted-foreground mt-2">
-            Your account was previously deactivated
-            {householdName ? ` from ${householdName}` : ""}. Choose how you&apos;d
-            like to proceed.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+        <Wordmark />
+        <h1 className="type-display mt-6 text-title-sm">Restore your household?</h1>
+        <p className="mt-2">
+          You&apos;re no longer a member of{" "}
+          {householdName ? (
+            <span className="font-semibold">{householdName}</span>
+          ) : (
+            "your household"
+          )}
+          . For up to 14 days, you can restore your access and keep everything you
+          added.
+        </p>
+
+        <div className="mt-8 space-y-3">
           <Button
-            className="w-full justify-start gap-3"
-            variant="default"
+            className="w-full"
             onClick={handleRestore}
             disabled={isLoading !== null}
           >
-            <RotateCcw className="h-4 w-4" />
-            <div className="text-left">
-              <p className="font-medium">Restore My Account</p>
-              <p className="text-xs opacity-80">
-                Reconnect to your previous household and data
-              </p>
-            </div>
+            {isLoading === "restore" ? "Restoring…" : "Restore household"}
           </Button>
-
           <Button
-            className="w-full justify-start gap-3"
             variant="outline"
+            className="w-full"
             onClick={handleFreshStart}
             disabled={isLoading !== null}
           >
-            <Sparkles className="h-4 w-4" />
-            <div className="text-left">
-              <p className="font-medium">Start Fresh</p>
-              <p className="text-xs text-muted-foreground">
-                Create a new household. Your old data transfers to the owner.
-              </p>
-            </div>
+            {isLoading === "fresh" ? "Rejoining…" : "Rejoin as a new member"}
           </Button>
+          <p className="text-sm text-muted-foreground">
+            Rejoining as a new member hands everything you added to the household
+            owner.
+          </p>
+        </div>
 
-          <Button
-            className="w-full justify-start gap-3"
-            variant="ghost"
-            onClick={() => void signOut()}
-            disabled={isLoading !== null}
-          >
-            <LogOut className="h-4 w-4" />
-            Cancel &amp; Sign Out
-          </Button>
-        </CardContent>
-      </Card>
+        <Button
+          variant="ghost"
+          className="-ml-4 mt-6 self-start"
+          onClick={() => void signOut()}
+          disabled={isLoading !== null}
+        >
+          Sign out
+        </Button>
+      </div>
     </main>
   );
 }

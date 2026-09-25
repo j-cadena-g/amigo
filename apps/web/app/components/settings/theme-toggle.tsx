@@ -1,36 +1,46 @@
-import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme, useIsMounted } from "@/app/components/theme-provider";
 import { useRovingRadioGroup } from "@/app/lib/use-roving-radio-group";
+import { cn } from "@/app/lib/utils";
 
 const THEME_VALUES = ["light", "dark", "system"] as const;
+
+const OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+] as const;
+
+const SEGMENT_CLASS =
+  "relative h-9 min-w-20 rounded-sm px-4 text-sm font-semibold transition-colors before:absolute before:inset-x-0 before:-inset-y-0.5 before:content-['']";
 
 export function SettingsThemeToggle() {
   const { theme, setTheme } = useTheme();
   const isMounted = useIsMounted();
   const getThemeRadioProps = useRovingRadioGroup(THEME_VALUES, theme, setTheme);
 
+  // The stored theme is only known on the client; render the same shape unselected until then.
   if (!isMounted) {
     return (
-      <div className="flex gap-2">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-10 w-24 animate-pulse rounded-md bg-muted"
-          />
+      <div className="inline-flex rounded-md border border-input p-0.5" aria-hidden="true">
+        {OPTIONS.map(({ value, label }) => (
+          <span
+            key={value}
+            className={cn(SEGMENT_CLASS, "flex items-center justify-center text-muted-foreground")}
+          >
+            {label}
+          </span>
         ))}
       </div>
     );
   }
 
-  const options = [
-    { value: "light" as const, label: "Light", icon: Sun },
-    { value: "dark" as const, label: "Dark", icon: Moon },
-    { value: "system" as const, label: "System", icon: Monitor },
-  ];
-
   return (
-    <div className="flex gap-2" role="radiogroup" aria-label="Theme">
-      {options.map(({ value, label, icon: Icon }) => (
+    <div
+      className="inline-flex rounded-md border border-input p-0.5"
+      role="radiogroup"
+      aria-label="Theme"
+    >
+      {OPTIONS.map(({ value, label }) => (
         <button
           key={value}
           type="button"
@@ -38,13 +48,13 @@ export function SettingsThemeToggle() {
           aria-checked={theme === value}
           onClick={() => setTheme(value)}
           {...getThemeRadioProps(value)}
-          className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+          className={cn(
+            SEGMENT_CLASS,
             theme === value
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
-          }`}
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
         >
-          <Icon className="h-4 w-4" />
           {label}
         </button>
       ))}

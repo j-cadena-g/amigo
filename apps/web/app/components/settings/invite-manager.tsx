@@ -73,7 +73,9 @@ export function InviteManager() {
       await navigator.clipboard.writeText(value);
       toast(`${label} copied`, { variant: "success" });
     } catch {
-      toast(`Couldn't copy ${label.toLowerCase()}`, { variant: "error" });
+      toast(`Couldn't copy the ${label.toLowerCase()}. Try again.`, {
+        variant: "error",
+      });
     }
   }
 
@@ -101,8 +103,8 @@ export function InviteManager() {
         } else {
           toast(
             data.emailError
-              ? `Invite created, but email failed: ${data.emailError}`
-              : "Invite created, but email failed to send",
+              ? `Invite created, but the email didn't send: ${data.emailError}`
+              : "Invite created, but the email didn't send. Share the code instead.",
             { variant: "error" }
           );
         }
@@ -119,9 +121,9 @@ export function InviteManager() {
 
   async function handleRevoke(invite: PendingInvite) {
     const confirmed = await confirm({
-      title: "Revoke invite",
-      description: `Revoke invite ${invite.codeDisplay}? It will no longer work.`,
-      confirmText: "Revoke",
+      title: "Revoke this invite?",
+      description: `${invite.codeDisplay} will stop working right away.`,
+      confirmText: "Revoke invite",
       variant: "destructive",
     });
     if (!confirmed) return;
@@ -162,12 +164,12 @@ export function InviteManager() {
         emailError?: string;
       };
       if (data.emailSent) {
-        toast("Invite email resent", { variant: "success" });
+        toast("Invite email sent again", { variant: "success" });
       } else {
         toast(
           data.emailError
-            ? `Email failed: ${data.emailError}`
-            : "Failed to resend invite email",
+            ? `The email didn't send: ${data.emailError}`
+            : "The email didn't send. Share the code instead.",
           { variant: "error" }
         );
       }
@@ -180,33 +182,42 @@ export function InviteManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleCreate} className="space-y-3">
-        <div>
-          <label htmlFor="invite-email" className="block text-sm font-medium mb-1">
-            Email <span className="text-muted-foreground font-normal">(optional)</span>
-          </label>
+    <div className="space-y-8">
+      <form onSubmit={handleCreate}>
+        <label htmlFor="invite-email" className="block text-sm font-semibold">
+          Email <span className="font-normal text-muted-foreground">(optional)</span>
+        </label>
+        <p id="invite-email-hint" className="text-sm text-muted-foreground">
+          Add an email to send the link, or leave it blank and share the code
+          yourself.
+        </p>
+        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
           <Input
             id="invite-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="friend@example.com"
+            placeholder="name@example.com"
             autoComplete="email"
+            aria-describedby="invite-email-hint"
+            className="min-w-0 flex-1"
           />
+          <Button type="submit" disabled={creating} className="shrink-0">
+            {creating ? "Creating…" : "Create invite"}
+          </Button>
         </div>
-        <Button type="submit" disabled={creating}>
-          {creating ? "Creating…" : "Create invite"}
-        </Button>
       </form>
 
       {created && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <div>
-            <p className="text-sm font-medium">New invite</p>
-            <p className="mt-1 font-mono text-lg tracking-wide">{created.code}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-sm font-semibold">New invite code</p>
+          <p className="mt-1 break-all font-mono text-lg font-medium">
+            {created.code}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Expires {formatExpiry(created.expiresAt)}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -225,10 +236,10 @@ export function InviteManager() {
             </Button>
           </div>
           {created.invitedEmail && (
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-3 text-sm text-muted-foreground">
               {created.emailSent
                 ? `Email sent to ${created.invitedEmail}`
-                : `Email to ${created.invitedEmail} failed${
+                : `The email to ${created.invitedEmail} didn't send${
                     created.emailError ? `: ${created.emailError}` : ""
                   }`}
             </p>
@@ -236,40 +247,42 @@ export function InviteManager() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <p className="text-sm font-medium">Pending invites</p>
+      <div>
+        <h3 className="font-semibold">Pending invites</h3>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
         ) : invites.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No pending invites</p>
+          <p className="mt-2 text-sm text-muted-foreground">No pending invites.</p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className="mt-2 divide-y divide-border border-y border-border">
             {invites.map((invite) => (
               <li
                 key={invite.id}
-                className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
-                <div className="min-w-0 space-y-1">
-                  <p className="font-mono text-sm">{invite.codeDisplay}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="break-all font-mono font-medium">
+                    {invite.codeDisplay}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
                     Expires {formatExpiry(invite.expiresAt)}
                     {invite.invitedEmail ? ` · ${invite.invitedEmail}` : ""}
                   </p>
                   {invite.invitedEmail && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {invite.emailSentAt
                         ? "Email sent"
                         : invite.emailLastError
-                          ? `Email error: ${invite.emailLastError}`
+                          ? `Email didn't send: ${invite.emailLastError}`
                           : "Email not sent"}
                     </p>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
+                <div className="-ml-3 flex shrink-0 flex-wrap gap-1 sm:ml-0">
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     disabled={busyId === invite.id}
                     onClick={() => void copyText("Invite link", invite.joinUrl)}
                   >
@@ -283,14 +296,14 @@ export function InviteManager() {
                       disabled={busyId === invite.id}
                       onClick={() => void handleResend(invite)}
                     >
-                      Resend
+                      Resend email
                     </Button>
                   )}
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="text-destructive hover:text-destructive/90"
+                    className="text-destructive hover:text-destructive"
                     disabled={busyId === invite.id}
                     onClick={() => void handleRevoke(invite)}
                   >

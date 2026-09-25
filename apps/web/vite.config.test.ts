@@ -42,7 +42,6 @@ describe("vite dev config", () => {
         "clsx",
         "dexie",
         "lucide-react",
-        "recharts",
         "tailwind-merge",
         "workbox-precaching",
         "workbox-window",
@@ -79,7 +78,6 @@ describe("vite dev config", () => {
         "react",
         "react-dom/server",
         "react/jsx-dev-runtime",
-        "recharts",
         "tailwind-merge",
       ])
     );

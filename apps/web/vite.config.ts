@@ -22,7 +22,6 @@ const clientOptimizeDepsIncludes = [
   "clsx",
   "dexie",
   "lucide-react",
-  "recharts",
   "tailwind-merge",
   "workbox-precaching",
   "workbox-window",
@@ -44,7 +43,6 @@ const workerSsrOptimizeDepsIncludes = [
   "react",
   "react-dom/server",
   "react/jsx-dev-runtime",
-  "recharts",
   "tailwind-merge",
 ];
 const workerSsrOptimizeDepsExcludes = ["@clerk/react-router/server", "drizzle-orm"];

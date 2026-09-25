@@ -1,7 +1,8 @@
 import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
-import { PiggyBank } from "lucide-react";
-import { toastMutationFailure } from "@/app/lib/api-error";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import type { CurrencyCode } from "@amigo/db";
+import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { centsToInputString } from "@/app/lib/decimal-input";
 import { cn } from "@/app/lib/utils";
@@ -12,9 +13,15 @@ import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
 import { CategoryBudgetMappingPanel } from "@/app/components/financial/category-budget-mapping-panel";
+import {
+  DeleteButton,
+  NativeSelect,
+  SharedCheckbox,
+} from "@/app/components/financial/form-controls";
+import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
+import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +29,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import type { CurrencyCode } from "@amigo/db";
-import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
 interface BudgetWithSpending {
   id: string;
@@ -65,17 +70,36 @@ function emptyBudgetForm(homeCurrency: CurrencyCode): BudgetFormData {
   };
 }
 
-function getProgressVariant(
-  percent: number,
-  remaining: number
-): "budget-list-progress--ok" | "budget-list-progress--warn" | "budget-list-progress--danger" {
-  if (remaining < 0 || percent >= 100) return "budget-list-progress--danger";
-  if (percent >= 90) return "budget-list-progress--danger";
+type ProgressVariant =
+  | "budget-list-progress--ok"
+  | "budget-list-progress--warn"
+  | "budget-list-progress--danger";
+
+function getProgressVariant(percent: number, remaining: number): ProgressVariant {
+  if (remaining < 0) return "budget-list-progress--danger";
   if (percent >= 75) return "budget-list-progress--warn";
   return "budget-list-progress--ok";
 }
 
-function BudgetCard({
+const PROGRESS_TEXT: Record<ProgressVariant, string> = {
+  "budget-list-progress--ok": "text-muted-foreground",
+  "budget-list-progress--warn": "text-warning",
+  "budget-list-progress--danger": "text-destructive",
+};
+
+const SUBMIT_LABELS = {
+  add: { idle: "Add budget", busy: "Adding…" },
+  edit: { idle: "Save budget", busy: "Saving…" },
+} as const;
+
+const ALERT_LABELS: Record<BudgetWithSpending["alertLevel"], string | null> = {
+  ok: null,
+  warn: "75%+ used",
+  critical: "90%+ used",
+  over: "Over",
+};
+
+function BudgetRow({
   budget,
   onEdit,
   onDelete,
@@ -88,90 +112,80 @@ function BudgetCard({
 }) {
   const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
-  const showBudgetCurrency =
-    budget.currency !== budget.homeCurrency;
+  const variant = getProgressVariant(budget.percentUsed, budget.remainingHomeCents);
+  const alert = ALERT_LABELS[budget.alertLevel];
+  const showBudgetCurrency = budget.currency !== budget.homeCurrency;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <CardTitle className="text-base truncate">{budget.name}</CardTitle>
-            {budget.alertLevel !== "ok" && (
+    <li className="flex items-start gap-2 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+          <p className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate font-semibold">{budget.name}</span>
+            {alert && (
               <span
                 className={cn(
-                  "text-[10px] font-semibold uppercase shrink-0 px-1.5 py-0.5 rounded",
-                  budget.alertLevel === "over"
-                    ? "bg-destructive/15 text-destructive"
-                    : budget.alertLevel === "critical"
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-warning/15 text-warning"
+                  "shrink-0 text-xs font-semibold",
+                  budget.alertLevel === "over" ? "text-destructive" : "text-warning"
                 )}
               >
-                {budget.alertLevel === "over"
-                  ? "Over"
-                  : budget.alertLevel === "critical"
-                    ? "90%+"
-                    : "75%+"}
+                {alert}
               </span>
             )}
-          </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={onEdit}>
-              Edit
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete} disabled={deleting}>
-              Delete
-            </Button>
-          </div>
+          </p>
+          <p className="shrink-0 font-mono text-sm font-medium">
+            {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency)} of{" "}
+            {formatCents(budget.limitAmountHome, budget.homeCurrency)}
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>
-              {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency)} of{" "}
-              {formatCents(budget.limitAmountHome, budget.homeCurrency)}
-            </span>
-            <span className="text-muted-foreground capitalize">
-              {budget.period}
-            </span>
-          </div>
-          {showBudgetCurrency && (
-            <p className="text-xs text-muted-foreground">
-              Limit in budget currency:{" "}
+        <progress
+          className={cn("budget-list-progress mt-2", variant)}
+          value={clampedPercent}
+          max={100}
+          aria-label={
+            isOverBudget
+              ? `${budget.name}: over budget`
+              : `${budget.name}: ${Math.round(clampedPercent)}% of budget used`
+          }
+        />
+        <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
+          <span className={cn("font-mono font-medium", PROGRESS_TEXT[variant])}>
+            {isOverBudget
+              ? `${formatCents(-budget.remainingHomeCents, budget.homeCurrency)} over`
+              : `${formatCents(budget.remainingHomeCents, budget.homeCurrency)} left`}
+          </span>
+          <span className="text-muted-foreground capitalize">{budget.period}</span>
+        </div>
+        {showBudgetCurrency && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Limit in budget currency:{" "}
+            <span className="font-mono font-medium">
               {formatCents(budget.limitAmount, budget.currency)}
-            </p>
-          )}
-          <progress
-            className={cn(
-              "budget-list-progress",
-              getProgressVariant(budget.percentUsed, budget.remainingHomeCents)
-            )}
-            value={clampedPercent}
-            max={100}
-            aria-label={`${budget.name}: ${clampedPercent}% of budget used`}
-          />
-          {isOverBudget ? (
-            <p className="text-sm font-medium text-destructive">
-              Over budget by{" "}
-              {formatCents(Math.abs(budget.remainingHomeCents), budget.homeCurrency)}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {formatCents(budget.remainingHomeCents, budget.homeCurrency)} remaining
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            </span>
+          </p>
+        )}
+      </div>
+      <div className="-mr-2 flex shrink-0">
+        <RowIconButton onClick={onEdit} aria-label={`Edit ${budget.name}`}>
+          <Pencil />
+        </RowIconButton>
+        <RowIconButton
+          tone="destructive"
+          onClick={onDelete}
+          disabled={deleting}
+          aria-label={`Delete ${budget.name}`}
+        >
+          <Trash2 />
+        </RowIconButton>
+      </div>
+    </li>
   );
 }
 
 function BudgetFormDialog({
   open,
   onOpenChange,
-  title,
+  mode,
   form,
   setForm,
   onSubmit,
@@ -179,10 +193,12 @@ function BudgetFormDialog({
   error,
   recordId,
   homeCurrency,
+  onDelete,
+  deleting = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  mode: "add" | "edit";
   form: BudgetFormData;
   setForm: React.Dispatch<React.SetStateAction<BudgetFormData>>;
   onSubmit: () => void;
@@ -190,18 +206,33 @@ function BudgetFormDialog({
   error?: string | null;
   recordId?: string;
   homeCurrency: CurrencyCode;
+  onDelete?: () => void;
+  deleting?: boolean;
 }) {
   const nameId = useId();
   const limitId = useId();
+  const currencyId = useId();
+  const periodId = useId();
+  const busy = submitting || deleting;
+  const labels = SUBMIT_LABELS[mode];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{mode === "add" ? "Add budget" : "Edit budget"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor={nameId} className="text-sm font-medium">Name</label>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-sm font-semibold">
+              Name
+            </label>
             <Input
               id={nameId}
               value={form.name}
@@ -209,9 +240,11 @@ function BudgetFormDialog({
               placeholder="e.g. Groceries"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor={limitId} className="text-sm font-medium">Limit</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor={limitId} className="text-sm font-semibold">
+                Limit
+              </label>
               <Input
                 id={limitId}
                 type="number"
@@ -222,47 +255,38 @@ function BudgetFormDialog({
                   setForm((f) => ({ ...f, limitAmount: e.target.value }))
                 }
                 placeholder="0.00"
+                className="font-mono font-medium"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Currency</label>
+            <div className="space-y-1.5">
+              <label htmlFor={currencyId} className="text-sm font-semibold">
+                Currency
+              </label>
               <CurrencySelect
+                id={currencyId}
                 value={form.currency}
                 onChange={(v) => setForm((f) => ({ ...f, currency: v }))}
               />
             </div>
           </div>
-          <div>
-            <label htmlFor="budget-form-period" className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={periodId} className="text-sm font-semibold">
               Period
             </label>
-            <select
-              id="budget-form-period"
+            <NativeSelect
+              id={periodId}
               value={form.period}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, period: e.target.value }))
-              }
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))}
             >
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </NativeSelect>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="budget-shared"
-              checked={form.isShared}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, isShared: e.target.checked }))
-              }
-              className="h-4 w-4 rounded border-input"
-            />
-            <label htmlFor="budget-shared" className="text-sm font-medium">
-              Shared (household-wide)
-            </label>
-          </div>
+          <SharedCheckbox
+            checked={form.isShared}
+            onCheckedChange={(isShared) => setForm((f) => ({ ...f, isShared }))}
+          />
           {recordId ? (
             <AuditHistoryPanel
               recordId={recordId}
@@ -270,20 +294,27 @@ function BudgetFormDialog({
               homeCurrency={homeCurrency}
             />
           ) : null}
-        </div>
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting || !form.name || !form.limitAmount}>
-            {submitting ? "Saving..." : "Save"}
-          </Button>
-        </DialogFooter>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <DialogFooter>
+            {onDelete && (
+              <DeleteButton onClick={onDelete} disabled={busy} className="sm:mr-auto">
+                <Trash2 />
+                {deleting ? "Deleting…" : "Delete"}
+              </DeleteButton>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !form.name || !form.limitAmount}>
+              {submitting ? labels.busy : labels.idle}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -344,9 +375,10 @@ export function BudgetList({
         setShowAdd(false);
         revalidator.revalidate();
       } else {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        setError(data?.message ?? "Failed to create budget");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't add the budget. Try again.");
       }
+    } catch {
+      setError("Couldn't add the budget. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -372,32 +404,33 @@ export function BudgetList({
         setEditingBudget(null);
         revalidator.revalidate();
       } else {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        setError(data?.message ?? "Failed to update budget");
+        setError((await readApiErrorMessage(res)) ?? "Couldn't save the budget. Try again.");
       }
+    } catch {
+      setError("Couldn't save the budget. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(budget: BudgetWithSpending) {
-    if (deletingId) return;
+  async function handleDelete(budget: BudgetWithSpending): Promise<boolean> {
+    if (deletingId) return false;
     setDeletingId(budget.id);
     try {
       const ok = await confirm({
-        title: "Delete Budget",
-        description: `Are you sure you want to delete "${budget.name}"? This action cannot be undone. Transactions linked to this budget will not be deleted but will no longer be tracked against it.`,
+        title: "Delete budget?",
+        description: `This can't be undone. Transactions linked to "${budget.name}" stay, but they won't count toward a budget anymore.`,
         confirmText: "Delete",
         variant: "destructive",
       });
-      if (!ok) return;
+      if (!ok) return false;
 
       const res = await fetch(`/api/budgets/${budget.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
         revalidator.revalidate();
-        return;
+        return true;
       }
       await toastMutationFailure(toast, res, "Delete budget");
     } catch {
@@ -405,74 +438,78 @@ export function BudgetList({
     } finally {
       setDeletingId(null);
     }
+    return false;
+  }
+
+  async function handleDeleteFromDialog() {
+    if (editingBudget && (await handleDelete(editingBudget))) {
+      setEditingBudget(null);
+    }
+  }
+
+  function renderRows(items: BudgetWithSpending[]) {
+    return items.map((b) => (
+      <BudgetRow
+        key={b.id}
+        budget={b}
+        onEdit={() => openEdit(b)}
+        onDelete={() => void handleDelete(b)}
+        deleting={deletingId === b.id}
+      />
+    ));
   }
 
   return (
-    <div className="space-y-6">
-      <FinancialSectionHeader
-        title="Budgets"
-        description="Track spending against category limits."
-        action={<Button onClick={openAdd}>Add Budget</Button>}
-      />
-
-      {shared.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Shared
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {shared.map((b) => (
-              <BudgetCard
-                key={b.id}
-                budget={b}
-                onEdit={() => openEdit(b)}
-                onDelete={() => void handleDelete(b)}
-                deleting={deletingId === b.id}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {personal.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Personal
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {personal.map((b) => (
-              <BudgetCard
-                key={b.id}
-                budget={b}
-                onEdit={() => openEdit(b)}
-                onDelete={() => void handleDelete(b)}
-                deleting={deletingId === b.id}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {budgets.length === 0 && (
-        <EmptyState
-          icon={PiggyBank}
-          title="No budgets yet"
-          description="Create one to start tracking your spending."
+    <div className="space-y-10">
+      <div>
+        <FinancialSectionHeader
+          title="Budgets"
+          className="border-b border-foreground pb-3"
+          action={
+            <Button type="button" onClick={openAdd}>
+              <Plus />
+              Add budget
+            </Button>
+          }
         />
-      )}
+
+        {budgets.length === 0 ? (
+          <EmptyState
+            message="No budgets yet. Set a monthly limit for a category, like groceries."
+            action={
+              <Button type="button" onClick={openAdd}>
+                <Plus />
+                Add budget
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            {shared.length > 0 && (
+              <LedgerSubgroup title="Shared" level={3}>
+                {renderRows(shared)}
+              </LedgerSubgroup>
+            )}
+            {personal.length > 0 && (
+              <LedgerSubgroup title="Personal" level={3}>
+                {renderRows(personal)}
+              </LedgerSubgroup>
+            )}
+          </>
+        )}
+      </div>
 
       <FinancialCollapsiblePanel
         title="Category → budget linking"
-        description="Choose which budget auto-selects when you log expenses in each category."
+        description="Pick the budget that's filled in when you log an expense in each category."
       >
         <CategoryBudgetMappingPanel />
       </FinancialCollapsiblePanel>
 
-      {/* Add dialog */}
       <BudgetFormDialog
         open={showAdd}
         onOpenChange={setShowAdd}
-        title="Add Budget"
+        mode="add"
         form={form}
         setForm={setForm}
         onSubmit={handleAdd}
@@ -481,13 +518,12 @@ export function BudgetList({
         homeCurrency={homeCurrency}
       />
 
-      {/* Edit dialog */}
       <BudgetFormDialog
         open={editingBudget !== null}
         onOpenChange={(open) => {
           if (!open) setEditingBudget(null);
         }}
-        title="Edit Budget"
+        mode="edit"
         form={form}
         setForm={setForm}
         onSubmit={handleEdit}
@@ -495,6 +531,8 @@ export function BudgetList({
         error={error}
         recordId={editingBudget?.id}
         homeCurrency={homeCurrency}
+        onDelete={() => void handleDeleteFromDialog()}
+        deleting={editingBudget !== null && deletingId === editingBudget.id}
       />
     </div>
   );

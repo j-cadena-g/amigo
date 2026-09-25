@@ -36,10 +36,13 @@ export function getFrequencyLabel(rule: RecurringFrequencyInput): string {
         : `Every ${interval} weeks`;
     }
     case "MONTHLY": {
+      // The scheduler clamps day 31 to each month's last day.
       const dayLabel =
-        dayOfMonth !== null && dayOfMonth !== undefined
-          ? ordinal(dayOfMonth)
-          : null;
+        dayOfMonth === 31
+          ? "Last day"
+          : dayOfMonth !== null && dayOfMonth !== undefined
+            ? ordinal(dayOfMonth)
+            : null;
       if (interval === 1) {
         return dayLabel ? `${dayLabel} of every month` : "Monthly";
       }

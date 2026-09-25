@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Calendar } from "../components/calendar";
+import { DayEntries } from "../components/day-detail-dialog";
 import { formatCents } from "./currency";
 import {
   formatDayTotal,
@@ -82,24 +82,18 @@ describe("transactionTotalsForDay", () => {
   });
 });
 
-describe("calendar day cells", () => {
-  it("does not print amounts on the date", () => {
+describe("day entries", () => {
+  it("shows the day's net and each amount with its sign", () => {
     const html = renderToStaticMarkup(
-      React.createElement(Calendar, {
-        compact: false,
-        initialMonth: "2026-09",
-        initialEvents: [
+      React.createElement(DayEntries, {
+        events: [
           {
             id: "t1",
             type: "transaction",
             date: "2026-09-12",
             title: "Coffee",
             color: "red",
-            metadata: {
-              amount: 450,
-              currency: "CAD",
-              transactionType: "expense",
-            },
+            metadata: { amount: 450, currency: "CAD", transactionType: "expense" },
           },
           {
             id: "t2",
@@ -107,27 +101,36 @@ describe("calendar day cells", () => {
             date: "2026-09-12",
             title: "Pay",
             color: "green",
+            metadata: { amount: 2000, currency: "CAD", transactionType: "income" },
+          },
+          {
+            id: "r1",
+            type: "recurring",
+            date: "2026-09-12",
+            title: "Netflix",
+            color: "red",
             metadata: {
-              amount: 2000,
+              amount: 1799,
               currency: "CAD",
-              transactionType: "income",
+              transactionType: "expense",
+              frequency: "MONTHLY",
             },
           },
         ],
       })
     );
 
-    expect(html).not.toContain(formatDayTotal(1550, "CAD"));
-    expect(html).not.toContain(formatCents(450, "CAD", { compact: true }));
-    expect(html).not.toContain(formatCents(2000, "CAD", { compact: true }));
-    expect(html).not.toContain("net ");
+    expect(html).toContain(formatDayTotal(2000 - 450 - 1799, "CAD"));
+    expect(html).toContain(`−${formatCents(450, "CAD")}`);
+    expect(html).toContain(`+${formatCents(2000, "CAD")}`);
+    expect(html).toContain("Scheduled · monthly");
   });
 });
 
 describe("formatDayTotal", () => {
-  it("prefixes a plus on a positive net and keeps the currency format otherwise", () => {
+  it("prefixes a plus on a positive net and a true minus on a negative one", () => {
     expect(formatDayTotal(10000, "CAD")).toBe(`+${formatCents(10000, "CAD")}`);
-    expect(formatDayTotal(-2500, "CAD")).toBe(formatCents(-2500, "CAD"));
+    expect(formatDayTotal(-2500, "CAD")).toBe(`−${formatCents(2500, "CAD")}`);
     expect(formatDayTotal(0, "CAD", { compact: true })).toBe(
       formatCents(0, "CAD", { compact: true })
     );

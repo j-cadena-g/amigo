@@ -11,7 +11,8 @@ import {
   parseHomeCurrency,
   scopeToHousehold,
 } from "@amigo/db";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { LedgerSection } from "@/app/components/ledger";
+import { AccountSettings } from "@/app/components/settings/account-settings";
 import { HouseholdSettingsForm } from "@/app/components/settings/household-settings-form";
 import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
@@ -57,67 +58,42 @@ export default function Settings() {
     session.role === "owner" || session.role === "admin";
 
   return (
-    <main className="container mx-auto px-4 py-8 md:px-6 relative z-10">
-      <div className="mb-6 animate-fade-in">
-        <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Settings
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage your household preferences
-        </p>
-      </div>
-      <div className="grid gap-4 max-w-2xl animate-stagger-in">
-        {/* Appearance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Appearance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SettingsThemeToggle />
-          </CardContent>
-        </Card>
+    <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+      <div className="max-w-2xl">
+        <h1 className="type-display text-title-sm md:text-title">Settings</h1>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <NotificationSettings />
-          </CardContent>
-        </Card>
+        <div className="mt-8 space-y-10">
+          <LedgerSection title="Household">
+            <div className="pt-4">
+              <HouseholdSettingsForm
+                name={household.name}
+                homeCurrency={parseHomeCurrency(household.homeCurrency)}
+                timezone={household.timezone ?? "UTC"}
+                canEdit={canManageHousehold}
+              />
+            </div>
+          </LedgerSection>
 
-        {/* Household Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Household</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HouseholdSettingsForm
-              name={household.name}
-              homeCurrency={parseHomeCurrency(household.homeCurrency)}
-              timezone={household.timezone ?? "UTC"}
-              canEdit={canManageHousehold}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Members */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y">
+          <LedgerSection
+            title="Members"
+            aside={
+              <span className="font-mono text-sm text-muted-foreground">
+                {members.length}
+              </span>
+            }
+          >
+            <ul className="divide-y divide-border">
               {members.map((member) => (
-                <div
+                <li
                   key={member.id}
-                  className="flex items-center justify-between py-3"
+                  className="flex items-center justify-between gap-4 py-3"
                 >
-                  <div>
-                    <p className="font-medium">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">
                       {member.name || member.email}
                       {member.id === session.userId && (
-                        <span className="ml-2 text-xs text-muted-foreground">
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
                           (you)
                         </span>
                       )}
@@ -137,31 +113,46 @@ export default function Settings() {
                       currentUserId={session.userId}
                     />
                   )}
-                </div>
+                </li>
               ))}
+            </ul>
+          </LedgerSection>
+
+          {canManageHousehold && (
+            <LedgerSection title="Invites">
+              <div className="pt-4">
+                <InviteManager />
+              </div>
+            </LedgerSection>
+          )}
+
+          <LedgerSection title="Notifications">
+            <div className="pt-4">
+              <NotificationSettings />
             </div>
-          </CardContent>
-        </Card>
+          </LedgerSection>
 
-        {canManageHousehold && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Invites</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InviteManager />
-            </CardContent>
-          </Card>
-        )}
+          <LedgerSection title="Appearance">
+            <div className="pt-4">
+              <SettingsThemeToggle />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Applies to this device only.
+              </p>
+            </div>
+          </LedgerSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Danger zone</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LeaveHousehold role={session.role} />
-          </CardContent>
-        </Card>
+          <LedgerSection title="Account">
+            <div className="pt-4">
+              <AccountSettings />
+            </div>
+          </LedgerSection>
+
+          <LedgerSection title="Leave household">
+            <div className="pt-4">
+              <LeaveHousehold role={session.role} />
+            </div>
+          </LedgerSection>
+        </div>
       </div>
     </main>
   );

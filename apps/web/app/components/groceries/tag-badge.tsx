@@ -1,15 +1,34 @@
 import type { GroceryTag } from "@amigo/db";
-import { tagColors, type TagColorKey } from "./constants";
+import { cn } from "@/app/lib/utils";
+import { tagColorKey, tagColors } from "./constants";
+
+export function TagDot({ color, className }: { color: string; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-block h-2 w-2 shrink-0 rounded-xs",
+        tagColors[tagColorKey(color)],
+        className
+      )}
+    />
+  );
+}
 
 interface TagBadgeProps {
   tag: GroceryTag;
+  className?: string;
 }
 
-export function TagBadge({ tag }: TagBadgeProps) {
-  const colorKey = (tag.color in tagColors ? tag.color : "gray") as TagColorKey;
-  const colors = tagColors[colorKey];
+export function TagBadge({ tag, className }: TagBadgeProps) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-semibold text-foreground",
+        className
+      )}
+    >
+      <TagDot color={tag.color} />
       {tag.name}
     </span>
   );

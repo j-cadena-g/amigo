@@ -8,15 +8,19 @@ import { GroceryItem } from "./grocery-item";
 import { HistorySection } from "./history-section";
 import { DatePickerModal } from "./date-picker-modal";
 import { EmptyState } from "@/app/components/empty-state";
+import { PushNotificationButton } from "@/app/components/push-notification-button";
 import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 
 interface GroceryListProps {
   items: GroceryItemWithTags[];
   allTags: GroceryTag[];
   userId: string;
+  /** The loader fell back to the offline cache. */
+  fromOffline: boolean;
 }
 
-export function GroceryList({ items, allTags, userId }: GroceryListProps) {
+export function GroceryList({ items, allTags, userId, fromOffline }: GroceryListProps) {
   const [newItemName, setNewItemName] = useState("");
   const [newItemTagIds, setNewItemTagIds] = useState<string[]>([]);
   const [recentTags, setRecentTags] = useState<GroceryTag[]>([]);
@@ -36,6 +40,7 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
     optimisticItems,
     activeItems,
     purchasedItems,
+    isPending,
     filterTagIds,
     datePickerItem,
     datePickerItemId,
@@ -53,6 +58,12 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
     toggleFilterTag,
     setDatePickerItemId,
   } = useGroceryLogic({ items, allTags: mergedTags, userId });
+
+  // Everything still to buy, regardless of the tag filter.
+  const toBuyCount = useMemo(
+    () => optimisticItems.filter((item) => !item.isPurchased).length,
+    [optimisticItems]
+  );
 
   const handleCreateTag = useCallback(
     async (name: string, color: string) => {
@@ -81,20 +92,44 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
     );
   }, []);
 
+  function clearFilters() {
+    filterTagIds.forEach(toggleFilterTag);
+  }
+
   const hasAnyItems = optimisticItems.length > 0;
 
   return (
-    <div className="mx-auto max-w-2xl">
-      {/* Add item form */}
-      <form onSubmit={handleSubmit} className="mb-6">
+    <div className="max-w-2xl">
+      <div className="flex min-h-10 items-start justify-between gap-4">
+        <h1 className="type-display min-w-0 text-title-sm md:text-title">
+          Groceries{" "}
+          <span className="text-muted-foreground">
+            <span aria-hidden="true">·</span> {toBuyCount}
+            <span className="sr-only"> to buy</span>
+          </span>
+        </h1>
+        <PushNotificationButton />
+      </div>
+      <p
+        role="status"
+        aria-live="polite"
+        className={fromOffline ? "mt-2 text-sm font-semibold" : "sr-only"}
+      >
+        {fromOffline
+          ? "You're offline, so this is the last saved list. New items, check-offs, deletions, and tag changes will sync when you reconnect."
+          : ""}
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-6">
         <div className="flex gap-2">
-          <input
+          <Input
             type="text"
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
-            placeholder="Add an item..."
+            placeholder="Add an item"
             aria-label="Add a grocery item"
-            className="flex-1 rounded-lg border border-input bg-background px-4 py-2.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            autoComplete="off"
+            className="min-w-0 flex-1"
           />
           <Button type="submit" disabled={!newItemName.trim()}>
             Add
@@ -110,8 +145,7 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
         </div>
       </form>
 
-      {/* Filter bar */}
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mt-6 flex min-h-10 items-center gap-2">
         <TagSelector
           mode="global"
           allTags={mergedTags}
@@ -126,28 +160,34 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            onClick={() => filterTagIds.forEach(toggleFilterTag)}
-            className="text-muted-foreground"
+            onClick={clearFilters}
+            className="px-3 text-muted-foreground"
           >
             Clear filters
           </Button>
         )}
+        <p role="status" className="ml-auto text-sm text-muted-foreground">
+          {isPending ? "Saving…" : ""}
+        </p>
       </div>
 
-      {/* Active items */}
       {!hasAnyItems ? (
-        <EmptyState
-          title="No grocery items"
-          description="Add your first item above to get started."
-        />
-      ) : activeItems.length === 0 && filterTagIds.length > 0 ? (
-        <EmptyState
-          title="No matching items"
-          description="No unpurchased items match the selected tags."
-        />
+        <EmptyState message="The list is empty. Add what you need above." />
+      ) : activeItems.length === 0 ? (
+        filterTagIds.length > 0 ? (
+          <EmptyState
+            message="Nothing left to buy has these tags."
+            action={
+              <Button type="button" variant="outline" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState message="Nothing left to buy." />
+        )
       ) : (
-        <div className="space-y-1">
+        <ul className="mt-2 divide-y divide-border border-y border-border">
           {activeItems.map((item) => (
             <GroceryItem
               key={item.id}
@@ -163,10 +203,9 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
               onEditTag={editTag}
             />
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* Purchased items (history) */}
       <HistorySection
         items={purchasedItems}
         onDelete={deleteItem}
@@ -174,7 +213,6 @@ export function GroceryList({ items, allTags, userId }: GroceryListProps) {
         onUpdatePurchaseDate={(id) => setDatePickerItemId(id)}
       />
 
-      {/* Date picker modal */}
       {datePickerItem && datePickerItemId && (
         <DatePickerModal
           item={datePickerItem}

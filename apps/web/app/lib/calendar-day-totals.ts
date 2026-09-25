@@ -1,5 +1,5 @@
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
-import { formatCents } from "@/app/lib/currency";
+import { formatSignedCents } from "@/app/lib/currency";
 
 export interface TransactionTotalEvent {
   type: string;
@@ -54,6 +54,5 @@ export function formatDayTotal(
   currency: CurrencyCode,
   options?: { compact?: boolean }
 ): string {
-  const prefix = netCents > 0 ? "+" : "";
-  return `${prefix}${formatCents(netCents, currency, options)}`;
+  return formatSignedCents(netCents, currency, { ...options, showPlus: true });
 }

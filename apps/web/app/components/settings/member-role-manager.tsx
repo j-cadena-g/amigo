@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRevalidator } from "react-router";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { useToast } from "@/app/components/toast-provider";
-import { Button } from "@/app/components/ui/button";
+import { Button, buttonVariants } from "@/app/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,19 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/app/components/ui/alert-dialog";
+import { describeMemberData, type MemberDataSummary } from "./member-data-summary";
 
 interface Member {
   id: string;
   displayName: string;
   role: "owner" | "admin" | "member";
-}
-
-interface DataSummary {
-  transactions: number;
-  recurringRules: number;
-  budgets: number;
-  assets: number;
-  debts: number;
 }
 
 interface MemberRoleManagerProps {
@@ -51,7 +44,7 @@ export function MemberRoleManager({
   const [submitting, setSubmitting] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
-  const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
+  const [dataSummary, setDataSummary] = useState<MemberDataSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
   const isSelf = member.id === currentUserId;
@@ -86,8 +79,10 @@ export function MemberRoleManager({
   async function handleTransferOwnership() {
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/members/${member.id}/transfer-ownership`, {
+      const res = await fetch("/api/members/transfer-ownership", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerId: member.id }),
       });
       if (res.ok) {
         setTransferOpen(false);
@@ -106,9 +101,9 @@ export function MemberRoleManager({
     setLoadingSummary(true);
     setRemoveOpen(true);
     try {
-      const res = await fetch(`/api/members/${member.id}/summary`);
+      const res = await fetch(`/api/members/${member.id}/data-summary`);
       if (res.ok) {
-        const data = (await res.json()) as DataSummary;
+        const data = (await res.json()) as MemberDataSummary;
         setDataSummary(data);
         return;
       }
@@ -139,6 +134,8 @@ export function MemberRoleManager({
     }
   }
 
+  const dataDescription = dataSummary ? describeMemberData(dataSummary) : "";
+
   return (
     <>
       <DropdownMenu>
@@ -150,41 +147,41 @@ export function MemberRoleManager({
         <DropdownMenuContent align="end">
           {member.role === "member" && (
             <DropdownMenuItem onClick={() => handleRoleChange("admin")}>
-              Make Admin
+              Make admin
             </DropdownMenuItem>
           )}
           {member.role === "admin" && isOwner && (
             <DropdownMenuItem onClick={() => handleRoleChange("member")}>
-              Demote to Member
+              Make member
             </DropdownMenuItem>
           )}
           {isOwner && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setTransferOpen(true)}>
-                Transfer Ownership
+                Transfer ownership
               </DropdownMenuItem>
             </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={openRemoveDialog}
-            className="text-destructive focus:text-destructive/90"
+            className="text-destructive focus:text-destructive"
           >
-            Remove Member
+            Remove member
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Transfer ownership confirmation */}
       <AlertDialog open={transferOpen} onOpenChange={setTransferOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Transfer Ownership</AlertDialogTitle>
+            <AlertDialogTitle>
+              Transfer ownership to {member.displayName}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to transfer household ownership to{" "}
-              <strong>{member.displayName}</strong>? You will be demoted to
-              admin. This action cannot be easily undone.
+              You&apos;ll become an admin, and only {member.displayName} will be able
+              to transfer ownership back.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -193,13 +190,12 @@ export function MemberRoleManager({
               onClick={handleTransferOwnership}
               disabled={submitting}
             >
-              {submitting ? "Transferring..." : "Transfer Ownership"}
+              {submitting ? "Transferring…" : "Transfer ownership"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Remove member confirmation with data summary */}
       <AlertDialog
         open={removeOpen}
         onOpenChange={(open) => {
@@ -211,33 +207,22 @@ export function MemberRoleManager({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+            <AlertDialogTitle>Remove {member.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove{" "}
-              <strong>{member.displayName}</strong> from the household?
+              They&apos;ll lose access to the household right away.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {loadingSummary ? (
             <p className="text-sm text-muted-foreground">
-              Loading data summary...
+              Loading what they&apos;ve added…
             </p>
           ) : dataSummary ? (
-            <div className="rounded-md border p-3 text-sm space-y-1">
-              <p className="font-medium">
-                This member&apos;s data in this household:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-                <li>{dataSummary.transactions} transaction(s)</li>
-                <li>{dataSummary.recurringRules} recurring rule(s)</li>
-                <li>{dataSummary.budgets} budget(s)</li>
-                <li>{dataSummary.assets} asset(s)</li>
-                <li>{dataSummary.debts} debt(s)</li>
-              </ul>
-              <p className="text-muted-foreground mt-2">
-                Their data will be preserved but reassigned to the household.
-              </p>
-            </div>
+            <p className="text-sm">
+              {dataDescription
+                ? `What they added stays in the household: ${dataDescription}.`
+                : "They haven't added anything yet."}
+            </p>
           ) : null}
 
           <AlertDialogFooter>
@@ -245,8 +230,9 @@ export function MemberRoleManager({
             <AlertDialogAction
               onClick={handleRemove}
               disabled={submitting || loadingSummary}
+              className={buttonVariants({ variant: "destructive" })}
             >
-              {submitting ? "Removing..." : "Remove Member"}
+              {submitting ? "Removing…" : "Remove member"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

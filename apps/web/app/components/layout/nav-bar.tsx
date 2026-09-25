@@ -1,23 +1,26 @@
-import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useUser, useClerk } from "@clerk/react-router";
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  Landmark,
+  ChevronDown,
+  House,
   Settings,
-  LogOut,
-  Menu,
-  X,
+  ShoppingBasket,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/app/lib/utils";
-import { Button } from "@/app/components/ui/button";
-import { ModeToggle } from "@/app/components/mode-toggle";
+import { Wordmark } from "@/app/components/wordmark";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/app/components/ui/dropdown-menu";
 
 const navLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/groceries", label: "Groceries", icon: ShoppingCart },
-  { href: "/financial", label: "Financial", icon: Landmark },
+  { href: "/dashboard", label: "Home", icon: House },
+  { href: "/groceries", label: "Groceries", icon: ShoppingBasket },
+  { href: "/financial", label: "Money", icon: Wallet },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -42,48 +45,71 @@ function isNavLinkActive(pathname: string, href: string) {
 }
 
 export function NavBar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
-  const mobileToggleRef = useRef<HTMLButtonElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-
-  // While the mobile menu is open: move focus to the first nav link, and let
-  // Escape close the menu and return focus to the toggle button.
-  useEffect(() => {
-    if (!mobileOpen) return;
-    mobileMenuRef.current?.querySelector<HTMLElement>("a")?.focus();
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setMobileOpen(false);
-        mobileToggleRef.current?.focus();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [mobileOpen]);
+  const displayName =
+    user?.firstName || user?.emailAddresses[0]?.emailAddress || "Account";
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center px-4 md:px-6">
-        {/* Brand */}
-        <Link
-          to="/dashboard"
-          className="group mr-8 flex items-center gap-2"
-        >
-          <img
-            src="/icon-1024.png"
-            alt="amigo"
-            className="h-8 w-8 rounded-lg shadow-sm shadow-primary/20 transition-transform group-hover:scale-105"
-          />
-          <span className="font-display font-bold text-xl tracking-tight">
-            amigo
-          </span>
-        </Link>
+    <>
+      <header className="sticky top-0 z-50 border-b border-border bg-background">
+        <div className="container mx-auto flex h-14 items-stretch gap-8 px-4 md:px-6">
+          <Link
+            to="/dashboard"
+            aria-label="amigo home"
+            className="flex items-center self-center rounded-sm"
+          >
+            <Wordmark />
+          </Link>
 
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-0.5 flex-1">
+          <nav aria-label="Main" className="hidden flex-1 items-stretch gap-6 md:flex">
+            {navLinks.map((link) => {
+              const active = isNavLinkActive(location.pathname, link.href);
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "relative flex items-center text-sm font-semibold transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5",
+                    active
+                      ? "text-foreground after:bg-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="ml-auto flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="max-w-40 truncate">{displayName}</span>
+                <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuItem asChild>
+                  <Link to="/settings">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void signOut()}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+
+      <nav
+        aria-label="Main"
+        data-bottom-bar=""
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
+        <div className="grid h-16 grid-cols-4">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const active = isNavLinkActive(location.pathname, link.href);
@@ -91,99 +117,21 @@ export function NavBar() {
               <Link
                 key={link.href}
                 to={link.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  "relative flex flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors before:absolute before:inset-x-4 before:top-0 before:h-0.5",
                   active
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    ? "text-foreground before:bg-foreground"
+                    : "text-muted-foreground"
                 )}
               >
-                <Icon className="h-4 w-4" />
-                <span>{link.label}</span>
-                {active && (
-                  <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
-                )}
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                {link.label}
               </Link>
             );
           })}
         </div>
-
-        {/* User info + theme + sign out */}
-        <div className="hidden md:flex items-center gap-3 ml-auto">
-          <span className="text-sm font-medium text-muted-foreground">
-            {user?.firstName || user?.emailAddresses[0]?.emailAddress}
-          </span>
-          <div className="h-5 w-px bg-border" />
-          <ModeToggle />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => signOut()}
-            aria-label="Sign out"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Mobile toggle */}
-        <Button
-          ref={mobileToggleRef}
-          variant="ghost"
-          size="icon"
-          className="md:hidden ml-auto"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
-        </Button>
-      </div>
-
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div
-          ref={mobileMenuRef}
-          className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pb-4 pt-2 animate-fade-in"
-        >
-          <div className="space-y-1">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const active = isNavLinkActive(location.pathname, link.href);
-              return (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                    active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </div>
-          <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
-            <button
-              onClick={() => signOut()}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-            <ModeToggle />
-          </div>
-        </div>
-      )}
-    </nav>
+      </nav>
+    </>
   );
 }

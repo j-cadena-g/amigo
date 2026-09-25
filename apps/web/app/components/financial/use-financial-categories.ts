@@ -24,7 +24,7 @@ export function useFinancialCategories(options?: { includeArchived?: boolean }) 
       }
       setCategories((await res.json()) as FinancialCategoryItem[]);
     } catch {
-      setError("Could not load categories");
+      setError("Couldn't load categories. Reload the page to try again.");
     } finally {
       setLoading(false);
     }

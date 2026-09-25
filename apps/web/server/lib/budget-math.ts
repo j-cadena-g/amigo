@@ -19,7 +19,7 @@ export function budgetAlertLevel(
   percentUsed: number,
   remainingHomeCents: number
 ): BudgetAlertLevel {
-  if (remainingHomeCents < 0 || percentUsed >= 100) return "over";
+  if (remainingHomeCents < 0) return "over";
   if (percentUsed >= 90) return "critical";
   if (percentUsed >= 75) return "warn";
   return "ok";

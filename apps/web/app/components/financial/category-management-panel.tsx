@@ -1,17 +1,25 @@
 import { useId, useState } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useConfirm } from "@/app/components/confirm-provider";
+import { TypeToggle } from "@/app/components/type-toggle";
+import { DeleteButton, NativeSelect } from "@/app/components/financial/form-controls";
 import {
   buildCategoryTree,
   useFinancialCategories,
 } from "@/app/components/financial/use-financial-categories";
 import { parseApiError } from "@/app/lib/parse-api-error";
 import type { FinancialCategoryType } from "@/app/lib/financial-category-types";
+import { cn } from "@/app/lib/utils";
+
+const CATEGORY_TYPE_OPTIONS = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+] as const;
 
 export function CategoryManagementPanel() {
   const nameId = useId();
-  const typeId = useId();
   const parentId = useId();
   const confirm = useConfirm();
   const { categories, loading, error, reload } = useFinancialCategories({
@@ -25,6 +33,12 @@ export function CategoryManagementPanel() {
 
   const tree = buildCategoryTree(categories.filter((c) => !c.archived));
   const parentOptions = tree.filter((row) => row.parent.type === type);
+
+  function selectType(next: FinancialCategoryType) {
+    if (next === type) return;
+    setType(next);
+    setParentCategoryId("");
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -46,14 +60,14 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Failed to create category"));
+        setFeedback(parseApiError(body, "Couldn't add the category. Try again."));
         return;
       }
       setName("");
       setParentCategoryId("");
       await reload();
     } catch {
-      setFeedback("Network error — could not create category");
+      setFeedback("Couldn't add the category. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -79,12 +93,12 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Failed to archive category"));
+        setFeedback(parseApiError(body, "Couldn't archive the category. Try again."));
         return;
       }
       await reload();
     } catch {
-      setFeedback("Network error — could not archive category");
+      setFeedback("Couldn't archive the category. Check your connection and try again.");
     }
   }
 
@@ -105,21 +119,21 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Failed to remove category"));
+        setFeedback(parseApiError(body, "Couldn't remove the category. Try again."));
         return;
       }
       await reload();
     } catch {
-      setFeedback("Network error — could not remove category");
+      setFeedback("Couldn't remove the category. Check your connection and try again.");
     }
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <form onSubmit={handleCreate} className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor={nameId} className="text-sm font-medium">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-sm font-semibold">
               Name
             </label>
             <Input
@@ -129,46 +143,35 @@ export function CategoryManagementPanel() {
               placeholder="e.g. Streaming"
             />
           </div>
-          <div>
-            <label htmlFor={typeId} className="text-sm font-medium">
-              Type
-            </label>
-            <select
-              id={typeId}
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as FinancialCategoryType);
-                setParentCategoryId("");
-              }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-            </select>
-          </div>
+          <TypeToggle
+            label="Category type"
+            options={CATEGORY_TYPE_OPTIONS}
+            value={type}
+            onChange={selectType}
+          />
         </div>
         {parentOptions.length > 0 ? (
-          <div>
-            <label htmlFor={parentId} className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={parentId} className="text-sm font-semibold">
               Parent category (optional)
             </label>
-            <select
+            <NativeSelect
               id={parentId}
               value={parentCategoryId}
               onChange={(e) => setParentCategoryId(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              <option value="">Top-level category</option>
+              <option value="">None (top level)</option>
               {parentOptions.map((row) => (
                 <option key={row.parent.id} value={row.parent.id}>
                   {row.parent.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         ) : null}
         <Button type="submit" size="sm" disabled={submitting || !name.trim()}>
-          Add category
+          <Plus />
+          {submitting ? "Adding…" : "Add category"}
         </Button>
       </form>
 
@@ -176,35 +179,32 @@ export function CategoryManagementPanel() {
         <p className="text-sm text-muted-foreground">Loading categories…</p>
       ) : error ? (
         <p className="text-sm text-destructive" role="alert">{error}</p>
+      ) : tree.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No categories yet.</p>
       ) : (
-        <div className="space-y-3">
-          {tree.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No categories yet.</p>
-          ) : (
-            tree.map((row) => (
-              <div key={row.parent.id} className="space-y-1">
-                <CategoryRow
-                  name={row.parent.name}
-                  type={row.parent.type}
-                  archived={row.parent.archived}
-                  onArchive={() => void handleArchive(row.parent.id)}
-                  onDelete={() => void handleDelete(row.parent.id)}
-                />
-                {row.children.map((child) => (
-                  <CategoryRow
-                    key={child.id}
-                    name={child.name}
-                    type={child.type}
-                    archived={child.archived}
-                    nested
-                    onArchive={() => void handleArchive(child.id)}
-                    onDelete={() => void handleDelete(child.id)}
-                  />
-                ))}
-              </div>
-            ))
-          )}
-        </div>
+        <ul className="divide-y divide-border border-t border-border">
+          {tree.flatMap((row) => [
+            <CategoryRow
+              key={row.parent.id}
+              name={row.parent.name}
+              type={row.parent.type}
+              archived={row.parent.archived}
+              onArchive={() => void handleArchive(row.parent.id)}
+              onDelete={() => void handleDelete(row.parent.id)}
+            />,
+            ...row.children.map((child) => (
+              <CategoryRow
+                key={child.id}
+                name={child.name}
+                type={child.type}
+                archived={child.archived}
+                nested
+                onArchive={() => void handleArchive(child.id)}
+                onDelete={() => void handleDelete(child.id)}
+              />
+            )),
+          ])}
+        </ul>
       )}
 
       {feedback ? <p className="text-sm text-destructive" role="alert">{feedback}</p> : null}
@@ -228,28 +228,36 @@ function CategoryRow({
   onDelete: () => void;
 }) {
   return (
-    <div
-      className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${
-        nested ? "ml-4" : ""
-      } ${archived ? "opacity-60" : ""}`}
+    <li
+      className={cn(
+        "flex items-center justify-between gap-3 py-2",
+        nested && "pl-5",
+        archived && "text-muted-foreground"
+      )}
     >
-      <div>
-        <p className="text-sm font-medium">{name}</p>
-        <p className="text-xs text-muted-foreground capitalize">
-          {type}
-          {archived ? " · archived" : ""}
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{name}</p>
+        <p className="text-xs text-muted-foreground">
+          {type === "income" ? "Income" : "Expense"}
+          {archived ? " · Archived" : ""}
         </p>
       </div>
       {!archived ? (
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onArchive}>
+        <div className="flex shrink-0 gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onArchive}
+            aria-label={`Archive ${name}`}
+          >
             Archive
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onDelete}>
+          <DeleteButton size="sm" onClick={onDelete} aria-label={`Remove ${name}`}>
             Remove
-          </Button>
+          </DeleteButton>
         </div>
       ) : null}
-    </div>
+    </li>
   );
 }

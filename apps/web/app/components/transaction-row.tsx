@@ -1,15 +1,18 @@
-import type { Dispatch, FormEvent, MutableRefObject, SetStateAction } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-import { formatCents } from "@/app/lib/currency";
-import { formatRelativeDate, formatTransactionDate } from "@/app/lib/format-dates";
+  useId,
+  type Dispatch,
+  type FormEvent,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
-import { EditTransactionForm } from "./transaction-form";
+import { Button } from "@/app/components/ui/button";
+import { DeleteButton } from "@/app/components/financial/form-controls";
+import { formatSignedCents } from "@/app/lib/currency";
+import { formatLedgerDate, formatTransactionDate } from "@/app/lib/format-dates";
+import { cn } from "@/app/lib/utils";
+import { EditTransactionForm, type TransactionFormState } from "./transaction-form";
 
 export interface TransactionDTO {
   id: string;
@@ -27,46 +30,26 @@ export interface TransactionDTO {
 
 interface TransactionRowProps {
   transaction: TransactionDTO;
-  todayStr: string;
+  homeCurrency: CurrencyCode;
   expanded: boolean;
   isEditing: boolean;
   isSubmitting: boolean;
-  homeCurrency: CurrencyCode;
   lastEditExpenseBudgetIdRef: MutableRefObject<string | null>;
   onToggleExpand: () => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: (e: FormEvent) => void;
   onDelete: () => void;
-  editForm: {
-    amount: string;
-    description: string;
-    categoryId: string;
-    type: "income" | "expense";
-    date: string;
-    budgetId: string | null;
-    currency: CurrencyCode;
-  };
-  onEditFormChange: Dispatch<
-    SetStateAction<{
-      amount: string;
-      description: string;
-      categoryId: string;
-      type: "income" | "expense";
-      date: string;
-      budgetId: string | null;
-      currency: CurrencyCode;
-    }>
-  >;
+  editForm: TransactionFormState;
+  onEditFormChange: Dispatch<SetStateAction<TransactionFormState>>;
 }
 
 export function TransactionRow({
   transaction,
-  todayStr,
+  homeCurrency,
   expanded,
   isEditing,
   isSubmitting,
-  homeCurrency: _homeCurrency,
   lastEditExpenseBudgetIdRef,
   onToggleExpand,
   onStartEdit,
@@ -76,107 +59,96 @@ export function TransactionRow({
   editForm,
   onEditFormChange,
 }: TransactionRowProps) {
+  const detailsId = useId();
+
   if (isEditing) {
     return (
-      <EditTransactionForm
-        form={editForm}
-        isSubmitting={isSubmitting}
-        lastExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
-        onChange={onEditFormChange}
-        onCancel={onCancelEdit}
-        onSubmit={onSaveEdit}
-        recordId={transaction.id}
-      />
+      <li>
+        <EditTransactionForm
+          form={editForm}
+          isSubmitting={isSubmitting}
+          lastExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
+          onChange={onEditFormChange}
+          onCancel={onCancelEdit}
+          onSubmit={onSaveEdit}
+          recordId={transaction.id}
+        />
+      </li>
     );
   }
 
+  const isIncome = transaction.type === "income";
+  const meta = [
+    transaction.description ? transaction.category : null,
+    transaction.currency !== homeCurrency ? transaction.currency : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div>
+    <li>
       <button
         type="button"
         onClick={onToggleExpand}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent/50 transition-colors"
+        aria-expanded={expanded}
+        aria-controls={expanded ? detailsId : undefined}
+        className="group flex w-full items-baseline gap-3 py-2.5 text-left"
       >
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div
-            className={`shrink-0 rounded-full p-2 ${
-              transaction.type === "income"
-                ? "bg-success/10"
-                : "bg-destructive/10"
-            }`}
-          >
-            {transaction.type === "income" ? (
-              <ArrowUp className="h-4 w-4 text-success" />
-            ) : (
-              <ArrowDown className="h-4 w-4 text-destructive" />
-            )}
-          </div>
-          <div className="overflow-hidden">
-            <p className="font-medium truncate">
-              {transaction.description || transaction.category}
-            </p>
-            <p className="text-sm text-muted-foreground truncate">
-              {transaction.category} &bull; {formatRelativeDate(transaction.date, todayStr)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            className={`font-semibold whitespace-nowrap ${
-              transaction.type === "income"
-                ? "text-success"
-                : "text-destructive"
-            }`}
-          >
-            {transaction.type === "income" ? "+" : "-"}
-            {formatCents(transaction.amount, transaction.currency)}
+        <span className="w-14 shrink-0 font-mono text-sm text-muted-foreground">
+          {formatLedgerDate(transaction.date)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold group-hover:underline">
+            {transaction.description || transaction.category}
           </span>
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-          />
-        </div>
+          {meta && (
+            <span className="block truncate text-sm text-muted-foreground">{meta}</span>
+          )}
+        </span>
+        <span
+          className={cn("shrink-0 font-mono font-medium", isIncome && "text-success")}
+        >
+          {formatSignedCents(
+            isIncome ? transaction.amount : -transaction.amount,
+            transaction.currency,
+            { showPlus: true }
+          )}
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            "h-4 w-4 shrink-0 self-center text-muted-foreground transition-transform",
+            expanded && "rotate-180"
+          )}
+        />
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 pt-1 bg-accent/30 border-t border-border/50">
-          <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-            <div>
-              <p className="text-muted-foreground text-xs">Category</p>
-              <p className="font-medium">{transaction.category}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Date</p>
-              <p className="font-medium">{formatTransactionDate(transaction.date)}</p>
-            </div>
+        <div id={detailsId} className="pb-3 pl-17">
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">Date</dt>
+            <dd>{formatTransactionDate(transaction.date)}</dd>
+            <dt className="text-muted-foreground">Category</dt>
+            <dd>{transaction.category}</dd>
             {transaction.description && (
-              <div className="col-span-2">
-                <p className="text-muted-foreground text-xs">Description</p>
-                <p className="font-medium">{transaction.description}</p>
-              </div>
+              <>
+                <dt className="text-muted-foreground">Description</dt>
+                <dd className="wrap-break-word">{transaction.description}</dd>
+              </>
             )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onStartEdit}
-              className="flex-1 flex items-center justify-center gap-2 rounded-md border border-input px-3 py-2 text-sm hover:bg-accent"
-            >
-              <Pencil className="h-4 w-4" />
+          </dl>
+          <div className="mt-3 flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onStartEdit}>
+              <Pencil />
               Edit
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="flex-1 flex items-center justify-center gap-2 rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="h-4 w-4" />
+            </Button>
+            <DeleteButton size="sm" onClick={onDelete}>
+              <Trash2 />
               Delete
-            </button>
+            </DeleteButton>
           </div>
         </div>
       )}
-    </div>
+    </li>
   );
 }

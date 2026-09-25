@@ -21,6 +21,16 @@ export function formatRelativeDate(dateStr: string, todayIso: string): string {
   });
 }
 
+/** Short month and day for ledger date columns, e.g. "Sep 23". */
+export function formatLedgerDate(date: string): string {
+  const dateOnly = date.split("T")[0]!;
+  return new Date(`${dateOnly}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function formatTransactionDate(date: string): string {
   const dateOnly = date.split("T")[0]!;
   const d = new Date(dateOnly + "T00:00:00Z");

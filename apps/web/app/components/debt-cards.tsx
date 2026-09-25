@@ -1,13 +1,16 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Button } from "@/app/components/ui/button";
-import { formatCents } from "@/app/lib/currency";
-import { CreditCard, Pencil } from "lucide-react";
-import { EditDebtDialog } from "@/app/components/edit-debt-dialog";
-import { EmptyState } from "@/app/components/empty-state";
-import { cn } from "@/app/lib/utils";
+import { useId, useState, type ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
+import { formatCents } from "@/app/lib/currency";
 import { getCreditCardSummary } from "@/app/lib/credit-card-summary";
+import { cn } from "@/app/lib/utils";
+import { PriceTag } from "@/app/components/price-tag";
+import { EditDebtDialog } from "@/app/components/edit-debt-dialog";
+import {
+  LedgerGroup,
+  LedgerSubgroup,
+  RowIconButton,
+} from "@/app/components/financial/ledger-group";
 
 export interface Debt {
   id: string;
@@ -30,47 +33,73 @@ interface DebtCardsProps {
   session: { userId: string; role: string };
 }
 
-function getCreditCardUtilizationColor(utilization: number) {
-  if (utilization < 30) return "bg-success";
-  if (utilization <= 70) return "bg-warning";
-  return "bg-destructive";
+type MeterTone = "default" | "warn" | "danger";
+
+function utilizationTone(utilization: number): MeterTone {
+  if (utilization > 100) return "danger";
+  if (utilization > 30) return "warn";
+  return "default";
+}
+
+const METER_FILL: Record<MeterTone, string> = {
+  default: "bg-foreground",
+  warn: "bg-warning",
+  danger: "bg-destructive",
+};
+
+function MeterBar({
+  percent,
+  tone = "default",
+  className,
+}: {
+  percent: number;
+  tone?: MeterTone;
+  className?: string;
+}) {
+  return (
+    <div aria-hidden="true" className={cn("h-1.5 w-full bg-secondary", className)}>
+      <div
+        className={cn("h-full", METER_FILL[tone])}
+        style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+      />
+    </div>
+  );
 }
 
 export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsProps) {
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
   const creditCardSummary = getCreditCardSummary(debts);
-  const shared = debts.filter((d) => d.isShared);
-  const personal = debts.filter((d) => !d.isShared);
+  const creditCards = debts.filter((d) => d.type === "CREDIT_CARD");
+  const loans = debts.filter((d) => d.type === "LOAN");
 
-  function renderDebtGroup(items: Debt[]) {
-    const loans = items.filter((d) => d.type === "LOAN");
-    const creditCards = items.filter((d) => d.type === "CREDIT_CARD");
+  function renderBySharing(items: Debt[]) {
+    const shared = items.filter((d) => d.isShared);
+    const personal = items.filter((d) => !d.isShared);
+    const renderRow = (debt: Debt) =>
+      debt.type === "LOAN" ? (
+        <LoanRow
+          key={debt.id}
+          debt={debt}
+          homeCurrency={homeCurrency}
+          onEdit={() => setEditingDebt(debt)}
+        />
+      ) : (
+        <CreditCardRow
+          key={debt.id}
+          debt={debt}
+          homeCurrency={homeCurrency}
+          onEdit={() => setEditingDebt(debt)}
+        />
+      );
+
     return (
       <>
-        {loans.length > 0 && (
-          <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Loans ({loans.length})
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {loans.map((debt) => (
-                <LoanCard key={debt.id} debt={debt} onEdit={() => setEditingDebt(debt)} />
-              ))}
-            </div>
-          </div>
+        {shared.length > 0 && (
+          <LedgerSubgroup title="Shared">{shared.map(renderRow)}</LedgerSubgroup>
         )}
-        {creditCards.length > 0 && (
-          <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Credit Cards ({creditCards.length})
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {creditCards.map((debt) => (
-                <CreditCardCard key={debt.id} debt={debt} onEdit={() => setEditingDebt(debt)} />
-              ))}
-            </div>
-          </div>
+        {personal.length > 0 && (
+          <LedgerSubgroup title="Personal">{personal.map(renderRow)}</LedgerSubgroup>
         )}
       </>
     );
@@ -78,31 +107,15 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
 
   return (
     <>
-      <div className="space-y-6">
-        {debts.length === 0 && (
-          <EmptyState
-            icon={CreditCard}
-            title="No debts yet"
-            description="Add a loan or credit card to track payoff progress."
-          />
-        )}
+      <div className="space-y-10">
         {creditCardSummary ? (
-          <CreditCardSummary
-            summary={creditCardSummary}
-            homeCurrency={homeCurrency}
-          />
+          <CreditCardSummary summary={creditCardSummary} homeCurrency={homeCurrency} />
         ) : null}
-        {shared.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Shared</h2>
-            {renderDebtGroup(shared)}
-          </div>
+        {creditCards.length > 0 && (
+          <LedgerGroup title="Credit cards">{renderBySharing(creditCards)}</LedgerGroup>
         )}
-        {personal.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Personal</h2>
-            {renderDebtGroup(personal)}
-          </div>
+        {loans.length > 0 && (
+          <LedgerGroup title="Loans">{renderBySharing(loans)}</LedgerGroup>
         )}
       </div>
 
@@ -126,183 +139,138 @@ function CreditCardSummary({
   summary: NonNullable<ReturnType<typeof getCreditCardSummary>>;
   homeCurrency: CurrencyCode;
 }) {
-  const barWidth = Math.min(100, summary.percentageUsed);
-  const barColor = getCreditCardUtilizationColor(summary.percentageUsed);
+  const headingId = useId();
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Available Credit</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Total available</p>
-            <p className="font-display text-2xl font-bold tracking-tight tabular-nums">
-              {formatCents(summary.availableCreditCents, homeCurrency)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Used</p>
-            <p className="text-lg font-semibold tabular-nums">
-              {summary.percentageUsed.toFixed(0)}%
-            </p>
-          </div>
-        </div>
-        <div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all", barColor)}
-              style={{ width: `${barWidth}%` }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {formatCents(summary.usedCreditCents, homeCurrency)} used of{" "}
-            {formatCents(summary.totalLimitCents, homeCurrency)} across{" "}
-            {summary.cardCount} {summary.cardCount === 1 ? "card" : "cards"}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId} className="text-sm font-semibold text-muted-foreground">
+        Available credit
+      </h3>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <PriceTag
+          cents={summary.availableCreditCents}
+          currency={homeCurrency}
+          variant="plain"
+          size="large"
+        />
+        <p className="font-mono text-sm font-medium">
+          {summary.percentageUsed.toFixed(0)}% used
+        </p>
+      </div>
+      <MeterBar
+        percent={summary.percentageUsed}
+        tone={utilizationTone(summary.percentageUsed)}
+        className="mt-3"
+      />
+      <p className="mt-2 text-sm text-muted-foreground">
+        <span className="font-mono font-medium text-foreground">
+          {formatCents(summary.usedCreditCents, homeCurrency)}
+        </span>{" "}
+        used of{" "}
+        <span className="font-mono font-medium text-foreground">
+          {formatCents(summary.totalLimitCents, homeCurrency)}
+        </span>{" "}
+        across {summary.cardCount} {summary.cardCount === 1 ? "card" : "cards"}
+      </p>
+    </section>
   );
 }
 
-function LoanCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
+function DebtRowLayout({
+  name,
+  figure,
+  meter,
+  details,
+  onEdit,
+}: {
+  name: string;
+  figure: string;
+  meter: ReactNode;
+  details: [string, string];
+  onEdit: () => void;
+}) {
+  return (
+    <li className="flex items-start gap-2 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+          <span className="min-w-0 truncate font-semibold">{name}</span>
+          <span className="shrink-0 font-mono text-sm font-medium">{figure}</span>
+        </div>
+        {meter}
+        <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 text-sm text-muted-foreground">
+          <span className="font-mono font-medium">{details[0]}</span>
+          <span>{details[1]}</span>
+        </div>
+      </div>
+      <RowIconButton className="-mr-2" onClick={onEdit} aria-label={`Edit ${name}`}>
+        <Pencil />
+      </RowIconButton>
+    </li>
+  );
+}
+
+function currencyNote(debt: Debt, homeCurrency: CurrencyCode): string {
+  return debt.currency !== homeCurrency ? ` · ${debt.currency}` : "";
+}
+
+function LoanRow({
+  debt,
+  homeCurrency,
+  onEdit,
+}: {
+  debt: Debt;
+  homeCurrency: CurrencyCode;
+  onEdit: () => void;
+}) {
   const loanAmount = debt.balanceInitial;
   const totalPaid = debt.balanceCurrent;
   const remaining = loanAmount - totalPaid;
   const percentage = loanAmount > 0 ? (totalPaid / loanAmount) * 100 : 0;
 
-  const barColor =
-    percentage > 75
-      ? "bg-success"
-      : percentage >= 25
-        ? "bg-warning"
-        : "bg-destructive";
-
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-base">{debt.name}</CardTitle>
-            {debt.isShared && (
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-                Shared
-              </span>
-            )}
-          </div>
-          <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground">Loan Amount</p>
-            <p className="font-medium tabular-nums">
-              {formatCents(loanAmount, debt.currency)}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Total Paid</p>
-            <p className="font-medium tabular-nums">
-              {formatCents(totalPaid, debt.currency)}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-muted-foreground">Remaining</span>
-            <span className="font-medium tabular-nums">
-              {formatCents(Math.max(0, remaining), debt.currency)}
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all", barColor)}
-              style={{ width: `${Math.min(100, percentage)}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {Math.min(100, percentage).toFixed(0)}% paid
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <DebtRowLayout
+      name={debt.name}
+      figure={`${formatCents(totalPaid, debt.currency)} of ${formatCents(loanAmount, debt.currency)}`}
+      meter={<MeterBar percent={percentage} className="mt-2" />}
+      details={[
+        `${formatCents(Math.max(0, remaining), debt.currency)} left`,
+        `${Math.min(100, percentage).toFixed(0)}% paid${currencyNote(debt, homeCurrency)}`,
+      ]}
+      onEdit={onEdit}
+    />
   );
 }
 
-function CreditCardCard({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
+function CreditCardRow({
+  debt,
+  homeCurrency,
+  onEdit,
+}: {
+  debt: Debt;
+  homeCurrency: CurrencyCode;
+  onEdit: () => void;
+}) {
   const creditLimit = debt.balanceInitial;
   const availableCredit = debt.balanceCurrent;
   const usedAmount = creditLimit - availableCredit;
   const utilization = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
-  const barWidth = Math.max(0, Math.min(100, utilization));
-  const barColor = getCreditCardUtilizationColor(utilization);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-base">{debt.name}</CardTitle>
-            <div className="flex gap-1.5">
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-                Credit Card
-              </span>
-              {debt.isShared && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-                  Shared
-                </span>
-              )}
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8">
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground">Credit Limit</p>
-            <p className="font-medium tabular-nums">
-              {formatCents(creditLimit, debt.currency)}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Available</p>
-            <p className="font-medium tabular-nums">
-              {formatCents(availableCredit, debt.currency)}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-muted-foreground">
-              {usedAmount < 0 ? "Unused Credit" : "Used"}
-            </span>
-            <span className="font-medium tabular-nums">
-              {formatCents(Math.abs(usedAmount), debt.currency)}
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all", barColor)}
-              style={{ width: `${barWidth}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {Math.max(0, utilization).toFixed(0)}% utilization
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <DebtRowLayout
+      name={debt.name}
+      figure={
+        usedAmount < 0
+          ? `${formatCents(Math.abs(usedAmount), debt.currency)} unused credit`
+          : `${formatCents(usedAmount, debt.currency)} of ${formatCents(creditLimit, debt.currency)}`
+      }
+      meter={
+        <MeterBar percent={utilization} tone={utilizationTone(utilization)} className="mt-2" />
+      }
+      details={[
+        `${formatCents(availableCredit, debt.currency)} available`,
+        `${Math.max(0, utilization).toFixed(0)}% utilization${currencyNote(debt, homeCurrency)}`,
+      ]}
+      onEdit={onEdit}
+    />
   );
 }

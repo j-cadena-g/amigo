@@ -7,9 +7,12 @@ import {
   type LoaderFunctionArgs,
 } from "react-router";
 import { Button } from "@/app/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Wordmark } from "@/app/components/wordmark";
 import { acceptInvite } from "@/app/lib/accept-invite";
 import { getSessionStatus } from "@/app/lib/session.server";
+
+const MISSING_CODE_ERROR =
+  "This link is missing its invite code. Open the full link from your invite.";
 
 export function loader({ context, params }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -26,12 +29,24 @@ export function meta() {
   return [{ title: "Join household · amigo" }];
 }
 
+function JoinLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+        <Wordmark />
+        <h1 className="type-display mt-6 text-title-sm">Join household</h1>
+        {children}
+      </div>
+    </main>
+  );
+}
+
 export default function JoinInvite() {
   const { status, code } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [error, setError] = useState<string | null>(
-    status === "needs_setup" && !code ? "Invite code is missing" : null
+    status === "needs_setup" && !code ? MISSING_CODE_ERROR : null
   );
   const [accepting, setAccepting] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -42,7 +57,7 @@ export default function JoinInvite() {
     }
 
     if (!code) {
-      setError("Invite code is missing");
+      setError(MISSING_CODE_ERROR);
       setAccepting(false);
       return;
     }
@@ -72,78 +87,69 @@ export default function JoinInvite() {
   if (status === "unauthenticated") {
     const returnTo = `/join/${encodeURIComponent(code)}`;
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-        <div className="text-center mb-6">
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Join household
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Sign in to accept your invitation.
-          </p>
+      <JoinLayout>
+        <p className="mt-2 text-muted-foreground">
+          Sign in or create an account to accept the invite.
+        </p>
+        <div className="mt-8">
+          <SignIn
+            routing="hash"
+            forceRedirectUrl={returnTo}
+            signUpForceRedirectUrl={returnTo}
+          />
         </div>
-        <SignIn
-          routing="hash"
-          forceRedirectUrl={returnTo}
-          signUpForceRedirectUrl={returnTo}
-        />
-      </main>
+      </JoinLayout>
     );
   }
 
   if (status === "authenticated") {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Already in a household</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              You already belong to a household
-            </p>
-            <Button className="w-full" onClick={() => navigate("/dashboard")}>
-              Go to dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
+      <JoinLayout>
+        <p className="mt-2">
+          Your account already belongs to a household, so this invite can&apos;t be
+          used with it. To accept it, sign in with a different account.
+        </p>
+        <Button className="mt-6 w-full" onClick={() => navigate("/dashboard")}>
+          Go to your household
+        </Button>
+      </JoinLayout>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Joining household</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error ? (
-            <>
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-              <Button
-                className="w-full"
-                disabled={accepting}
-                onClick={() => setRetryCount((count) => count + 1)}
-              >
-                Try again
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate("/setup")}
-              >
-                Set up your own household
-              </Button>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {accepting ? "Accepting invite…" : "Preparing…"}
+    <JoinLayout>
+      {error ? (
+        <>
+          <p className="mt-2 text-destructive" role="alert">
+            {error}
+          </p>
+          {error !== MISSING_CODE_ERROR && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              If the invite expired or was already used, ask for a new one.
             </p>
           )}
-        </CardContent>
-      </Card>
-    </main>
+          <div className="mt-6 space-y-3">
+            <Button
+              className="w-full"
+              disabled={accepting}
+              onClick={() => setRetryCount((count) => count + 1)}
+            >
+              Try again
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate("/setup")}
+            >
+              Create a household instead
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-muted-foreground" role="status">
+          {accepting ? "Accepting the invite…" : "Opening the invite…"}
+        </p>
+      )}
+    </JoinLayout>
   );
 }

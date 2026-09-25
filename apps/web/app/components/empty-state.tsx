@@ -1,27 +1,16 @@
-import type { LucideIcon } from "lucide-react";
+import { cn } from "@/app/lib/utils";
 
 interface EmptyStateProps {
-  icon?: LucideIcon;
-  title: string;
-  description?: string;
-  children?: React.ReactNode;
+  message: string;
+  action?: React.ReactNode;
+  className?: string;
 }
 
-export function EmptyState({ icon: Icon, title, description, children }: EmptyStateProps) {
+export function EmptyState({ message, action, className }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-      {Icon && (
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary">
-          <Icon className="h-7 w-7 text-muted-foreground/60" />
-        </div>
-      )}
-      <h3 className="font-display text-lg font-semibold">{title}</h3>
-      {description && (
-        <p className="text-sm text-muted-foreground mt-1.5 max-w-sm leading-relaxed">
-          {description}
-        </p>
-      )}
-      {children && <div className="mt-5">{children}</div>}
+    <div className={cn("py-6", className)}>
+      <p className="max-w-prose text-muted-foreground">{message}</p>
+      {action && <div className="mt-4 flex flex-wrap gap-2">{action}</div>}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { listCategoriesForSelect } from "@/app/components/financial/use-financial-categories";
+import { NativeSelect } from "@/app/components/financial/form-controls";
 import type {
   FinancialCategoryItem,
   FinancialCategoryType,
@@ -28,13 +29,12 @@ export function CategorySelect({
   const options = listCategoriesForSelect(categories, type);
 
   return (
-    <select
+    <NativeSelect
       id={id}
       aria-label={ariaLabel}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
     >
       <option value="">{placeholder}</option>
       {options.map(({ category, indent }) => (
@@ -44,6 +44,6 @@ export function CategorySelect({
           {category.name}
         </option>
       ))}
-    </select>
+    </NativeSelect>
   );
 }

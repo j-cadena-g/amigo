@@ -101,6 +101,30 @@ describe("getFrequencyLabel", () => {
       getFrequencyLabel({
         frequency: "MONTHLY",
         interval: 1,
+        dayOfMonth: 31,
+        dayOfWeek: null,
+      })
+    ).toBe("Last day of every month");
+    expect(
+      getFrequencyLabel({
+        frequency: "MONTHLY",
+        interval: 2,
+        dayOfMonth: 31,
+        dayOfWeek: null,
+      })
+    ).toBe("Last day every 2 months");
+    expect(
+      getFrequencyLabel({
+        frequency: "MONTHLY",
+        interval: 1,
+        dayOfMonth: 30,
+        dayOfWeek: null,
+      })
+    ).toBe("30th of every month");
+    expect(
+      getFrequencyLabel({
+        frequency: "MONTHLY",
+        interval: 1,
         dayOfMonth: null,
         dayOfWeek: null,
       })

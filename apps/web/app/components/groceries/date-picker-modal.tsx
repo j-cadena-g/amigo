@@ -41,7 +41,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {item.isPurchased ? "Edit Purchase Date" : "Mark as Purchased"}
+            {item.isPurchased ? "Edit purchase date" : "Mark as bought"}
           </DialogTitle>
           <DialogDescription>{item.itemName}</DialogDescription>
         </DialogHeader>
@@ -49,9 +49,9 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
         <div>
           <label
             htmlFor="purchase-date"
-            className="block text-sm font-medium text-foreground"
+            className="block text-sm font-semibold text-foreground"
           >
-            Purchase Date
+            Bought on
           </label>
           <input
             id="purchase-date"
@@ -59,7 +59,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
             value={selectedDate}
             max={todayStr}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="mt-1.5 block w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         </div>
 
@@ -68,7 +68,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
             Cancel
           </Button>
           <Button type="button" onClick={handleConfirm}>
-            Confirm
+            {item.isPurchased ? "Save date" : "Mark as bought"}
           </Button>
         </DialogFooter>
       </DialogContent>

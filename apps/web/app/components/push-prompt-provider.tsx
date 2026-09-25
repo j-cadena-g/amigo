@@ -1,10 +1,12 @@
 import {
   useState,
   useEffect,
+  useRef,
   createContext,
   useContext,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router";
 import { PushNotificationModal } from "./push-notification-modal";
 import {
   getNotificationPermissionStatus,
@@ -13,11 +15,18 @@ import {
 } from "@/app/lib/push/client";
 import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
 
+const PROMPT_DELAY_MS = 2000;
+
 interface PushPromptContextValue {
   showPrompt: () => void;
 }
 
 const PushPromptContext = createContext<PushPromptContextValue | null>(null);
+
+/** Alerts are about the grocery list, so the automatic prompt only appears there. */
+export function isPushPromptPath(pathname: string): boolean {
+  return pathname === "/groceries" || pathname.startsWith("/groceries/");
+}
 
 function clearPushPromptedFlag(): void {
   if (typeof window === "undefined") return;
@@ -42,8 +51,14 @@ interface PushPromptProviderProps {
 
 export function PushPromptProvider({ children }: PushPromptProviderProps) {
   const [showModal, setShowModal] = useState(false);
+  const { pathname } = useLocation();
+  const onPromptPath = isPushPromptPath(pathname);
+  // Once per app session, even when storage is unavailable to remember a dismissal.
+  const autoPromptedRef = useRef(false);
 
   useEffect(() => {
+    if (!onPromptPath || autoPromptedRef.current) return;
+
     async function checkShouldPrompt(): Promise<boolean> {
       if (typeof window === "undefined") return false;
 
@@ -74,16 +89,20 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
       return true;
     }
 
+    let cancelled = false;
     const timer = setTimeout(() => {
       void checkShouldPrompt().then((shouldPrompt) => {
-        if (shouldPrompt) {
-          setShowModal(true);
-        }
+        if (cancelled || !shouldPrompt) return;
+        autoPromptedRef.current = true;
+        setShowModal(true);
       });
-    }, 3000);
+    }, PROMPT_DELAY_MS);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [onPromptPath]);
 
   return (
     <PushPromptContext.Provider

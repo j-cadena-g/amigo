@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useRevalidator } from "react-router";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import type { CurrencyCode } from "@amigo/db";
 import { toastMutationFailure } from "@/app/lib/api-error";
-import { formatCents } from "@/app/lib/currency";
-import { formatTransactionDate } from "@/app/lib/format-dates";
+import { formatSignedCents } from "@/app/lib/currency";
+import { formatLedgerDate } from "@/app/lib/format-dates";
 import { getFrequencyLabel } from "@/app/lib/recurring-labels";
 import { cn } from "@/app/lib/utils";
 import { EmptyState } from "@/app/components/empty-state";
@@ -11,11 +12,14 @@ import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Switch } from "@/app/components/ui/switch";
 import { Button } from "@/app/components/ui/button";
+import { FinancialSectionHeader } from "@/app/components/financial-section-header";
+import { FinancialCollapsiblePanel } from "@/app/components/financial/financial-collapsible-panel";
+import { CategoryManagementPanel } from "@/app/components/financial/category-management-panel";
+import { RowIconButton } from "@/app/components/financial/ledger-group";
 import {
   AddRecurringDialog,
   EditRecurringDialog,
 } from "@/app/components/recurring-dialogs";
-import type { CurrencyCode } from "@amigo/db";
 
 interface RecurringRule {
   id: string;
@@ -44,8 +48,9 @@ interface RecurringListProps {
   homeCurrency: CurrencyCode;
 }
 
-function RecurringRuleCard({
+function RecurringRuleRow({
   rule,
+  homeCurrency,
   toggling,
   deleting,
   onToggle,
@@ -53,6 +58,7 @@ function RecurringRuleCard({
   onDelete,
 }: {
   rule: RecurringRule;
+  homeCurrency: CurrencyCode;
   toggling: boolean;
   deleting: boolean;
   onToggle: () => void;
@@ -61,71 +67,58 @@ function RecurringRuleCard({
 }) {
   const isIncome = rule.type === "income";
   const title = rule.description || rule.category;
-  const amountLabel = `${isIncome ? "+" : "-"}${formatCents(rule.amount, rule.currency)}`;
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 rounded-lg border px-4 py-3",
-        !rule.isActive && "border-dashed opacity-70"
-      )}
-    >
+    <li className="flex items-center gap-3 py-3">
       <Switch
-        className="mt-1"
         checked={rule.isActive}
         disabled={toggling}
         onCheckedChange={onToggle}
         aria-label={rule.isActive ? `Pause ${title}` : `Resume ${title}`}
       />
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-3">
-          <p className="min-w-0 flex-1 font-medium wrap-break-word">{title}</p>
+      <div className={cn("min-w-0 flex-1", !rule.isActive && "text-muted-foreground")}>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="truncate font-semibold">{title}</span>
           <span
             className={cn(
-              "shrink-0 font-medium tabular-nums whitespace-nowrap",
-              isIncome
-                ? "text-success"
-                : "text-destructive"
+              "shrink-0 font-mono font-medium",
+              isIncome && rule.isActive && "text-success"
             )}
           >
-            {amountLabel}
+            {formatSignedCents(isIncome ? rule.amount : -rule.amount, rule.currency, {
+              showPlus: true,
+            })}
           </span>
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground capitalize">
-          {rule.category}
-        </p>
         <p className="text-sm text-muted-foreground">
-          {getFrequencyLabel(rule)}
+          {rule.description ? `${rule.category} · ` : ""}
+          {getFrequencyLabel(rule)} ·{" "}
+          {rule.isActive ? (
+            <>
+              Next <span className="font-mono">{formatLedgerDate(rule.nextRunDate)}</span>
+            </>
+          ) : (
+            "Paused"
+          )}
+          {rule.currency !== homeCurrency ? ` · ${rule.currency}` : ""}
         </p>
-        <p className="text-sm text-muted-foreground">
-          Next: {formatTransactionDate(rule.nextRunDate)}
-        </p>
-        <div className="mt-1 flex justify-end gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11 sm:h-9 sm:w-9"
-            onClick={onEdit}
-            aria-label={`Edit ${title}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11 sm:h-9 sm:w-9"
-            onClick={onDelete}
-            disabled={deleting}
-            aria-label={`Delete ${title}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
-    </div>
+
+      <div className="-mr-2 flex shrink-0">
+        <RowIconButton onClick={onEdit} aria-label={`Edit ${title}`}>
+          <Pencil />
+        </RowIconButton>
+        <RowIconButton
+          tone="destructive"
+          onClick={onDelete}
+          disabled={deleting}
+          aria-label={`Delete ${title}`}
+        >
+          <Trash2 />
+        </RowIconButton>
+      </div>
+    </li>
   );
 }
 
@@ -148,73 +141,97 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         revalidator.revalidate();
         return;
       }
-      await toastMutationFailure(toast, res, "Update recurring rule");
+      await toastMutationFailure(toast, res, "Update recurring transaction");
     } catch {
-      await toastMutationFailure(toast, null, "Update recurring rule");
+      await toastMutationFailure(toast, null, "Update recurring transaction");
     } finally {
       setToggling(null);
     }
   }
 
-  async function handleDelete(rule: RecurringRule) {
-    if (deleting) return;
+  async function handleDelete(rule: RecurringRule): Promise<boolean> {
+    if (deleting) return false;
     setDeleting(rule.id);
     try {
       const ok = await confirm({
-        title: "Delete Recurring Transaction",
-        description: `Are you sure you want to delete this recurring ${rule.type}? Future transactions will no longer be generated. Past transactions are not affected.`,
+        title: "Delete recurring transaction?",
+        description:
+          "It stops creating new transactions. Ones it already posted stay.",
         confirmText: "Delete",
         variant: "destructive",
       });
-      if (!ok) return;
+      if (!ok) return false;
 
       const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
         revalidator.revalidate();
-        return;
+        return true;
       }
-      await toastMutationFailure(toast, res, "Delete recurring rule");
+      await toastMutationFailure(toast, res, "Delete recurring transaction");
     } catch {
-      await toastMutationFailure(toast, null, "Delete recurring rule");
+      await toastMutationFailure(toast, null, "Delete recurring transaction");
     } finally {
       setDeleting(null);
     }
+    return false;
   }
 
-  return (
-    <div className="space-y-4">
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => setShowAddDialog(true)}
-        className="h-auto w-full border-2 border-dashed border-border py-3 text-muted-foreground hover:border-muted-foreground hover:bg-transparent hover:text-foreground"
-      >
-        <Plus className="h-5 w-5" />
-        Add Recurring Transaction
-      </Button>
+  async function handleDeleteFromDialog() {
+    if (editingRule && (await handleDelete(editingRule))) {
+      setEditingRule(null);
+    }
+  }
 
-      {rules.length === 0 ? (
-        <EmptyState
-          title="No recurring transactions yet"
-          description="Add a scheduled transaction to automate regular income or expenses."
+  const openAdd = () => setShowAddDialog(true);
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <FinancialSectionHeader
+          title="Recurring"
+          description="Each one posts automatically on its next date."
+          className="border-b border-foreground pb-3"
+          action={
+            <Button type="button" onClick={openAdd}>
+              <Plus />
+              Add recurring
+            </Button>
+          }
         />
-      ) : (
-        <div className="space-y-2">
-          {rules.map((rule) => (
-            <RecurringRuleCard
-              key={rule.id}
-              rule={rule}
-              toggling={toggling === rule.id}
-              deleting={deleting === rule.id}
-              onToggle={() => handleToggle(rule)}
-              onEdit={() => setEditingRule(rule)}
-              onDelete={() => void handleDelete(rule)}
-            />
-          ))}
-        </div>
-      )}
+
+        {rules.length === 0 ? (
+          <EmptyState
+            message="No recurring transactions yet. Add rent, pay, or a subscription and it will post on schedule."
+            action={
+              <Button type="button" onClick={openAdd}>
+                <Plus />
+                Add recurring
+              </Button>
+            }
+          />
+        ) : (
+          <ul className="divide-y divide-border">
+            {rules.map((rule) => (
+              <RecurringRuleRow
+                key={rule.id}
+                rule={rule}
+                homeCurrency={homeCurrency}
+                toggling={toggling === rule.id}
+                deleting={deleting === rule.id}
+                onToggle={() => handleToggle(rule)}
+                onEdit={() => setEditingRule(rule)}
+                onDelete={() => void handleDelete(rule)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <FinancialCollapsiblePanel title="Manage categories">
+        <CategoryManagementPanel />
+      </FinancialCollapsiblePanel>
 
       <AddRecurringDialog
         open={showAddDialog}
@@ -228,6 +245,8 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
           if (!open) setEditingRule(null);
         }}
         rule={editingRule}
+        onDelete={() => void handleDeleteFromDialog()}
+        deleting={editingRule !== null && deleting === editingRule.id}
       />
     </div>
   );

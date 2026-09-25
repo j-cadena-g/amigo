@@ -1,19 +1,20 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
+import { Trash2 } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { CurrencySelect } from "@/app/components/currency-select";
+import { DeleteButton, SharedCheckbox } from "@/app/components/financial/form-controls";
+import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString } from "@/app/lib/decimal-input";
-import { Trash2 } from "lucide-react";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
@@ -27,19 +28,25 @@ interface EditDebtDialogProps {
 export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps) {
   const confirm = useConfirm();
   const revalidator = useRevalidator();
+  const nameId = useId();
+  const currencyId = useId();
+  const firstAmountId = useId();
+  const secondAmountId = useId();
   const [name, setName] = useState(debt.name);
   const [currency, setCurrency] = useState<CurrencyCode>(debt.currency);
   const [isShared, setIsShared] = useState(debt.userId === null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isLoan = debt.type === "LOAN";
+  const noun = isLoan ? "loan" : "credit card";
 
   // Loan fields
   const [loanAmount, setLoanAmount] = useState(
-    debt.type === "LOAN" ? centsToInputString(debt.balanceInitial) : ""
+    isLoan ? centsToInputString(debt.balanceInitial) : ""
   );
   const [totalPaid, setTotalPaid] = useState(
-    debt.type === "LOAN" ? centsToInputString(debt.balanceCurrent) : ""
+    isLoan ? centsToInputString(debt.balanceCurrent) : ""
   );
 
   // Credit card fields
@@ -56,24 +63,23 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
     setLoading(true);
 
     try {
-      const body =
-        debt.type === "LOAN"
-          ? {
-              type: "LOAN" as const,
-              name,
-              loanAmount: parseFloat(loanAmount) || 0,
-              totalPaid: parseFloat(totalPaid) || 0,
-              currency,
-              isShared,
-            }
-          : {
-              type: "CREDIT_CARD" as const,
-              name,
-              creditLimit: parseFloat(creditLimit) || 0,
-              availableCredit: parseFloat(availableCredit) || 0,
-              currency,
-              isShared,
-            };
+      const body = isLoan
+        ? {
+            type: "LOAN" as const,
+            name,
+            loanAmount: parseFloat(loanAmount) || 0,
+            totalPaid: parseFloat(totalPaid) || 0,
+            currency,
+            isShared,
+          }
+        : {
+            type: "CREDIT_CARD" as const,
+            name,
+            creditLimit: parseFloat(creditLimit) || 0,
+            availableCredit: parseFloat(availableCredit) || 0,
+            currency,
+            isShared,
+          };
 
       const res = await fetch(`/api/debts/${debt.id}`, {
         method: "PATCH",
@@ -82,14 +88,14 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to update debt");
+        setError((await readApiErrorMessage(res)) ?? `Couldn't save the ${noun}. Try again.`);
+        return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(`Couldn't save the ${noun}. Check your connection and try again.`);
     } finally {
       setLoading(false);
     }
@@ -97,8 +103,8 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   async function handleDelete() {
     const ok = await confirm({
-      title: "Delete Debt",
-      description: "Are you sure you want to delete this debt? This action cannot be undone.",
+      title: `Delete ${noun}?`,
+      description: "This can't be undone.",
       confirmText: "Delete",
       variant: "destructive",
     });
@@ -113,139 +119,122 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(data?.message ?? "Failed to delete debt");
+        setError((await readApiErrorMessage(res)) ?? `Couldn't delete the ${noun}. Try again.`);
+        return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch {
+      setError(`Couldn't delete the ${noun}. Check your connection and try again.`);
     } finally {
       setDeleting(false);
     }
   }
 
+  const busy = loading || deleting;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Edit {debt.type === "LOAN" ? "Loan" : "Credit Card"}</DialogTitle>
-          <DialogDescription>
-            Update the details of this {debt.type === "LOAN" ? "loan" : "credit card"}.
-          </DialogDescription>
+          <DialogTitle>{isLoan ? "Edit loan" : "Edit credit card"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="edit-debt-name" className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-sm font-semibold">
               Name
             </label>
             <Input
-              id="edit-debt-name"
+              id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="edit-debt-currency" className="text-sm font-medium">
+          <div className="space-y-1.5">
+            <label htmlFor={currencyId} className="text-sm font-semibold">
               Currency
             </label>
-            <select
-              id="edit-debt-currency"
+            <CurrencySelect
+              id={currencyId}
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {SUPPORTED_CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setCurrency(v as CurrencyCode)}
+            />
           </div>
 
-          {debt.type === "LOAN" ? (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="edit-loan-amount" className="text-sm font-medium">
-                  Loan Amount
+          {isLoan ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor={firstAmountId} className="text-sm font-semibold">
+                  Loan amount
                 </label>
                 <Input
-                  id="edit-loan-amount"
+                  id={firstAmountId}
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={loanAmount}
                   onChange={(e) => setLoanAmount(e.target.value)}
+                  className="font-mono font-medium"
                   required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="edit-total-paid" className="text-sm font-medium">
-                  Total Paid
+              <div className="space-y-1.5">
+                <label htmlFor={secondAmountId} className="text-sm font-semibold">
+                  Total paid
                 </label>
                 <Input
-                  id="edit-total-paid"
+                  id={secondAmountId}
                   type="number"
                   step="0.01"
                   min="0"
                   max={loanAmount || undefined}
                   value={totalPaid}
                   onChange={(e) => setTotalPaid(e.target.value)}
+                  className="font-mono font-medium"
                   required
                 />
               </div>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="edit-credit-limit" className="text-sm font-medium">
-                  Credit Limit
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor={firstAmountId} className="text-sm font-semibold">
+                  Credit limit
                 </label>
                 <Input
-                  id="edit-credit-limit"
+                  id={firstAmountId}
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={creditLimit}
                   onChange={(e) => setCreditLimit(e.target.value)}
+                  className="font-mono font-medium"
                   required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="edit-available-credit" className="text-sm font-medium">
-                  Available Credit
+              <div className="space-y-1.5">
+                <label htmlFor={secondAmountId} className="text-sm font-semibold">
+                  Available credit
                 </label>
                 <Input
-                  id="edit-available-credit"
+                  id={secondAmountId}
                   type="number"
                   step="0.01"
                   min="0"
                   value={availableCredit}
                   onChange={(e) => setAvailableCredit(e.target.value)}
+                  className="font-mono font-medium"
                   required
                 />
               </div>
-            </>
+            </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="edit-debt-shared"
-              checked={isShared}
-              onChange={(e) => setIsShared(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <label htmlFor="edit-debt-shared" className="text-sm font-medium">
-              Shared (household-wide)
-            </label>
-          </div>
+          <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
           <AuditHistoryPanel recordId={debt.id} table="debts" />
 
@@ -253,29 +242,22 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
             <p className="text-sm text-destructive" role="alert">{error}</p>
           )}
 
-          <DialogFooter className="flex-row justify-between sm:justify-between">
+          <DialogFooter>
+            <DeleteButton onClick={() => void handleDelete()} disabled={busy} className="sm:mr-auto">
+              <Trash2 />
+              {deleting ? "Deleting…" : "Delete"}
+            </DeleteButton>
             <Button
               type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={loading || deleting}
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
             >
-              <Trash2 className="h-4 w-4 mr-1" />
-              {deleting ? "Deleting..." : "Delete"}
+              Cancel
             </Button>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={loading || deleting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || deleting || !name.trim()}>
-                {loading ? "Saving..." : "Save"}
-              </Button>
-            </div>
+            <Button type="submit" disabled={busy || !name.trim()}>
+              {loading ? "Saving…" : isLoan ? "Save loan" : "Save credit card"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

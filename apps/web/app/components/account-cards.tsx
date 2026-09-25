@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Button } from "@/app/components/ui/button";
-import { EmptyState } from "@/app/components/empty-state";
-import { formatCents } from "@/app/lib/currency";
-import { Pencil, Wallet } from "lucide-react";
-import { EditAccountDialog } from "@/app/components/edit-account-dialog";
+import { Pencil } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
+import { formatSignedCents } from "@/app/lib/currency";
 import { accountTypeLabel } from "@/app/lib/financial-account-types";
+import { cn } from "@/app/lib/utils";
+import { EditAccountDialog } from "@/app/components/edit-account-dialog";
+import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
 
 export type AccountRow = {
   id: string;
@@ -21,85 +20,77 @@ export type AccountRow = {
 
 interface AccountCardsProps {
   accounts: AccountRow[];
+  homeCurrency: CurrencyCode;
 }
 
-function AccountCard({
+function AccountListRow({
   account,
+  homeCurrency,
   onEdit,
 }: {
   account: AccountRow;
+  homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const meta = [
+    accountTypeLabel(account.type),
+    account.isShared ? "Shared" : "Personal",
+    account.archived ? "Archived" : null,
+    account.currency !== homeCurrency ? account.currency : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <Card className={account.archived ? "opacity-70" : undefined}>
-      <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
-        <div className="min-w-0">
-          <CardTitle className="text-base truncate">{account.name}</CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {accountTypeLabel(account.type)}
-            {account.isShared ? " · Shared" : " · Personal"}
-            {account.archived ? " · Archived" : ""}
-          </p>
+    <li className="flex items-center gap-2 py-2.5">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 items-baseline gap-3",
+          account.archived && "text-muted-foreground"
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{account.name}</p>
+          <p className="truncate text-sm text-muted-foreground">{meta}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={onEdit}
-          aria-label={`Edit account ${account.name}`}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <p className="text-lg font-semibold tabular-nums">
-          {formatCents(account.balance, account.currency)}
-        </p>
-      </CardContent>
-    </Card>
+        <span className="shrink-0 font-mono font-medium">
+          {formatSignedCents(account.balance, account.currency)}
+        </span>
+      </div>
+      <RowIconButton
+        className="-mr-2"
+        onClick={onEdit}
+        aria-label={`Edit account ${account.name}`}
+      >
+        <Pencil />
+      </RowIconButton>
+    </li>
   );
 }
 
-export function AccountCards({ accounts }: AccountCardsProps) {
+export function AccountCards({ accounts, homeCurrency }: AccountCardsProps) {
   const [editing, setEditing] = useState<AccountRow | null>(null);
   const shared = accounts.filter((a) => a.isShared === true);
   const personal = accounts.filter((a) => a.isShared !== true);
 
+  const renderRows = (items: AccountRow[]) =>
+    items.map((a) => (
+      <AccountListRow
+        key={a.id}
+        account={a}
+        homeCurrency={homeCurrency}
+        onEdit={() => setEditing(a)}
+      />
+    ));
+
   return (
     <>
-      <div className="space-y-6">
-        {shared.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Shared
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {shared.map((a) => (
-                <AccountCard key={a.id} account={a} onEdit={() => setEditing(a)} />
-              ))}
-            </div>
-          </div>
-        )}
-        {personal.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Personal
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {personal.map((a) => (
-                <AccountCard key={a.id} account={a} onEdit={() => setEditing(a)} />
-              ))}
-            </div>
-          </div>
-        )}
-        {accounts.length === 0 && (
-          <EmptyState
-            icon={Wallet}
-            title="No accounts yet"
-            description="Add your first account to start tracking balances."
-          />
-        )}
-      </div>
+      {shared.length > 0 && (
+        <LedgerSubgroup title="Shared">{renderRows(shared)}</LedgerSubgroup>
+      )}
+      {personal.length > 0 && (
+        <LedgerSubgroup title="Personal">{renderRows(personal)}</LedgerSubgroup>
+      )}
       {editing && (
         <EditAccountDialog
           key={editing.id}

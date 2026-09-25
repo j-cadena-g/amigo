@@ -20,8 +20,8 @@ export function createAmigoPwaOptions(): Partial<VitePWAOptions> {
       description: "Household management for budgeting and grocery tracking",
       start_url: "/",
       display: "standalone",
-      background_color: "#f4f6f9",
-      theme_color: "#3B7BD5",
+      background_color: "#ffffff",
+      theme_color: "#ffffff",
       icons: [
         {
           src: "/icon-192.png",
@@ -37,6 +37,12 @@ export function createAmigoPwaOptions(): Partial<VitePWAOptions> {
           src: "/icon-1024.png",
           sizes: "1024x1024",
           type: "image/png",
+        },
+        {
+          src: "/icon-maskable-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
         },
       ],
     },

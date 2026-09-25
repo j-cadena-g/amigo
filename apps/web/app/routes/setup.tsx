@@ -4,12 +4,16 @@ import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { Wordmark } from "@/app/components/wordmark";
 import { acceptInvite } from "@/app/lib/accept-invite";
 import {
   buildTimezoneOptions,
   getBrowserTimezone,
 } from "@/app/lib/timezones";
 import { getSessionStatus } from "@/app/lib/session.server";
+
+const SELECT_CLASS =
+  "mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base";
 
 export function loader({ context }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -36,7 +40,7 @@ export function meta() {
 export default function Setup() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [householdName, setHouseholdName] = useState("My Household");
+  const [householdName, setHouseholdName] = useState("My household");
   const [currency, setCurrency] = useState("CAD");
   const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
@@ -72,9 +76,9 @@ export default function Setup() {
       }
 
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(data?.error ?? "Something went wrong");
+      setError(data?.error ?? "Couldn't create the household. Try again.");
     } catch {
-      setError("Network error. Please try again.");
+      setError("Couldn't create the household. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -96,47 +100,53 @@ export default function Setup() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md mx-auto p-6">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold tracking-tight">Welcome to amigo</h1>
-          <p className="text-muted-foreground mt-2">
-            Let&apos;s set up your household.
-          </p>
-        </div>
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+        <Wordmark />
+        <h1 className="type-display mt-6 text-title-sm">Set up your household</h1>
 
-        <div className="mb-8 space-y-3">
-          <Button
+        <div className="mt-1">
+          <button
             type="button"
-            variant="link"
             onClick={() => setShowInviteCode((open) => !open)}
             aria-expanded={showInviteCode}
             aria-controls="invite-code-form"
-            className="h-auto p-0"
+            className="block py-2 text-left text-muted-foreground hover:text-foreground"
           >
-            {showInviteCode ? "Hide invite code" : "Have an invite code?"}
-          </Button>
+            {showInviteCode ? (
+              "Hide invite code"
+            ) : (
+              <>
+                Joining someone&apos;s household?{" "}
+                <span className="font-semibold text-foreground underline decoration-muted-foreground/60 underline-offset-4">
+                  Enter an invite code
+                </span>
+              </>
+            )}
+          </button>
 
           {showInviteCode && (
-            <form id="invite-code-form" onSubmit={handleAcceptInvite} className="space-y-3 rounded-md border p-4">
-              <div>
-                <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
-                  Invite code
-                </label>
-                <Input
-                  id="inviteCode"
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  className="font-mono uppercase"
-                  placeholder="AMIGO-XXXXXXXXXXXXX"
-                  autoComplete="off"
-                  required
-                />
-              </div>
+            <form
+              id="invite-code-form"
+              onSubmit={handleAcceptInvite}
+              className="mt-4 border-b border-border pb-8"
+            >
+              <label htmlFor="inviteCode" className="block text-sm font-semibold">
+                Invite code
+              </label>
+              <Input
+                id="inviteCode"
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className="mt-1.5 font-mono uppercase"
+                placeholder="AMIGO-XXXXXXXXXXXXX"
+                autoComplete="off"
+                required
+              />
 
               {inviteError && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="mt-2 text-sm text-destructive" role="alert">
                   {inviteError}
                 </p>
               )}
@@ -144,17 +154,17 @@ export default function Setup() {
               <Button
                 type="submit"
                 disabled={acceptingInvite || inviteCode.trim().length === 0}
-                className="w-full"
+                className="mt-4 w-full"
               >
-                {acceptingInvite ? "Joining..." : "Join household"}
+                {acceptingInvite ? "Joining…" : "Join household"}
               </Button>
             </form>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <div>
-            <label htmlFor="householdName" className="block text-sm font-medium mb-1">
+            <label htmlFor="householdName" className="block text-sm font-semibold">
               Household name
             </label>
             <Input
@@ -164,21 +174,24 @@ export default function Setup() {
               onChange={(e) => setHouseholdName(e.target.value)}
               required
               maxLength={100}
+              aria-describedby="householdName-hint"
+              className="mt-1.5"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              This name is stored in the app and tagged on your Clerk profile.
+            <p id="householdName-hint" className="mt-1.5 text-sm text-muted-foreground">
+              Everyone you invite sees this name. You can change it later in
+              Settings.
             </p>
           </div>
 
           <div>
-            <label htmlFor="currency" className="block text-sm font-medium mb-1">
-              Home Currency
+            <label htmlFor="currency" className="block text-sm font-semibold">
+              Home currency
             </label>
             <select
               id="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+              className={SELECT_CLASS}
             >
               {CURRENCY_CODES.map((code) => (
                 <option key={code} value={code}>
@@ -189,14 +202,15 @@ export default function Setup() {
           </div>
 
           <div>
-            <label htmlFor="timezone" className="block text-sm font-medium mb-1">
+            <label htmlFor="timezone" className="block text-sm font-semibold">
               Timezone
             </label>
             <select
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+              aria-describedby="timezone-hint"
+              className={SELECT_CLASS}
             >
               {buildTimezoneOptions(timezone).map((tz) => (
                 <option key={tz} value={tz}>
@@ -204,8 +218,9 @@ export default function Setup() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Budget periods and transaction dates use your household&apos;s local calendar day.
+            <p id="timezone-hint" className="mt-1.5 text-sm text-muted-foreground">
+              Budget periods and transaction dates use your household&apos;s local
+              calendar day.
             </p>
           </div>
 
@@ -220,7 +235,7 @@ export default function Setup() {
             disabled={submitting || householdName.trim().length === 0}
             className="w-full"
           >
-            {submitting ? "Creating..." : "Create household"}
+            {submitting ? "Creating…" : "Create household"}
           </Button>
         </form>
       </div>

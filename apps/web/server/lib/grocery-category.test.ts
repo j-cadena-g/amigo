@@ -51,14 +51,32 @@ describe("categorizeGroceryItem", () => {
     );
   });
 
-  it("stores General when the call times out", async () => {
+  it("stores General when run throws synchronously", async () => {
+    const run = vi.fn(() => {
+      throw new Error("sync");
+    });
+
+    await expect(categorizeGroceryItem({ run }, "pollo")).resolves.toBe(
+      "General"
+    );
+  });
+
+  it("stores General when the call times out and aborts the inference", async () => {
     vi.useFakeTimers();
-    const run = vi.fn(() => new Promise(() => undefined));
+    const run = vi.fn(
+      (_model: string, _input: unknown, options?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener("abort", () => {
+            reject(new Error("aborted"));
+          });
+        })
+    );
     const pending = categorizeGroceryItem({ run }, "jabón");
 
     await vi.advanceTimersByTimeAsync(2500);
 
     await expect(pending).resolves.toBe("General");
+    expect(run.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
   });
 
   it("skips run when the supplied category is allowlisted", async () => {

@@ -12,7 +12,11 @@ const AISLE_INSTRUCTIONS =
   "Which grocery aisle is this item? The name may be English, Spanish, or a mix of both.";
 
 export interface GroceryCategoryAi {
-  run(model: string, input: JevChoiceInput): Promise<unknown>;
+  run(
+    model: string,
+    input: JevChoiceInput,
+    options?: { signal?: AbortSignal }
+  ): Promise<unknown>;
 }
 
 export function groceryCategoryAi(
@@ -21,7 +25,7 @@ export function groceryCategoryAi(
   if (!ai) return undefined;
   const runner = ai as unknown as GroceryCategoryAi;
   return {
-    run: (model, input) => runner.run(model, input),
+    run: (model, input, options) => runner.run(model, input, options),
   };
 }
 
@@ -49,33 +53,37 @@ export async function categorizeGroceryItem(
     return DEFAULT_GROCERY_CATEGORY;
   }
 
-  const inference = Promise.resolve(
-    ai.run(GROCERY_CATEGORY_MODEL, {
-      state: name,
-      questions: {
-        aisle: {
-          type: "choice",
-          instructions: AISLE_INSTRUCTIONS,
-          criteria: GROCERY_CATEGORY_CRITERIA,
-        },
-      },
-    })
-  );
-  void inference.catch(() => undefined);
-
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    const inference = ai.run(
+      GROCERY_CATEGORY_MODEL,
+      {
+        state: name,
+        questions: {
+          aisle: {
+            type: "choice",
+            instructions: AISLE_INSTRUCTIONS,
+            criteria: GROCERY_CATEGORY_CRITERIA,
+          },
+        },
+      },
+      { signal: controller.signal }
+    );
+    void Promise.resolve(inference).catch(() => undefined);
+
     const response = await Promise.race([
       inference,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("grocery categorization timed out")),
-          GROCERY_CATEGORY_TIMEOUT_MS
-        );
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("grocery categorization timed out"));
+        }, GROCERY_CATEGORY_TIMEOUT_MS);
       }),
     ]);
     return choiceFromJev(response);
   } catch {
+    controller.abort();
     return DEFAULT_GROCERY_CATEGORY;
   } finally {
     if (timer !== undefined) clearTimeout(timer);

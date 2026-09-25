@@ -255,6 +255,14 @@ export function useGroceryLogic({
               const raw = (await res.json()) as SerializedGroceryItem;
               const realItem = buildItemFromServer(action.item, raw);
               setBaseItems((prev) => [realItem, ...prev]);
+            } else if (action.type === "edit_name") {
+              const raw = (await res.json()) as SerializedGroceryItem;
+              setBaseItems((prev) =>
+                applyOptimisticAction(prev, {
+                  ...action,
+                  category: raw.category,
+                })
+              );
             } else {
               setBaseItems((prev) => applyOptimisticAction(prev, action));
             }

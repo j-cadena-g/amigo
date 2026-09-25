@@ -26,8 +26,10 @@ import {
   ROUTE_RATE_LIMITS,
 } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
-
-const DEFAULT_GROCERY_CATEGORY = "General";
+import {
+  categorizeGroceryItem,
+  groceryCategoryAi,
+} from "../lib/grocery-category";
 
 const addItemSchema = z.object({
   name: z.string().min(1).max(255),
@@ -143,6 +145,11 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     const itemId = crypto.randomUUID();
+    const category = await categorizeGroceryItem(
+      groceryCategoryAi(env.AI),
+      validated.name.trim(),
+      validated.category
+    );
 
     const item = await withAudit(
       db,
@@ -162,7 +169,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
             householdId: session!.householdId,
             createdByUserId: session!.userId,
             itemName: validated.name.trim(),
-            category: validated.category?.trim() || DEFAULT_GROCERY_CATEGORY,
+            category,
           })
           .returning()
           .get()
@@ -292,6 +299,11 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
+    const category = await categorizeGroceryItem(
+      groceryCategoryAi(env.AI),
+      validated.name.trim()
+    );
+
     const updated = await withAudit(
       db,
       {
@@ -308,6 +320,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
           .update(groceryItems)
           .set({
             itemName: validated.name.trim(),
+            category,
             updatedAt: new Date(),
           })
           .where(

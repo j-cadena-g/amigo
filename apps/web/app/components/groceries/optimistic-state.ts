@@ -64,7 +64,15 @@ export function applyOptimisticAction(
 
     case "edit_name":
       return items.map((item) =>
-        item.id === action.id ? { ...item, itemName: action.name } : item
+        item.id === action.id
+          ? {
+              ...item,
+              itemName: action.name,
+              ...(action.category !== undefined
+                ? { category: action.category }
+                : {}),
+            }
+          : item
       );
 
     case "update_purchase_date":

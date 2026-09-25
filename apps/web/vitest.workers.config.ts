@@ -15,6 +15,9 @@ export default defineConfig({
         wrangler: {
           configPath: "./wrangler.jsonc",
         },
+        // Workers AI is remote-only. Keep the binding, but do not open a
+        // remote proxy session from integration tests.
+        remoteBindings: false,
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,

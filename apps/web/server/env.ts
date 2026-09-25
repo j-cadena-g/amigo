@@ -16,6 +16,7 @@ export interface Env {
   HOUSEHOLD: DurableObjectNamespace;
   ASSETS: Fetcher;
   EMAIL: SendEmailBinding;
+  AI: Ai;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   APP_ORIGIN: string;

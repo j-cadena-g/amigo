@@ -11,5 +11,5 @@ export type OptimisticAction =
   | { type: "toggle_with_date"; id: string; purchasedAt: Date }
   | { type: "delete"; id: string }
   | { type: "update_tags"; id: string; tagIds: string[]; allTags: GroceryTag[] }
-  | { type: "edit_name"; id: string; name: string }
+  | { type: "edit_name"; id: string; name: string; category?: string | null }
   | { type: "update_purchase_date"; id: string; purchasedAt: Date };

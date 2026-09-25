@@ -98,17 +98,22 @@ describe("categorizeGroceryItem", () => {
       categorizeGroceryItem({ run }, "jabón líquido")
     ).resolves.toEqual({ category: "General", decided: false });
     const line = String(vi.mocked(console.warn).mock.calls[0]?.[0]);
-    expect(JSON.parse(line)).toMatchObject({
-      reason: "unrecognized_response",
-      keys: ["state", "questions"],
-    });
+    expect(JSON.parse(line)).toEqual(
+      expect.objectContaining({
+        reason: "unrecognized_response",
+        shape: "no_answers",
+      })
+    );
     expect(line).not.toContain("jabón");
+    expect(line).not.toContain("state");
   });
 
   it("stores General and logs the error, without the item name, when run throws", async () => {
     const run = vi
       .fn()
-      .mockRejectedValue(new Error("2021: Insufficient AI Gateway credits"));
+      .mockRejectedValue(
+        new Error("2021: Insufficient AI Gateway credits for pollo")
+      );
 
     await expect(categorizeGroceryItem({ run }, "pollo")).resolves.toEqual({
       category: "General",
@@ -117,6 +122,7 @@ describe("categorizeGroceryItem", () => {
     expect(loggedReasons()).toEqual(["error"]);
     const line = String(vi.mocked(console.warn).mock.calls[0]?.[0]);
     expect(line).toContain("Insufficient AI Gateway credits");
+    expect(line).toContain("[redacted]");
     expect(line).not.toContain("pollo");
   });
 

@@ -124,7 +124,7 @@ export async function categorizeGroceryItem(
     if (timedOut) {
       logFallback("timeout");
     } else {
-      logFallback("error", { error: String(error) });
+      logFallback("error", { error: safeErrorText(error, name) });
     }
     return { category: fallback, decided: false };
   } finally {
@@ -138,10 +138,7 @@ function choiceFromJev(response: unknown): string | null {
   const body = field(response, "result") ?? response;
   const aisle = field(field(body, "answers"), "aisle");
   if (!aisle || typeof aisle !== "object") {
-    // Field names only: values could echo the request, which holds the item name.
-    const keys =
-      response && typeof response === "object" ? Object.keys(response) : [];
-    logFallback("unrecognized_response", { keys: keys.slice(0, 10) });
+    logFallback("unrecognized_response", { shape: responseShape(response) });
     return null;
   }
   const choice = field(aisle, "choice");
@@ -158,6 +155,27 @@ function choiceFromJev(response: unknown): string | null {
     return null;
   }
   return choice;
+}
+
+function responseShape(response: unknown): string {
+  if (response === null) return "null";
+  if (Array.isArray(response)) return "array";
+  if (typeof response !== "object") return typeof response;
+  const body = field(response, "result") ?? response;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return "no_body";
+  const answers = field(body, "answers");
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
+    return "no_answers";
+  }
+  return "no_aisle";
+}
+
+function safeErrorText(error: unknown, itemName: string): string {
+  const message = error instanceof Error ? error.message : "rejected";
+  const needle = itemName.trim();
+  const redacted =
+    needle.length >= 3 ? message.split(needle).join("[redacted]") : "rejected";
+  return redacted.slice(0, 200);
 }
 
 function field(value: unknown, key: string): unknown {

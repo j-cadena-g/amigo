@@ -17,7 +17,7 @@ export const GROCERY_CATEGORIES = [
   "Health & Beauty",
   "Baby",
   "Pet Care",
-  "Beer & Wine",
+  "Alcoholic Beverages",
   "General",
 ] as const;
 
@@ -27,7 +27,7 @@ export const DEFAULT_GROCERY_CATEGORY: GroceryCategory = "General";
 
 export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
   "Fruits & Vegetables":
-    "Fresh fruits, vegetables, and herbs, plus packaged salads. Includes frutas, verduras, aguacate, lechuga, manzana, cilantro, papas (potatoes).",
+    "Fresh fruits, vegetables, and herbs, plus packaged salads. Includes frutas, verduras, aguacate, lechuga, manzana, cilantro, papas (fresh potatoes, not papas fritas).",
   Bakery:
     "Bread, buns, bagels, tortillas, and baked goods such as croissants, muffins, and cakes. Includes pan, bolillo, pan dulce, tortillas.",
   Deli:
@@ -42,11 +42,11 @@ export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
   "International Foods":
     "Mexican, Latin American, Asian, and other world foods from the international aisle. Includes salsa, chiles en lata, masa harina, frijoles refritos, salsa de soya.",
   Snacks:
-    "Chips, crackers, cookies, candy, chocolate, nuts, and popcorn. Includes papitas, galletas, dulces, cacahuates.",
+    "Chips, crackers, cookies, candy, chocolate, nuts, and popcorn. Includes papitas (bagged potato chips; papitas fritas are frozen fries), galletas, dulces, cacahuates.",
   Beverages:
     "Drinks other than milk and alcohol: water, juice, pop, coffee, and tea. Includes agua, jugo, refresco, café, té.",
   Frozen:
-    "Frozen meals, pizza, vegetables, fries, nuggets, and ice cream. Includes congelados, helado, pizza congelada.",
+    "Frozen meals, pizza, vegetables, fries, nuggets, and ice cream. Includes congelados, papas fritas, papitas fritas, helado, pizza congelada.",
   Household:
     "Cleaning supplies, laundry, dish soap, paper towels, toilet paper, garbage bags, foil, batteries, and light bulbs. Includes detergente, jabón para trastes, papel higiénico, cloro, pilas, focos.",
   "Health & Beauty":
@@ -54,7 +54,7 @@ export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
   Baby: "Diapers, wipes, formula, and baby food. Includes pañales, toallitas, fórmula, comida para bebé.",
   "Pet Care":
     "Pet food, treats, litter, and supplies. Includes comida para perro, comida para gato, arena para gato.",
-  "Beer & Wine":
+  "Alcoholic Beverages":
     "Beer, wine, cider, coolers, and spirits. Includes cerveza, chelas, vino, tequila.",
   General: "Does not fit another aisle.",
 };

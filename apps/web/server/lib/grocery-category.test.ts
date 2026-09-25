@@ -41,10 +41,10 @@ afterEach(() => {
 
 describe("categorizeGroceryItem", () => {
   it("stores a confident allowlisted choice from the binding's response", async () => {
-    const run = vi.fn().mockResolvedValue(jevResponse("Dairy", 0.8));
+    const run = vi.fn().mockResolvedValue(jevResponse("Dairy & Eggs", 0.8));
 
     await expect(categorizeGroceryItem({ run }, "leche 2%")).resolves.toEqual({
-      category: "Dairy",
+      category: "Dairy & Eggs",
       decided: true,
     });
     expect(run).toHaveBeenCalledOnce();
@@ -63,7 +63,7 @@ describe("categorizeGroceryItem", () => {
   });
 
   it("stores General when confidence is below 0.5", async () => {
-    const run = vi.fn().mockResolvedValue(jevResponse("Produce", 0.49));
+    const run = vi.fn().mockResolvedValue(jevResponse("Fruits & Vegetables", 0.49));
 
     await expect(categorizeGroceryItem({ run }, "aguacate")).resolves.toEqual({
       category: "General",
@@ -76,7 +76,7 @@ describe("categorizeGroceryItem", () => {
     const missing = vi
       .fn()
       .mockResolvedValue({ state: "Completed", result: { answers: {} } });
-    const unknown = vi.fn().mockResolvedValue(jevResponse("Deli", 0.9));
+    const unknown = vi.fn().mockResolvedValue(jevResponse("Hardware", 0.9));
 
     await expect(categorizeGroceryItem({ run: missing }, "pan")).resolves.toEqual(
       { category: "General", decided: false }
@@ -86,7 +86,7 @@ describe("categorizeGroceryItem", () => {
     ).resolves.toEqual({ category: "General", decided: false });
     expect(loggedReasons()).toEqual(["unrecognized_response", "unknown_choice"]);
     const unknownLine = String(vi.mocked(console.warn).mock.calls[1]?.[0]);
-    expect(unknownLine).not.toContain("Deli");
+    expect(unknownLine).not.toContain("Hardware");
   });
 
   it("logs only field names for a response that echoes the item name", async () => {
@@ -173,8 +173,8 @@ describe("categorizeGroceryItem", () => {
     const confident = vi.fn().mockResolvedValue(jevResponse("Frozen", 0.99));
 
     await expect(
-      categorizeGroceryItem({ run: failing }, "leche 2%", { fallback: "Dairy" })
-    ).resolves.toEqual({ category: "Dairy", decided: false });
+      categorizeGroceryItem({ run: failing }, "leche 2%", { fallback: "Dairy & Eggs" })
+    ).resolves.toEqual({ category: "Dairy & Eggs", decided: false });
     await expect(
       categorizeGroceryItem({ run: confident }, "helado", {
         fallback: "Bakery",
@@ -190,8 +190,8 @@ describe("categorizeGroceryItem", () => {
     const run = vi.fn();
 
     await expect(
-      categorizeGroceryItem({ run }, "leche", { supplied: "Dairy" })
-    ).resolves.toEqual({ category: "Dairy", decided: true });
+      categorizeGroceryItem({ run }, "leche", { supplied: "Dairy & Eggs" })
+    ).resolves.toEqual({ category: "Dairy & Eggs", decided: true });
     expect(run).not.toHaveBeenCalled();
   });
 });

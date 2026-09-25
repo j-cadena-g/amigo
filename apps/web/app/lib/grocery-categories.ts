@@ -1,14 +1,23 @@
+// Departments that Real Canadian Superstore, Sobeys (Voilà), and Metro share,
+// in the order you'd walk a typical store: fresh counters, centre aisles,
+// frozen near the end, then non-food. The list's sections follow this order.
 export const GROCERY_CATEGORIES = [
-  "Produce",
-  "Dairy",
-  "Meat",
-  "Seafood",
+  "Fruits & Vegetables",
   "Bakery",
-  "Frozen",
+  "Deli",
+  "Meat",
+  "Fish & Seafood",
+  "Dairy & Eggs",
   "Pantry",
-  "Beverages",
+  "International Foods",
   "Snacks",
+  "Beverages",
+  "Frozen",
   "Household",
+  "Health & Beauty",
+  "Baby",
+  "Pet Care",
+  "Beer & Wine",
   "General",
 ] as const;
 
@@ -17,22 +26,36 @@ export type GroceryCategory = (typeof GROCERY_CATEGORIES)[number];
 export const DEFAULT_GROCERY_CATEGORY: GroceryCategory = "General";
 
 export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
-  Produce:
-    "Fruits and vegetables. Includes frutas, verduras, aguacate, lechuga, manzana.",
-  Dairy:
-    "Milk, cheese, yogurt, butter, and eggs. Includes leche, queso, yogur, huevos.",
-  Meat: "Beef, chicken, pork, and other meat. Includes carne, pollo, res, cerdo.",
-  Seafood: "Fish and shellfish. Includes pescado, camarón, atún.",
-  Bakery: "Bread and baked goods. Includes pan, tortillas, bolillo.",
-  Frozen:
-    "Frozen meals, ice cream, and frozen vegetables. Includes congelados, helado.",
+  "Fruits & Vegetables":
+    "Fresh fruits, vegetables, and herbs, plus packaged salads. Includes frutas, verduras, aguacate, lechuga, manzana, cilantro, papas (potatoes).",
+  Bakery:
+    "Bread, buns, bagels, tortillas, and baked goods such as croissants, muffins, and cakes. Includes pan, bolillo, pan dulce, tortillas.",
+  Deli:
+    "Deli counter meats and cheeses, rotisserie chicken, and ready-to-eat meals, salads, and sushi. Includes jamón rebanado, pollo rostizado, comida preparada.",
+  Meat: "Fresh beef, chicken, pork, turkey, ground meat, bacon, and sausages. Includes carne, pollo, res, cerdo, chorizo, tocino.",
+  "Fish & Seafood":
+    "Fresh fish and shellfish. Includes pescado, camarón, salmón, tilapia.",
+  "Dairy & Eggs":
+    "Milk, cheese, yogurt, butter, cream, and eggs. Includes leche, queso, yogur, mantequilla, crema, huevos.",
   Pantry:
-    "Dry goods, canned food, rice, pasta, oil, and spices. Includes arroz, pasta, frijoles, aceite.",
+    "Canned and dry goods: rice, pasta, beans, flour, sugar, oil, spices, sauces, cereal, and baking supplies. Includes arroz, pasta, frijoles, harina, azúcar, aceite, atún en lata.",
+  "International Foods":
+    "Mexican, Latin American, Asian, and other world foods from the international aisle. Includes salsa, chiles en lata, masa harina, frijoles refritos, salsa de soya.",
+  Snacks:
+    "Chips, crackers, cookies, candy, chocolate, nuts, and popcorn. Includes papitas, galletas, dulces, cacahuates.",
   Beverages:
-    "Drinks other than milk. Includes jugo, refresco, café, agua.",
-  Snacks: "Chips, cookies, and candy. Includes papas, galletas, dulces.",
+    "Drinks other than milk and alcohol: water, juice, pop, coffee, and tea. Includes agua, jugo, refresco, café, té.",
+  Frozen:
+    "Frozen meals, pizza, vegetables, fries, nuggets, and ice cream. Includes congelados, helado, pizza congelada.",
   Household:
-    "Cleaning supplies, paper goods, and soap. Includes jabón, papel higiénico, detergente.",
+    "Cleaning supplies, laundry, dish soap, paper towels, toilet paper, garbage bags, foil, batteries, and light bulbs. Includes detergente, jabón para trastes, papel higiénico, cloro, pilas, focos.",
+  "Health & Beauty":
+    "Personal care, beauty, and pharmacy: shampoo, toothpaste, deodorant, body soap, razors, vitamins, and medicine. Includes champú, pasta de dientes, desodorante, medicina.",
+  Baby: "Diapers, wipes, formula, and baby food. Includes pañales, toallitas, fórmula, comida para bebé.",
+  "Pet Care":
+    "Pet food, treats, litter, and supplies. Includes comida para perro, comida para gato, arena para gato.",
+  "Beer & Wine":
+    "Beer, wine, cider, coolers, and spirits. Includes cerveza, chelas, vino, tequila.",
   General: "Does not fit another aisle.",
 };
 

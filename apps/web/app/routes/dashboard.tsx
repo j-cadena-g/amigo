@@ -71,7 +71,7 @@ export default function Dashboard() {
         className="mt-8"
       />
 
-      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-2">
+      <div className="mt-10 grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-2">
         <DashboardUpcomingRecurring items={upcomingRecurring} />
         <DashboardBudgetProgress budgets={budgetsWithSpending} currency={currency} />
         <DashboardRecentTransactions transactions={recentTransactions} />

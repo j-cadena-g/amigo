@@ -44,10 +44,10 @@ describe("assertDevelopmentAgentSignin", () => {
 });
 
 describe("buildSignInTicketUrl", () => {
-  it("puts the ticket on the hash SignIn route", () => {
+  it("puts the ticket in the query string, where SignIn reads it", () => {
     expect(
       buildSignInTicketUrl("http://localhost:5190", "ticket-value")
-    ).toBe("http://localhost:5190/#/?__clerk_ticket=ticket-value");
+    ).toBe("http://localhost:5190/?__clerk_ticket=ticket-value");
   });
 });
 
@@ -85,7 +85,7 @@ describe("createAgentSigninUrl", () => {
     expect(clerk.signInTokens.createSignInToken).not.toHaveBeenCalled();
   });
 
-  it("falls back to a hash ticket URL when Agent Tasks are unavailable", async () => {
+  it("falls back to a ticket URL when Agent Tasks are unavailable", async () => {
     const clerk = {
       agentTasks: {
         create: vi.fn().mockRejectedValue(new Error("not enabled")),
@@ -111,7 +111,41 @@ describe("createAgentSigninUrl", () => {
 
     expect(result).toEqual({
       kind: "ticket",
-      url: "http://localhost:5190/#/?__clerk_ticket=sit_1",
+      url: "http://localhost:5190/?__clerk_ticket=sit_1",
+    });
+  });
+
+  it("skips Agent Tasks when ticketOnly is set, keeping the testing token", async () => {
+    const clerk = {
+      agentTasks: { create: vi.fn() },
+      testingTokens: {
+        createTestingToken: vi.fn().mockResolvedValue({ token: "tt_1" }),
+      },
+      users: {
+        getUserList: vi.fn().mockResolvedValue({
+          data: [{ id: "user_1" }],
+        }),
+      },
+      signInTokens: {
+        createSignInToken: vi.fn().mockResolvedValue({ token: "sit_1" }),
+      },
+    };
+
+    const result = await createAgentSigninUrl({
+      clerk,
+      email: "agent@example.com",
+      origin: "http://localhost:5190",
+      ticketOnly: true,
+    });
+
+    expect(clerk.agentTasks.create).not.toHaveBeenCalled();
+    expect(clerk.signInTokens.createSignInToken).toHaveBeenCalledWith({
+      userId: "user_1",
+      expiresInSeconds: 120,
+    });
+    expect(result).toEqual({
+      kind: "ticket",
+      url: "http://localhost:5190/?__clerk_ticket=sit_1&__clerk_testing_token=tt_1",
     });
   });
 });

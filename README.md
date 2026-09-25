@@ -304,10 +304,10 @@ Cloud agents still need a signed-in Clerk user to use the app UI. Do **not** com
 
 | Key | Purpose |
 | --- | --- |
-| `AGENT_LOGIN_EMAIL` | Clerk Development user email; required for local first login to claim the seeded Demo Household |
-| `AGENT_LOGIN_PASSWORD` | Optional last-resort Clerk form fill; prefer `pnpm run agent:signin-url` |
+| `AGENT_LOGIN_EMAIL` | Clerk Development user email; required for local first login to claim the seeded Demo Household and for `/dev/agent-signin` |
+| `AGENT_LOGIN_PASSWORD` | Optional last-resort Clerk form fill; prefer `/dev/agent-signin` |
 
-1. When the agent needs a signed-in browser session, with `pnpm run dev` already up, run `pnpm run agent:signin-url` and open the URL on stdout immediately (Clerk Agent Task, or a hash `__clerk_ticket` fallback). Do **not** print `AGENT_LOGIN_PASSWORD`, disable masking, or paste the URL into logs, PRs, or chat. Filling the hosted Clerk form is a last resort only.
+1. When the agent needs a signed-in browser session, with `pnpm run dev` already up, open `http://localhost:5190/dev/agent-signin`. The dev server mints a one-time Clerk sign-in token for `AGENT_LOGIN_EMAIL` on its side and redirects the browser to the sign-in form with it (`/?__clerk_ticket=…`), which lands on `/dashboard`. The agent never copies a token or password, but that redirect URL is a credential until it is used or expires (60s) and can land in browser history, so treat it like one. The browser never leaves localhost (some agent browsers block Clerk's own domain). The route 404s unless `APP_ENV=development`, `CLERK_SECRET_KEY` is a `sk_test_` key, and the request comes straight from this machine: the dev server refuses LAN clients (`--host`), anything a proxy or HTTP tunnel relays (it checks for forwarding headers), and requests the browser marks `Sec-Fetch-Site: cross-site`. A raw TCP forward (`ssh -R`, `socat`) adds no headers and looks local, so don't expose the dev server that way while `AGENT_LOGIN_EMAIL` is set. `pnpm run agent:signin-url` still prints a one-time Clerk-hosted URL (Clerk Agent Task, or a `__clerk_ticket` fallback) for browsers that can open Clerk's domain; `pnpm run agent:signin-url --ticket` skips the Agent Task and prints a localhost `__clerk_ticket` URL that expires in 120s. Open either immediately. Do **not** print `AGENT_LOGIN_PASSWORD`, disable masking, or paste sign-in URLs into logs, PRs, or chat. Filling the hosted Clerk form is a last resort only.
 
 Other developers doing agentic work should seed the same pattern in **their** Clerk app and Environment.
 

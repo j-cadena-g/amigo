@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import type { Plugin } from "vite";
+import { describe, expect, it, vi } from "vitest";
 import { AMIGO_DEV_PORT } from "./server/lib/dev-origin";
 import viteConfig from "./vite.config";
+
+type TestMiddleware = (
+  req: unknown,
+  res: { statusCode: number; end: () => void },
+  next: () => void
+) => void;
 
 describe("vite dev config", () => {
   it("uses the dedicated amigo dev port with strictPort enabled", async () => {
@@ -81,5 +88,42 @@ describe("vite dev config", () => {
         "tailwind-merge",
       ])
     );
+  });
+
+  it("404s the agent sign-in route unless the browser connects directly from this machine", async () => {
+    const config =
+      typeof viteConfig === "function"
+        ? await viteConfig({ command: "serve", mode: "development" })
+        : viteConfig;
+    const plugin = ((config.plugins ?? []) as unknown[]).flat(Infinity).find(
+      (entry) => (entry as Plugin | null)?.name === "amigo:agent-signin-local-only"
+    ) as Plugin | undefined;
+    expect(plugin).toBeDefined();
+
+    let middleware: TestMiddleware | undefined;
+    (plugin!.configureServer as (server: unknown) => void)({
+      middlewares: {
+        use: (handler: TestMiddleware) => {
+          middleware = handler;
+        },
+      },
+    });
+
+    const run = (url: string, remoteAddress: string, headers: Record<string, string> = {}) => {
+      const res = { statusCode: 200, end: vi.fn() };
+      const next = vi.fn();
+      middleware!({ url, socket: { remoteAddress }, headers }, res, next);
+      return { status: res.statusCode, passedOn: next.mock.calls.length === 1 };
+    };
+
+    expect(run("/dev/agent-signin", "::1")).toEqual({ status: 200, passedOn: true });
+    expect(run("/dev/agent-signin", "192.168.1.20")).toEqual({ status: 404, passedOn: false });
+    expect(
+      run("/dev/agent-signin", "::1", { "sec-fetch-site": "cross-site" })
+    ).toEqual({ status: 404, passedOn: false });
+    expect(
+      run("/DEV/Agent-Signin/", "127.0.0.1", { "cf-connecting-ip": "203.0.113.9" })
+    ).toEqual({ status: 404, passedOn: false });
+    expect(run("/dashboard", "192.168.1.20")).toEqual({ status: 200, passedOn: true });
   });
 });

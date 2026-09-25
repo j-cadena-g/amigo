@@ -32,12 +32,15 @@ export function assertDevelopmentAgentSignin(env = process.env) {
 }
 
 /**
+ * <SignIn> reads __clerk_ticket from the query string; after a `#` it is
+ * ignored and the form just asks for an email.
+ *
  * @param {string} origin
  * @param {string} token
  */
 export function buildSignInTicketUrl(origin, token) {
   const base = origin.replace(/\/+$/, "");
-  return `${base}/#/?__clerk_ticket=${encodeURIComponent(token)}`;
+  return `${base}/?__clerk_ticket=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -73,25 +76,34 @@ async function readTestingToken(clerk) {
  *   },
  *   email: string,
  *   origin: string,
- * }} params
+ *   ticketOnly?: boolean,
+ * }} params `ticketOnly` skips the Clerk-hosted Agent Task for browsers that
+ *   refuse to open Clerk's domain; the ticket URL stays on `origin`.
  */
-export async function createAgentSigninUrl({ clerk, email, origin }) {
+export async function createAgentSigninUrl({
+  clerk,
+  email,
+  origin,
+  ticketOnly = false,
+}) {
   const testingToken = await readTestingToken(clerk);
 
-  try {
-    const task = await clerk.agentTasks.create({
-      onBehalfOf: { identifier: email },
-      permissions: "*",
-      agentName: AGENT_NAME,
-      taskDescription: "Local agentic sign-in",
-      redirectUrl: `${origin}/dashboard`,
-    });
-    return {
-      kind: "agent_task",
-      url: withTestingToken(task.url, testingToken),
-    };
-  } catch {
-    // Agent Tasks are experimental; fall back to a short-lived sign-in token.
+  if (!ticketOnly) {
+    try {
+      const task = await clerk.agentTasks.create({
+        onBehalfOf: { identifier: email },
+        permissions: "*",
+        agentName: AGENT_NAME,
+        taskDescription: "Local agentic sign-in",
+        redirectUrl: `${origin}/dashboard`,
+      });
+      return {
+        kind: "agent_task",
+        url: withTestingToken(task.url, testingToken),
+      };
+    } catch {
+      // Agent Tasks are experimental; fall back to a short-lived sign-in token.
+    }
   }
 
   const listed = await clerk.users.getUserList({

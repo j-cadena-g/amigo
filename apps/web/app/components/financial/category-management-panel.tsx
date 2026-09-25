@@ -131,7 +131,7 @@ export function CategoryManagementPanel() {
   return (
     <div className="space-y-5">
       <form onSubmit={handleCreate} className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
               Name

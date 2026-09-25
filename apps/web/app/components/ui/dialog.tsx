@@ -61,7 +61,7 @@ const DialogContent = React.forwardRef<
         borderColor: "var(--color-border)",
       }}
       className={cn(
-        "fixed left-1/2 top-1/2 z-[51] grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg animate-appear",
+        "fixed left-1/2 top-1/2 z-[51] grid w-[calc(100%-2rem)] max-w-lg grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg animate-appear",
         className
       )}
       {...props}

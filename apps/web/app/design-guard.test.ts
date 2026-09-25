@@ -61,6 +61,14 @@ const BANNED: BannedPattern[] = [
     reason: "text smaller than 12px",
     test: matches(/\btext-\[(?:[0-9]|1[01])px\]/),
   },
+  {
+    // An implicit grid column sizes to its widest unwrapped line, so one
+    // truncated label pushes every figure in a mobile column off-screen.
+    reason: "grid without a base column template (add grid-cols-1)",
+    test: (line) =>
+      /(?:^|[\s"'`])grid(?=[\s"'`]|$)/.test(line) &&
+      !/(?:^|[\s"'`])grid-cols-/.test(line),
+  },
 ];
 
 function sourceFiles(dir: string): string[] {
@@ -95,6 +103,8 @@ describe("design guard", () => {
     "bg-[#ffd400] text-[#151515]",
     "border-[#E2E2DD]",
     "text-[10px]",
+    "grid gap-3 sm:grid-cols-2",
+    "mt-10 grid gap-x-12 lg:grid-cols-2",
   ])("flags %s", (line) => {
     expect(isBanned(line)).toBe(true);
   });
@@ -109,6 +119,8 @@ describe("design guard", () => {
     "bg-tag text-tag-foreground",
     'content="#ffffff"',
     "text-xs",
+    "grid grid-cols-1 gap-3 sm:grid-cols-2",
+    "grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3",
   ])("allows %s", (line) => {
     expect(isBanned(line)).toBe(false);
   });

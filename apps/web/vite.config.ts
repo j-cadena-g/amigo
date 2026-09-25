@@ -1,9 +1,10 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { reactRouter } from "@react-router/dev/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { createAmigoPwaOptions } from "./pwa.config";
+import { isAgentSigninPath, isDirectLocalRequest } from "./server/lib/agent-signin-guard";
 import { AMIGO_DEV_PORT } from "./server/lib/dev-origin";
 
 const optimizeDepsExcludes = [
@@ -47,6 +48,29 @@ const workerSsrOptimizeDepsIncludes = [
 ];
 const workerSsrOptimizeDepsExcludes = ["@clerk/react-router/server", "drizzle-orm"];
 
+/**
+ * /dev/agent-signin hands a session to whoever asks, so only a browser on this
+ * machine may reach it. The Worker can only see the client-supplied Host, so
+ * 404 LAN clients (`--host`), proxied or HTTP-tunneled requests, and requests
+ * marked cross-site here, before the Cloudflare plugin passes them on.
+ */
+function agentSigninLocalOnly(): Plugin {
+  return {
+    name: "amigo:agent-signin-local-only",
+    enforce: "pre",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (isAgentSigninPath(req.url) && !isDirectLocalRequest(req)) {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   const isVitest = process.env.VITEST === "true";
 
@@ -85,6 +109,7 @@ export default defineConfig(({ command }) => {
       },
     },
     plugins: [
+      agentSigninLocalOnly(),
       command === "serve" && !isVitest
         ? cloudflare(
             process.env.AMIGO_WRANGLER_CONFIG

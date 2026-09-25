@@ -11,7 +11,7 @@ const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
  * Local agent browsers only: a development env, a Clerk development key, an
  * agent email, and a request addressed to this machine. Anything else 404s,
  * so a misconfigured deploy still can't hand out sessions. The Host is
- * client-supplied, so the dev server also 404s LAN, tunneled, and cross-site
+ * client-supplied, so the dev server also 404s LAN, proxied, and cross-site
  * requests before they get here (agentSigninLocalOnly in vite.config.ts).
  */
 function isAgentSigninEnabled(

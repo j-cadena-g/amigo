@@ -20,8 +20,9 @@ interface IncomingRequestLike {
 
 /**
  * A browser on this machine talking to the dev server directly: no LAN peer,
- * no proxy, and not a navigation another site started. Tools that send no
- * Fetch Metadata (curl) still pass.
+ * no proxy, and not marked Sec-Fetch-Site: cross-site. Tools that send no
+ * Fetch Metadata (curl) still pass. A raw TCP forward (ssh -R, socat) adds no
+ * headers and is indistinguishable from a local client here.
  */
 export function isDirectLocalRequest(req: IncomingRequestLike): boolean {
   const address = req.socket.remoteAddress?.replace(/^::ffff:/, "") ?? "";

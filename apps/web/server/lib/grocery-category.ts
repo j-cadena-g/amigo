@@ -40,21 +40,47 @@ interface JevChoiceInput {
   };
 }
 
+type FallbackReason =
+  | "no_binding"
+  | "timeout"
+  | "error"
+  | "unrecognized_response"
+  | "unknown_choice"
+  | "low_confidence";
+
+// One JSON line per fallback, so a billing or response-shape problem shows up
+// in Workers Logs. Never log the item name.
+function logFallback(reason: FallbackReason, meta?: Record<string, unknown>) {
+  console.warn(
+    JSON.stringify({ context: "grocery-category", reason, ...meta, ts: Date.now() })
+  );
+}
+
+/**
+ * Returns the supplied category when it is allowlisted, otherwise Jev's
+ * confident choice. When Jev can't decide, returns `fallback` (General unless
+ * the caller passes something else, such as an item's current category).
+ */
 export async function categorizeGroceryItem(
   ai: GroceryCategoryAi | undefined,
   name: string,
-  supplied?: string | null
-): Promise<string> {
+  {
+    supplied,
+    fallback = DEFAULT_GROCERY_CATEGORY,
+  }: { supplied?: string | null; fallback?: string | null } = {}
+): Promise<string | null> {
   const explicit = supplied?.trim();
   if (explicit && isGroceryCategory(explicit)) {
     return explicit;
   }
   if (!ai) {
-    return DEFAULT_GROCERY_CATEGORY;
+    logFallback("no_binding");
+    return fallback;
   }
 
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   try {
     const inference = ai.run(
       GROCERY_CATEGORY_MODEL,
@@ -76,42 +102,53 @@ export async function categorizeGroceryItem(
       inference,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
+          timedOut = true;
           controller.abort();
           reject(new Error("grocery categorization timed out"));
         }, GROCERY_CATEGORY_TIMEOUT_MS);
       }),
     ]);
-    return choiceFromJev(response);
-  } catch {
+    return choiceFromJev(response) ?? fallback;
+  } catch (error) {
     controller.abort();
-    return DEFAULT_GROCERY_CATEGORY;
+    if (timedOut) {
+      logFallback("timeout");
+    } else {
+      logFallback("error", { error: String(error) });
+    }
+    return fallback;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
 }
 
-function choiceFromJev(response: unknown): string {
-  if (!response || typeof response !== "object") {
-    return DEFAULT_GROCERY_CATEGORY;
-  }
-  const answers = (response as { answers?: unknown }).answers;
-  if (!answers || typeof answers !== "object") {
-    return DEFAULT_GROCERY_CATEGORY;
-  }
-  const aisle = (answers as { aisle?: unknown }).aisle;
+function choiceFromJev(response: unknown): string | null {
+  // The AI binding wraps third-party model output as
+  // { state, result: { model, answers, usage }, gatewayMetadata }.
+  const body = field(response, "result") ?? response;
+  const aisle = field(field(body, "answers"), "aisle");
   if (!aisle || typeof aisle !== "object") {
-    return DEFAULT_GROCERY_CATEGORY;
+    logFallback("unrecognized_response", { state: field(response, "state") });
+    return null;
   }
-  const choice = (aisle as { choice?: unknown }).choice;
-  const confidence = (aisle as { confidence?: unknown }).confidence;
+  const choice = field(aisle, "choice");
+  const confidence = field(aisle, "confidence");
   if (typeof choice !== "string" || !isGroceryCategory(choice)) {
-    return DEFAULT_GROCERY_CATEGORY;
+    logFallback("unknown_choice", { choice });
+    return null;
   }
   if (
     typeof confidence !== "number" ||
     confidence < GROCERY_CATEGORY_MIN_CONFIDENCE
   ) {
-    return DEFAULT_GROCERY_CATEGORY;
+    logFallback("low_confidence", { choice, confidence });
+    return null;
   }
   return choice;
+}
+
+function field(value: unknown, key: string): unknown {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)[key]
+    : undefined;
 }

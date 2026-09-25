@@ -148,7 +148,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
     const category = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
-      validated.category
+      { supplied: validated.category }
     );
 
     const item = await withAudit(
@@ -299,9 +299,11 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
+    // If Jev can't decide, keep the current aisle rather than resetting it.
     const category = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
-      validated.name.trim()
+      validated.name.trim(),
+      { fallback: existing.category }
     );
 
     const updated = await withAudit(

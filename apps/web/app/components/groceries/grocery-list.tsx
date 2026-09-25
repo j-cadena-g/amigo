@@ -11,6 +11,7 @@ import { EmptyState } from "@/app/components/empty-state";
 import { PushNotificationButton } from "@/app/components/push-notification-button";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { groupGroceriesByAisle } from "@/app/lib/grocery-categories";
 
 interface GroceryListProps {
   items: GroceryItemWithTags[];
@@ -63,6 +64,10 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
   const toBuyCount = useMemo(
     () => optimisticItems.filter((item) => !item.isPurchased).length,
     [optimisticItems]
+  );
+  const activeGroups = useMemo(
+    () => groupGroceriesByAisle(activeItems),
+    [activeItems]
   );
 
   const handleCreateTag = useCallback(
@@ -187,23 +192,32 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
           <EmptyState message="Nothing left to buy." />
         )
       ) : (
-        <ul className="mt-2 divide-y divide-border border-y border-border">
-          {activeItems.map((item) => (
-            <GroceryItem
-              key={item.id}
-              item={item}
-              allTags={mergedTags}
-              onToggle={toggleItem}
-              onToggleWithDate={toggleItemWithDate}
-              onDelete={deleteItem}
-              onUpdateTags={updateTags}
-              onEditName={editName}
-              onCreateTag={handleCreateTag}
-              onDeleteTag={deleteTag}
-              onEditTag={editTag}
-            />
+        <div className="mt-2 flex flex-col gap-4">
+          {activeGroups.map((group) => (
+            <section key={group.category}>
+              <h2 className="mb-1 text-sm font-semibold text-muted-foreground">
+                {group.category}
+              </h2>
+              <ul className="divide-y divide-border border-y border-border">
+                {group.items.map((item) => (
+                  <GroceryItem
+                    key={item.id}
+                    item={item}
+                    allTags={mergedTags}
+                    onToggle={toggleItem}
+                    onToggleWithDate={toggleItemWithDate}
+                    onDelete={deleteItem}
+                    onUpdateTags={updateTags}
+                    onEditName={editName}
+                    onCreateTag={handleCreateTag}
+                    onDeleteTag={deleteTag}
+                    onEditTag={editTag}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       <HistorySection

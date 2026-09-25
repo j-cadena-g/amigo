@@ -84,6 +84,21 @@ describe("optimistic grocery mutations", () => {
     });
 
     expect(committed[0]?.itemName).toBe("Oat Milk");
+    expect(committed[0]?.category).toBe("General");
+  });
+
+  it("commits a renamed item into the aisle from the server", () => {
+    const baseItems = [createItem({ id: "milk", itemName: "Milk", category: "Dairy" })];
+
+    const committed = applyOptimisticAction(baseItems, {
+      type: "edit_name",
+      id: "milk",
+      name: "Manzanas",
+      category: "Produce",
+    });
+
+    expect(committed[0]?.itemName).toBe("Manzanas");
+    expect(committed[0]?.category).toBe("Produce");
   });
 
   it("commits a delete action by removing the item", () => {

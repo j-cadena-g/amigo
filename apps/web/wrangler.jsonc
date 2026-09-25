@@ -64,6 +64,11 @@
     }
   ],
 
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+
   "durable_objects": {
     "bindings": [
       {

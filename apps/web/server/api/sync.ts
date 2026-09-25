@@ -17,6 +17,10 @@ import { withAudit } from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
+import {
+  categorizeGroceryItem,
+  groceryCategoryAi,
+} from "../lib/grocery-category";
 
 const MAX_BATCH_SIZE = 10;
 const GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE = 500;
@@ -65,7 +69,12 @@ export const handleSyncRequest: ApiHandler = async ({
 
   for (const mutation of validated.mutations) {
     try {
-      const serverItem = await processMutation(db, session!, mutation);
+      const serverItem = await processMutation(
+        db,
+        session!,
+        mutation,
+        groceryCategoryAi(env.AI)
+      );
       results.push({
         id: mutation.id,
         success: true,
@@ -179,7 +188,8 @@ async function resolveIdempotentAdd(
 async function processMutation(
   db: ReturnType<typeof getDb>,
   session: { userId: string; householdId: string },
-  mutation: z.infer<typeof syncMutationSchema>
+  mutation: z.infer<typeof syncMutationSchema>,
+  ai: ReturnType<typeof groceryCategoryAi>
 ): Promise<Record<string, unknown> | null> {
   switch (mutation.operation) {
     case "add": {
@@ -218,14 +228,22 @@ async function processMutation(
         }
       }
 
+      const itemName = name.trim().slice(0, 255);
+      const { category: resolvedCategory } = await categorizeGroceryItem(
+        ai,
+        itemName,
+        {
+          supplied: typeof category === "string" ? category : undefined,
+        }
+      );
       const newItemId = crypto.randomUUID();
       const writes = [
         db.insert(groceryItems).values({
           id: newItemId,
           householdId: session.householdId,
           createdByUserId: session.userId,
-          itemName: name.trim().slice(0, 255),
-          category: category?.trim().slice(0, 100) || "General",
+          itemName,
+          category: resolvedCategory,
         }),
         ...(validTags.length > 0
           ? [

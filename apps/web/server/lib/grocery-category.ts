@@ -9,7 +9,7 @@ export const GROCERY_CATEGORY_TIMEOUT_MS = 2500;
 export const GROCERY_CATEGORY_MIN_CONFIDENCE = 0.5;
 
 const AISLE_INSTRUCTIONS =
-  "Which grocery aisle is this item? The name may be English, Spanish, or a mix of both.";
+  "Which aisle of a Canadian supermarket is this item in? The name may be English, Spanish, or a mix of both.";
 
 export interface GroceryCategoryAi {
   run(

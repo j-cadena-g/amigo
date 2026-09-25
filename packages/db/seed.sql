@@ -15,9 +15,9 @@ VALUES
 
 INSERT OR IGNORE INTO grocery_items (id, household_id, created_by_user_id, item_name, category, is_purchased, created_at, updated_at)
 VALUES
-  ('gi-seed-001', 'hh-seed-001', 'user-seed-001', 'Milk', 'Dairy', 0, 1709942400000, 1709942400000),
+  ('gi-seed-001', 'hh-seed-001', 'user-seed-001', 'Milk', 'Dairy & Eggs', 0, 1709942400000, 1709942400000),
   ('gi-seed-002', 'hh-seed-001', 'user-seed-001', 'Bread', 'Bakery', 0, 1709942400000, 1709942400000),
-  ('gi-seed-003', 'hh-seed-001', 'user-seed-001', 'Eggs', 'Dairy', 0, 1709942400000, 1709942400000);
+  ('gi-seed-003', 'hh-seed-001', 'user-seed-001', 'Eggs', 'Dairy & Eggs', 0, 1709942400000, 1709942400000);
 
 INSERT OR IGNORE INTO budgets (id, household_id, user_id, name, category, limit_amount, currency, period, created_at, updated_at)
 VALUES

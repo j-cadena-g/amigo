@@ -110,7 +110,7 @@ describe("grocery categorization integration", () => {
   }
 
   it("stores Jev's aisle when an item is added", async () => {
-    const run = vi.fn().mockResolvedValue(jevResponse("Dairy"));
+    const run = vi.fn().mockResolvedValue(jevResponse("Dairy & Eggs"));
 
     const response = await callGroceries(envWithAi(run), "POST", "", {
       name: "leche 2%",
@@ -119,7 +119,7 @@ describe("grocery categorization integration", () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({
       itemName: "leche 2%",
-      category: "Dairy",
+      category: "Dairy & Eggs",
     });
     expect(run).toHaveBeenCalledWith(
       "typesafe/jev",
@@ -144,7 +144,7 @@ describe("grocery categorization integration", () => {
   });
 
   it("keeps the current aisle when Jev fails on a rename", async () => {
-    const id = await seedItem("leche", "Dairy");
+    const id = await seedItem("leche", "Dairy & Eggs");
     const run = vi
       .fn()
       .mockRejectedValue(new Error("2021: Insufficient AI Gateway credits"));
@@ -158,7 +158,7 @@ describe("grocery categorization integration", () => {
       .select()
       .from(groceryItems)
       .where(eq(groceryItems.id, id));
-    expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy" });
+    expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy & Eggs" });
   });
 
   // A Jev call that stays pending until the test answers it, so another
@@ -186,7 +186,7 @@ describe("grocery categorization integration", () => {
   }
 
   it("keeps an overlapping rename's aisle when Jev fails", async () => {
-    const id = await seedItem("leche", "Dairy");
+    const id = await seedItem("leche", "Dairy & Eggs");
     const { run, jev } = pendingJev();
 
     const rename = callGroceries(envWithAi(run), "PATCH", id, {
@@ -205,7 +205,7 @@ describe("grocery categorization integration", () => {
   });
 
   it("stores Jev's aisle even when it matches the one read before an overlapping rename", async () => {
-    const id = await seedItem("leche", "Dairy");
+    const id = await seedItem("leche", "Dairy & Eggs");
     const { run, jev } = pendingJev();
 
     const rename = callGroceries(envWithAi(run), "PATCH", id, {
@@ -213,18 +213,18 @@ describe("grocery categorization integration", () => {
     });
     await vi.waitFor(() => expect(run).toHaveBeenCalled());
     await landOverlappingRename(id);
-    jev.resolve(jevResponse("Dairy"));
+    jev.resolve(jevResponse("Dairy & Eggs"));
 
     expect((await rename).status).toBe(200);
     const [row] = await db
       .select()
       .from(groceryItems)
       .where(eq(groceryItems.id, id));
-    expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy" });
+    expect(row).toMatchObject({ itemName: "leche 2%", category: "Dairy & Eggs" });
   });
 
   it("stores Jev's aisle for an offline sync add", async () => {
-    const run = vi.fn().mockResolvedValue(jevResponse("Produce"));
+    const run = vi.fn().mockResolvedValue(jevResponse("Fruits & Vegetables"));
 
     const response = await handleSyncRequest({
       env: envWithAi(run),
@@ -255,7 +255,7 @@ describe("grocery categorization integration", () => {
       results: [
         {
           success: true,
-          serverItem: { itemName: "aguacate avocado", category: "Produce" },
+          serverItem: { itemName: "aguacate avocado", category: "Fruits & Vegetables" },
         },
       ],
     });

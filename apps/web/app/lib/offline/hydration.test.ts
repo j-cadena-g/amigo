@@ -1,9 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  hydrateFromServer,
   overlayPendingMutations,
   selectMutationsToOverlay,
 } from "./hydration";
-import type { OfflineGroceryItem, SyncQueueEntry } from "./db";
+import { getOfflineDB, type OfflineGroceryItem, type SyncQueueEntry } from "./db";
+
+vi.mock("./db", () => ({ getOfflineDB: vi.fn() }));
+vi.mock("./sync-queue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./sync-queue")>()),
+  setLastSyncTimestamp: vi.fn(),
+}));
 
 const ctx = { householdId: "hh1", userId: "u1", now: 1_700_000_000_100 };
 
@@ -159,5 +166,51 @@ describe("selectMutationsToOverlay", () => {
     const result = overlayPendingMutations(rows, selected, ctx);
     expect(result).toHaveLength(1);
     expect(result[0]?.isPurchased).toBe(true);
+  });
+});
+
+describe("hydrateFromServer", () => {
+  it("takes the server's aisle for a pending row whose server version is unchanged", async () => {
+    const pending = item({
+      id: "g1",
+      category: "Dairy",
+      isPurchased: true,
+      _serverVersion: 10,
+      _syncStatus: "pending",
+    });
+    const update = vi.fn();
+    vi.mocked(getOfflineDB).mockReturnValue({
+      groceryItems: {
+        count: vi.fn().mockResolvedValue(1),
+        get: vi.fn().mockResolvedValue(pending),
+        update,
+      },
+      groceryTags: { get: vi.fn(), put: vi.fn() },
+    } as unknown as ReturnType<typeof getOfflineDB>);
+
+    await hydrateFromServer(
+      [
+        {
+          id: "g1",
+          householdId: "hh1",
+          createdByUserId: "u1",
+          createdByUserDisplayName: null,
+          itemName: "Milk",
+          category: "Dairy & Eggs",
+          isPurchased: false,
+          purchasedAt: null,
+          createdAt: ctx.now,
+          updatedAt: 10,
+          deletedAt: null,
+          tags: [],
+        },
+      ],
+      []
+    );
+
+    expect(update).toHaveBeenCalledWith("g1", {
+      category: "Dairy & Eggs",
+      _serverVersion: 10,
+    });
   });
 });

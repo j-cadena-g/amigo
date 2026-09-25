@@ -86,6 +86,8 @@ export function mergeItems(
   if (strategy === "local-wins") {
     return {
       ...local,
+      // Offline edits never change the aisle; the server assigns it.
+      category: server.category,
       _serverVersion: server.updatedAt,
       _syncStatus: "pending",
     };

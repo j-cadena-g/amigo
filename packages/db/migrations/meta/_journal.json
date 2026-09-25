@@ -141,6 +141,13 @@
       "when": 1786400000000,
       "tag": "0019_recurring_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1790353308892,
+      "tag": "0020_grocery_aisles_canada",
+      "breakpoints": true
     }
   ]
 }

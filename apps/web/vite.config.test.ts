@@ -119,6 +119,9 @@ describe("vite dev config", () => {
     expect(run("/dev/agent-signin", "::1")).toEqual({ status: 200, passedOn: true });
     expect(run("/dev/agent-signin", "192.168.1.20")).toEqual({ status: 404, passedOn: false });
     expect(
+      run("/dev/agent-signin", "::1", { "sec-fetch-site": "cross-site" })
+    ).toEqual({ status: 404, passedOn: false });
+    expect(
       run("/DEV/Agent-Signin/", "127.0.0.1", { "cf-connecting-ip": "203.0.113.9" })
     ).toEqual({ status: 404, passedOn: false });
     expect(run("/dashboard", "192.168.1.20")).toEqual({ status: 200, passedOn: true });

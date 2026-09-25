@@ -18,11 +18,20 @@ interface IncomingRequestLike {
   headers: Record<string, string | string[] | undefined>;
 }
 
-/** A browser on this machine talking to the dev server directly: no LAN peer, no proxy. */
+/**
+ * A browser on this machine talking to the dev server directly: no LAN peer,
+ * no proxy, and not a navigation another site started. Tools that send no
+ * Fetch Metadata (curl) still pass.
+ */
 export function isDirectLocalRequest(req: IncomingRequestLike): boolean {
   const address = req.socket.remoteAddress?.replace(/^::ffff:/, "") ?? "";
   const loopback = address === "::1" || address.startsWith("127.");
-  return loopback && FORWARDING_HEADERS.every((name) => req.headers[name] === undefined);
+  const crossSite = req.headers["sec-fetch-site"] === "cross-site";
+  return (
+    loopback &&
+    !crossSite &&
+    FORWARDING_HEADERS.every((name) => req.headers[name] === undefined)
+  );
 }
 
 /**

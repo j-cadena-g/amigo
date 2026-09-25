@@ -51,8 +51,8 @@ const workerSsrOptimizeDepsExcludes = ["@clerk/react-router/server", "drizzle-or
 /**
  * /dev/agent-signin hands a session to whoever asks, so only a browser on this
  * machine may reach it. The Worker can only see the client-supplied Host, so
- * 404 LAN clients (`--host`) and proxied or tunneled requests here, before the
- * Cloudflare plugin passes them on.
+ * 404 LAN clients (`--host`), proxied or tunneled requests, and navigations
+ * another site started here, before the Cloudflare plugin passes them on.
  */
 function agentSigninLocalOnly(): Plugin {
   return {

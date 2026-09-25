@@ -10,7 +10,15 @@ describe("isDirectLocalRequest", () => {
     expect(isDirectLocalRequest(request(address))).toBe(true);
   });
 
+  it.each(["none", "same-origin", "same-site"])(
+    "accepts a local browser navigation with Sec-Fetch-Site: %s",
+    (site) => {
+      expect(isDirectLocalRequest(request("::1", { "sec-fetch-site": site }))).toBe(true);
+    }
+  );
+
   it.each([
+    ["a navigation another site started", request("127.0.0.1", { "sec-fetch-site": "cross-site" })],
     ["a LAN peer", request("192.168.1.20")],
     ["an IPv4-mapped LAN peer", request("::ffff:192.168.1.20")],
     ["an unknown peer", request(undefined)],

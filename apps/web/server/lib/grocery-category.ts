@@ -134,7 +134,7 @@ function choiceFromJev(response: unknown): string | null {
   const choice = field(aisle, "choice");
   const confidence = field(aisle, "confidence");
   if (typeof choice !== "string" || !isGroceryCategory(choice)) {
-    logFallback("unknown_choice", { choice });
+    logFallback("unknown_choice");
     return null;
   }
   if (

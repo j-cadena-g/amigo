@@ -82,6 +82,8 @@ describe("categorizeGroceryItem", () => {
       categorizeGroceryItem({ run: unknown }, "pan")
     ).resolves.toBe("General");
     expect(loggedReasons()).toEqual(["unrecognized_response", "unknown_choice"]);
+    const unknownLine = String(vi.mocked(console.warn).mock.calls[1]?.[0]);
+    expect(unknownLine).not.toContain("Deli");
   });
 
   it("stores General and logs the error, without the item name, when run throws", async () => {

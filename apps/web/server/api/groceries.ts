@@ -299,7 +299,8 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    // If Jev can't decide, keep the current aisle rather than resetting it.
+    // If Jev can't decide, leave the aisle column alone so a rename that
+    // finished while this one was waiting is not overwritten.
     const category = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
@@ -322,7 +323,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
           .update(groceryItems)
           .set({
             itemName: validated.name.trim(),
-            category,
+            ...(category !== existing.category ? { category } : {}),
             updatedAt: new Date(),
           })
           .where(

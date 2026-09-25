@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
 - `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work; `--ticket` skips the Agent Task for browsers that block Clerk's domain
-- `/dev/agent-signin` signs a local browser in as `AGENT_LOGIN_EMAIL`, minting the Clerk sign-in token on the server so agents never handle it and never leave localhost (development, `sk_test_` key, and direct connections from this machine only)
+- `/dev/agent-signin` signs a local browser in as `AGENT_LOGIN_EMAIL`: the server mints the Clerk sign-in token and redirects the browser to the sign-in form with it, so agents never copy a token and never leave localhost (development, `sk_test_` key, and direct connections from this machine only)
 - **Household invites** — create/list/resend/revoke invite codes, email delivery, join link (`/join/:code`), and setup-page acceptance ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))

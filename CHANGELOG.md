@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
-- `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work
+- `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work; `--ticket` skips the Agent Task for browsers that block Clerk's domain
+- `/dev/agent-signin` signs a local browser in as `AGENT_LOGIN_EMAIL`, minting the Clerk sign-in token on the server so agents never handle it and never leave localhost (development, `sk_test_` key, and localhost only)
 - **Household invites** — create/list/resend/revoke invite codes, email delivery, join link (`/join/:code`), and setup-page acceptance ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))
@@ -38,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `pnpm run agent:signin-url`'s sign-in ticket fallback puts `__clerk_ticket` in the query string; after a `#`, Clerk's sign-in form ignored it
 - Transaction history shows field-level diffs instead of JSON character indexes ([#138](https://github.com/j-cadena-g/amigo/pull/138))
 - Recurring and transaction amount edits when a linked budget was later deleted ([#135](https://github.com/j-cadena-g/amigo/pull/135))
 - Production web push: emit `sw.js` into Wrangler `build/client` assets (it was written to `dist/` and 404ed live), and stop hanging on `serviceWorker.ready` when none is registered

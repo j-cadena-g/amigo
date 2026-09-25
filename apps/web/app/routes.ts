@@ -4,6 +4,8 @@ export default [
   index("routes/_index.tsx"),
   route("setup", "routes/setup.tsx"),
   route("join/:code", "routes/join.$code.tsx"),
+  // Local agent browser sign-in; 404s outside development on localhost.
+  route("dev/agent-signin", "routes/dev.agent-signin.ts"),
   route("api/health", "routes/api.health.ts"),
   route("api/me", "routes/api.me.ts"),
   route("api/dashboard", "routes/api.dashboard.ts"),

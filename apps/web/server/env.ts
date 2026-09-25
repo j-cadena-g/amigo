@@ -20,7 +20,7 @@ export interface Env {
   CLERK_PUBLISHABLE_KEY: string;
   APP_ORIGIN: string;
   APP_ENV: string;
-  /** Local-only; used to claim the seed household for agentic Clerk login. */
+  /** Local-only; claims the seed household on agent login and enables /dev/agent-signin. */
   AGENT_LOGIN_EMAIL?: string;
   /** mailto: or https: URI for Web Push VAPID */
   VAPID_SUBJECT?: string;

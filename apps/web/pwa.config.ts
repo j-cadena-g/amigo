@@ -38,6 +38,12 @@ export function createAmigoPwaOptions(): Partial<VitePWAOptions> {
           sizes: "1024x1024",
           type: "image/png",
         },
+        {
+          src: "/icon-maskable-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
       ],
     },
     devOptions: {

@@ -115,7 +115,7 @@ function buildNotificationPayload(
     title: "Grocery List Update",
     body,
     icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    badge: "/badge-96.png",
     tag: "grocery-update",
     data: {
       url: "/groceries",

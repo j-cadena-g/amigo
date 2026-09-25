@@ -196,7 +196,7 @@ function MappingRow({
   return (
     <li
       className={cn(
-        "grid items-center gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]",
+        "grid grid-cols-1 items-center gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]",
         nested && "pl-5"
       )}
     >

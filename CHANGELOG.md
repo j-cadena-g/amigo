@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Spanish interface.** Every screen, dialog, and client-side message is translated, including Clerk's sign-in. The language follows the number and date format (so a Colombian household or a Spanish browser gets Spanish automatically), or pick it under Settings › Language and region. Copy lives in typed English/Spanish catalogs under `app/i18n/`, so a missing translation is a type error. Server error messages, emails, and push notifications are still English
+- Jev picks grocery aisles for the household's own country (a Colombian household's items are filed as at Éxito or Carulla), with Colombian everyday words added to each aisle; new households get starter categories named in their language
+- **Spanish interface.** Every screen, dialog, and client-side message is translated, including Clerk's sign-in. The language follows the number and date format (so a Colombian household or a Spanish browser gets Spanish automatically), or pick it under Settings › Language and region. Copy lives in typed English/Spanish catalogs under `app/i18n/`, so a missing translation is a type error. API error messages, invite emails, and grocery push notifications follow the reader's language too
 - **Number and date format** in Settings: money and dates follow each user's locale instead of the currency's, so a Colombian reader sees `US$ 12,50` and `23 sept` while a Canadian sees `US$12.50` and `Sep 23`. Automatic (the default) uses the household's currency, or the browser's language when it differs; amount fields take the same decimal separator
 - **Colombian peso (COP)** as a transaction, account, budget, and home currency; pesos display whole with Colombian grouping (`$ 45.000`) while storage stays integer cents
 - **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household

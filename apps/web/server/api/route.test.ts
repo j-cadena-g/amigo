@@ -286,4 +286,71 @@ describe("handleApiRoute", () => {
       code: "UNAUTHORIZED",
     });
   });
+
+  describe("error language", () => {
+    const notFound = async () => {
+      throw new ActionError("Item not found", "NOT_FOUND");
+    };
+
+    it("translates errors for a Spanish browser", async () => {
+      const response = await handleApiRoute(
+        makeRouteArgs(
+          new Request("http://localhost/api/test", {
+            headers: { "Accept-Language": "es-CO,es;q=0.9" },
+          })
+        ),
+        { auth: "none", handler: notFound }
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: "No se encontró el artículo",
+        code: "NOT_FOUND",
+      });
+    });
+
+    it("uses the signed-in user's saved language", async () => {
+      const query = {
+        select: () => query,
+        from: () => query,
+        innerJoin: () => query,
+        where: () => query,
+        get: async () => ({ locale: null, language: "es", homeCurrency: "CAD" }),
+      };
+      mocks.getDb.mockReturnValue(query);
+
+      const response = await handleApiRoute(
+        makeRouteArgs(
+          new Request("http://localhost/api/test", { headers: { "Accept-Language": "en-CA" } }),
+          {
+            cspNonce: "test-nonce",
+            sessionStatus: "authenticated",
+            session: {
+              userId: "user-1",
+              householdId: "household-1",
+              role: "member",
+              email: "user@example.com",
+              name: null,
+            },
+          }
+        ),
+        { auth: "none", handler: notFound }
+      );
+
+      await expect(response.json()).resolves.toMatchObject({ error: "No se encontró el artículo" });
+    });
+
+    it("leaves English errors and successful responses untouched", async () => {
+      const english = await handleApiRoute(makeRouteArgs(), { auth: "none", handler: notFound });
+      await expect(english.json()).resolves.toMatchObject({ error: "Item not found" });
+
+      const ok = await handleApiRoute(
+        makeRouteArgs(
+          new Request("http://localhost/api/test", { headers: { "Accept-Language": "es" } })
+        ),
+        { auth: "none", handler: async () => Response.json({ error: "Item not found" }) }
+      );
+      await expect(ok.json()).resolves.toEqual({ error: "Item not found" });
+    });
+  });
 });

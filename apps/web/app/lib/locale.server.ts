@@ -31,7 +31,8 @@ export async function loadViewerRegion(
   request: Request
 ): Promise<ViewerRegion> {
   const acceptLanguage = request.headers.get("Accept-Language");
-  const session = getApp(context).session;
+  // Never fails a response: with no readable session, go by the browser.
+  const session = getApp(context)?.session;
   if (!session) return region({}, acceptLanguage);
 
   try {

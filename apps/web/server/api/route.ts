@@ -9,6 +9,7 @@ import type {
 import { ZodError } from "zod";
 import type { AppSession, Env, SessionStatus } from "../env";
 import { ActionError, jsonError } from "../lib/errors";
+import { localizeErrorResponse } from "../lib/localize-error";
 import { clerkTokenAuthOptions } from "../lib/clerk-auth-options";
 import { isUnsafeHttpMethod, requestMatchesAllowedOrigin } from "../lib/request-origin";
 import { assertSessionStillValid } from "../lib/session";
@@ -37,6 +38,17 @@ export async function handleApiRoute(
     handler: ApiHandler;
   }
 ) {
+  const response = await runApiRoute(args, options);
+  return localizeErrorResponse(response, args.context, args.request);
+}
+
+async function runApiRoute(
+  args: ApiRouteArgs,
+  options: {
+    auth: ApiAuthMode;
+    handler: ApiHandler;
+  }
+): Promise<Response> {
   try {
     const requestIsUnsafe = isUnsafeHttpMethod(args.request.method);
     const baseArgs: ApiHandlerArgs = {

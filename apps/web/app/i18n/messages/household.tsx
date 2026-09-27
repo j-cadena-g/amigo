@@ -22,22 +22,17 @@ export const household = defineMessages({
       copyCodeFailed: "Couldn't copy the invite code. Try again.",
       created: "Invite created",
       createdAndSent: "Invite created and email sent",
-      createdNotSent: (error: string | undefined) =>
-        error
-          ? `Invite created, but the email didn't send: ${error}`
-          : "Invite created, but the email didn't send. Share the code instead.",
+      createdNotSent: "Invite created, but the email didn't send. Share the code instead.",
       emailSentTo: (email: string) => `Email sent to ${email}`,
-      emailNotSentTo: (email: string, error: string | undefined) =>
-        `The email to ${email} didn't send${error ? `: ${error}` : ""}`,
+      emailNotSentTo: (email: string) => `The email to ${email} didn't send`,
       pending: "Pending invites",
       none: "No pending invites.",
       emailSent: "Email sent",
-      emailFailed: (error: string) => `Email didn't send: ${error}`,
+      emailFailed: "Email didn't send",
       emailNotSent: "Email not sent",
       resend: "Resend email",
       resent: "Invite email sent again",
-      resendFailed: (error: string | undefined) =>
-        error ? `The email didn't send: ${error}` : "The email didn't send. Share the code instead.",
+      resendFailed: "The email didn't send. Share the code instead.",
       revoke: "Revoke",
       revokeTitle: "Revoke this invite?",
       revokeBody: (code: string) => `${code} will stop working right away.`,
@@ -97,22 +92,17 @@ export const household = defineMessages({
       copyCodeFailed: "No se pudo copiar el código de invitación. Inténtalo de nuevo.",
       created: "Invitación creada",
       createdAndSent: "Invitación creada y correo enviado",
-      createdNotSent: (error: string | undefined) =>
-        error
-          ? `Invitación creada, pero el correo no se envió: ${error}`
-          : "Invitación creada, pero el correo no se envió. Comparte el código.",
+      createdNotSent: "Invitación creada, pero el correo no se envió. Comparte el código.",
       emailSentTo: (email: string) => `Correo enviado a ${email}`,
-      emailNotSentTo: (email: string, error: string | undefined) =>
-        `El correo a ${email} no se envió${error ? `: ${error}` : ""}`,
+      emailNotSentTo: (email: string) => `El correo a ${email} no se envió`,
       pending: "Invitaciones pendientes",
       none: "No hay invitaciones pendientes.",
       emailSent: "Correo enviado",
-      emailFailed: (error: string) => `El correo no se envió: ${error}`,
+      emailFailed: "El correo no se envió",
       emailNotSent: "Correo no enviado",
       resend: "Reenviar correo",
       resent: "Se volvió a enviar el correo de invitación",
-      resendFailed: (error: string | undefined) =>
-        error ? `El correo no se envió: ${error}` : "El correo no se envió. Comparte el código.",
+      resendFailed: "El correo no se envió. Comparte el código.",
       revoke: "Revocar",
       revokeTitle: "¿Revocar esta invitación?",
       revokeBody: (code: string) => `${code} dejará de funcionar de inmediato.`,

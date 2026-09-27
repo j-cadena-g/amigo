@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { categorizeGroceryItem } from "./grocery-category";
+import { aisleInstructions, categorizeGroceryItem } from "./grocery-category";
 
 // What the Workers AI binding returns for typesafe/jev (captured from a live
 // call): the model's body sits under `result`.
@@ -193,5 +193,50 @@ describe("categorizeGroceryItem", () => {
       categorizeGroceryItem({ run }, "leche", { supplied: "Dairy & Eggs" })
     ).resolves.toEqual({ category: "Dairy & Eggs", decided: true });
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("aisleInstructions", () => {
+  it("pictures the household's own supermarkets", () => {
+    expect(aisleInstructions("COP")).toContain("Colombian supermarket");
+    expect(aisleInstructions("COP")).toContain("Éxito");
+    expect(aisleInstructions("CAD")).toContain("Canadian supermarket");
+    expect(aisleInstructions(null)).toContain("Canadian supermarket");
+  });
+
+  it("sends the household's store to Jev", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Pantry", 0.9));
+    await categorizeGroceryItem({ run }, "panela", { homeCurrency: async () => "COP" });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      questions: { aisle: { instructions: expect.stringContaining("Colombian") } },
+    });
+  });
+
+  it("skips the currency lookup when the category was supplied", async () => {
+    const run = vi.fn();
+    const lookup = vi.fn(async () => "COP" as const);
+    await categorizeGroceryItem({ run }, "panela", { supplied: "Pantry", homeCurrency: lookup });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("stops waiting for a currency lookup that hangs", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Pantry", 0.9));
+    const never = () => new Promise<"COP">(() => undefined);
+    await expect(
+      categorizeGroceryItem({ run }, "panela", { homeCurrency: never })
+    ).resolves.toEqual({ category: "Pantry", decided: true });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      questions: { aisle: { instructions: expect.stringContaining("Canadian") } },
+    });
+  });
+
+  it("falls back to the default store when the currency lookup fails", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Pantry", 0.9));
+    await expect(
+      categorizeGroceryItem({ run }, "panela", { homeCurrency: async () => Promise.reject(new Error("db")) })
+    ).resolves.toEqual({ category: "Pantry", decided: true });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      questions: { aisle: { instructions: expect.stringContaining("Canadian") } },
+    });
   });
 });

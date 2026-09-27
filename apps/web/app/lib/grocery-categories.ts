@@ -1,6 +1,8 @@
 // Departments that Real Canadian Superstore, Sobeys (Voilà), and Metro share,
 // in the order you'd walk a typical store: fresh counters, centre aisles,
 // frozen near the end, then non-food. The list's sections follow this order.
+// Colombian stores (Éxito, Carulla, D1) group the same way; the criteria below
+// include their everyday words so Jev files them too.
 export const GROCERY_CATEGORIES = [
   "Fruits & Vegetables",
   "Bakery",
@@ -27,35 +29,35 @@ export const DEFAULT_GROCERY_CATEGORY: GroceryCategory = "General";
 
 export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
   "Fruits & Vegetables":
-    "Fresh fruits, vegetables, and herbs, plus packaged salads. Includes frutas, verduras, aguacate, lechuga, manzana, cilantro, papas (fresh potatoes, not papas fritas).",
+    "Fresh fruits, vegetables, and herbs, plus packaged salads. Includes frutas, verduras, aguacate, lechuga, manzana, cilantro, papas (fresh potatoes, not papas fritas), papa criolla, plátano, yuca, mazorca, habichuela, lulo, maracuyá, guanábana.",
   Bakery:
-    "Bread, buns, bagels, tortillas, and baked goods such as croissants, muffins, and cakes. Includes pan, bolillo, pan dulce, tortillas.",
+    "Bread, buns, bagels, tortillas, and baked goods such as croissants, muffins, and cakes. Includes pan, bolillo, pan dulce, tortillas, pan tajado, pan de bono, almojábanas, buñuelos, arepas.",
   Deli:
-    "Deli counter meats and cheeses, rotisserie chicken, and ready-to-eat meals, salads, and sushi. Includes jamón rebanado, pollo rostizado, comida preparada.",
-  Meat: "Fresh beef, chicken, pork, turkey, ground meat, bacon, and sausages. Includes carne, pollo, res, cerdo, chorizo, tocino.",
+    "Deli counter meats and cheeses, rotisserie chicken, and ready-to-eat meals, salads, and sushi. Includes jamón rebanado, pollo rostizado, comida preparada, jamón tajado, salchichón, mortadela.",
+  Meat: "Fresh beef, chicken, pork, turkey, ground meat, bacon, and sausages. Includes carne, pollo, res, cerdo, chorizo, tocino, carne molida, costilla, sobrebarriga, longaniza.",
   "Fish & Seafood":
     "Fresh fish and shellfish. Includes pescado, camarón, salmón, tilapia.",
   "Dairy & Eggs":
-    "Milk, cheese, yogurt, butter, cream, and eggs. Includes leche, queso, yogur, mantequilla, crema, huevos.",
+    "Milk, cheese, yogurt, butter, cream, and eggs. Includes leche, queso, yogur, mantequilla, crema, huevos, queso campesino, queso costeño, suero costeño, kumis.",
   Pantry:
-    "Canned and dry goods: rice, pasta, beans, flour, sugar, oil, spices, sauces, cereal, and baking supplies. Includes arroz, pasta, frijoles, harina, azúcar, aceite, atún en lata.",
+    "Canned and dry goods: rice, pasta, beans, flour, sugar, oil, spices, sauces, cereal, and baking supplies. Includes arroz, pasta, frijoles, harina, azúcar, aceite, atún en lata, fríjoles, lentejas, panela, harina de maíz precocida, arequipe, bocadillo, chocolate de mesa.",
   "International Foods":
     "Mexican, Latin American, Asian, and other world foods from the international aisle. Includes salsa, chiles en lata, masa harina, frijoles refritos, salsa de soya.",
   Snacks:
-    "Chips, crackers, cookies, candy, chocolate, nuts, and popcorn. Includes papitas (bagged potato chips; papitas fritas are frozen fries), galletas, dulces, cacahuates.",
+    "Chips, crackers, cookies, candy, chocolate, nuts, and popcorn. Includes papitas (bagged potato chips; papitas fritas are frozen fries), galletas, dulces, cacahuates, papas de paquete, pasabocas, maní, chocolatinas, chitos.",
   Beverages:
-    "Drinks other than milk and alcohol: water, juice, pop, coffee, and tea. Includes agua, jugo, refresco, café, té.",
+    "Drinks other than milk and alcohol: water, juice, pop, coffee, and tea. Includes agua, jugo, refresco, café, té, gaseosa, malta, aromática, café molido.",
   Frozen:
     "Frozen meals, pizza, vegetables, fries, nuggets, and ice cream. Includes congelados, papas fritas, papitas fritas, helado, pizza congelada.",
   Household:
-    "Cleaning supplies, laundry, dish soap, paper towels, toilet paper, garbage bags, foil, batteries, and light bulbs. Includes detergente, jabón para trastes, papel higiénico, cloro, pilas, focos.",
+    "Cleaning supplies, laundry, dish soap, paper towels, toilet paper, garbage bags, foil, batteries, and light bulbs. Includes detergente, jabón para trastes, papel higiénico, cloro, pilas, focos, límpido, jabón en barra, lavaloza, esponjilla, bombillos.",
   "Health & Beauty":
-    "Personal care, beauty, and pharmacy: shampoo, toothpaste, deodorant, body soap, razors, vitamins, and medicine. Includes champú, pasta de dientes, desodorante, medicina.",
-  Baby: "Diapers, wipes, formula, and baby food. Includes pañales, toallitas, fórmula, comida para bebé.",
+    "Personal care, beauty, and pharmacy: shampoo, toothpaste, deodorant, body soap, razors, vitamins, and medicine. Includes champú, pasta de dientes, desodorante, medicina, crema dental, toallas higiénicas.",
+  Baby: "Diapers, wipes, formula, and baby food. Includes pañales, toallitas, fórmula, comida para bebé, pañitos húmedos.",
   "Pet Care":
     "Pet food, treats, litter, and supplies. Includes comida para perro, comida para gato, arena para gato.",
   "Alcoholic Beverages":
-    "Beer, wine, cider, coolers, and spirits. Includes cerveza, chelas, vino, tequila.",
+    "Beer, wine, cider, coolers, and spirits. Includes cerveza, chelas, vino, tequila, aguardiente, ron.",
   General: "Does not fit another aisle.",
 };
 

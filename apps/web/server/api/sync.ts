@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   scopeToHousehold,
+  type CurrencyCode,
 } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
@@ -16,6 +17,8 @@ import { logServerError } from "../lib/errors";
 import { withAudit } from "../lib/audit";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
+import { getHomeCurrency } from "../lib/household-currency";
+import { localizeResultErrors } from "../lib/localize-error";
 import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
 import {
   categorizeGroceryItem,
@@ -48,6 +51,7 @@ export const handleSyncRequest: ApiHandler = async ({
   env,
   request,
   session,
+  loadContext,
 }) => {
   if (request.method !== "POST") {
     return new Response(null, {
@@ -66,6 +70,14 @@ export const handleSyncRequest: ApiHandler = async ({
   const db = getDb(env.DB);
   const results: MutationResult[] = [];
   let processedCount = 0;
+  // One lookup shared by the batch, only if Jev is asked; a failure isn't
+  // cached, so a later item can try again.
+  let homeCurrencyLookup: Promise<CurrencyCode> | undefined;
+  const homeCurrency = () =>
+    (homeCurrencyLookup ??= getHomeCurrency(db, session!.householdId).catch((error: unknown) => {
+      homeCurrencyLookup = undefined;
+      throw error;
+    }));
 
   for (const mutation of validated.mutations) {
     try {
@@ -73,7 +85,8 @@ export const handleSyncRequest: ApiHandler = async ({
         db,
         session!,
         mutation,
-        groceryCategoryAi(env.AI)
+        groceryCategoryAi(env.AI),
+        homeCurrency
       );
       results.push({
         id: mutation.id,
@@ -116,7 +129,7 @@ export const handleSyncRequest: ApiHandler = async ({
   return Response.json({
     processed: processedCount,
     failed: validated.mutations.length - processedCount,
-    results,
+    results: await localizeResultErrors(results, loadContext, request),
   });
 };
 
@@ -189,7 +202,8 @@ async function processMutation(
   db: ReturnType<typeof getDb>,
   session: { userId: string; householdId: string },
   mutation: z.infer<typeof syncMutationSchema>,
-  ai: ReturnType<typeof groceryCategoryAi>
+  ai: ReturnType<typeof groceryCategoryAi>,
+  homeCurrency: () => Promise<CurrencyCode>
 ): Promise<Record<string, unknown> | null> {
   switch (mutation.operation) {
     case "add": {
@@ -234,6 +248,7 @@ async function processMutation(
         itemName,
         {
           supplied: typeof category === "string" ? category : undefined,
+          homeCurrency,
         }
       );
       const newItemId = crypto.randomUUID();

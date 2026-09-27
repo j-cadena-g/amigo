@@ -15,6 +15,7 @@ import { setClerkHouseholdMetadata } from "../lib/clerk-household-metadata";
 import { sendTransactionalEmail } from "../lib/email";
 import { ActionError, logServerError } from "../lib/errors";
 import { buildInviteEmailContent } from "../lib/invite-email";
+import { loadViewerRegion, type ViewerRegion } from "@/app/lib/locale.server";
 import {
   generateInviteCode,
   hashInviteCode,
@@ -76,6 +77,7 @@ async function sendInviteEmail(options: {
   inviterName: string;
   codeDisplay: string;
   expiresAt: Date;
+  region: ViewerRegion;
 }): Promise<{ sent: boolean; error: string | null }> {
   const joinUrl = buildJoinUrl(options.env.APP_ORIGIN, options.codeDisplay);
   const content = buildInviteEmailContent({
@@ -84,6 +86,8 @@ async function sendInviteEmail(options: {
     code: options.codeDisplay,
     joinUrl,
     expiresAt: options.expiresAt,
+    language: options.region.language,
+    locale: options.region.locale,
   });
 
   try {
@@ -108,6 +112,7 @@ export const handleInvitesRequest: ApiHandler = async ({
   params,
   request,
   session,
+  loadContext,
 }) => {
   const path = getSplatPath(params);
   const splatSegments = getSplatSegments(params);
@@ -216,6 +221,7 @@ export const handleInvitesRequest: ApiHandler = async ({
         inviterName,
         codeDisplay,
         expiresAt,
+        region: await loadViewerRegion(loadContext, request),
       });
       emailSent = sendResult.sent;
       emailError = sendResult.error;
@@ -397,6 +403,7 @@ export const handleInvitesRequest: ApiHandler = async ({
       inviterName,
       codeDisplay: invite.codeDisplay,
       expiresAt: invite.expiresAt,
+      region: await loadViewerRegion(loadContext, request),
     });
 
     await db

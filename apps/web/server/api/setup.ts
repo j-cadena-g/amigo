@@ -1,5 +1,6 @@
 import { createClerkClient } from "@clerk/backend";
 import { CURRENCY_CODES, eq, getDb, households, users, and, isNull, seedStarterFinancialCategories } from "@amigo/db";
+import { resolveLanguage, resolveLocale } from "@/app/lib/locale";
 import { z } from "zod";
 import { isValidTimeZone } from "../lib/dates";
 import {
@@ -151,7 +152,14 @@ export const handleSetupRequest: ApiHandler = async ({
   }
 
   try {
-    await seedStarterFinancialCategories(db, householdId);
+    // Name the starter categories the way the new household will read them.
+    const language = resolveLanguage({
+      locale: resolveLocale({
+        homeCurrency,
+        acceptLanguage: request.headers.get("Accept-Language"),
+      }),
+    });
+    await seedStarterFinancialCategories(db, householdId, language);
   } catch (seedError) {
     console.error("Failed to seed starter financial categories", {
       error: seedError,

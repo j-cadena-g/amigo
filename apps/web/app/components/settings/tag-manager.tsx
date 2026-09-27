@@ -18,6 +18,12 @@ export interface ManagedTag {
   itemCount: number;
 }
 
+const NEW_TAG = "new";
+
+function duplicateNameMessage(name: string): string {
+  return `“${name}” already exists. Choose another name.`;
+}
+
 function itemsLabel(count: number): string {
   return `${count} ${count === 1 ? "item" : "items"}`;
 }
@@ -29,12 +35,12 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState<TagColorKey>("blue");
-  // One tag mutation at a time, so an earlier request can't unlock a later one.
+  // One tag mutation at a time (add, save, or delete), so an earlier request
+  // can't unlock a later one and an add can't race a rename to the same name.
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyRef = useRef(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<TagColorKey>("blue");
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -47,12 +53,13 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
   async function create(e: FormEvent) {
     e.preventDefault();
     const name = newName.trim();
-    if (!name || creating) return;
+    if (!name || busyRef.current) return;
     if (tags.some((t) => t.name.toLowerCase() === name.toLowerCase())) {
-      setCreateError(`“${name}” already exists.`);
+      setCreateError(duplicateNameMessage(name));
       return;
     }
-    setCreating(true);
+    busyRef.current = true;
+    setBusyId(NEW_TAG);
     setCreateError(null);
     try {
       const res = await fetch("/api/tags", {
@@ -67,14 +74,15 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
       revalidator.revalidate();
       // 200 means another member added the same name first.
       if (res.status !== 201) {
-        setCreateError(`“${name}” already exists.`);
+        setCreateError(duplicateNameMessage(name));
         return;
       }
       closeAdd();
     } catch {
       toast(connectionFailedMessage("Add tag"), { variant: "error" });
     } finally {
-      setCreating(false);
+      busyRef.current = false;
+      setBusyId(null);
     }
   }
 
@@ -192,9 +200,9 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
             <Button
               type="submit"
               size="sm"
-              disabled={!newName.trim() || creating}
+              disabled={!newName.trim() || busyId !== null}
             >
-              {creating ? "Adding…" : "Add tag"}
+              {busyId === NEW_TAG ? "Adding…" : "Add tag"}
             </Button>
           </div>
         </form>

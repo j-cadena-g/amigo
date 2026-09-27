@@ -1,18 +1,11 @@
 import { useEffect, useState } from "react";
-import { SignIn, useAuth } from "@clerk/react-router";
-import {
-  redirect,
-  useLoaderData,
-  useNavigate,
-  type LoaderFunctionArgs,
-} from "react-router";
+import { SignIn, useAuth, useClerk } from "@clerk/react-router";
+import { type LoaderFunctionArgs, type MetaArgs, redirect, useLoaderData, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Wordmark } from "@/app/components/wordmark";
 import { acceptInvite } from "@/app/lib/accept-invite";
 import { getSessionStatus } from "@/app/lib/session.server";
-
-const MISSING_CODE_ERROR =
-  "This link is missing its invite code. Open the full link from your invite.";
+import { pageTitle, useT } from "@/app/i18n";
 
 export function loader({ context, params }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -25,16 +18,17 @@ export function loader({ context, params }: LoaderFunctionArgs) {
   return { status, code };
 }
 
-export function meta() {
-  return [{ title: "Join household · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.joinHousehold);
 }
 
 function JoinLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
-        <h1 className="type-display mt-6 text-title-sm">Join household</h1>
+        <h1 className="type-display mt-6 text-title-sm">{t.nav.joinHousehold}</h1>
         {children}
       </div>
     </main>
@@ -42,11 +36,13 @@ function JoinLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function JoinInvite() {
+  const t = useT();
   const { status, code } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { getToken } = useAuth();
+  const { signOut } = useClerk();
   const [error, setError] = useState<string | null>(
-    status === "needs_setup" && !code ? MISSING_CODE_ERROR : null
+    status === "needs_setup" && !code ? t.onboarding.missingCode : null
   );
   const [accepting, setAccepting] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -57,7 +53,7 @@ export default function JoinInvite() {
     }
 
     if (!code) {
-      setError(MISSING_CODE_ERROR);
+      setError(t.onboarding.missingCode);
       setAccepting(false);
       return;
     }
@@ -75,22 +71,20 @@ export default function JoinInvite() {
         return;
       }
 
-      setError(result.error);
+      setError(result.error ?? (result.network ? t.onboarding.networkError : t.onboarding.acceptFailed));
       setAccepting(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [status, code, getToken, navigate, retryCount]);
+  }, [status, code, getToken, navigate, retryCount, t]);
 
   if (status === "unauthenticated") {
     const returnTo = `/join/${encodeURIComponent(code)}`;
     return (
       <JoinLayout>
-        <p className="mt-2 text-muted-foreground">
-          Sign in or create an account to accept the invite.
-        </p>
+        <p className="mt-2 text-muted-foreground">{t.onboarding.signInToAccept}</p>
         <div className="mt-8">
           <SignIn
             routing="hash"
@@ -105,13 +99,21 @@ export default function JoinInvite() {
   if (status === "authenticated") {
     return (
       <JoinLayout>
-        <p className="mt-2">
-          Your account already belongs to a household, so this invite can&apos;t be
-          used with it. To accept it, sign in with a different account.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => navigate("/dashboard")}>
-          Go to your household
-        </Button>
+        <p className="mt-2">{t.onboarding.alreadyInHousehold}</p>
+        <div className="mt-6 space-y-3">
+          <Button className="w-full" onClick={() => navigate("/dashboard")}>
+            {t.onboarding.goToHousehold}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() =>
+              void signOut({ redirectUrl: `/join/${encodeURIComponent(code)}` })
+            }
+          >
+            {t.onboarding.useDifferentAccount}
+          </Button>
+        </div>
       </JoinLayout>
     );
   }
@@ -123,10 +125,8 @@ export default function JoinInvite() {
           <p className="mt-2 text-destructive" role="alert">
             {error}
           </p>
-          {error !== MISSING_CODE_ERROR && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              If the invite expired or was already used, ask for a new one.
-            </p>
+          {error !== t.onboarding.missingCode && (
+            <p className="mt-2 text-sm text-muted-foreground">{t.onboarding.askForNew}</p>
           )}
           <div className="mt-6 space-y-3">
             <Button
@@ -134,20 +134,20 @@ export default function JoinInvite() {
               disabled={accepting}
               onClick={() => setRetryCount((count) => count + 1)}
             >
-              Try again
+              {t.common.tryAgain}
             </Button>
             <Button
               variant="outline"
               className="w-full"
               onClick={() => navigate("/setup")}
             >
-              Create a household instead
+              {t.onboarding.createInstead}
             </Button>
           </div>
         </>
       ) : (
         <p className="mt-2 text-muted-foreground" role="status">
-          {accepting ? "Accepting the invite…" : "Opening the invite…"}
+          {accepting ? t.onboarding.accepting : t.onboarding.opening}
         </p>
       )}
     </JoinLayout>

@@ -15,14 +15,22 @@ import { capitalizeFirst } from "@/app/lib/format-dates";
 import type { CalendarEvent } from "@/app/lib/month-strip";
 import { cn } from "@/app/lib/utils";
 import { useLocale } from "@/app/lib/use-locale";
+import { type Messages, useT } from "@/app/i18n";
 
-const ENTRY_KIND_LABELS: Record<CalendarEvent["type"], string | null> = {
-  transaction: null,
-  recurring: "Scheduled",
-  grocery_purchase: "Groceries",
-};
+function frequencyLabel(frequency: string | undefined, t: Messages): string | undefined {
+  if (!frequency) return undefined;
+  const label = t.common.frequencies[frequency as keyof Messages["common"]["frequencies"]];
+  return label ? label.toLocaleLowerCase() : frequency.toLowerCase();
+}
+
+function entryKindLabel(type: CalendarEvent["type"], t: Messages): string | null {
+  if (type === "recurring") return t.calendar.kindScheduled;
+  if (type === "grocery_purchase") return t.calendar.kindGroceries;
+  return null;
+}
 
 export function DayEntries({ events }: { events: CalendarEvent[] }) {
+  const t = useT();
   const locale = useLocale();
   const totals = transactionTotalsForDay(events);
 
@@ -32,7 +40,7 @@ export function DayEntries({ events }: { events: CalendarEvent[] }) {
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {totals.map((total) => (
             <span key={total.currency}>
-              <span className="text-muted-foreground">Net </span>
+              <span className="text-muted-foreground">{t.calendar.net} </span>
               <span
                 className={cn(
                   "font-mono font-medium",
@@ -52,8 +60,8 @@ export function DayEntries({ events }: { events: CalendarEvent[] }) {
           const isIncome = event.metadata?.transactionType === "income";
           const meta = [
             event.subtitle,
-            ENTRY_KIND_LABELS[event.type],
-            event.metadata?.frequency?.toLowerCase(),
+            entryKindLabel(event.type, t),
+            frequencyLabel(event.metadata?.frequency, t),
           ]
             .filter(Boolean)
             .join(" · ");
@@ -98,6 +106,7 @@ interface DayDetailDialogProps {
 }
 
 export function DayDetailDialog({ date, events, onClose }: DayDetailDialogProps) {
+  const t = useT();
   const locale = useLocale();
   return (
     <Dialog
@@ -121,7 +130,7 @@ export function DayDetailDialog({ date, events, onClose }: DayDetailDialogProps)
               )}
           </DialogTitle>
           <DialogDescription>
-            {events.length === 1 ? "1 entry" : `${events.length} entries`}
+            {t.calendar.entries(events.length)}
           </DialogDescription>
         </DialogHeader>
         <DayEntries events={events} />

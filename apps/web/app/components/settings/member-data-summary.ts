@@ -1,3 +1,6 @@
+import type { UiLanguage } from "@amigo/db";
+import { messagesFor } from "@/app/i18n";
+
 /** Response of GET /api/members/:id/data-summary. */
 export interface MemberDataSummary {
   transactions: number;
@@ -8,27 +11,25 @@ export interface MemberDataSummary {
   groceryItems: number;
 }
 
-const LABELS: Record<keyof MemberDataSummary, [singular: string, plural: string]> = {
-  transactions: ["transaction", "transactions"],
-  recurringTransactions: ["recurring rule", "recurring rules"],
-  personalBudgets: ["budget", "budgets"],
-  assets: ["asset", "assets"],
-  debts: ["debt", "debts"],
-  groceryItems: ["grocery item", "grocery items"],
-};
-
-const listFormat = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+const ORDER: (keyof MemberDataSummary)[] = [
+  "transactions",
+  "recurringTransactions",
+  "personalBudgets",
+  "assets",
+  "debts",
+  "groceryItems",
+];
 
 /**
  * Non-zero counts as one phrase, e.g. "12 transactions, 1 budget, and 4 grocery
- * items". Empty when the member hasn't added anything.
+ * items" or "12 movimientos, 1 presupuesto y 4 artículos de compras". Empty
+ * when the member hasn't added anything.
  */
-export function describeMemberData(summary: MemberDataSummary): string {
-  const parts = (Object.keys(LABELS) as (keyof MemberDataSummary)[]).flatMap((key) => {
+export function describeMemberData(summary: MemberDataSummary, language: UiLanguage): string {
+  const labels = messagesFor(language).household.members.data;
+  const parts = ORDER.flatMap((key) => {
     const count = summary[key] ?? 0;
-    if (count <= 0) return [];
-    const [singular, plural] = LABELS[key];
-    return [`${count} ${count === 1 ? singular : plural}`];
+    return count > 0 ? [labels[key](count)] : [];
   });
-  return listFormat.format(parts);
+  return new Intl.ListFormat(language, { style: "long", type: "conjunction" }).format(parts);
 }

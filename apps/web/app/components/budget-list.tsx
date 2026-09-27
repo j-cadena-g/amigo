@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import type { CurrencyCode } from "@amigo/db";
+import { BUDGET_PERIODS, type BudgetPeriod, type CurrencyCode } from "@amigo/db";
 import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
@@ -31,6 +31,7 @@ import {
   DialogFooter,
 } from "@/app/components/ui/dialog";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface BudgetWithSpending {
   id: string;
@@ -89,18 +90,6 @@ const PROGRESS_TEXT: Record<ProgressVariant, string> = {
   "budget-list-progress--danger": "text-destructive",
 };
 
-const SUBMIT_LABELS = {
-  add: { idle: "Add budget", busy: "Adding…" },
-  edit: { idle: "Save budget", busy: "Saving…" },
-} as const;
-
-const ALERT_LABELS: Record<BudgetWithSpending["alertLevel"], string | null> = {
-  ok: null,
-  warn: "75%+ used",
-  critical: "90%+ used",
-  over: "Over",
-};
-
 function BudgetRow({
   budget,
   onEdit,
@@ -112,11 +101,12 @@ function BudgetRow({
   onDelete: () => void;
   deleting: boolean;
 }) {
+  const t = useT();
   const locale = useLocale();
   const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
   const variant = getProgressVariant(budget.percentUsed, budget.remainingHomeCents);
-  const alert = ALERT_LABELS[budget.alertLevel];
+  const alert = budget.alertLevel === "ok" ? null : t.budgets.alerts[budget.alertLevel];
   const showBudgetCurrency = budget.currency !== budget.homeCurrency;
 
   return (
@@ -137,8 +127,10 @@ function BudgetRow({
             )}
           </p>
           <p className="shrink-0 font-mono text-sm font-medium">
-            {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency, locale)} of{" "}
-            {formatCents(budget.limitAmountHome, budget.homeCurrency, locale)}
+            {t.dashboard.spentOfLimit(
+              formatCents(budget.currentSpendingHomeCents, budget.homeCurrency, locale),
+              formatCents(budget.limitAmountHome, budget.homeCurrency, locale)
+            )}
           </p>
         </div>
         <progress
@@ -147,21 +139,23 @@ function BudgetRow({
           max={100}
           aria-label={
             isOverBudget
-              ? `${budget.name}: over budget`
-              : `${budget.name}: ${Math.round(clampedPercent)}% of budget used`
+              ? t.dashboard.overBudgetLabel(budget.name)
+              : t.dashboard.usedLabel(budget.name, Math.round(clampedPercent))
           }
         />
         <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
           <span className={cn("font-mono font-medium", PROGRESS_TEXT[variant])}>
             {isOverBudget
-              ? `${formatCents(-budget.remainingHomeCents, budget.homeCurrency, locale)} over`
-              : `${formatCents(budget.remainingHomeCents, budget.homeCurrency, locale)} left`}
+              ? t.dashboard.over(formatCents(-budget.remainingHomeCents, budget.homeCurrency, locale))
+              : t.dashboard.left(formatCents(budget.remainingHomeCents, budget.homeCurrency, locale))}
           </span>
-          <span className="text-muted-foreground capitalize">{budget.period}</span>
+          <span className="text-muted-foreground">
+            {t.common.periods[budget.period as BudgetPeriod] ?? budget.period}
+          </span>
         </div>
         {showBudgetCurrency && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Limit in budget currency:{" "}
+            {t.dashboard.limitInBudgetCurrency}{" "}
             <span className="font-mono font-medium">
               {formatCents(budget.limitAmount, budget.currency, locale)}
             </span>
@@ -169,14 +163,14 @@ function BudgetRow({
         )}
       </div>
       <div className="-mr-2 flex shrink-0">
-        <RowIconButton onClick={onEdit} aria-label={`Edit ${budget.name}`}>
+        <RowIconButton onClick={onEdit} aria-label={t.budgets.editNamed(budget.name)}>
           <Pencil />
         </RowIconButton>
         <RowIconButton
           tone="destructive"
           onClick={onDelete}
           disabled={deleting}
-          aria-label={`Delete ${budget.name}`}
+          aria-label={t.budgets.deleteNamed(budget.name)}
         >
           <Trash2 />
         </RowIconButton>
@@ -212,12 +206,16 @@ function BudgetFormDialog({
   onDelete?: () => void;
   deleting?: boolean;
 }) {
+  const t = useT();
   const nameId = useId();
   const limitId = useId();
   const currencyId = useId();
   const periodId = useId();
   const busy = submitting || deleting;
-  const labels = SUBMIT_LABELS[mode];
+  const labels =
+    mode === "add"
+      ? { idle: t.budgets.add, busy: t.common.adding }
+      : { idle: t.budgets.save, busy: t.common.saving };
 
   const canSubmit = form.name.trim() !== "" && isPositiveAmount(form.limitAmount);
 
@@ -225,7 +223,7 @@ function BudgetFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{mode === "add" ? "Add budget" : "Edit budget"}</DialogTitle>
+          <DialogTitle>{mode === "add" ? t.budgets.add : t.budgets.edit}</DialogTitle>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -237,19 +235,19 @@ function BudgetFormDialog({
         >
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="e.g. Groceries"
+              placeholder={t.budgets.namePlaceholder}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor={limitId} className="text-sm font-semibold">
-                Limit
+                {t.budgets.limit}
               </label>
               <AmountInput
                 id={limitId}
@@ -262,7 +260,7 @@ function BudgetFormDialog({
             </div>
             <div className="space-y-1.5">
               <label htmlFor={currencyId} className="text-sm font-semibold">
-                Currency
+                {t.common.currency}
               </label>
               <CurrencySelect
                 id={currencyId}
@@ -273,16 +271,18 @@ function BudgetFormDialog({
           </div>
           <div className="space-y-1.5">
             <label htmlFor={periodId} className="text-sm font-semibold">
-              Period
+              {t.common.period}
             </label>
             <NativeSelect
               id={periodId}
               value={form.period}
               onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))}
             >
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
+              {BUDGET_PERIODS.map((period) => (
+                <option key={period} value={period}>
+                  {t.common.periods[period]}
+                </option>
+              ))}
             </NativeSelect>
           </div>
           <SharedCheckbox
@@ -301,7 +301,7 @@ function BudgetFormDialog({
             {onDelete && (
               <DeleteButton onClick={onDelete} disabled={busy} className="sm:mr-auto">
                 <Trash2 />
-                {deleting ? "Deleting…" : "Delete"}
+                {deleting ? t.common.deleting : t.common.delete}
               </DeleteButton>
             )}
             <Button
@@ -310,7 +310,7 @@ function BudgetFormDialog({
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={busy || !canSubmit}>
               {submitting ? labels.busy : labels.idle}
@@ -327,6 +327,7 @@ export function BudgetList({
   session: _session,
   homeCurrency,
 }: BudgetListProps) {
+  const t = useT();
   const locale = useLocale();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
@@ -378,10 +379,10 @@ export function BudgetList({
         setShowAdd(false);
         revalidator.revalidate();
       } else {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't add the budget. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.budgets.addAction));
       }
     } catch {
-      setError("Couldn't add the budget. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.budgets.addAction));
     } finally {
       setSubmitting(false);
     }
@@ -407,10 +408,10 @@ export function BudgetList({
         setEditingBudget(null);
         revalidator.revalidate();
       } else {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't save the budget. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.budgets.saveAction));
       }
     } catch {
-      setError("Couldn't save the budget. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.budgets.saveAction));
     } finally {
       setSubmitting(false);
     }
@@ -421,9 +422,9 @@ export function BudgetList({
     setDeletingId(budget.id);
     try {
       const ok = await confirm({
-        title: "Delete budget?",
-        description: `This can't be undone. Transactions linked to "${budget.name}" stay, but they won't count toward a budget anymore.`,
-        confirmText: "Delete",
+        title: t.budgets.deleteTitle,
+        description: t.budgets.deleteBody(budget.name),
+        confirmText: t.common.delete,
         variant: "destructive",
       });
       if (!ok) return false;
@@ -435,9 +436,9 @@ export function BudgetList({
         revalidator.revalidate();
         return true;
       }
-      await toastMutationFailure(toast, res, "Delete budget");
+      await toastMutationFailure(toast, res, t.budgets.deleteAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Delete budget");
+      await toastMutationFailure(toast, null, t.budgets.deleteAction, t.common);
     } finally {
       setDeletingId(null);
     }
@@ -466,35 +467,35 @@ export function BudgetList({
     <div className="space-y-10">
       <div>
         <FinancialSectionHeader
-          title="Budgets"
+          title={t.nav.budgets}
           className="border-b border-foreground pb-3"
           action={
             <Button type="button" onClick={openAdd}>
               <Plus />
-              Add budget
+              {t.budgets.add}
             </Button>
           }
         />
 
         {budgets.length === 0 ? (
           <EmptyState
-            message="No budgets yet. Set a monthly limit for a category, like groceries."
+            message={t.budgets.empty}
             action={
               <Button type="button" onClick={openAdd}>
                 <Plus />
-                Add budget
+                {t.budgets.add}
               </Button>
             }
           />
         ) : (
           <>
             {shared.length > 0 && (
-              <LedgerSubgroup title="Shared" level={3}>
+              <LedgerSubgroup title={t.budgets.shared} level={3}>
                 {renderRows(shared)}
               </LedgerSubgroup>
             )}
             {personal.length > 0 && (
-              <LedgerSubgroup title="Personal" level={3}>
+              <LedgerSubgroup title={t.budgets.personal} level={3}>
                 {renderRows(personal)}
               </LedgerSubgroup>
             )}
@@ -503,8 +504,8 @@ export function BudgetList({
       </div>
 
       <FinancialCollapsiblePanel
-        title="Category → budget linking"
-        description="Pick the budget that's filled in when you log an expense in each category."
+        title={t.budgets.linkingTitle}
+        description={t.budgets.linkingHint}
       >
         <CategoryBudgetMappingPanel />
       </FinancialCollapsiblePanel>

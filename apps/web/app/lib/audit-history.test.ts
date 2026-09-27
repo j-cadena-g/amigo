@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { messagesFor } from "@/app/i18n";
+
+const en = messagesFor("en");
+const es = messagesFor("es");
 import { formatCents } from "@/app/lib/currency";
 import {
   auditTimestampIso,
@@ -14,20 +18,24 @@ import {
 
 describe("audit history helpers", () => {
   it("labels standard audit actions", () => {
-    expect(formatAuditAction("INSERT")).toBe("Created");
-    expect(formatAuditAction("UPDATE")).toBe("Updated");
-    expect(formatAuditAction("DELETE")).toBe("Deleted");
+    expect(formatAuditAction("INSERT", en.audit)).toBe("Created");
+    expect(formatAuditAction("UPDATE", en.audit)).toBe("Updated");
+    expect(formatAuditAction("DELETE", en.audit)).toBe("Deleted");
+    expect(formatAuditAction("UPDATE", es.audit)).toBe("Actualizado");
+    expect(formatAuditAction("MERGE", es.audit)).toBe("MERGE");
   });
 
-  it("humanizes field names", () => {
-    expect(formatAuditFieldName("isShared")).toBe("Is Shared");
-    expect(formatAuditFieldName("userId")).toBe("User Id");
+  it("labels known fields and humanizes the rest", () => {
+    expect(formatAuditFieldName("isShared", en.audit)).toBe("Shared");
+    expect(formatAuditFieldName("limitAmount", es.audit)).toBe("Monto límite");
+    expect(formatAuditFieldName("dueDay", es.audit)).toBe("Due Day");
   });
 
   it("formats primitive values", () => {
     expect(formatAuditValue(null)).toBe("—");
     expect(formatAuditValue(true)).toBe("Yes");
     expect(formatAuditValue(false)).toBe("No");
+    expect(formatAuditValue(true, { labels: es.common })).toBe("Sí");
     expect(formatAuditValue("")).toBe("—");
     expect(formatAuditValue("Checking")).toBe("Checking");
     const fn = () => "x";

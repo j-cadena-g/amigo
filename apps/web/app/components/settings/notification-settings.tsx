@@ -7,13 +7,16 @@ import {
   isIOS,
   isPWAInstalled,
   isSubscribed,
+  pushErrorCode,
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/app/lib/push/client";
+import { useT } from "@/app/i18n";
 
 type Status = "loading" | "subscribed" | "unsubscribed" | "denied" | "unsupported";
 
 export function NotificationSettings() {
+  const t = useT();
   const { showPrompt } = usePushPrompt();
   const [status, setStatus] = useState<Status>("loading");
   const [toggling, setToggling] = useState(false);
@@ -55,11 +58,7 @@ export function NotificationSettings() {
         setStatus("unsubscribed");
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `Couldn't update notifications: ${err.message}`
-          : "Couldn't update notifications. Try again."
-      );
+      setError(t.notifications.updateFailed(t.notifications.reason[pushErrorCode(err)]));
       await refreshStatus();
     } finally {
       setToggling(false);
@@ -68,26 +67,21 @@ export function NotificationSettings() {
 
   if (status === "loading") {
     return (
-      <p className="text-sm text-muted-foreground">Checking notification status…</p>
+      <p className="text-sm text-muted-foreground">{t.notifications.checking}</p>
     );
   }
 
   if (status === "unsupported" && !needsIOSInstall) {
     return (
-      <p className="text-muted-foreground">
-        This browser doesn&apos;t support notifications.
-      </p>
+      <p className="text-muted-foreground">{t.notifications.unsupported}</p>
     );
   }
 
   if (status === "denied") {
     return (
       <div>
-        <p className="font-semibold">Notifications are blocked</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your browser blocked notifications for amigo. Allow them in your
-          browser&apos;s site settings to turn them back on.
-        </p>
+        <p className="font-semibold">{t.notifications.blockedTitle}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t.notifications.blockedBody}</p>
       </div>
     );
   }
@@ -101,14 +95,13 @@ export function NotificationSettings() {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <label htmlFor="grocery-notifications" className="font-semibold">
-              Grocery list changes
+              {t.notifications.groceryChanges}
             </label>
             <p
               id="grocery-notifications-hint"
               className="text-sm text-muted-foreground"
             >
-              Get a notification when someone else adds an item or marks one as
-              bought.
+              {t.notifications.groceryChangesHint}
             </p>
           </div>
           <Switch
@@ -123,10 +116,7 @@ export function NotificationSettings() {
 
       {needsIOSInstall && (
         <div>
-          <p className="text-sm">
-            On iPhone and iPad, notifications only work after you add amigo to your
-            Home Screen and open it from there.
-          </p>
+          <p className="text-sm">{t.notifications.iosHint}</p>
           <Button
             type="button"
             variant="outline"
@@ -134,7 +124,7 @@ export function NotificationSettings() {
             className="mt-3"
             onClick={() => showPrompt()}
           >
-            Show install steps
+            {t.notifications.showInstallSteps}
           </Button>
         </div>
       )}

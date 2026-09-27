@@ -22,11 +22,7 @@ import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/dec
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { useLocale } from "@/app/lib/use-locale";
-
-const TRANSACTION_TYPE_OPTIONS = [
-  { value: "expense", label: "Expense" },
-  { value: "income", label: "Income" },
-] as const;
+import { useT } from "@/app/i18n";
 
 type SchedulePreset =
   | "daily"
@@ -38,12 +34,6 @@ type SchedulePreset =
   | "monthly-same"
   | "yearly"
   | "custom";
-
-const INTERVAL_UNITS: Record<RecurringFormData["customFrequency"], string> = {
-  DAILY: "days",
-  WEEKLY: "weeks",
-  MONTHLY: "months",
-};
 
 interface RecurringFormData {
   type: "income" | "expense";
@@ -148,6 +138,7 @@ function RecurringFields({
   /** When set, budget suggestions are ignored after this ref's value changes (e.g. edit dialog rule switch). */
   budgetSuggestScopeRef?: React.RefObject<string | null | undefined>;
 }) {
+  const t = useT();
   const { categories } = useFinancialCategories();
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
   const budgetSuggestRequestSeq = useRef(0);
@@ -222,8 +213,11 @@ function RecurringFields({
   return (
     <>
       <TypeToggle
-        label="Transaction type"
-        options={TRANSACTION_TYPE_OPTIONS}
+        label={t.transactions.typeLabel}
+        options={[
+          { value: "expense", label: t.common.expense },
+          { value: "income", label: t.common.income },
+        ] as const}
         value={form.type}
         onChange={selectType}
       />
@@ -231,7 +225,7 @@ function RecurringFields({
       <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3">
         <div className="min-w-0 space-y-1.5">
           <label htmlFor={amountId} className="text-sm font-semibold">
-            Amount
+            {t.common.amount}
           </label>
           <AmountInput
             id={amountId}
@@ -243,7 +237,7 @@ function RecurringFields({
         </div>
         <div className="space-y-1.5">
           <label htmlFor={currencyId} className="text-sm font-semibold">
-            Currency
+            {t.common.currency}
           </label>
           <CurrencySelect
             id={currencyId}
@@ -256,7 +250,7 @@ function RecurringFields({
 
       <div className="space-y-1.5">
         <label htmlFor={categoryFieldId} className="text-sm font-semibold">
-          Category
+          {t.common.category}
         </label>
         <CategorySelect
           id={categoryFieldId}
@@ -271,7 +265,7 @@ function RecurringFields({
       </div>
       <div className="space-y-1.5">
         <label htmlFor={descriptionId} className="text-sm font-semibold">
-          Description (optional)
+          {t.common.descriptionOptional}
         </label>
         <Input
           id={descriptionId}
@@ -284,7 +278,7 @@ function RecurringFields({
 
       <div className="space-y-1.5">
         <label htmlFor={scheduleId} className="text-sm font-semibold">
-          Schedule
+          {t.recurring.schedule}
         </label>
         <NativeSelect
           id={scheduleId}
@@ -296,15 +290,15 @@ function RecurringFields({
             }))
           }
         >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="biweekly">Every 2 weeks</option>
-          <option value="monthly-1">Monthly on the 1st</option>
-          <option value="monthly-15">Monthly on the 15th</option>
-          <option value="monthly-last">Monthly on the last day</option>
-          <option value="monthly-same">Monthly, same day as the start date</option>
-          <option value="yearly">Yearly</option>
-          <option value="custom">Custom</option>
+          <option value="daily">{t.recurring.presets.daily}</option>
+          <option value="weekly">{t.recurring.presets.weekly}</option>
+          <option value="biweekly">{t.recurring.presets.biweekly}</option>
+          <option value="monthly-1">{t.recurring.presets.monthly1}</option>
+          <option value="monthly-15">{t.recurring.presets.monthly15}</option>
+          <option value="monthly-last">{t.recurring.presets.monthlyLast}</option>
+          <option value="monthly-same">{t.recurring.presets.monthlySame}</option>
+          <option value="yearly">{t.recurring.presets.yearly}</option>
+          <option value="custom">{t.recurring.presets.custom}</option>
         </NativeSelect>
       </div>
 
@@ -312,7 +306,7 @@ function RecurringFields({
         <div className="space-y-3 rounded-xl border border-border p-3">
           <div className="space-y-1.5">
             <label htmlFor={frequencyId} className="text-sm font-semibold">
-              Frequency
+              {t.recurring.frequency}
             </label>
             <NativeSelect
               id={frequencyId}
@@ -324,14 +318,14 @@ function RecurringFields({
                 }))
               }
             >
-              <option value="DAILY">Daily</option>
-              <option value="WEEKLY">Weekly</option>
-              <option value="MONTHLY">Monthly</option>
+              <option value="DAILY">{t.common.frequencies.DAILY}</option>
+              <option value="WEEKLY">{t.common.frequencies.WEEKLY}</option>
+              <option value="MONTHLY">{t.common.frequencies.MONTHLY}</option>
             </NativeSelect>
           </div>
           <div className="space-y-1.5">
             <label htmlFor={intervalId} className="text-sm font-semibold">
-              Repeat every
+              {t.recurring.repeatEvery}
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -346,14 +340,14 @@ function RecurringFields({
                 className="w-24"
               />
               <span id={intervalUnitId} className="text-sm text-muted-foreground">
-                {INTERVAL_UNITS[form.customFrequency]}
+                {t.recurring.units[form.customFrequency]}
               </span>
             </div>
           </div>
           {form.customFrequency === "MONTHLY" && (
             <div className="space-y-1.5">
               <label htmlFor={dayOfMonthId} className="text-sm font-semibold">
-                Day of month
+                {t.recurring.dayOfMonth}
               </label>
               <Input
                 id={dayOfMonthId}
@@ -373,7 +367,7 @@ function RecurringFields({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label htmlFor={startDateId} className="text-sm font-semibold">
-            Start date
+            {t.recurring.startDate}
           </label>
           <Input
             id={startDateId}
@@ -386,7 +380,7 @@ function RecurringFields({
         </div>
         <div className="space-y-1.5">
           <label htmlFor={endDateId} className="text-sm font-semibold">
-            End date (optional)
+            {t.recurring.endDateOptional}
           </label>
           <Input
             id={endDateId}
@@ -402,7 +396,7 @@ function RecurringFields({
       {form.type === "expense" && (
         <div className="space-y-1.5">
           <label htmlFor={budgetFieldId} className="text-sm font-semibold">
-            Budget (optional)
+            {t.transactions.budgetOptional}
           </label>
           <BudgetSelect
             id={budgetFieldId}
@@ -451,6 +445,7 @@ export function AddRecurringDialog({
   onOpenChange,
   defaultCurrency = "CAD",
 }: AddRecurringDialogProps) {
+  const t = useT();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() => emptyForm(defaultCurrency));
   const [submitting, setSubmitting] = useState(false);
@@ -476,8 +471,7 @@ export function AddRecurringDialog({
       });
       if (!res.ok) {
         setError(
-          (await readApiErrorMessage(res)) ??
-            "Couldn't add the recurring transaction. Try again."
+          (await readApiErrorMessage(res)) ?? t.common.couldNot(t.recurring.addAction)
         );
         return;
       }
@@ -485,9 +479,7 @@ export function AddRecurringDialog({
       onOpenChange(false);
       revalidator.revalidate();
     } catch {
-      setError(
-        "Couldn't add the recurring transaction. Check your connection and try again."
-      );
+      setError(t.common.couldNotConnection(t.recurring.addAction));
     } finally {
       setSubmitting(false);
     }
@@ -497,7 +489,7 @@ export function AddRecurringDialog({
     <Dialog key={defaultCurrency} open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Add recurring transaction</DialogTitle>
+          <DialogTitle>{t.recurring.addTitle}</DialogTitle>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -519,10 +511,10 @@ export function AddRecurringDialog({
               onClick={() => handleOpenChange(false)}
               disabled={submitting}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={submitting || !canSubmit(form)}>
-              {submitting ? "Adding…" : "Add recurring"}
+              {submitting ? t.common.adding : t.recurring.add}
             </Button>
           </DialogFooter>
         </form>
@@ -580,6 +572,7 @@ export function EditRecurringDialog({
   onDelete,
   deleting,
 }: EditRecurringDialogProps) {
+  const t = useT();
   const locale = useLocale();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() =>
@@ -615,17 +608,14 @@ export function EditRecurringDialog({
       });
       if (!res.ok) {
         setError(
-          (await readApiErrorMessage(res)) ??
-            "Couldn't save the recurring transaction. Try again."
+          (await readApiErrorMessage(res)) ?? t.common.couldNot(t.recurring.saveAction)
         );
         return;
       }
       onOpenChange(false);
       revalidator.revalidate();
     } catch {
-      setError(
-        "Couldn't save the recurring transaction. Check your connection and try again."
-      );
+      setError(t.common.couldNotConnection(t.recurring.saveAction));
     } finally {
       setSubmitting(false);
     }
@@ -635,7 +625,7 @@ export function EditRecurringDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Edit recurring transaction</DialogTitle>
+          <DialogTitle>{t.recurring.editTitle}</DialogTitle>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -665,7 +655,7 @@ export function EditRecurringDialog({
           <DialogFooter>
             <DeleteButton onClick={onDelete} disabled={busy} className="sm:mr-auto">
               <Trash2 />
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? t.common.deleting : t.common.delete}
             </DeleteButton>
             <Button
               type="button"
@@ -673,10 +663,10 @@ export function EditRecurringDialog({
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={busy || !canSubmit(form)}>
-              {submitting ? "Saving…" : "Save recurring"}
+              {submitting ? t.common.saving : t.recurring.save}
             </Button>
           </DialogFooter>
         </form>

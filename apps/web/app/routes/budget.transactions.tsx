@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
@@ -16,6 +16,7 @@ import { visibleFinancialTransactionsCondition } from "@/server/lib/financial-vi
 import { todayInTz } from "@/server/lib/dates";
 import { getHouseholdTimezone } from "@/server/lib/household-timezone";
 import { TransactionList } from "@/app/components/transaction-list";
+import { pageTitle } from "@/app/i18n";
 
 export async function loader({ context, request }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -62,8 +63,8 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Transactions · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.transactions);
 }
 
 export default function Transactions() {

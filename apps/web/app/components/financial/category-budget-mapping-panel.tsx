@@ -8,6 +8,7 @@ import {
 import type { CategoryBudgetMappingRow } from "@/app/lib/financial-category-types";
 import { parseApiError } from "@/app/lib/parse-api-error";
 import { cn } from "@/app/lib/utils";
+import { useT } from "@/app/i18n";
 
 interface BudgetOption {
   id: string;
@@ -18,6 +19,7 @@ interface BudgetOption {
 type Feedback = { tone: "success" | "error"; message: string };
 
 export function CategoryBudgetMappingPanel() {
+  const t = useT();
   const { categories, loading: categoriesLoading } = useFinancialCategories();
   const [budgets, setBudgets] = useState<BudgetOption[]>([]);
   const [mappings, setMappings] = useState<Record<string, string | null>>({});
@@ -60,7 +62,7 @@ export function CategoryBudgetMappingPanel() {
         if (!cancelled) {
           setFeedback({
             tone: "error",
-            message: "Couldn't load budget links. Reload the page to try again.",
+            message: t.categories.links.loadFailed,
           });
         }
       } finally {
@@ -70,7 +72,7 @@ export function CategoryBudgetMappingPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   function setMapping(categoryId: string, budgetId: string | null) {
     setMappings((prev) => ({ ...prev, [categoryId]: budgetId }));
@@ -97,15 +99,15 @@ export function CategoryBudgetMappingPanel() {
         } | null;
         setFeedback({
           tone: "error",
-          message: parseApiError(body, "Couldn't save the links. Try again."),
+          message: parseApiError(body, t.common.couldNot(t.categories.links.saveAction)),
         });
         return;
       }
-      setFeedback({ tone: "success", message: "Links saved." });
+      setFeedback({ tone: "success", message: t.categories.links.saved });
     } catch {
       setFeedback({
         tone: "error",
-        message: "Couldn't save the links. Check your connection and try again.",
+        message: t.common.couldNotConnection(t.categories.links.saveAction),
       });
     } finally {
       setSubmitting(false);
@@ -113,17 +115,15 @@ export function CategoryBudgetMappingPanel() {
   }
 
   if (loading || categoriesLoading) {
-    return <p className="text-sm text-muted-foreground">Loading budget links…</p>;
+    return <p className="text-sm text-muted-foreground">{t.categories.links.loading}</p>;
   }
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Subcategories override their parent when set.
-      </p>
+      <p className="text-sm text-muted-foreground">{t.categories.links.override}</p>
 
       {expenseTree.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No expense categories yet.</p>
+        <p className="text-sm text-muted-foreground">{t.categories.links.noExpenseCategories}</p>
       ) : (
         <ul className="divide-y divide-border border-t border-border">
           {expenseTree.flatMap((row) => [
@@ -136,7 +136,7 @@ export function CategoryBudgetMappingPanel() {
               onChange={setMapping}
               hint={
                 row.children.length > 0
-                  ? "Default for unlinked subcategories"
+                  ? t.categories.links.parentDefault
                   : undefined
               }
             />,
@@ -156,7 +156,7 @@ export function CategoryBudgetMappingPanel() {
       )}
 
       <Button type="button" size="sm" disabled={submitting} onClick={() => void handleSave()}>
-        {submitting ? "Saving…" : "Save links"}
+        {submitting ? t.common.saving : t.categories.links.save}
       </Button>
 
       {feedback ? (
@@ -191,6 +191,7 @@ function MappingRow({
   nested?: boolean;
   hint?: string;
 }) {
+  const t = useT();
   const selectId = `budget-mapping-${categoryId}`;
 
   return (
@@ -211,11 +212,11 @@ function MappingRow({
         value={budgetId ?? ""}
         onChange={(e) => onChange(categoryId, e.target.value || null)}
       >
-        <option value="">No budget</option>
+        <option value="">{t.transactions.noBudget}</option>
         {budgets.map((budget) => (
           <option key={budget.id} value={budget.id}>
             {budget.name}
-            {budget.isShared ? " (shared)" : ""}
+            {budget.isShared ? ` ${t.categories.links.shared}` : ""}
           </option>
         ))}
       </NativeSelect>

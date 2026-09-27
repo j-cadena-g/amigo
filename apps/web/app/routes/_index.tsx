@@ -8,6 +8,7 @@ import {
   SIGN_IN_REDIRECT_PROPS,
 } from "@/app/lib/post-sign-in";
 import { getSessionStatus } from "@/app/lib/session.server";
+import { useT } from "@/app/i18n";
 
 export function loader({ context }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -28,9 +29,10 @@ export function loader({ context }: LoaderFunctionArgs) {
 }
 
 function FullPageLoading() {
+  const t = useT();
   return (
     <main className="min-h-screen flex items-center justify-center bg-background">
-      <p className="text-muted-foreground">Loading…</p>
+      <p className="text-muted-foreground">{t.common.loading}</p>
     </main>
   );
 }
@@ -40,6 +42,7 @@ export function meta() {
 }
 
 function SignedInContinue() {
+  const t = useT();
   const revalidator = useRevalidator();
   const didRevalidate = useRef(false);
 
@@ -55,10 +58,10 @@ function SignedInContinue() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
-        <h1 className="type-display mt-6 text-title-sm">You&apos;re signed in</h1>
-        <p className="mt-2 text-muted-foreground">Taking you to your household…</p>
+        <h1 className="type-display mt-6 text-title-sm">{t.nav.signedIn}</h1>
+        <p className="mt-2 text-muted-foreground">{t.nav.takingYouHome}</p>
         <Button asChild className="mt-6 w-full">
-          <a href={POST_SIGN_IN_CONTINUE_PATH}>Continue</a>
+          <a href={POST_SIGN_IN_CONTINUE_PATH}>{t.nav.continue}</a>
         </Button>
       </div>
     </main>
@@ -66,6 +69,7 @@ function SignedInContinue() {
 }
 
 export default function Index() {
+  const t = useT();
   const { isSignedIn, isLoaded } = useUser();
 
   if (!isLoaded) {
@@ -83,9 +87,7 @@ export default function Index() {
           <h1>
             <Wordmark className="px-3 pb-1 pt-2 text-title-sm md:text-title" />
           </h1>
-          <p className="mt-4 text-lg">
-            Shared budgets, bills, and grocery lists for your household.
-          </p>
+          <p className="mt-4 text-lg">{t.nav.tagline}</p>
         </div>
 
         <SignIn routing="hash" {...SIGN_IN_REDIRECT_PROPS} />

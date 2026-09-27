@@ -5,6 +5,7 @@ import { cn } from "@/app/lib/utils";
 import type { TagColorKey } from "./constants";
 import { TagBadge, TagDot } from "./tag-badge";
 import { TagColorPicker } from "./tag-color-picker";
+import { useT } from "@/app/i18n";
 
 interface TagInputProps {
   allTags: GroceryTag[];
@@ -19,6 +20,7 @@ export function TagInput({
   onToggleTag,
   onCreateTag,
 }: TagInputProps) {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -139,7 +141,7 @@ export function TagInput({
               type="button"
               onClick={() => removeTag(tag.id)}
               className="relative rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
-              aria-label={`Remove ${tag.name}`}
+              aria-label={t.groceries.tags.removeNamed(tag.name)}
             >
               <X className="h-3 w-3" aria-hidden="true" />
             </button>
@@ -160,9 +162,9 @@ export function TagInput({
           aria-activedescendant={
             highlightIndex >= 0 ? `${listboxId}-option-${highlightIndex}` : undefined
           }
-          aria-label="Search or create a tag"
+          aria-label={t.groceries.tags.searchOrCreate}
           placeholder={
-            selectedTags.length > 0 ? "Add a tag" : "Tags (optional)"
+            selectedTags.length > 0 ? t.groceries.tags.addATag : t.groceries.tags.optional
           }
           className="min-w-[100px] flex-1 border-b border-transparent bg-transparent py-1 text-base text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
         />
@@ -213,7 +215,7 @@ export function TagInput({
               >
                 <Plus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="truncate">
-                  {isCreating ? "Creating…" : <>Create &ldquo;{search.trim()}&rdquo;</>}
+                  {isCreating ? t.groceries.tags.creating : t.groceries.tags.create(search.trim())}
                 </span>
               </button>
               <TagColorPicker

@@ -1,5 +1,7 @@
+import { CURRENCY_CODES } from "@amigo/db";
 import { NativeSelect } from "@/app/components/financial/form-controls";
-import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
+import { useLanguage, useT } from "@/app/i18n";
+import { currencyName } from "@/app/lib/currency";
 
 interface CurrencySelectProps {
   value: string;
@@ -21,18 +23,20 @@ export function CurrencySelect({
   "aria-label": ariaLabel,
   compact = false,
 }: CurrencySelectProps) {
+  const t = useT();
+  const language = useLanguage();
   return (
     <NativeSelect
       id={id}
-      aria-label={ariaLabel ?? (id ? undefined : "Currency")}
+      aria-label={ariaLabel ?? (id ? undefined : t.common.currency)}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       compact={compact}
       className={className}
     >
-      {SUPPORTED_CURRENCIES.map((c) => (
-        <option key={c.code} value={c.code}>
-          {compact ? c.code : `${c.code} – ${c.name}`}
+      {CURRENCY_CODES.map((code) => (
+        <option key={code} value={code}>
+          {compact ? code : `${code} – ${currencyName(code, language)}`}
         </option>
       ))}
     </NativeSelect>

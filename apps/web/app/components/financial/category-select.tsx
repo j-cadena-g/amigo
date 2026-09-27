@@ -4,6 +4,7 @@ import type {
   FinancialCategoryItem,
   FinancialCategoryType,
 } from "@/app/lib/financial-category-types";
+import { useT } from "@/app/i18n";
 
 interface CategorySelectProps {
   id?: string;
@@ -23,9 +24,10 @@ export function CategorySelect({
   type,
   categories,
   disabled,
-  placeholder = "Select category",
+  placeholder,
   "aria-label": ariaLabel,
 }: CategorySelectProps) {
+  const t = useT();
   const options = listCategoriesForSelect(categories, type);
 
   return (
@@ -36,7 +38,7 @@ export function CategorySelect({
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
     >
-      <option value="">{placeholder}</option>
+      <option value="">{placeholder ?? t.categories.select}</option>
       {options.map(({ category, indent }) => (
         <option key={category.id} value={category.id}>
           {indent ? "\u00A0\u00A0" : ""}

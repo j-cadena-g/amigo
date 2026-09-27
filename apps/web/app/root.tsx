@@ -13,7 +13,9 @@ import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { getCspNonce } from "@/app/lib/session.server";
-import { loadLocale } from "@/app/lib/locale.server";
+import { esES } from "@clerk/localizations";
+import { loadViewerRegion } from "@/app/lib/locale.server";
+import { DEFAULT_LANGUAGE, isUiLanguage, LanguageContext, messagesFor, useT } from "@/app/i18n";
 import { DEFAULT_LOCALE } from "@/app/lib/locale";
 import { LocaleContext } from "@/app/lib/use-locale";
 import { appContextMiddleware } from "@/server/middleware/app-context";
@@ -28,17 +30,18 @@ export const middleware: Route.MiddlewareFunction[] = [
 export const loader = (args: Route.LoaderArgs) =>
   rootAuthLoader(args, async () => ({
     cspNonce: getCspNonce(args.context) ?? "",
-    locale: await loadLocale(args.context, args.request),
+    ...(await loadViewerRegion(args.context, args.request)),
   }));
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const rootData = useRouteLoaderData("root") as
-    | { cspNonce?: string; locale?: string }
+    | { cspNonce?: string; locale?: string; language?: string }
     | undefined;
   const cspNonce = rootData?.cspNonce || undefined;
+  const language = isUiLanguage(rootData?.language) ? rootData.language : DEFAULT_LANGUAGE;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={language} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -66,9 +69,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
           }}
         />
-        <LocaleContext.Provider value={rootData?.locale ?? DEFAULT_LOCALE}>
-          {children}
-        </LocaleContext.Provider>
+        <LanguageContext.Provider value={language}>
+          <LocaleContext.Provider value={rootData?.locale ?? DEFAULT_LOCALE}>
+            {children}
+          </LocaleContext.Provider>
+        </LanguageContext.Provider>
         <ScrollRestoration nonce={cspNonce} />
         <Scripts nonce={cspNonce} />
       </body>
@@ -106,18 +111,27 @@ const clerkAppearance = {
   },
 };
 
+/** Clerk's own Spanish, plus the sign-in hint this app adds in both languages. */
 const clerkLocalization = {
-  signIn: {
-    start: { subtitle: "Use the email you signed up with." },
+  en: {
+    signIn: { start: { subtitle: messagesFor("en").common.signInSubtitle } },
+  },
+  es: {
+    ...esES,
+    signIn: {
+      ...esES.signIn,
+      start: { ...esES.signIn?.start, subtitle: messagesFor("es").common.signInSubtitle },
+    },
   },
 };
 
 export default function App({ loaderData }: Route.ComponentProps) {
+  const language = isUiLanguage(loaderData?.language) ? loaderData.language : DEFAULT_LANGUAGE;
   return (
     <ClerkProvider
       loaderData={loaderData}
       appearance={clerkAppearance}
-      localization={clerkLocalization}
+      localization={clerkLocalization[language]}
     >
       <ToastProvider>
         <Outlet />
@@ -127,16 +141,17 @@ export default function App({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "This page didn't load";
-  let details = "Reload the page to try again.";
+  const t = useT();
+  let message = t.common.errorTitle;
+  let details = t.common.errorDetails;
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {
-      message = "Page not found";
-      details = "This page doesn't exist or has moved.";
+      message = t.common.notFoundTitle;
+      details = t.common.notFoundDetails;
     } else if (error.statusText) {
-      details = `${error.statusText}. Reload the page to try again.`;
+      details = t.common.errorStatus(error.statusText);
     }
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
@@ -150,7 +165,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <p className="mt-2 text-muted-foreground">{details}</p>
         <div className="mt-6">
           <Link to="/dashboard" className={buttonVariants()}>
-            Go to Home
+            {t.common.goHome}
           </Link>
         </div>
         {stack && (

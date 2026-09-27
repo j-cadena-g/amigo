@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
@@ -27,6 +27,7 @@ import {
   isTransactionalAccountType,
 } from "@/app/lib/financial-account-types";
 import { Button } from "@/app/components/ui/button";
+import { pageTitle, useT } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -99,11 +100,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Accounts · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.accounts);
 }
 
 export default function FinancialAccounts() {
+  const t = useT();
   const { accounts, archivedAccounts, legacyAssets, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
@@ -116,43 +118,43 @@ export default function FinancialAccounts() {
   return (
     <div className="space-y-8">
       <FinancialSectionHeader
-        title="Holdings"
-        description="Credit cards are under Debts."
+        title={t.accounts.holdings}
+        description={t.accounts.creditCardsUnderDebts}
         action={
           <Button type="button" onClick={openAdd}>
             <Plus />
-            Add account
+            {t.accounts.add}
           </Button>
         }
       />
 
       {accounts.length === 0 && (
         <EmptyState
-          message="No accounts yet. Add a bank account, investment, or property to track its balance here."
+          message={t.accounts.empty}
           action={
             <Button type="button" onClick={openAdd}>
               <Plus />
-              Add account
+              {t.accounts.add}
             </Button>
           }
         />
       )}
 
       {transactional.length > 0 && (
-        <LedgerGroup title="Accounts">
+        <LedgerGroup title={t.nav.accounts}>
           <AccountCards accounts={transactional} homeCurrency={homeCurrency} />
         </LedgerGroup>
       )}
 
       {holdings.length > 0 && (
-        <LedgerGroup title="Investments & property">
+        <LedgerGroup title={t.accounts.investmentsAndProperty}>
           <AccountCards accounts={holdings} homeCurrency={homeCurrency} />
         </LedgerGroup>
       )}
 
       {archivedAccounts.length > 0 && (
         <LedgerGroup
-          title="Archived"
+          title={t.accounts.archived}
           aside={
             <Button
               type="button"
@@ -161,7 +163,7 @@ export default function FinancialAccounts() {
               aria-expanded={showArchived}
               onClick={() => setShowArchived((value) => !value)}
             >
-              {showArchived ? "Hide" : `Show (${archivedAccounts.length})`}
+              {showArchived ? t.accounts.hide : t.accounts.show(archivedAccounts.length)}
             </Button>
           }
         >
@@ -172,9 +174,9 @@ export default function FinancialAccounts() {
       )}
 
       {legacyAssets.length > 0 && (
-        <LedgerGroup title="Legacy assets">
+        <LedgerGroup title={t.accounts.legacyAssets}>
           <p className="pt-3 text-sm text-muted-foreground">
-            Older entries from before accounts. Convert each one to an account, or delete it.
+            {t.accounts.legacyHint}
           </p>
           <AssetCards
             assets={legacyAssets}

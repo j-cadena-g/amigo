@@ -1,40 +1,27 @@
 import type { FinancialAccount } from "@amigo/db";
+import type { Messages } from "@/app/i18n";
 
 /** Types shown in add/edit selects (excludes legacy OTHER). */
-export const ACCOUNT_TYPE_SELECT_OPTIONS: readonly {
-  value: FinancialAccount["type"];
-  label: string;
-}[] = [
-  { value: "CHECKING", label: "Checking" },
-  { value: "SAVINGS", label: "Savings" },
-  { value: "CASH", label: "Cash" },
-  { value: "INVESTMENT", label: "Investment" },
-  { value: "PROPERTY", label: "Property" },
-] as const;
+export const ACCOUNT_TYPE_SELECT_VALUES = [
+  "CHECKING",
+  "SAVINGS",
+  "CASH",
+  "INVESTMENT",
+  "PROPERTY",
+] as const satisfies readonly FinancialAccount["type"][];
 
-const LABEL_BY_TYPE: Record<string, string> = {
-  ...Object.fromEntries(
-    ACCOUNT_TYPE_SELECT_OPTIONS.map((o) => [o.value, o.label])
-  ),
-  OTHER: "Other",
-  CREDIT: "Credit card",
-};
+export type AccountTypeSelectValue = (typeof ACCOUNT_TYPE_SELECT_VALUES)[number];
 
-export type AccountTypeSelectValue =
-  (typeof ACCOUNT_TYPE_SELECT_OPTIONS)[number]["value"];
-
-export function getAccountTypeSelectOptions(
-  currentType?: string
-): { value: FinancialAccount["type"]; label: string }[] {
-  const options = [...ACCOUNT_TYPE_SELECT_OPTIONS];
-  if (currentType === "OTHER") {
-    options.push({ value: "OTHER", label: "Other" });
-  }
-  return options;
+/** Types for an account's select, keeping legacy OTHER when it already has it. */
+export function getAccountTypeSelectValues(currentType?: string): FinancialAccount["type"][] {
+  const values: FinancialAccount["type"][] = [...ACCOUNT_TYPE_SELECT_VALUES];
+  if (currentType === "OTHER") values.push("OTHER");
+  return values;
 }
 
-export function accountTypeLabel(type: string): string {
-  return LABEL_BY_TYPE[type] ?? type.replace(/_/g, " ").toLowerCase();
+export function accountTypeLabel(type: string, t: Messages): string {
+  const labels: Record<string, string> = t.accounts.types;
+  return labels[type] ?? type.replace(/_/g, " ").toLowerCase();
 }
 
 export function isAssetHoldingType(type: string): boolean {

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import type { GroceryItemWithTags } from "./types";
 import { toDateInputValue } from "./constants";
+import { useT } from "@/app/i18n";
 
 interface DatePickerModalProps {
   item: GroceryItemWithTags;
@@ -18,6 +19,7 @@ interface DatePickerModalProps {
 }
 
 export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalProps) {
+  const t = useT();
   const todayStr = toDateInputValue(new Date());
 
   const initialDate = item.purchasedAt
@@ -41,7 +43,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {item.isPurchased ? "Edit purchase date" : "Mark as bought"}
+            {item.isPurchased ? t.groceries.editPurchaseDate : t.groceries.markAsBought}
           </DialogTitle>
           <DialogDescription>{item.itemName}</DialogDescription>
         </DialogHeader>
@@ -51,7 +53,7 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
             htmlFor="purchase-date"
             className="block text-sm font-semibold text-foreground"
           >
-            Bought on
+            {t.groceries.boughtOn}
           </label>
           <input
             id="purchase-date"
@@ -65,10 +67,10 @@ export function DatePickerModal({ item, onConfirm, onCancel }: DatePickerModalPr
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button type="button" onClick={handleConfirm}>
-            {item.isPurchased ? "Save date" : "Mark as bought"}
+            {item.isPurchased ? t.groceries.saveDate : t.groceries.markAsBought}
           </Button>
         </DialogFooter>
       </DialogContent>

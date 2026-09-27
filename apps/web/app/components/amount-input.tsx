@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, type ComponentProps, type Ref } from "r
 import type { CurrencyCode } from "@amigo/db";
 import { Input } from "@/app/components/ui/input";
 import { amountPlaceholder, amountValidationMessage } from "@/app/lib/decimal-input";
+import { useT } from "@/app/i18n";
 import { useLocale } from "@/app/lib/use-locale";
 import { cn } from "@/app/lib/utils";
 
@@ -40,6 +41,7 @@ export function AmountInput({
   ref,
   ...props
 }: AmountInputProps) {
+  const t = useT();
   const locale = useLocale();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const message = amountValidationMessage(value, {
@@ -48,6 +50,7 @@ export function AmountInput({
     max,
     currency,
     locale,
+    messages: t.common,
   });
 
   useEffect(() => {

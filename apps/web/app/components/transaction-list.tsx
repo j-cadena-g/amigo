@@ -29,13 +29,9 @@ import {
   type TransactionDTO,
 } from "@/app/components/transaction-row";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 export type { TransactionDTO };
-
-const FILTER_LABELS: Record<"income" | "expense", string> = {
-  income: "income",
-  expense: "expenses",
-};
 
 interface TransactionListProps {
   initialTransactions: TransactionDTO[];
@@ -54,6 +50,7 @@ function MonthTotalsLine({
   currency: CurrencyCode;
   typeFilter?: "income" | "expense" | null;
 }) {
+  const t = useT();
   const locale = useLocale();
   const showOut = typeFilter !== "income";
   const showIn = typeFilter !== "expense";
@@ -66,7 +63,7 @@ function MonthTotalsLine({
             <span className="font-medium text-foreground">
               {formatSignedCents(-totals.outCents, currency, locale)}
             </span>{" "}
-            out
+            {t.transactions.out}
           </>
         )}
         {showOut && showIn && " · "}
@@ -80,12 +77,12 @@ function MonthTotalsLine({
             >
               {formatSignedCents(totals.inCents, currency, locale, { showPlus: true })}
             </span>{" "}
-            in
+            {t.transactions.in}
           </>
         )}
       </span>
       {totals.hasOtherCurrencies && (
-        <span className="block text-xs">Other currencies not included</span>
+        <span className="block text-xs">{t.transactions.otherCurrencies}</span>
       )}
     </p>
   );
@@ -98,6 +95,7 @@ export function TransactionList({
   homeCurrency,
   todayStr,
 }: TransactionListProps) {
+  const t = useT();
   const locale = useLocale();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
@@ -247,11 +245,11 @@ export function TransactionList({
       } else {
         const message = await readApiErrorMessage(res);
         console.error("Failed to add transaction:", res.status, message);
-        setFormError(message ?? "Couldn't add the transaction. Try again.");
+        setFormError(message ?? t.common.couldNot(t.transactions.addAction));
       }
     } catch (err) {
       console.error("Transaction request failed:", err);
-      setFormError("Couldn't add the transaction. Check your connection and try again.");
+      setFormError(t.common.couldNotConnection(t.transactions.addAction));
     } finally {
       setIsSubmitting(false);
     }
@@ -259,9 +257,9 @@ export function TransactionList({
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
-      title: "Delete transaction?",
-      description: "This can't be undone.",
-      confirmText: "Delete",
+      title: t.transactions.deleteTitle,
+      description: t.common.cantBeUndone,
+      confirmText: t.common.delete,
       variant: "destructive",
     });
     if (!ok) return;
@@ -271,25 +269,25 @@ export function TransactionList({
         method: "DELETE",
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Delete transaction");
+        await toastMutationFailure(toast, res, t.transactions.deleteAction, t.common);
         return;
       }
       revalidator.revalidate();
     } catch {
-      await toastMutationFailure(toast, null, "Delete transaction");
+      await toastMutationFailure(toast, null, t.transactions.deleteAction, t.common);
     }
   };
 
-  const handleStartEdit = (t: TransactionDTO) => {
-    setEditingId(t.id);
+  const handleStartEdit = (transaction: TransactionDTO) => {
+    setEditingId(transaction.id);
     setEditForm({
-      amount: centsToInputString(t.amount, t.currency, locale),
-      description: t.description || "",
-      categoryId: t.categoryId ?? "",
-      type: t.type,
-      date: t.date.split("T")[0] ?? t.date,
-      budgetId: t.budgetId,
-      currency: t.currency,
+      amount: centsToInputString(transaction.amount, transaction.currency, locale),
+      description: transaction.description || "",
+      categoryId: transaction.categoryId ?? "",
+      type: transaction.type,
+      date: transaction.date.split("T")[0] ?? transaction.date,
+      budgetId: transaction.budgetId,
+      currency: transaction.currency,
     });
   };
 
@@ -303,7 +301,7 @@ export function TransactionList({
       const res = await fetch("/api/transactions/export");
       if (!res.ok) {
         setExportError(
-          (await readApiErrorMessage(res)) ?? "Couldn't export transactions. Try again."
+          (await readApiErrorMessage(res)) ?? t.common.couldNot(t.transactions.exportAction)
         );
         return;
       }
@@ -315,7 +313,7 @@ export function TransactionList({
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setExportError("Couldn't export transactions. Check your connection and try again.");
+      setExportError(t.common.couldNotConnection(t.transactions.exportAction));
     }
   };
 
@@ -341,10 +339,10 @@ export function TransactionList({
         handleCancelEdit();
         revalidator.revalidate();
       } else {
-        await toastMutationFailure(toast, res, "Save transaction");
+        await toastMutationFailure(toast, res, t.transactions.saveAction, t.common);
       }
     } catch {
-      await toastMutationFailure(toast, null, "Save transaction");
+      await toastMutationFailure(toast, null, t.transactions.saveAction, t.common);
     } finally {
       setIsSubmitting(false);
     }
@@ -359,12 +357,12 @@ export function TransactionList({
   return (
     <div className="space-y-6">
       <FinancialSectionHeader
-        title="Transactions"
+        title={t.nav.transactions}
         action={
           <>
             <Button type="button" onClick={handleOpenAddForm}>
               <Plus />
-              Add transaction
+              {t.transactions.add}
             </Button>
             <Button
               type="button"
@@ -373,7 +371,7 @@ export function TransactionList({
               onClick={() => void handleExportCsv()}
             >
               <Download />
-              Export CSV
+              {t.transactions.exportCsv}
             </Button>
             <Button
               type="button"
@@ -382,7 +380,7 @@ export function TransactionList({
               onClick={() => setImportOpen(true)}
             >
               <Upload />
-              Import JSON
+              {t.transactions.importJson}
             </Button>
           </>
         }
@@ -411,28 +409,28 @@ export function TransactionList({
         />
       )}
 
-      <FinancialCollapsiblePanel title="Manage categories">
+      <FinancialCollapsiblePanel title={t.transactions.manageCategories}>
         <CategoryManagementPanel />
       </FinancialCollapsiblePanel>
 
       {typeFilter && (
         <p className="text-sm text-muted-foreground">
-          Showing {FILTER_LABELS[typeFilter]} only ·{" "}
-          <SectionLink to="/financial">Clear filter</SectionLink>
+          {t.transactions.showingOnly(
+            typeFilter,
+            <SectionLink to="/financial">{t.transactions.clearFilter}</SectionLink>
+          )}
         </p>
       )}
 
       {allTransactions.length === 0 ? (
         <EmptyState
           message={
-            typeFilter
-              ? `No ${typeFilter} transactions yet.`
-              : "No transactions yet. Add one, or import a JSON file."
+            typeFilter ? t.transactions.emptyFiltered(typeFilter) : t.transactions.empty
           }
           action={
             <Button type="button" onClick={handleOpenAddForm}>
               <Plus />
-              Add transaction
+              {t.transactions.add}
             </Button>
           }
         />
@@ -483,11 +481,11 @@ export function TransactionList({
         {isLoadingMore && (
           <>
             <Loader2 aria-hidden className="h-5 w-5 animate-spin text-muted-foreground" />
-            <span className="sr-only">Loading more transactions…</span>
+            <span className="sr-only">{t.transactions.loadingMore}</span>
           </>
         )}
         {!hasMore && allTransactions.length > 0 && (
-          <p className="text-sm text-muted-foreground">{"That's everything."}</p>
+          <p className="text-sm text-muted-foreground">{t.transactions.end}</p>
         )}
       </div>
 

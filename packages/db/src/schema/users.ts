@@ -3,6 +3,9 @@ import { households } from "./households";
 
 export const USER_ROLES = ["owner", "admin", "member"] as const;
 
+/** Languages the web app's interface is translated into. */
+export const UI_LANGUAGES = ["en", "es"] as const;
+
 /** Number and date formats a user can choose; labels live in the web app. */
 export const FORMAT_LOCALES = [
   "en-CA",
@@ -31,6 +34,8 @@ export const users = sqliteTable("users", {
    * household's currency and the browser's language.
    */
   locale: text("locale", { enum: FORMAT_LOCALES }),
+  /** Interface language. Null follows the resolved number and date format. */
+  language: text("language", { enum: UI_LANGUAGES }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -46,3 +51,4 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type UserRole = (typeof USER_ROLES)[number];
 export type FormatLocale = (typeof FORMAT_LOCALES)[number];
+export type UiLanguage = (typeof UI_LANGUAGES)[number];

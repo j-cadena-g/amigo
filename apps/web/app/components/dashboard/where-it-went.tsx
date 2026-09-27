@@ -2,6 +2,10 @@ import type { CurrencyCode } from "@amigo/db";
 import { formatCents } from "@/app/lib/currency";
 import { LedgerSection } from "@/app/components/ledger";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
+
+/** Key for the rolled-up row, so it can't collide with a category name. */
+const EVERYTHING_ELSE = "\u0000rest";
 
 const SHOWN_CATEGORIES = 6;
 
@@ -26,6 +30,7 @@ export function WhereItWent({
   lastMonthShort,
   className,
 }: WhereItWentProps) {
+  const t = useT();
   const locale = useLocale();
   const sorted = [...categoryData].sort((a, b) => b.amount - a.amount);
   const shown = sorted.slice(0, SHOWN_CATEGORIES);
@@ -35,7 +40,7 @@ export function WhereItWent({
       ? [
           ...shown,
           {
-            category: "Everything else",
+            category: EVERYTHING_ELSE,
             amount: rest.reduce((sum, r) => sum + r.amount, 0),
           },
         ]
@@ -51,7 +56,7 @@ export function WhereItWent({
 
   return (
     <LedgerSection
-      title="Where it went"
+      title={t.dashboard.whereItWent}
       aside={
         <span className="flex gap-4 text-sm text-muted-foreground">
           <span className="w-24 text-right">{monthShort}</span>
@@ -65,13 +70,15 @@ export function WhereItWent({
       <ul className="divide-y divide-border">
         {rows.map((row) => {
           const previous =
-            row.category === "Everything else"
+            row.category === EVERYTHING_ELSE
               ? restLastMonth
               : (lastMonth.get(row.category) ?? 0);
           return (
             <li key={row.category} className="flex items-center gap-4 py-2.5">
               <span className="w-28 shrink-0 truncate font-semibold sm:w-40">
-                {capitalize(row.category)}
+                {row.category === EVERYTHING_ELSE
+                  ? t.dashboard.everythingElse
+                  : capitalize(row.category)}
               </span>
               <span aria-hidden="true" className="h-1.5 flex-1 bg-secondary">
                 <span

@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/app/components/ui/dialog";
 import { cn } from "@/app/lib/utils";
+import { useT } from "@/app/i18n";
 
 interface TransactionImportDialogProps {
   open: boolean;
@@ -18,15 +19,12 @@ interface TransactionImportDialogProps {
 
 type ImportFeedback = { tone: "success" | "error"; message: string };
 
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
 export function TransactionImportDialog({
   open,
   onOpenChange,
   onImported,
 }: TransactionImportDialogProps) {
+  const t = useT();
   const dryRunId = useId();
   const [importText, setImportText] = useState("");
   const [importDryRun, setImportDryRun] = useState(true);
@@ -80,16 +78,16 @@ export function TransactionImportDialog({
       try {
         parsed = JSON.parse(importText) as unknown;
       } catch {
-        fail("That isn't valid JSON. Check for a missing comma, quote, or bracket.");
+        fail(t.imports.invalidJson);
         return;
       }
       if (typeof parsed !== "object" || parsed === null || !("rows" in parsed)) {
-        fail('JSON must be an object with a "rows" array.');
+        fail(t.imports.needsRows);
         return;
       }
       const rows = (parsed as { rows: unknown }).rows;
       if (!Array.isArray(rows) || rows.length === 0) {
-        fail('"rows" needs at least one transaction.');
+        fail(t.imports.emptyRows);
         return;
       }
       const res = await fetch("/api/transactions/import", {
@@ -106,20 +104,20 @@ export function TransactionImportDialog({
         message?: string;
       } | null;
       if (!res.ok) {
-        fail(data?.error ?? data?.message ?? "Couldn't import the transactions. Try again.");
+        fail(data?.error ?? data?.message ?? t.common.couldNot(t.imports.action));
         return;
       }
       if (importDryRun) {
         const count = data?.count ?? rows.length;
         setImportFeedback({
           tone: "success",
-          message: `${plural(count, "row", "rows")} ready. Turn off dry run to import.`,
+          message: t.imports.ready(count),
         });
         return;
       }
       setImportFeedback({
         tone: "success",
-        message: `Imported ${plural(data?.inserted ?? 0, "transaction", "transactions")}.`,
+        message: t.imports.imported(data?.inserted ?? 0),
       });
       onImported();
       if (importCloseTimeoutRef.current != null) {
@@ -133,7 +131,7 @@ export function TransactionImportDialog({
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
       }
-      fail("Couldn't import the transactions. Check your connection and try again.");
+      fail(t.common.couldNotConnection(t.imports.action));
     } finally {
       if (importAbortRef.current === controller) {
         importAbortRef.current = null;
@@ -142,26 +140,22 @@ export function TransactionImportDialog({
     }
   };
 
-  const busyLabel = importDryRun ? "Checking…" : "Importing…";
+  const busyLabel = importDryRun ? t.imports.checking : t.imports.importing;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import transactions</DialogTitle>
+          <DialogTitle>{t.imports.title}</DialogTitle>
           <DialogDescription>
-            Paste JSON with a <code className="text-xs">rows</code> array. Each row needs{" "}
-            <code className="text-xs">date</code>, <code className="text-xs">type</code>,{" "}
-            <code className="text-xs">category</code>, and <code className="text-xs">amount</code> in
-            major units (for example 12.34). Optional fields:{" "}
-            <code className="text-xs">description</code>, <code className="text-xs">currency</code>,{" "}
-            <code className="text-xs">budgetId</code>, <code className="text-xs">accountId</code>,{" "}
-            <code className="text-xs">externalId</code>. Maximum 200 rows per request.
+            {t.imports.help((name) => (
+              <code className="text-xs">{name}</code>
+            ))}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleImportSubmit} className="space-y-4">
           <textarea
-            aria-label="Import transactions JSON"
+            aria-label={t.imports.textareaLabel}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             rows={10}
@@ -178,7 +172,7 @@ export function TransactionImportDialog({
               className="h-4 w-4 shrink-0 accent-primary"
             />
             <label htmlFor={dryRunId} className="text-sm font-semibold">
-              Dry run (check the rows without importing)
+              {t.imports.dryRun}
             </label>
           </div>
           {importFeedback && (
@@ -196,10 +190,10 @@ export function TransactionImportDialog({
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={importBusy || !importText.trim()}>
-              {importBusy ? busyLabel : importDryRun ? "Check rows" : "Import transactions"}
+              {importBusy ? busyLabel : importDryRun ? t.imports.check : t.imports.title}
             </Button>
           </DialogFooter>
         </form>

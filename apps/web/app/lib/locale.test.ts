@@ -5,6 +5,7 @@ import {
   FORMAT_LOCALE_OPTIONS,
   isFormatLocale,
   parseAcceptLanguage,
+  resolveLanguage,
   resolveLocale,
 } from "./locale";
 
@@ -69,6 +70,16 @@ describe("resolveLocale", () => {
     );
   });
 
+  it("lets a saved interface language pick the format ahead of the browser", () => {
+    expect(resolveLocale({ homeCurrency: "CAD", acceptLanguage: "en-CA", language: "es" })).toBe(
+      "es-CO"
+    );
+    expect(resolveLocale({ homeCurrency: "COP", acceptLanguage: "es-CO", language: "en" })).toBe(
+      "en-CA"
+    );
+    expect(resolveLocale({ preferred: "en-US", language: "es" })).toBe("en-US");
+  });
+
   it("defaults to en-CA when nothing is known", () => {
     expect(resolveLocale({})).toBe(DEFAULT_LOCALE);
     expect(resolveLocale({ acceptLanguage: "en-GB" })).toBe(DEFAULT_LOCALE);
@@ -82,5 +93,28 @@ describe("FORMAT_LOCALE_OPTIONS", () => {
     for (const option of FORMAT_LOCALE_OPTIONS) expect(option.label).not.toBe("");
     expect(isFormatLocale("es-CO")).toBe(true);
     expect(isFormatLocale("es")).toBe(false);
+  });
+});
+
+describe("resolveLanguage", () => {
+  it("uses the saved language first", () => {
+    expect(resolveLanguage({ preferred: "es", locale: "en-CA" })).toBe("es");
+    expect(resolveLanguage({ preferred: "en", locale: "es-CO" })).toBe("en");
+  });
+
+  it("follows the format's language when it's translated", () => {
+    expect(resolveLanguage({ locale: "es-CO" })).toBe("es");
+    expect(resolveLanguage({ locale: "es-MX" })).toBe("es");
+    expect(resolveLanguage({ locale: "en-GB" })).toBe("en");
+  });
+
+  it("falls back to English for formats in other languages", () => {
+    expect(resolveLanguage({ locale: "fr-CA" })).toBe("en");
+    expect(resolveLanguage({ locale: "de-DE", preferred: "fr" })).toBe("en");
+  });
+
+  it("gives a Colombian household Spanish without any setting", () => {
+    const locale = resolveLocale({ homeCurrency: "COP", acceptLanguage: "es-CO,es;q=0.9" });
+    expect(resolveLanguage({ locale })).toBe("es");
   });
 });

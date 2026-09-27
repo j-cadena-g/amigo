@@ -1,4 +1,5 @@
 import type { CurrencyCode } from "@amigo/db";
+import type { Messages } from "@/app/i18n";
 import { formatCents } from "@/app/lib/currency";
 import {
   transactionTotalsForDay,
@@ -133,22 +134,16 @@ export function formatStripDate(date: string, locale: string): string {
 export function describeStripDay(
   day: MonthStripDay,
   currency: CurrencyCode,
-  locale: string
+  locale: string,
+  t: Messages["calendar"]
 ): string {
+  const money = (cents: number) => formatCents(cents, currency, locale);
   const parts = [formatStripDate(day.date, locale)];
-  if (day.spentCents > 0) parts.push(`spent ${formatCents(day.spentCents, currency, locale)}`);
-  if (day.receivedCents > 0) {
-    parts.push(`received ${formatCents(day.receivedCents, currency, locale)}`);
-  }
-  if (day.scheduledSpentCents > 0) {
-    parts.push(`${formatCents(day.scheduledSpentCents, currency, locale)} due`);
-  }
-  if (day.scheduledReceivedCents > 0) {
-    parts.push(`${formatCents(day.scheduledReceivedCents, currency, locale)} expected`);
-  }
+  if (day.spentCents > 0) parts.push(t.spentAmount(money(day.spentCents)));
+  if (day.receivedCents > 0) parts.push(t.receivedAmount(money(day.receivedCents)));
+  if (day.scheduledSpentCents > 0) parts.push(t.due(money(day.scheduledSpentCents)));
+  if (day.scheduledReceivedCents > 0) parts.push(t.expected(money(day.scheduledReceivedCents)));
   const count = day.events.length;
-  parts.push(
-    count === 0 ? "nothing recorded" : `${count} ${count === 1 ? "entry" : "entries"}`
-  );
+  parts.push(count === 0 ? t.nothingRecorded : t.entries(count));
   return parts.join(" · ");
 }

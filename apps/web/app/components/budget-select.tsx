@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { formatCents } from "@/app/lib/currency";
 import { NativeSelect } from "@/app/components/financial/form-controls";
-import type { CurrencyCode } from "@amigo/db";
+import type { BudgetPeriod, CurrencyCode } from "@amigo/db";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface Budget {
   id: string;
@@ -26,8 +27,11 @@ export function BudgetSelect({
   id,
   "aria-label": ariaLabel,
 }: BudgetSelectProps) {
+  const t = useT();
   const locale = useLocale();
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const periodLabel = (period: string) =>
+    (t.common.periods[period as BudgetPeriod] ?? period).toLocaleLowerCase();
 
   useEffect(() => {
     fetch("/api/budgets")
@@ -46,21 +50,21 @@ export function BudgetSelect({
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
     >
-      <option value="">No budget</option>
+      <option value="">{t.transactions.noBudget}</option>
       {shared.length > 0 && (
-        <optgroup label="Shared">
+        <optgroup label={t.transactions.sharedBudgets}>
           {shared.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{b.period})
+              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{periodLabel(b.period)})
             </option>
           ))}
         </optgroup>
       )}
       {personal.length > 0 && (
-        <optgroup label="Personal">
+        <optgroup label={t.transactions.personalBudgets}>
           {personal.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{b.period})
+              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{periodLabel(b.period)})
             </option>
           ))}
         </optgroup>

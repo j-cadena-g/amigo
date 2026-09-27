@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { messagesFor } from "@/app/i18n";
+
+const en = messagesFor("en");
 import {
   buildMonthStrip,
   describeStripDay,
@@ -126,10 +129,10 @@ describe("describeStripDay", () => {
       homeCurrency: "CAD",
     });
 
-    expect(describeStripDay(strip.days[19]!, "CAD", "en-CA")).toBe(
+    expect(describeStripDay(strip.days[19]!, "CAD", "en-CA", en.calendar)).toBe(
       "Sun, Sep 20 · spent $98.12 · received $20.00 · 2 entries"
     );
-    expect(describeStripDay(strip.days[20]!, "CAD", "en-CA")).toBe(
+    expect(describeStripDay(strip.days[20]!, "CAD", "en-CA", en.calendar)).toBe(
       "Mon, Sep 21 · nothing recorded"
     );
   });
@@ -145,10 +148,10 @@ describe("describeStripDay", () => {
       homeCurrency: "CAD",
     });
 
-    expect(describeStripDay(strip.days[27]!, "CAD", "en-CA")).toBe(
+    expect(describeStripDay(strip.days[27]!, "CAD", "en-CA", en.calendar)).toBe(
       "Mon, Sep 28 · $142.00 due · 1 entry"
     );
-    expect(describeStripDay(strip.days[29]!, "CAD", "en-CA")).toBe(
+    expect(describeStripDay(strip.days[29]!, "CAD", "en-CA", en.calendar)).toBe(
       "Wed, Sep 30 · $2,850.00 expected · 1 entry"
     );
   });

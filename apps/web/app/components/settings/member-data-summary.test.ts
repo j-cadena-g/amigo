@@ -18,12 +18,12 @@ describe("describeMemberData", () => {
         groceryItems: 4,
         transactions: 12,
         personalBudgets: 2,
-      })
+      }, "en")
     ).toBe("12 transactions, 2 budgets, and 4 grocery items");
   });
 
   it("joins two counts without a comma", () => {
-    expect(describeMemberData({ ...EMPTY, assets: 2, debts: 3 })).toBe(
+    expect(describeMemberData({ ...EMPTY, assets: 2, debts: 3 }, "en")).toBe(
       "2 assets and 3 debts"
     );
   });
@@ -37,13 +37,19 @@ describe("describeMemberData", () => {
         assets: 1,
         debts: 1,
         groceryItems: 1,
-      })
+      }, "en")
     ).toBe(
       "1 transaction, 1 recurring rule, 1 budget, 1 asset, 1 debt, and 1 grocery item"
     );
   });
 
+  it("reads naturally in Spanish", () => {
+    expect(
+      describeMemberData({ ...EMPTY, transactions: 12, personalBudgets: 1, groceryItems: 4 }, "es")
+    ).toBe("12 movimientos, 1 presupuesto y 4 artículos de compras");
+  });
+
   it("is empty when the member added nothing", () => {
-    expect(describeMemberData(EMPTY)).toBe("");
+    expect(describeMemberData(EMPTY, "en")).toBe("");
   });
 });

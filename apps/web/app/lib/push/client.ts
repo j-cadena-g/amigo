@@ -1,3 +1,22 @@
+/** Why turning notifications on or off failed; the interface words each one. */
+export type PushErrorCode = "unsupported" | "denied" | "unavailable" | "not-configured" | "failed";
+
+/** An error from this module; `message` is English for logs, `code` is for the UI. */
+export class PushError extends Error {
+  constructor(
+    public readonly code: PushErrorCode,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = "PushError";
+  }
+}
+
+export function pushErrorCode(error: unknown): PushErrorCode {
+  return error instanceof PushError ? error.code : "failed";
+}
+
 export type NotificationPermissionStatus =
   | "granted"
   | "denied"
@@ -31,7 +50,7 @@ export function isIOS(): boolean {
 async function fetchPushConfig(): Promise<{ vapidPublicKey: string | null }> {
   const res = await fetch("/api/push/status");
   if (!res.ok) {
-    throw new Error("Failed to load push configuration");
+    throw new PushError("failed", "Failed to load push configuration");
   }
   return res.json() as Promise<{ vapidPublicKey: string | null }>;
 }
@@ -56,23 +75,23 @@ async function getActivePushRegistration(): Promise<ServiceWorkerRegistration | 
 
 export async function subscribeToPush(): Promise<void> {
   if (getNotificationPermissionStatus() === "unsupported") {
-    throw new Error("Push notifications are not supported in this browser");
+    throw new PushError("unsupported", "Push notifications are not supported in this browser");
   }
 
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
-    throw new Error("Notification permission denied");
+    throw new PushError("denied", "Notification permission denied");
   }
 
   const registration = await getActivePushRegistration();
   if (!registration) {
-    throw new Error("Service worker is not available");
+    throw new PushError("unavailable", "Service worker is not available");
   }
   const { vapidPublicKey } = await fetchPushConfig();
 
   if (!vapidPublicKey) {
-    throw new Error("Push notifications are not configured on this server");
+    throw new PushError("not-configured", "Push notifications are not configured on this server");
   }
 
   const existingSubscription = await registration.pushManager.getSubscription();
@@ -89,7 +108,7 @@ export async function subscribeToPush(): Promise<void> {
   if (pushSubscriptionKeysMissing(p256dhKey, authKey)) {
     // Drop invalid subscriptions (new or existing) so retries can recreate them.
     await subscription.unsubscribe().catch(() => undefined);
-    throw new Error("Failed to get subscription keys");
+    throw new PushError("failed", "Failed to get subscription keys");
   }
 
   const res = await fetch("/api/push", {
@@ -109,7 +128,7 @@ export async function subscribeToPush(): Promise<void> {
       await subscription.unsubscribe().catch(() => undefined);
     }
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(data.error ?? "Failed to save subscription");
+    throw new PushError("failed", data.error ?? "Failed to save subscription");
   }
 }
 
@@ -138,14 +157,12 @@ export async function unsubscribeFromPush(): Promise<void> {
       err instanceof Error
         ? `Failed to remove subscription: ${err.message}`
         : "Failed to remove subscription";
-    throw new Error(message, { cause: err });
+    throw new PushError("failed", message, { cause: err });
   }
 
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(
-      data.error ?? `Failed to remove subscription (${res.status})`
-    );
+    throw new PushError("failed", data.error ?? `Failed to remove subscription (${res.status})`);
   }
 
   await subscription.unsubscribe();

@@ -1,10 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, households, eq, parseHomeCurrency, type CurrencyCode } from "@amigo/db";
 import { BudgetList } from "@/app/components/budget-list";
 import { getBudgetsWithSpending } from "@/server/lib/budget-spending";
 import { getHouseholdTimezone } from "@/server/lib/household-timezone";
+import { pageTitle } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -37,8 +38,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Budgets · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.budgets);
 }
 
 export default function Budgets() {

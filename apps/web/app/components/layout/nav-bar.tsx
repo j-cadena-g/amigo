@@ -7,6 +7,7 @@ import {
   ShoppingBasket,
   Wallet,
 } from "lucide-react";
+import { useT, type Messages } from "@/app/i18n";
 import { cn } from "@/app/lib/utils";
 import { Wordmark } from "@/app/components/wordmark";
 import {
@@ -18,10 +19,10 @@ import {
 } from "@/app/components/ui/dropdown-menu";
 
 const navLinks = [
-  { href: "/dashboard", label: "Home", icon: House },
-  { href: "/groceries", label: "Groceries", icon: ShoppingBasket },
-  { href: "/financial", label: "Money", icon: Wallet },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: (t: Messages) => t.nav.home, icon: House },
+  { href: "/groceries", label: (t: Messages) => t.nav.groceries, icon: ShoppingBasket },
+  { href: "/financial", label: (t: Messages) => t.nav.money, icon: Wallet },
+  { href: "/settings", label: (t: Messages) => t.nav.settings, icon: Settings },
 ];
 
 function isNavLinkActive(pathname: string, href: string) {
@@ -45,11 +46,12 @@ function isNavLinkActive(pathname: string, href: string) {
 }
 
 export function NavBar() {
+  const t = useT();
   const location = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
   const displayName =
-    user?.firstName || user?.emailAddresses[0]?.emailAddress || "Account";
+    user?.firstName || user?.emailAddresses[0]?.emailAddress || t.nav.account;
 
   return (
     <>
@@ -57,13 +59,13 @@ export function NavBar() {
         <div className="container mx-auto flex h-14 items-stretch gap-8 px-4 md:px-6">
           <Link
             to="/dashboard"
-            aria-label="amigo home"
+            aria-label={t.nav.homeLink}
             className="flex items-center self-center rounded-sm"
           >
             <Wordmark />
           </Link>
 
-          <nav aria-label="Main" className="hidden flex-1 items-stretch gap-6 md:flex">
+          <nav aria-label={t.nav.main} className="hidden flex-1 items-stretch gap-6 md:flex">
             {navLinks.map((link) => {
               const active = isNavLinkActive(location.pathname, link.href);
               return (
@@ -78,7 +80,7 @@ export function NavBar() {
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {link.label}
+                  {link.label(t)}
                 </Link>
               );
             })}
@@ -92,11 +94,11 @@ export function NavBar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem asChild>
-                  <Link to="/settings">Settings</Link>
+                  <Link to="/settings">{t.nav.settings}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => void signOut()}>
-                  Sign out
+                  {t.nav.signOut}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -105,7 +107,7 @@ export function NavBar() {
       </header>
 
       <nav
-        aria-label="Main"
+        aria-label={t.nav.main}
         data-bottom-bar=""
         className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
       >
@@ -126,7 +128,7 @@ export function NavBar() {
                 )}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
-                {link.label}
+                {link.label(t)}
               </Link>
             );
           })}

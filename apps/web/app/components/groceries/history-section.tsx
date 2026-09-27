@@ -5,6 +5,7 @@ import { formatHistoryDate } from "./constants";
 import { CheckButton } from "./check-button";
 import { TagBadge } from "./tag-badge";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface HistorySectionProps {
   items: GroceryItemWithTags[];
@@ -25,6 +26,7 @@ export function HistorySection({
   onToggle,
   onUpdatePurchaseDate,
 }: HistorySectionProps) {
+  const t = useT();
   const locale = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
   const listId = useId();
@@ -34,7 +36,7 @@ export function HistorySection({
 
     for (const item of items) {
       const purchasedAt = item.purchasedAt ? new Date(item.purchasedAt) : new Date();
-      const label = formatHistoryDate(purchasedAt, locale);
+      const label = formatHistoryDate(purchasedAt, locale, t.groceries);
       const dateOnly = new Date(
         purchasedAt.getFullYear(),
         purchasedAt.getMonth(),
@@ -51,7 +53,7 @@ export function HistorySection({
     }
 
     return Array.from(groupMap.values()).sort((a, b) => b.sortKey - a.sortKey);
-  }, [items, locale]);
+  }, [items, locale, t]);
 
   if (items.length === 0) return null;
 
@@ -70,7 +72,7 @@ export function HistorySection({
           ) : (
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           )}
-          Bought ({items.length})
+          {t.groceries.bought(items.length)}
         </button>
       </h2>
 
@@ -88,7 +90,7 @@ export function HistorySection({
                       checked
                       onClick={() => onToggle(item.id)}
                       className="mt-0.5"
-                      aria-label={`Mark ${item.itemName} as not bought`}
+                      aria-label={t.groceries.markNotBought(item.itemName)}
                     />
 
                     <div className="min-w-0 flex-1">
@@ -112,16 +114,16 @@ export function HistorySection({
                       <button
                         type="button"
                         onClick={() => onUpdatePurchaseDate(item.id)}
-                        aria-label={`Edit date for ${item.itemName}`}
+                        aria-label={t.groceries.editDateFor(item.itemName)}
                         className="relative text-sm text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] hover:text-foreground hover:decoration-foreground"
                       >
-                        Edit date
+                        {t.groceries.editDate}
                       </button>
 
                       <button
                         type="button"
                         onClick={() => onDelete(item.id)}
-                        aria-label={`Delete ${item.itemName}`}
+                        aria-label={t.groceries.deleteNamed(item.itemName)}
                         className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />

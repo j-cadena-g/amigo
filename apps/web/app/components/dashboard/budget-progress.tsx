@@ -1,9 +1,10 @@
-import type { CurrencyCode } from "@amigo/db";
+import type { BudgetPeriod, CurrencyCode } from "@amigo/db";
 import type { BudgetWithSpending } from "@/server/lib/dashboard-data";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { LedgerSection, SectionLink } from "@/app/components/ledger";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface DashboardBudgetProgressProps {
   budgets: BudgetWithSpending[];
@@ -16,15 +17,16 @@ export function DashboardBudgetProgress({
   currency,
   className,
 }: DashboardBudgetProgressProps) {
+  const t = useT();
   const locale = useLocale();
   return (
     <LedgerSection
-      title="Budgets"
-      aside={<SectionLink to="/financial/budgets">Manage</SectionLink>}
+      title={t.nav.budgets}
+      aside={<SectionLink to="/financial/budgets">{t.dashboard.manage}</SectionLink>}
       className={className}
     >
       {budgets.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">No budgets yet.</p>
+        <p className="py-4 text-sm text-muted-foreground">{t.dashboard.noBudgets}</p>
       ) : (
         <ul className="divide-y divide-border">
           {budgets.map((b) => {
@@ -51,8 +53,10 @@ export function DashboardBudgetProgress({
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="truncate font-semibold">{b.name}</span>
                   <span className="shrink-0 font-mono text-sm font-medium text-muted-foreground">
-                    {formatCents(b.spentHomeCents, currency, locale)} of{" "}
-                    {formatCents(b.limitHomeCents, currency, locale)}
+                    {t.dashboard.spentOfLimit(
+                      formatCents(b.spentHomeCents, currency, locale),
+                      formatCents(b.limitHomeCents, currency, locale)
+                    )}
                   </span>
                 </div>
                 <progress
@@ -67,7 +71,7 @@ export function DashboardBudgetProgress({
                   value={Math.min(pct, 100)}
                   max={100}
                   aria-label={
-                    isOver ? `${b.name}: over budget` : `${b.name}: ${pct}% of budget used`
+                    isOver ? t.dashboard.overBudgetLabel(b.name) : t.dashboard.usedLabel(b.name, pct)
                   }
                 />
                 <p className="mt-1.5 flex justify-between gap-4 text-sm">
@@ -82,14 +86,16 @@ export function DashboardBudgetProgress({
                     )}
                   >
                     {isOver
-                      ? `${formatCents(-remaining, currency, locale)} over`
-                      : `${formatCents(remaining, currency, locale)} left`}
+                      ? t.dashboard.over(formatCents(-remaining, currency, locale))
+                      : t.dashboard.left(formatCents(remaining, currency, locale))}
                   </span>
-                  <span className="text-muted-foreground capitalize">{b.period}</span>
+                  <span className="text-muted-foreground">
+                    {t.common.periods[b.period as BudgetPeriod] ?? b.period}
+                  </span>
                 </p>
                 {budgetCur !== currency && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Limit in budget currency:{" "}
+                    {t.dashboard.limitInBudgetCurrency}{" "}
                     <span className="font-mono font-medium">
                       {formatCents(b.limitOriginalCents, budgetCur, locale)}
                     </span>
@@ -97,14 +103,14 @@ export function DashboardBudgetProgress({
                 )}
                 {b.recurringImpactHomeCents > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Upcoming recurring (est.):{" "}
+                    {t.dashboard.upcomingRecurring}{" "}
                     <span className="font-mono font-medium">
                       {formatCents(b.recurringImpactHomeCents, currency, locale)}
                     </span>
                     {projectedPct > 100 && (
                       <span className="font-semibold text-warning">
                         {" "}
-                        — with recurring, ~{projectedPct}% of limit
+                        {t.dashboard.withRecurring(projectedPct)}
                       </span>
                     )}
                   </p>

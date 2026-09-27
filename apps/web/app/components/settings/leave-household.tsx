@@ -3,12 +3,14 @@ import { toastMutationFailure } from "@/app/lib/api-error";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
+import { useT } from "@/app/i18n";
 
 interface LeaveHouseholdProps {
   role: "owner" | "admin" | "member";
 }
 
 export function LeaveHousehold({ role }: LeaveHouseholdProps) {
+  const t = useT();
   const confirm = useConfirm();
   const toast = useToast();
   const [leaving, setLeaving] = useState(false);
@@ -16,10 +18,9 @@ export function LeaveHousehold({ role }: LeaveHouseholdProps) {
 
   async function handleLeave() {
     const confirmed = await confirm({
-      title: "Leave this household?",
-      description:
-        "You'll lose access right away. Sign back in within 14 days to restore your access.",
-      confirmText: "Leave household",
+      title: t.settings.leave.confirmTitle,
+      description: t.settings.leave.confirmBody,
+      confirmText: t.settings.leave.button,
       variant: "destructive",
     });
     if (!confirmed) return;
@@ -28,12 +29,12 @@ export function LeaveHousehold({ role }: LeaveHouseholdProps) {
     try {
       const res = await fetch("/api/members/leave", { method: "POST" });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Leave household");
+        await toastMutationFailure(toast, res, t.settings.leave.action, t.common);
         return;
       }
       window.location.assign("/restore-account");
     } catch {
-      await toastMutationFailure(toast, null, "Leave household");
+      await toastMutationFailure(toast, null, t.settings.leave.action, t.common);
     } finally {
       setLeaving(false);
     }
@@ -41,26 +42,20 @@ export function LeaveHousehold({ role }: LeaveHouseholdProps) {
 
   if (isOwner) {
     return (
-      <p className="text-muted-foreground">
-        You own this household, so you can&apos;t leave it yet. First choose Manage
-        next to another member, then Transfer ownership.
-      </p>
+      <p className="text-muted-foreground">{t.settings.leave.ownerBlocked}</p>
     );
   }
 
   return (
     <div>
-      <p className="text-muted-foreground">
-        You&apos;ll lose access to the household&apos;s lists and money right away.
-        You can restore your access within 14 days.
-      </p>
+      <p className="text-muted-foreground">{t.settings.leave.body}</p>
       <Button
         variant="destructive"
         className="mt-4"
         disabled={leaving}
         onClick={handleLeave}
       >
-        {leaving ? "Leaving…" : "Leave household"}
+        {leaving ? t.settings.leave.leaving : t.settings.leave.button}
       </Button>
     </div>
   );

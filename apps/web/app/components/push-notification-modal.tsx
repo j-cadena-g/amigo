@@ -9,18 +9,21 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import {
-  subscribeToPush,
   getNotificationPermissionStatus,
   isIOS,
   isPWAInstalled,
+  pushErrorCode,
+  subscribeToPush,
 } from "@/app/lib/push/client";
 import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
+import { useT } from "@/app/i18n";
 
 interface PushNotificationModalProps {
   onClose: () => void;
 }
 
 export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
+  const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,11 +44,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
       }
       onClose();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `Couldn't turn on notifications: ${err.message}`
-          : "Couldn't turn on notifications. Try again."
-      );
+      setError(t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)]));
     } finally {
       setIsLoading(false);
     }
@@ -72,33 +71,23 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="pr-6">
-            Get a notification when the grocery list changes
-          </DialogTitle>
-          <DialogDescription>
-            You&apos;ll get one when someone else in your household adds an item or
-            marks one as bought.
-          </DialogDescription>
+          <DialogTitle className="pr-6">{t.notifications.promptTitle}</DialogTitle>
+          <DialogDescription>{t.notifications.promptBody}</DialogDescription>
         </DialogHeader>
 
         {needsIOSInstall && (
           <div className="text-sm">
-            <p className="font-semibold">
-              On iPhone and iPad, add amigo to your Home Screen first:
-            </p>
+            <p className="font-semibold">{t.notifications.iosTitle}</p>
             <ol className="mt-2 list-inside list-decimal space-y-1 text-muted-foreground">
-              <li>Tap the Share button in Safari.</li>
-              <li>Choose &ldquo;Add to Home Screen&rdquo;.</li>
-              <li>Open amigo from your Home Screen and turn on notifications.</li>
+              {t.notifications.iosSteps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
             </ol>
           </div>
         )}
 
         {isDenied && (
-          <p className="text-sm">
-            Notifications are blocked for amigo in this browser. Allow them in your
-            browser&apos;s site settings, then try again.
-          </p>
+          <p className="text-sm">{t.notifications.promptDenied}</p>
         )}
 
         {error && (
@@ -109,14 +98,14 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleSkip}>
-            Not now
+            {t.notifications.notNow}
           </Button>
           <Button
             type="button"
             onClick={() => void handleEnable()}
             disabled={isLoading || isDenied || needsIOSInstall}
           >
-            {isLoading ? "Turning on…" : "Turn on notifications"}
+            {isLoading ? t.notifications.turningOn : t.notifications.turnOn}
           </Button>
         </DialogFooter>
       </DialogContent>

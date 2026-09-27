@@ -19,11 +19,7 @@ import { SectionLink } from "@/app/components/ledger";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { isPositiveAmount } from "@/app/lib/decimal-input";
-
-const TRANSACTION_TYPE_OPTIONS = [
-  { value: "expense", label: "Expense" },
-  { value: "income", label: "Income" },
-] as const;
+import { useT } from "@/app/i18n";
 
 export interface TransactionFormState {
   amount: string;
@@ -52,6 +48,7 @@ function TransactionFields({
   onBudgetChange,
   amountRef,
 }: TransactionFieldsProps) {
+  const t = useT();
   const amountId = useId();
   const currencyId = useId();
   const dateId = useId();
@@ -79,8 +76,11 @@ function TransactionFields({
   return (
     <>
       <TypeToggle
-        label="Transaction type"
-        options={TRANSACTION_TYPE_OPTIONS}
+        label={t.transactions.typeLabel}
+        options={[
+          { value: "expense", label: t.common.expense },
+          { value: "income", label: t.common.income },
+        ] as const}
         value={form.type}
         onChange={selectType}
       />
@@ -88,7 +88,7 @@ function TransactionFields({
       <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3 sm:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,11rem)]">
         <div className="space-y-1.5">
           <label htmlFor={amountId} className="text-sm font-semibold">
-            Amount
+            {t.common.amount}
           </label>
           <AmountInput
             id={amountId}
@@ -103,7 +103,7 @@ function TransactionFields({
         </div>
         <div className="space-y-1.5">
           <label htmlFor={currencyId} className="text-sm font-semibold">
-            Currency
+            {t.common.currency}
           </label>
           <CurrencySelect
             id={currencyId}
@@ -116,7 +116,7 @@ function TransactionFields({
         </div>
         <div className="col-span-2 space-y-1.5 sm:col-span-1">
           <label htmlFor={dateId} className="text-sm font-semibold">
-            Date
+            {t.common.date}
           </label>
           <Input
             id={dateId}
@@ -135,7 +135,7 @@ function TransactionFields({
 
       <div className="space-y-1.5">
         <label htmlFor={descriptionId} className="text-sm font-semibold">
-          Description (optional)
+          {t.common.descriptionOptional}
         </label>
         <Input
           id={descriptionId}
@@ -153,7 +153,7 @@ function TransactionFields({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor={categoryFieldId} className="text-sm font-semibold">
-            Category
+            {t.common.category}
           </label>
           <CategorySelect
             id={categoryFieldId}
@@ -167,7 +167,7 @@ function TransactionFields({
         {form.type === "expense" && (
           <div className="space-y-1.5">
             <label htmlFor={budgetFieldId} className="text-sm font-semibold">
-              Budget (optional)
+              {t.transactions.budgetOptional}
             </label>
             <BudgetSelect
               id={budgetFieldId}
@@ -190,10 +190,11 @@ function FormActions({
   submitDisabled: boolean;
   submitLabel: string;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
       <Button type="button" variant="outline" onClick={onCancel}>
-        Cancel
+        {t.common.cancel}
       </Button>
       <Button type="submit" disabled={submitDisabled}>
         {submitLabel}
@@ -227,6 +228,7 @@ export function AddTransactionForm({
   onSubmit,
   amountRef,
 }: AddTransactionFormProps) {
+  const t = useT();
   useEffect(() => {
     if (form.type !== "expense" || !allowBudgetSuggest || !form.categoryId) return;
     const ac = new AbortController();
@@ -277,8 +279,9 @@ export function AddTransactionForm({
       )}
 
       <p className="text-sm text-muted-foreground">
-        Need this on a schedule?{" "}
-        <SectionLink to="/financial/recurring">Set up a recurring transaction</SectionLink>
+        {t.transactions.needSchedule(
+          <SectionLink to="/financial/recurring">{t.transactions.setUpRecurring}</SectionLink>
+        )}
       </p>
 
       <FormActions
@@ -286,7 +289,7 @@ export function AddTransactionForm({
         submitDisabled={
           isSubmitting || !isPositiveAmount(form.amount) || !form.categoryId
         }
-        submitLabel={isSubmitting ? "Adding…" : "Add transaction"}
+        submitLabel={isSubmitting ? t.transactions.adding : t.transactions.add}
       />
     </form>
   );
@@ -311,6 +314,7 @@ export function EditTransactionForm({
   onSubmit,
   recordId,
 }: EditTransactionFormProps) {
+  const t = useT();
   return (
     <form onSubmit={onSubmit} className="my-3 space-y-4 rounded-xl border border-border p-4">
       <TransactionFields
@@ -330,7 +334,7 @@ export function EditTransactionForm({
         submitDisabled={
           isSubmitting || !isPositiveAmount(form.amount) || !form.categoryId
         }
-        submitLabel={isSubmitting ? "Saving…" : "Save transaction"}
+        submitLabel={isSubmitting ? t.common.saving : t.transactions.save}
       />
     </form>
   );

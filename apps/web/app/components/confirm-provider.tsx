@@ -11,6 +11,7 @@ import {
 } from "@/app/components/ui/alert-dialog";
 import { buttonVariants } from "@/app/components/ui/button";
 import { cn } from "@/app/lib/utils";
+import { useT } from "@/app/i18n";
 
 interface ConfirmOptions {
   title: string;
@@ -29,6 +30,7 @@ export function useConfirm(): ConfirmFn {
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
@@ -67,7 +69,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleCancel}>
-              {options?.cancelText || "Cancel"}
+              {options?.cancelText || t.common.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirm}
@@ -76,7 +78,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   buttonVariants({ variant: "destructive" })
               )}
             >
-              {options?.confirmText || "Confirm"}
+              {options?.confirmText || t.common.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

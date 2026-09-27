@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
@@ -19,6 +19,7 @@ import { AddDebtDialog } from "@/app/components/add-debt-dialog";
 import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { Button } from "@/app/components/ui/button";
+import { pageTitle, useT } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -47,11 +48,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Debts · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.debts);
 }
 
 export default function FinancialDebts() {
+  const t = useT();
   const { debts: debtData, homeCurrency, userId, role } =
     useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
@@ -60,21 +62,21 @@ export default function FinancialDebts() {
   return (
     <div className="space-y-8">
       <FinancialSectionHeader
-        title="Debts"
+        title={t.nav.debts}
         action={
           <Button type="button" onClick={openAdd}>
             <Plus />
-            Add debt
+            {t.debts.add}
           </Button>
         }
       />
       {debtData.length === 0 ? (
         <EmptyState
-          message="No debts yet. Add a loan or credit card to track what's left to pay."
+          message={t.debts.empty}
           action={
             <Button type="button" onClick={openAdd}>
               <Plus />
-              Add debt
+              {t.debts.add}
             </Button>
           }
         />

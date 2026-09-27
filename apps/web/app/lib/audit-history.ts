@@ -1,4 +1,5 @@
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
+import type { Messages } from "@/app/i18n";
 import { formatCents } from "@/app/lib/currency";
 import { DEFAULT_LOCALE } from "@/app/lib/locale";
 
@@ -31,24 +32,19 @@ const HOME_MONEY_AUDIT_FIELDS = new Set(["limitAmountHome"]);
 
 export type AuditChange = { from: unknown; to: unknown };
 
-export function formatAuditAction(action: string): string {
-  switch (action) {
-    case "INSERT":
-      return "Created";
-    case "UPDATE":
-      return "Updated";
-    case "DELETE":
-      return "Deleted";
-    default:
-      return action;
-  }
+export function formatAuditAction(action: string, t: Messages["audit"]): string {
+  return t.actions[action] ?? action;
 }
 
-export function formatAuditFieldName(key: string): string {
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase());
+/** The field's label, or the key made readable ("dueDay" → "Due Day") if it has none. */
+export function formatAuditFieldName(key: string, t: Messages["audit"]): string {
+  return (
+    t.fields[key] ??
+    key
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .replace(/^\w/, (c) => c.toUpperCase())
+  );
 }
 
 function isCurrencyCode(value: unknown): value is CurrencyCode {
@@ -122,10 +118,14 @@ export function formatAuditValue(
     currency?: CurrencyCode | null;
     homeCurrency?: CurrencyCode | null;
     locale?: string;
+    /** Words for booleans; English when omitted. */
+    labels?: { yes: string; no: string };
   }
 ): string {
   if (value === null || value === undefined) return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") {
+    return value ? (options?.labels?.yes ?? "Yes") : (options?.labels?.no ?? "No");
+  }
   if (typeof value === "number") {
     if (options?.field && HOME_MONEY_AUDIT_FIELDS.has(options.field)) {
       if (options.homeCurrency) {

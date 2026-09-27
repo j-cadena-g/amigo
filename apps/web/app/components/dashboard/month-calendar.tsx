@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/month-strip";
 import { cn } from "@/app/lib/utils";
 import { useLocale } from "@/app/lib/use-locale";
+import { type Messages, useT } from "@/app/i18n";
 
 
 interface MonthCalendarProps {
@@ -35,13 +36,14 @@ function aheadLine(
   expectedCents: number,
   currency: CurrencyCode,
   locale: string,
-  period: string
+  period: string,
+  t: Messages["calendar"]
 ): string {
   const parts = [];
-  if (dueCents > 0) parts.push(`${formatCents(dueCents, currency, locale)} due`);
-  if (expectedCents > 0) parts.push(`${formatCents(expectedCents, currency, locale)} expected`);
-  if (parts.length === 0) return `Nothing scheduled ${period}.`;
-  return `${parts.join(" and ")} ${period}.`;
+  if (dueCents > 0) parts.push(t.due(formatCents(dueCents, currency, locale)));
+  if (expectedCents > 0) parts.push(t.expected(formatCents(expectedCents, currency, locale)));
+  if (parts.length === 0) return t.nothingScheduled(period);
+  return t.scheduled(parts.join(t.and), period);
 }
 
 export function MonthCalendar({
@@ -51,6 +53,7 @@ export function MonthCalendar({
   currency,
   className,
 }: MonthCalendarProps) {
+  const t = useT();
   const locale = useLocale();
   const [month, setMonth] = useState(initialMonth);
   const [eventsByMonth, setEventsByMonth] = useState<Record<string, CalendarEvent[]>>({
@@ -91,10 +94,10 @@ export function MonthCalendar({
     } catch {
       if (requestId !== requestIdRef.current) return;
       setLoadError(
-        `Couldn't load ${formatMonthLabel(target, locale)}. Check your connection and try again.`
+        t.calendar.loadFailed(formatMonthLabel(target, locale))
       );
     }
-  }, [locale]);
+  }, [locale, t]);
 
   const events = eventsByMonth[month];
 
@@ -124,8 +127,8 @@ export function MonthCalendar({
     month >= todayMonth ? scheduledAhead(strip.days, todayStr) : null;
   const period =
     month === todayMonth
-      ? `for the rest of ${formatMonthInSentence(month, locale)}`
-      : `in ${formatMonthInSentence(month, locale, { withYear: true })}`;
+      ? t.calendar.restOfMonth(formatMonthInSentence(month, locale))
+      : t.calendar.inMonth(formatMonthInSentence(month, locale, { withYear: true }));
 
   return (
     <LedgerSection
@@ -135,7 +138,7 @@ export function MonthCalendar({
         <div className="flex items-center gap-1">
           {month !== todayMonth && (
             <Button type="button" variant="outline" size="sm" onClick={() => goTo(todayMonth)}>
-              This month
+              {t.calendar.thisMonth}
             </Button>
           )}
           <Button
@@ -146,7 +149,7 @@ export function MonthCalendar({
             onClick={() => goTo(shiftMonth(month, -1))}
           >
             <ChevronLeft />
-            <span className="sr-only">Previous month</span>
+            <span className="sr-only">{t.calendar.previousMonth}</span>
           </Button>
           <Button
             type="button"
@@ -156,7 +159,7 @@ export function MonthCalendar({
             onClick={() => goTo(shiftMonth(month, 1))}
           >
             <ChevronRight />
-            <span className="sr-only">Next month</span>
+            <span className="sr-only">{t.calendar.nextMonth}</span>
           </Button>
         </div>
       }
@@ -171,25 +174,25 @@ export function MonthCalendar({
                 onClick={() => void load(month)}
                 className="font-semibold underline underline-offset-4"
               >
-                Try again
+                {t.common.tryAgain}
               </button>
             </span>
           ) : events === undefined ? (
-            "Loading…"
+            t.common.loading
           ) : null}
         </p>
         <div className="flex gap-4">
           <span className="flex items-center gap-1.5">
             <span aria-hidden="true" className="h-2.5 w-2 bg-foreground" />
-            Spent
+            {t.calendar.legendSpent}
           </span>
           <span className="flex items-center gap-1.5">
             <span aria-hidden="true" className="h-2.5 w-2 border border-foreground" />
-            Due
+            {t.calendar.legendDue}
           </span>
           <span className="flex items-center gap-1.5">
             <span aria-hidden="true" className="h-2.5 w-2 bg-success" />
-            Received
+            {t.calendar.legendReceived}
           </span>
         </div>
       </div>
@@ -212,7 +215,7 @@ export function MonthCalendar({
             type="button"
             disabled={day.events.length === 0}
             onClick={() => setOpenDate(day.date)}
-            aria-label={describeStripDay(day, currency, locale)}
+            aria-label={describeStripDay(day, currency, locale, t.calendar)}
             className={cn(
               "flex min-h-16 min-w-0 flex-col items-start gap-0.5 overflow-hidden border-r border-b border-border p-0.5 text-left md:min-h-24 md:p-1.5",
               "hover:bg-secondary focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent",
@@ -255,7 +258,7 @@ export function MonthCalendar({
 
       {ahead && events !== undefined && (
         <p className="mt-3 text-sm">
-          {aheadLine(ahead.dueCents, ahead.expectedCents, currency, locale, period)}
+          {aheadLine(ahead.dueCents, ahead.expectedCents, currency, locale, period, t.calendar)}
         </p>
       )}
 

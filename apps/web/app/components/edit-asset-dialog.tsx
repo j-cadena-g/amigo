@@ -29,13 +29,9 @@ import {
   type LegacyAssetType,
 } from "@/app/lib/legacy-asset-migration";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
-const ASSET_TYPES = [
-  { value: "BANK", label: "Bank account" },
-  { value: "INVESTMENT", label: "Investment" },
-  { value: "CASH", label: "Cash" },
-  { value: "PROPERTY", label: "Property" },
-] as const;
+const ASSET_TYPES = ["BANK", "INVESTMENT", "CASH", "PROPERTY"] as const;
 
 interface EditAssetDialogProps {
   asset: Asset;
@@ -44,6 +40,7 @@ interface EditAssetDialogProps {
 }
 
 export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogProps) {
+  const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
@@ -80,7 +77,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     e.preventDefault();
     if (busy) return;
     if (hasInvalidBalance) {
-      setError("Enter a balance of 0 or more, with up to two decimal places.");
+      setError(t.accounts.asset.balanceInvalid);
       return;
     }
     setError(null);
@@ -100,14 +97,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't save the asset. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.asset.saveAction));
         return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError("Couldn't save the asset. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.asset.saveAction));
     } finally {
       setLoading(false);
     }
@@ -116,7 +113,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   async function handleConvert() {
     if (busy) return;
     if (hasUnsavedChanges) {
-      setError("Save your changes before you convert this asset.");
+      setError(t.accounts.asset.saveFirst);
       return;
     }
 
@@ -124,10 +121,9 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     setError(null);
 
     const ok = await confirm({
-      title: "Convert to account?",
-      description:
-        "This creates an account with the same balance and removes the legacy entry. Transactions were never linked to legacy assets, so none move.",
-      confirmText: "Convert",
+      title: t.accounts.asset.convertTitle,
+      description: t.accounts.asset.convertBody,
+      confirmText: t.accounts.asset.convert,
     });
     if (!ok) {
       setConverting(false);
@@ -148,14 +144,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't convert the asset. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.asset.convertAction));
         return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError("Couldn't convert the asset. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.asset.convertAction));
     } finally {
       setConverting(false);
     }
@@ -168,9 +164,9 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
     setError(null);
 
     const ok = await confirm({
-      title: "Delete asset?",
-      description: "This can't be undone.",
-      confirmText: "Delete",
+      title: t.accounts.asset.deleteTitle,
+      description: t.common.cantBeUndone,
+      confirmText: t.common.delete,
       variant: "destructive",
     });
     if (!ok) {
@@ -184,14 +180,14 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't delete the asset. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.asset.deleteAction));
         return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError("Couldn't delete the asset. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.asset.deleteAction));
     } finally {
       setDeleting(false);
     }
@@ -204,13 +200,13 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
         aria-describedby={undefined}
       >
         <DialogHeader>
-          <DialogTitle>Edit legacy asset</DialogTitle>
+          <DialogTitle>{t.accounts.asset.edit}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
@@ -222,7 +218,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
           <div className="space-y-1.5">
             <label htmlFor={typeId} className="text-sm font-semibold">
-              Type
+              {t.common.type}
             </label>
             <NativeSelect
               id={typeId}
@@ -233,9 +229,9 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                 setAccountType(mapLegacyAssetTypeToAccountType(next as LegacyAssetType));
               }}
             >
-              {ASSET_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {ASSET_TYPES.map((value) => (
+                <option key={value} value={value}>
+                  {t.accounts.assetTypes[value]}
                 </option>
               ))}
             </NativeSelect>
@@ -244,22 +240,20 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
           {type === "BANK" && (
             <div className="space-y-1.5">
               <label htmlFor={convertTypeId} className="text-sm font-semibold">
-                Convert as
+                {t.accounts.asset.convertAs}
               </label>
               <NativeSelect
                 id={convertTypeId}
                 value={accountType}
                 onChange={(e) => {
                   const next = e.target.value;
-                  const match = BANK_CONVERSION_ACCOUNT_TYPES.find(
-                    (t) => t.value === next
-                  );
-                  if (match) setAccountType(match.value);
+                  const match = BANK_CONVERSION_ACCOUNT_TYPES.find((value) => value === next);
+                  if (match) setAccountType(match);
                 }}
               >
-                {BANK_CONVERSION_ACCOUNT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                {BANK_CONVERSION_ACCOUNT_TYPES.map((value) => (
+                  <option key={value} value={value}>
+                    {t.accounts.types[value]}
                   </option>
                 ))}
               </NativeSelect>
@@ -269,7 +263,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor={balanceId} className="text-sm font-semibold">
-                Balance
+                {t.common.balance}
               </label>
               <AmountInput
                 id={balanceId}
@@ -281,7 +275,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
             </div>
             <div className="space-y-1.5">
               <label htmlFor={currencyId} className="text-sm font-semibold">
-                Currency
+                {t.common.currency}
               </label>
               <CurrencySelect
                 id={currencyId}
@@ -297,7 +291,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
 
           {hasUnsavedChanges ? (
             <p className="text-sm text-muted-foreground">
-              Save your changes before converting this asset.
+              {t.accounts.asset.unsavedHint}
             </p>
           ) : null}
 
@@ -307,7 +301,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
             <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
               <DeleteButton onClick={() => void handleDelete()} disabled={busy}>
                 <Trash2 />
-                {deleting ? "Deleting…" : "Delete"}
+                {deleting ? t.common.deleting : t.common.delete}
               </DeleteButton>
               <Button
                 type="button"
@@ -316,7 +310,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
                 disabled={busy || !name.trim() || hasUnsavedChanges}
               >
                 <ArrowRightLeft />
-                {converting ? "Converting…" : "Convert to account"}
+                {converting ? t.accounts.asset.converting : t.accounts.asset.convertToAccount}
               </Button>
             </div>
             <Button
@@ -325,10 +319,10 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={busy || !name.trim() || hasInvalidBalance}>
-              {loading ? "Saving…" : "Save asset"}
+              {loading ? t.common.saving : t.accounts.asset.save}
             </Button>
           </DialogFooter>
         </form>

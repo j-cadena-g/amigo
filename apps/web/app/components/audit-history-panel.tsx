@@ -16,6 +16,7 @@ import {
 } from "@/app/lib/audit-history";
 import type { CurrencyCode } from "@amigo/db";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 export type AuditTableName =
   | "grocery_items"
@@ -50,6 +51,7 @@ export function AuditHistoryPanel({
   timeZone,
   homeCurrency,
 }: AuditHistoryPanelProps) {
+  const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,7 +108,7 @@ export function AuditHistoryPanel({
         className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
         aria-expanded={open}
       >
-        <span className="text-sm font-semibold">History</span>
+        <span className="text-sm font-semibold">{t.audit.history}</span>
         <ChevronDown
           aria-hidden="true"
           className={cn(
@@ -118,23 +120,23 @@ export function AuditHistoryPanel({
       {open ? (
         <div className="border-t border-border px-3 py-3">
           {loading && (
-            <p className="text-sm text-muted-foreground">Loading history…</p>
+            <p className="text-sm text-muted-foreground">{t.audit.loading}</p>
           )}
           {failed && !loading && (
             <p className="text-sm text-destructive" role="alert">
-              Couldn&apos;t load the history.{" "}
+              {t.audit.loadFailed}{" "}
               <Button
                 type="button"
                 variant="link"
                 onClick={() => setAttempt((n) => n + 1)}
                 className="h-auto p-0 align-baseline text-destructive"
               >
-                Try again
+                {t.common.tryAgain}
               </Button>
             </p>
           )}
           {!loading && !failed && history && history.length === 0 && (
-            <p className="text-sm text-muted-foreground">No history yet.</p>
+            <p className="text-sm text-muted-foreground">{t.audit.none}</p>
           )}
           {!loading && !failed && history && history.length > 0 && (
             <ul className="space-y-3">
@@ -154,11 +156,11 @@ export function AuditHistoryPanel({
                   <li key={entry.id} className="text-sm">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                       <span className="font-semibold">
-                        {formatAuditAction(entry.action)}
+                        {formatAuditAction(entry.action, t.audit)}
                         {entry.userName ? (
                           <span className="font-normal text-muted-foreground">
                             {" "}
-                            by {entry.userName}
+                            {t.audit.by(entry.userName)}
                           </span>
                         ) : null}
                       </span>
@@ -171,7 +173,7 @@ export function AuditHistoryPanel({
                         </time>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          Unknown time
+                          {t.audit.unknownTime}
                         </span>
                       )}
                     </div>
@@ -180,7 +182,7 @@ export function AuditHistoryPanel({
                         {changes.map(([key, change]) => (
                           <li key={key}>
                             <span className="text-foreground/80">
-                              {formatAuditFieldName(key)}
+                              {formatAuditFieldName(key, t.audit)}
                             </span>
                             :{" "}
                             {formatAuditValue((change as AuditChange).from, {
@@ -188,6 +190,7 @@ export function AuditHistoryPanel({
                               currency: sideCurrencies.from,
                               homeCurrency,
                               locale,
+                              labels: t.common,
                             })}{" "}
                             →{" "}
                             {formatAuditValue((change as AuditChange).to, {
@@ -195,6 +198,7 @@ export function AuditHistoryPanel({
                               currency: sideCurrencies.to,
                               homeCurrency,
                               locale,
+                              labels: t.common,
                             })}
                           </li>
                         ))}

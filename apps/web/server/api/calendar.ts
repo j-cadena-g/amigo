@@ -15,6 +15,12 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { parseCalendarQuery } from "../lib/request-validation";
 import { visibleFinancialTransactionsCondition, visibleRecurringRulesCondition } from "../lib/financial-visibility";
 import { calculateNextRunDate } from "../lib/recurring-processor";
+import {
+  endOfIsoDayInTz,
+  startOfIsoDayInTz,
+  toISODateInTz,
+} from "../lib/dates";
+import { getHouseholdTimezone } from "../lib/household-timezone";
 import type { ApiHandler } from "./route";
 
 export interface CalendarEvent {
@@ -144,12 +150,13 @@ export const handleCalendarRequest: ApiHandler = async ({
   const monthEnd = new Date(Date.UTC(year, month + 1, 0));
   const startStr = monthStart.toISOString().split("T")[0]!;
   const endStr = monthEnd.toISOString().split("T")[0]!;
-  const startMs = monthStart.getTime();
-  const endMs = new Date(
-    Date.UTC(year, month + 1, 0, 23, 59, 59, 999)
-  ).getTime();
 
   const db = getDb(env.DB);
+  // Grocery purchases are instants; bound and date them in the household's
+  // timezone so they land on the same day as on the dashboard.
+  const timeZone = await getHouseholdTimezone(db, session!.householdId);
+  const monthStartInstant = startOfIsoDayInTz(startStr, timeZone);
+  const monthEndInstant = endOfIsoDayInTz(endStr, timeZone);
   const householdScope = scopeToHousehold(
     recurringTransactions.householdId,
     session!.householdId
@@ -175,8 +182,8 @@ export const handleCalendarRequest: ApiHandler = async ({
           scopeToHousehold(groceryItems.householdId, session!.householdId),
           eq(groceryItems.isPurchased, true),
           isNotNull(groceryItems.purchasedAt),
-          gte(groceryItems.purchasedAt, new Date(startMs)),
-          lte(groceryItems.purchasedAt, new Date(endMs)),
+          gte(groceryItems.purchasedAt, monthStartInstant),
+          lte(groceryItems.purchasedAt, monthEndInstant),
           isNull(groceryItems.deletedAt)
         )
       )
@@ -225,7 +232,7 @@ export const handleCalendarRequest: ApiHandler = async ({
     events.push({
       id: `grocery-${item.id}`,
       type: "grocery_purchase",
-      date: item.purchasedAt.toISOString().split("T")[0]!,
+      date: toISODateInTz(item.purchasedAt, timeZone),
       title: item.itemName,
       color: "orange",
       metadata: { itemCount: 1 },

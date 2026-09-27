@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   amountValidationMessage,
   centsToInputString,
-  filterAmountTyping,
   isPositiveAmount,
   parseAmount,
 } from "./decimal-input";
@@ -63,19 +62,6 @@ describe("parseAmount", () => {
   });
 });
 
-describe("filterAmountTyping", () => {
-  it("keeps digits and both separators", () => {
-    expect(filterAmountTyping("$ 45.000,50 COP")).toBe("45.000,50");
-    expect(filterAmountTyping("1e2")).toBe("12");
-  });
-
-  it("keeps a leading minus only when negatives are allowed", () => {
-    expect(filterAmountTyping("-5.50")).toBe("5.50");
-    expect(filterAmountTyping("-5.50", { allowNegative: true })).toBe("-5.50");
-    expect(filterAmountTyping("5-0", { allowNegative: true })).toBe("50");
-  });
-});
-
 describe("isPositiveAmount", () => {
   it("accepts only amounts above zero", () => {
     expect(isPositiveAmount("0.01")).toBe(true);
@@ -98,6 +84,11 @@ describe("amountValidationMessage", () => {
       "Enter an amount greater than 0."
     );
     expect(amountValidationMessage("-5")).toBe("Enter 0 or more.");
+    expect(amountValidationMessage("-45", { positive: true })).toBe(
+      "Enter an amount greater than 0."
+    );
+    expect(amountValidationMessage("1e2")).not.toBe("");
+    expect(amountValidationMessage("$45.000")).not.toBe("");
     expect(amountValidationMessage("-5", { allowNegative: true })).toBe("");
     expect(amountValidationMessage("600", { max: 500, currency: "CAD" })).toMatch(
       /^Enter no more than .*500\.00\.$/

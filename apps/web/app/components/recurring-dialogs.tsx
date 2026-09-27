@@ -18,7 +18,7 @@ import { useFinancialCategories } from "@/app/components/financial/use-financial
 import { DeleteButton, NativeSelect } from "@/app/components/financial/form-controls";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
+import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
@@ -98,7 +98,7 @@ function emptyForm(currency: CurrencyCode): RecurringFormData {
 }
 
 function canSubmit(form: RecurringFormData): boolean {
-  return Boolean(form.amount && form.categoryId && form.startDate);
+  return isPositiveAmount(form.amount) && Boolean(form.categoryId && form.startDate);
 }
 
 function presetToSchedule(preset: SchedulePreset, form: RecurringFormData) {
@@ -235,6 +235,7 @@ function RecurringFields({
           <AmountInput
             id={amountId}
             currency={form.currency as CurrencyCode}
+            positive
             value={form.amount}
             onValueChange={(amount) => setForm((f) => ({ ...f, amount }))}
           />
@@ -463,6 +464,7 @@ export function AddRecurringDialog({
   }
 
   async function handleSubmit() {
+    if (!canSubmit(form)) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -600,7 +602,7 @@ export function EditRecurringDialog({
   const busy = submitting || deleting;
 
   async function handleSubmit() {
-    if (!rule) return;
+    if (!rule || !canSubmit(form)) return;
     setSubmitting(true);
     setError(null);
     try {

@@ -58,15 +58,6 @@ export function parseAmount(raw: string): number | null {
   return negative && amount !== 0 ? -amount : amount;
 }
 
-/** Keep only characters an amount can contain while the user types or pastes. */
-export function filterAmountTyping(
-  raw: string,
-  options?: { allowNegative?: boolean }
-): string {
-  const digits = raw.replace(/[^\d.,]/g, "");
-  return options?.allowNegative && /^\s*[-−]/.test(raw) ? `-${digits}` : digits;
-}
-
 export function isPositiveAmount(raw: string): boolean {
   const amount = parseAmount(raw);
   return amount !== null && amount > 0;

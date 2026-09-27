@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, type ComponentProps, type Ref } from "r
 import type { CurrencyCode } from "@amigo/db";
 import { Input } from "@/app/components/ui/input";
 import { currencyFractionDigits } from "@/app/lib/currency";
-import { amountValidationMessage, filterAmountTyping } from "@/app/lib/decimal-input";
+import { amountValidationMessage } from "@/app/lib/decimal-input";
 import { cn } from "@/app/lib/utils";
 
 type AmountInputProps = Omit<
@@ -24,7 +24,9 @@ type AmountInputProps = Omit<
 /**
  * Money field that accepts "1,234.56" and "1.234,56" alike. A text input,
  * not `type="number"`, so "45.000" isn't read as 45; read the value with
- * `parseAmount`. Invalid amounts block form submission like native min/max.
+ * `parseAmount`. Input is kept as typed, never rewritten, so a pasted "-45"
+ * or "1e2" is rejected rather than saved as a different amount. Invalid
+ * amounts block form submission like native min/max.
  */
 export function AmountInput({
   value,
@@ -67,7 +69,7 @@ export function AmountInput({
       inputMode="decimal"
       autoComplete="off"
       value={value}
-      onChange={(e) => onValueChange(filterAmountTyping(e.target.value, { allowNegative }))}
+      onChange={(e) => onValueChange(e.target.value)}
       placeholder={placeholder ?? (currencyFractionDigits(currency) === 0 ? "0" : "0.00")}
       className={cn("font-mono font-medium", className)}
     />

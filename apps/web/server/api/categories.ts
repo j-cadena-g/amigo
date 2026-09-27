@@ -18,6 +18,7 @@ import {
   validateCategoryParent,
 } from "../lib/financial-categories";
 import { seedStarterFinancialCategories } from "@amigo/db";
+import { loadViewerRegion } from "@/app/lib/locale.server";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 
@@ -55,6 +56,7 @@ export const handleCategoriesRequest: ApiHandler = async ({
   params,
   request,
   session,
+  loadContext,
 }) => {
   const splatSegments = getSplatSegments(params);
   if (splatSegments.length > 1) {
@@ -67,7 +69,15 @@ export const handleCategoriesRequest: ApiHandler = async ({
   const db = getDb(env.DB);
   const householdId = session!.householdId;
 
-  await seedStarterFinancialCategories(db, householdId);
+  await seedStarterFinancialCategories(
+    db,
+    householdId,
+    // Only runs when there's nothing yet; a failed lookup seeds in English.
+    () =>
+      loadViewerRegion(loadContext, request)
+        .then((region) => region.language)
+        .catch(() => "en" as const)
+  );
 
   if (request.method === "GET" && !path) {
     await enforceRateLimit(

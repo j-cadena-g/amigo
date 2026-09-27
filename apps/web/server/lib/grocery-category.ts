@@ -1,3 +1,4 @@
+import type { CurrencyCode } from "@amigo/db";
 import {
   DEFAULT_GROCERY_CATEGORY,
   GROCERY_CATEGORY_CRITERIA,
@@ -7,9 +8,40 @@ import {
 export const GROCERY_CATEGORY_MODEL = "typesafe/jev";
 export const GROCERY_CATEGORY_TIMEOUT_MS = 2500;
 export const GROCERY_CATEGORY_MIN_CONFIDENCE = 0.5;
+/** How long categorization waits for the household's currency before using the default store. */
+const HOME_CURRENCY_WAIT_MS = 500;
 
-const AISLE_INSTRUCTIONS =
-  "Which aisle of a Canadian supermarket is this item in? The name may be English, Spanish, or a mix of both.";
+/** What `load` gives if it settles within `ms`, else null; failures become null too. */
+async function settleWithin<T>(load: () => T | Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve()
+        .then(load)
+        .catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Where the household shops, from its home currency, so Jev pictures the right store. */
+const STORE_BY_CURRENCY: Partial<Record<CurrencyCode, string>> = {
+  CAD: "a Canadian supermarket",
+  COP: "a Colombian supermarket (such as Éxito, Carulla, D1, or Olímpica)",
+  MXN: "a Mexican supermarket (such as Walmart, Soriana, or Chedraui)",
+  USD: "an American supermarket",
+  GBP: "a British supermarket",
+  EUR: "a European supermarket",
+};
+
+export function aisleInstructions(homeCurrency?: CurrencyCode | null): string {
+  const store = (homeCurrency && STORE_BY_CURRENCY[homeCurrency]) ?? STORE_BY_CURRENCY.CAD;
+  return `Which aisle of ${store} is this item in? The name may be English, Spanish, or a mix of both.`;
+}
 
 export interface GroceryCategoryAi {
   run(
@@ -73,7 +105,13 @@ export async function categorizeGroceryItem(
   {
     supplied,
     fallback = DEFAULT_GROCERY_CATEGORY,
-  }: { supplied?: string | null; fallback?: string | null } = {}
+    homeCurrency,
+  }: {
+    supplied?: string | null;
+    fallback?: string | null;
+    /** The household's currency, or a lookup run only if Jev is asked. */
+    homeCurrency?: CurrencyCode | null | (() => Promise<CurrencyCode | null>);
+  } = {}
 ): Promise<GroceryCategoryDecision> {
   const explicit = supplied?.trim();
   if (explicit && isGroceryCategory(explicit)) {
@@ -84,6 +122,13 @@ export async function categorizeGroceryItem(
     return { category: fallback, decided: false };
   }
 
+  // A failed or slow currency lookup only costs Jev the store's country, not the answer.
+  const instructions = aisleInstructions(
+    await settleWithin(
+      typeof homeCurrency === "function" ? homeCurrency : () => homeCurrency ?? null,
+      HOME_CURRENCY_WAIT_MS
+    )
+  );
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
@@ -95,7 +140,7 @@ export async function categorizeGroceryItem(
         questions: {
           aisle: {
             type: "choice",
-            instructions: AISLE_INSTRUCTIONS,
+            instructions,
             criteria: GROCERY_CATEGORY_CRITERIA,
           },
         },

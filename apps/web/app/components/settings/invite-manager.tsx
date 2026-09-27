@@ -108,7 +108,7 @@ export function InviteManager() {
         if (data.emailSent) {
           toast(t.household.invites.createdAndSent, { variant: "success" });
         } else {
-          toast(t.household.invites.createdNotSent(data.emailError), { variant: "error" });
+          toast(t.household.invites.createdNotSent, { variant: "error" });
         }
       } else {
         toast(t.household.invites.created, { variant: "success" });
@@ -168,7 +168,7 @@ export function InviteManager() {
       if (data.emailSent) {
         toast(t.household.invites.resent, { variant: "success" });
       } else {
-        toast(t.household.invites.resendFailed(data.emailError), { variant: "error" });
+        toast(t.household.invites.resendFailed, { variant: "error" });
       }
       await loadInvites();
     } catch {
@@ -236,7 +236,7 @@ export function InviteManager() {
             <p className="mt-3 text-sm text-muted-foreground">
               {created.emailSent
                 ? t.household.invites.emailSentTo(created.invitedEmail)
-                : t.household.invites.emailNotSentTo(created.invitedEmail, created.emailError)}
+                : t.household.invites.emailNotSentTo(created.invitedEmail)}
             </p>
           )}
         </div>
@@ -268,7 +268,7 @@ export function InviteManager() {
                       {invite.emailSentAt
                         ? t.household.invites.emailSent
                         : invite.emailLastError
-                          ? t.household.invites.emailFailed(invite.emailLastError)
+                          ? t.household.invites.emailFailed
                           : t.household.invites.emailNotSent}
                     </p>
                   )}

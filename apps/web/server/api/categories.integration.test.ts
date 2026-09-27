@@ -58,6 +58,16 @@ describe("categories integration", () => {
     ]);
   });
 
+  it("names starter categories in the household's language", async () => {
+    const db = getDb(getIntegrationEnv().DB);
+    const seeded = await seedStarterFinancialCategories(db, householdId, async () => "es");
+    expect(seeded.map((category) => category.name)).toEqual([
+      "Mercado",
+      "Gastos del hogar",
+      "Suscripciones",
+    ]);
+  });
+
   it("does not seed starters when the household already has custom categories", async () => {
     const env = getIntegrationEnv();
     const db = getDb(env.DB);

@@ -26,6 +26,7 @@ import {
   ROUTE_RATE_LIMITS,
 } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
+import { getHomeCurrency } from "../lib/household-currency";
 import {
   categorizeGroceryItem,
   groceryCategoryAi,
@@ -148,7 +149,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
     const { category } = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
-      { supplied: validated.category }
+      { supplied: validated.category, homeCurrency: () => getHomeCurrency(db, session!.householdId) }
     );
 
     const item = await withAudit(
@@ -305,7 +306,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
     const { category, decided } = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
-      { fallback: existing.category }
+      { fallback: existing.category, homeCurrency: () => getHomeCurrency(db, session!.householdId) }
     );
 
     const updated = await withAudit(

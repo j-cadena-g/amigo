@@ -11,7 +11,7 @@ interface TagColorPickerProps {
 
 export function TagColorPicker({ value, onChange, className }: TagColorPickerProps) {
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
+    <div className={cn("grid w-fit grid-cols-8 gap-2", className)}>
       {COLOR_KEYS.map((color) => (
         <button
           key={color}
@@ -20,6 +20,7 @@ export function TagColorPicker({ value, onChange, className }: TagColorPickerPro
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onChange(color)}
           aria-label={`Color ${color}`}
+          title={color}
           aria-pressed={value === color}
           className={cn(
             "relative h-6 w-6 rounded-sm before:absolute before:-inset-2 before:content-['']",

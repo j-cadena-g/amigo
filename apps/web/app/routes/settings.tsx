@@ -5,9 +5,14 @@ import {
   getDb,
   users,
   households,
+  groceryItems,
+  groceryItemTags,
+  groceryTags,
   eq,
   and,
+  asc,
   isNull,
+  sql,
   parseHomeCurrency,
   scopeToHousehold,
 } from "@amigo/db";
@@ -18,6 +23,7 @@ import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
 import { MemberRoleManager } from "@/app/components/settings/member-role-manager";
 import { NotificationSettings } from "@/app/components/settings/notification-settings";
+import { TagManager } from "@/app/components/settings/tag-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -25,7 +31,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const env = getEnv(context);
   const db = getDb(env.DB);
 
-  const [household, members] = await Promise.all([
+  const [household, members, tags] = await Promise.all([
     db.query.households.findFirst({
       where: eq(households.id, session.householdId),
     }),
@@ -36,11 +42,33 @@ export async function loader({ context }: LoaderFunctionArgs) {
       ),
       columns: { id: true, name: true, email: true, role: true },
     }),
+    db
+      .select({
+        id: groceryTags.id,
+        name: groceryTags.name,
+        color: groceryTags.color,
+        itemCount: sql<number>`count(${groceryItems.id})`,
+      })
+      .from(groceryTags)
+      .leftJoin(groceryItemTags, eq(groceryItemTags.tagId, groceryTags.id))
+      .leftJoin(
+        groceryItems,
+        and(
+          eq(groceryItems.id, groceryItemTags.itemId),
+          scopeToHousehold(groceryItems.householdId, session.householdId),
+          isNull(groceryItems.deletedAt)
+        )
+      )
+      .where(scopeToHousehold(groceryTags.householdId, session.householdId))
+      .groupBy(groceryTags.id)
+      .orderBy(asc(sql`lower(${groceryTags.name})`))
+      .all(),
   ]);
 
   return {
     household: household!,
     members,
+    tags,
     session: {
       userId: session.userId,
       role: session.role,
@@ -53,7 +81,7 @@ export function meta() {
 }
 
 export default function Settings() {
-  const { household, members, session } = useLoaderData<typeof loader>();
+  const { household, members, tags, session } = useLoaderData<typeof loader>();
   const canManageHousehold =
     session.role === "owner" || session.role === "admin";
 
@@ -125,6 +153,8 @@ export default function Settings() {
               </div>
             </LedgerSection>
           )}
+
+          <TagManager tags={tags} />
 
           <LedgerSection title="Notifications">
             <div className="pt-4">

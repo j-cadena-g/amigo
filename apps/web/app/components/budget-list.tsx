@@ -4,7 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
 import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
-import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
+import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { useConfirm } from "@/app/components/confirm-provider";
@@ -217,6 +217,8 @@ function BudgetFormDialog({
   const busy = submitting || deleting;
   const labels = SUBMIT_LABELS[mode];
 
+  const canSubmit = form.name.trim() !== "" && isPositiveAmount(form.limitAmount);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
@@ -226,6 +228,7 @@ function BudgetFormDialog({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!canSubmit) return;
             onSubmit();
           }}
           className="space-y-4"
@@ -249,6 +252,8 @@ function BudgetFormDialog({
               <AmountInput
                 id={limitId}
                 currency={form.currency as CurrencyCode}
+                positive
+                required
                 value={form.limitAmount}
                 onValueChange={(limitAmount) => setForm((f) => ({ ...f, limitAmount }))}
               />
@@ -305,7 +310,7 @@ function BudgetFormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !form.name || !form.limitAmount}>
+            <Button type="submit" disabled={busy || !canSubmit}>
               {submitting ? labels.busy : labels.idle}
             </Button>
           </DialogFooter>

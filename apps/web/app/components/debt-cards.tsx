@@ -11,6 +11,7 @@ import {
   LedgerSubgroup,
   RowIconButton,
 } from "@/app/components/financial/ledger-group";
+import { useLocale } from "@/app/lib/use-locale";
 
 export interface Debt {
   id: string;
@@ -139,6 +140,7 @@ function CreditCardSummary({
   summary: NonNullable<ReturnType<typeof getCreditCardSummary>>;
   homeCurrency: CurrencyCode;
 }) {
+  const locale = useLocale();
   const headingId = useId();
 
   return (
@@ -164,11 +166,11 @@ function CreditCardSummary({
       />
       <p className="mt-2 text-sm text-muted-foreground">
         <span className="font-mono font-medium text-foreground">
-          {formatCents(summary.usedCreditCents, homeCurrency)}
+          {formatCents(summary.usedCreditCents, homeCurrency, locale)}
         </span>{" "}
         used of{" "}
         <span className="font-mono font-medium text-foreground">
-          {formatCents(summary.totalLimitCents, homeCurrency)}
+          {formatCents(summary.totalLimitCents, homeCurrency, locale)}
         </span>{" "}
         across {summary.cardCount} {summary.cardCount === 1 ? "card" : "cards"}
       </p>
@@ -222,6 +224,7 @@ function LoanRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const locale = useLocale();
   const loanAmount = debt.balanceInitial;
   const totalPaid = debt.balanceCurrent;
   const remaining = loanAmount - totalPaid;
@@ -230,10 +233,10 @@ function LoanRow({
   return (
     <DebtRowLayout
       name={debt.name}
-      figure={`${formatCents(totalPaid, debt.currency)} of ${formatCents(loanAmount, debt.currency)}`}
+      figure={`${formatCents(totalPaid, debt.currency, locale)} of ${formatCents(loanAmount, debt.currency, locale)}`}
       meter={<MeterBar percent={percentage} className="mt-2" />}
       details={[
-        `${formatCents(Math.max(0, remaining), debt.currency)} left`,
+        `${formatCents(Math.max(0, remaining), debt.currency, locale)} left`,
         `${Math.min(100, percentage).toFixed(0)}% paid${currencyNote(debt, homeCurrency)}`,
       ]}
       onEdit={onEdit}
@@ -250,6 +253,7 @@ function CreditCardRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const locale = useLocale();
   const creditLimit = debt.balanceInitial;
   const availableCredit = debt.balanceCurrent;
   const usedAmount = creditLimit - availableCredit;
@@ -260,14 +264,14 @@ function CreditCardRow({
       name={debt.name}
       figure={
         usedAmount < 0
-          ? `${formatCents(Math.abs(usedAmount), debt.currency)} unused credit`
-          : `${formatCents(usedAmount, debt.currency)} of ${formatCents(creditLimit, debt.currency)}`
+          ? `${formatCents(Math.abs(usedAmount), debt.currency, locale)} unused credit`
+          : `${formatCents(usedAmount, debt.currency, locale)} of ${formatCents(creditLimit, debt.currency, locale)}`
       }
       meter={
         <MeterBar percent={utilization} tone={utilizationTone(utilization)} className="mt-2" />
       }
       details={[
-        `${formatCents(availableCredit, debt.currency)} available`,
+        `${formatCents(availableCredit, debt.currency, locale)} available`,
         `${Math.max(0, utilization).toFixed(0)}% utilization${currencyNote(debt, homeCurrency)}`,
       ]}
       onEdit={onEdit}

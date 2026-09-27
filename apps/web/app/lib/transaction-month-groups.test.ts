@@ -29,6 +29,7 @@ describe("groupTransactionsByMonth", () => {
     const groups = groupTransactionsByMonth([...september, ...august], {
       homeCurrency: "CAD",
       hasMore: false,
+      locale: "en-CA",
     });
 
     expect(groups.map((g) => [g.month, g.label])).toEqual([
@@ -43,6 +44,7 @@ describe("groupTransactionsByMonth", () => {
     const groups = groupTransactionsByMonth([...september, ...august], {
       homeCurrency: "CAD",
       hasMore: false,
+      locale: "en-CA",
     });
 
     expect(groups.map((g) => g.totals)).toEqual([
@@ -55,6 +57,7 @@ describe("groupTransactionsByMonth", () => {
     const groups = groupTransactionsByMonth([...september, ...august], {
       homeCurrency: "CAD",
       hasMore: true,
+      locale: "en-CA",
     });
 
     expect(groups[0]!.totals).not.toBeNull();
@@ -65,6 +68,7 @@ describe("groupTransactionsByMonth", () => {
     const groups = groupTransactionsByMonth(september, {
       homeCurrency: "CAD",
       hasMore: true,
+      locale: "en-CA",
     });
 
     expect(groups).toHaveLength(1);
@@ -74,14 +78,16 @@ describe("groupTransactionsByMonth", () => {
   it("reads the month from timestamp-shaped dates", () => {
     const groups = groupTransactionsByMonth(
       [txn("t1", "2026-10-01T00:00:00.000Z", 500), txn("t2", "2026-09-30T23:00:00Z", 700)],
-      { homeCurrency: "CAD", hasMore: false }
+      { homeCurrency: "CAD", hasMore: false, locale: "en-CA" }
     );
 
     expect(groups.map((g) => g.month)).toEqual(["2026-10", "2026-09"]);
   });
 
   it("returns no groups for an empty list", () => {
-    expect(groupTransactionsByMonth([], { homeCurrency: "CAD", hasMore: true })).toEqual([]);
+    expect(
+      groupTransactionsByMonth([], { homeCurrency: "CAD", hasMore: true, locale: "en-CA" })
+    ).toEqual([]);
   });
 });
 
@@ -110,7 +116,7 @@ describe("monthTotals", () => {
 describe("month labels", () => {
   it("keys and names calendar months", () => {
     expect(monthKey("2026-01-31")).toBe("2026-01");
-    expect(formatMonthHeading("2026-01")).toBe("January 2026");
-    expect(formatMonthHeading("2025-12")).toBe("December 2025");
+    expect(formatMonthHeading("2026-01", "en-CA")).toBe("January 2026");
+    expect(formatMonthHeading("2025-12", "en-CA")).toBe("December 2025");
   });
 });

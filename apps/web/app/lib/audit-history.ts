@@ -1,5 +1,6 @@
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import { formatCents } from "@/app/lib/currency";
+import { DEFAULT_LOCALE } from "@/app/lib/locale";
 
 const HIDDEN_AUDIT_FIELDS = new Set([
   "id",
@@ -120,6 +121,7 @@ export function formatAuditValue(
     field?: string;
     currency?: CurrencyCode | null;
     homeCurrency?: CurrencyCode | null;
+    locale?: string;
   }
 ): string {
   if (value === null || value === undefined) return "—";
@@ -127,14 +129,14 @@ export function formatAuditValue(
   if (typeof value === "number") {
     if (options?.field && HOME_MONEY_AUDIT_FIELDS.has(options.field)) {
       if (options.homeCurrency) {
-        return formatCents(value, options.homeCurrency);
+        return formatCents(value, options.homeCurrency, options.locale ?? DEFAULT_LOCALE);
       }
       // Avoid labeling home-currency cents with the record currency.
       return formatBareCents(value);
     }
     if (options?.field && RECORD_MONEY_AUDIT_FIELDS.has(options.field)) {
       if (options.currency) {
-        return formatCents(value, options.currency);
+        return formatCents(value, options.currency, options.locale ?? DEFAULT_LOCALE);
       }
       return formatBareCents(value);
     }
@@ -175,7 +177,8 @@ export function resolveAuditTimeZone(timeZone?: string): string {
 
 export function formatAuditTimestamp(
   timestampMs: number,
-  timeZone = "UTC"
+  timeZone = "UTC",
+  locale: string = DEFAULT_LOCALE
 ): string | null {
   if (!Number.isFinite(timestampMs)) return null;
   const date = new Date(timestampMs);
@@ -183,13 +186,13 @@ export function formatAuditTimestamp(
 
   const resolvedZone = resolveAuditTimeZone(timeZone);
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: resolvedZone,
     }).format(date);
   } catch {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: "UTC",

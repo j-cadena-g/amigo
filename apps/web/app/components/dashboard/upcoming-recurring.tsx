@@ -4,6 +4,7 @@ import { formatSignedCents } from "@/app/lib/currency";
 import { formatLedgerDate } from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
 import { LedgerRow, LedgerSection, SectionLink } from "@/app/components/ledger";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface DashboardUpcomingRecurringProps {
   items: UpcomingRecurring[];
@@ -14,6 +15,7 @@ export function DashboardUpcomingRecurring({
   items,
   className,
 }: DashboardUpcomingRecurringProps) {
+  const locale = useLocale();
   return (
     <LedgerSection
       title="Coming up"
@@ -29,7 +31,7 @@ export function DashboardUpcomingRecurring({
           {items.map((r) => (
             <LedgerRow
               key={r.id}
-              date={formatLedgerDate(r.nextRunDate)}
+              date={formatLedgerDate(r.nextRunDate, locale)}
               label={r.description || r.category}
               meta={`${r.description ? `${r.category} · ` : ""}${r.frequency.toLowerCase()}`}
               figure={
@@ -37,6 +39,7 @@ export function DashboardUpcomingRecurring({
                   {formatSignedCents(
                     r.type === "income" ? r.amount : -r.amount,
                     r.currency as CurrencyCode,
+                    locale,
                     { showPlus: true }
                   )}
                 </span>

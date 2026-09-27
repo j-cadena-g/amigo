@@ -13,7 +13,7 @@ describe("PriceTag", () => {
     const html = render({ cents: 234056, currency: "CAD" });
 
     expect(html).toContain(
-      `<span class="sr-only">${formatSignedCents(234056, "CAD")}</span>`
+      `<span class="sr-only">${formatSignedCents(234056, "CAD", "en-CA")}</span>`
     );
     expect(html).toMatch(/aria-hidden="true"[^>]*>.*>\$<.*>2,340<.*>56</);
   });
@@ -26,7 +26,7 @@ describe("PriceTag", () => {
   it("puts a true minus in front of negative amounts", () => {
     const html = render({ cents: -2746958, currency: "CAD", size: "large" });
 
-    expect(html).toContain(formatSignedCents(-2746958, "CAD"));
+    expect(html).toContain(formatSignedCents(-2746958, "CAD", "en-CA"));
     expect(html).toMatch(/aria-hidden="true"[^>]*>.*>−<.*>\$<.*>27,469</);
   });
 });

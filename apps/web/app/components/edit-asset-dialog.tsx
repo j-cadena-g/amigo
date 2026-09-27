@@ -28,6 +28,7 @@ import {
   mapLegacyAssetTypeToAccountType,
   type LegacyAssetType,
 } from "@/app/lib/legacy-asset-migration";
+import { useLocale } from "@/app/lib/use-locale";
 
 const ASSET_TYPES = [
   { value: "BANK", label: "Bank account" },
@@ -43,6 +44,7 @@ interface EditAssetDialogProps {
 }
 
 export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogProps) {
+  const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
   const nameId = useId();
@@ -52,7 +54,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const currencyId = useId();
   const [name, setName] = useState(asset.name);
   const [type, setType] = useState(asset.type);
-  const [balance, setBalance] = useState(centsToInputString(asset.balance, asset.currency));
+  const [balance, setBalance] = useState(centsToInputString(asset.balance, asset.currency, locale));
   const [currency, setCurrency] = useState<CurrencyCode>(asset.currency);
   const [isShared, setIsShared] = useState(asset.userId === null);
   const [accountType, setAccountType] = useState<FinancialAccount["type"]>(() =>

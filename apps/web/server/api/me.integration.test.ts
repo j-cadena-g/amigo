@@ -67,6 +67,42 @@ describe("me integration", () => {
     });
 
     expect(response.status).toBe(405);
-    expect(response.headers.get("Allow")).toBe("GET");
+    expect(response.headers.get("Allow")).toBe("GET, PATCH");
+  });
+
+  describe("PATCH locale", () => {
+    const readLocale = async (response: Promise<Response>) =>
+      ((await (await response).json()) as { user: { locale: string | null } }).user.locale;
+    const call = (method: string, body?: unknown) =>
+      handleMeRequest({
+        env: getIntegrationEnv(),
+        params: {},
+        request: new Request("http://localhost/api/me", {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+        session: testSession({ userId: ownerId, householdId, role: "owner" }),
+        sessionStatus: "authenticated",
+        loadContext: {} as never,
+      });
+
+    it("starts unset, saves a supported format, and clears it with null", async () => {
+      expect((await readLocale(call("GET")))).toBeNull();
+
+      const saved = await call("PATCH", { locale: "es-CO" });
+      expect(saved.status).toBe(200);
+      expect((await readLocale(Promise.resolve(saved)))).toBe("es-CO");
+      expect((await readLocale(call("GET")))).toBe("es-CO");
+
+      const cleared = await call("PATCH", { locale: null });
+      expect((await readLocale(Promise.resolve(cleared)))).toBeNull();
+    });
+
+    it("rejects formats outside the supported list", async () => {
+      await expect(call("PATCH", { locale: "xx-YY" })).rejects.toThrow();
+      await expect(call("PATCH", {})).rejects.toThrow();
+      expect((await readLocale(call("GET")))).toBeNull();
+    });
   });
 });

@@ -3,6 +3,18 @@ import { households } from "./households";
 
 export const USER_ROLES = ["owner", "admin", "member"] as const;
 
+/** Number and date formats a user can choose; labels live in the web app. */
+export const FORMAT_LOCALES = [
+  "en-CA",
+  "en-US",
+  "en-GB",
+  "fr-CA",
+  "es-CO",
+  "es-MX",
+  "es-ES",
+  "de-DE",
+] as const;
+
 export const users = sqliteTable("users", {
   id: text("id")
     .primaryKey()
@@ -14,6 +26,11 @@ export const users = sqliteTable("users", {
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
   role: text("role", { enum: USER_ROLES }).notNull().default("member"),
+  /**
+   * BCP 47 tag for number and date formatting, e.g. "es-CO". Null follows the
+   * household's currency and the browser's language.
+   */
+  locale: text("locale", { enum: FORMAT_LOCALES }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -28,3 +45,4 @@ export const users = sqliteTable("users", {
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type UserRole = (typeof USER_ROLES)[number];
+export type FormatLocale = (typeof FORMAT_LOCALES)[number];

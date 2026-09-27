@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface BudgetWithSpending {
   id: string;
@@ -111,6 +112,7 @@ function BudgetRow({
   onDelete: () => void;
   deleting: boolean;
 }) {
+  const locale = useLocale();
   const isOverBudget = budget.remainingHomeCents < 0;
   const clampedPercent = Math.min(budget.percentUsed, 100);
   const variant = getProgressVariant(budget.percentUsed, budget.remainingHomeCents);
@@ -135,8 +137,8 @@ function BudgetRow({
             )}
           </p>
           <p className="shrink-0 font-mono text-sm font-medium">
-            {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency)} of{" "}
-            {formatCents(budget.limitAmountHome, budget.homeCurrency)}
+            {formatCents(budget.currentSpendingHomeCents, budget.homeCurrency, locale)} of{" "}
+            {formatCents(budget.limitAmountHome, budget.homeCurrency, locale)}
           </p>
         </div>
         <progress
@@ -152,8 +154,8 @@ function BudgetRow({
         <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
           <span className={cn("font-mono font-medium", PROGRESS_TEXT[variant])}>
             {isOverBudget
-              ? `${formatCents(-budget.remainingHomeCents, budget.homeCurrency)} over`
-              : `${formatCents(budget.remainingHomeCents, budget.homeCurrency)} left`}
+              ? `${formatCents(-budget.remainingHomeCents, budget.homeCurrency, locale)} over`
+              : `${formatCents(budget.remainingHomeCents, budget.homeCurrency, locale)} left`}
           </span>
           <span className="text-muted-foreground capitalize">{budget.period}</span>
         </div>
@@ -161,7 +163,7 @@ function BudgetRow({
           <p className="mt-1 text-xs text-muted-foreground">
             Limit in budget currency:{" "}
             <span className="font-mono font-medium">
-              {formatCents(budget.limitAmount, budget.currency)}
+              {formatCents(budget.limitAmount, budget.currency, locale)}
             </span>
           </p>
         )}
@@ -325,6 +327,7 @@ export function BudgetList({
   session: _session,
   homeCurrency,
 }: BudgetListProps) {
+  const locale = useLocale();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
   const toast = useToast();
@@ -347,7 +350,7 @@ export function BudgetList({
   function openEdit(budget: BudgetWithSpending) {
     setForm({
       name: budget.name,
-      limitAmount: centsToInputString(budget.limitAmount, budget.currency),
+      limitAmount: centsToInputString(budget.limitAmount, budget.currency, locale),
       currency: budget.currency,
       period: budget.period,
       isShared: budget.isShared,

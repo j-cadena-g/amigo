@@ -47,6 +47,7 @@ export const ROUTE_RATE_LIMITS = {
   },
   me: {
     get: RATE_LIMIT_PRESETS.READ,
+    patch: RATE_LIMIT_PRESETS.MUTATION,
   },
   debts: {
     list: RATE_LIMIT_PRESETS.READ,

@@ -4,6 +4,7 @@ import type { CurrencyCode } from "@amigo/db";
 import { PriceTag } from "@/app/components/price-tag";
 import { Button } from "@/app/components/ui/button";
 import { formatCents, formatSignedCents } from "@/app/lib/currency";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface MonthHeroProps {
   monthName: string;
@@ -32,6 +33,7 @@ export function MonthHero({
   groceryCount,
   currency,
 }: MonthHeroProps) {
+  const locale = useLocale();
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -52,11 +54,11 @@ export function MonthHero({
           </p>
           <p className="text-muted-foreground">
             <span className="font-mono font-medium text-foreground">
-              {formatCents(incomeCents, currency)}
+              {formatCents(incomeCents, currency, locale)}
             </span>{" "}
             in ·{" "}
             <span className="font-mono font-medium text-foreground">
-              {formatSignedCents(netCents, currency, { showPlus: true })}
+              {formatSignedCents(netCents, currency, locale, { showPlus: true })}
             </span>{" "}
             net ·{" "}
             <Link

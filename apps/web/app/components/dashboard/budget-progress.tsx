@@ -3,6 +3,7 @@ import type { BudgetWithSpending } from "@/server/lib/dashboard-data";
 import { formatCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
 import { LedgerSection, SectionLink } from "@/app/components/ledger";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface DashboardBudgetProgressProps {
   budgets: BudgetWithSpending[];
@@ -15,6 +16,7 @@ export function DashboardBudgetProgress({
   currency,
   className,
 }: DashboardBudgetProgressProps) {
+  const locale = useLocale();
   return (
     <LedgerSection
       title="Budgets"
@@ -49,8 +51,8 @@ export function DashboardBudgetProgress({
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="truncate font-semibold">{b.name}</span>
                   <span className="shrink-0 font-mono text-sm font-medium text-muted-foreground">
-                    {formatCents(b.spentHomeCents, currency)} of{" "}
-                    {formatCents(b.limitHomeCents, currency)}
+                    {formatCents(b.spentHomeCents, currency, locale)} of{" "}
+                    {formatCents(b.limitHomeCents, currency, locale)}
                   </span>
                 </div>
                 <progress
@@ -80,8 +82,8 @@ export function DashboardBudgetProgress({
                     )}
                   >
                     {isOver
-                      ? `${formatCents(-remaining, currency)} over`
-                      : `${formatCents(remaining, currency)} left`}
+                      ? `${formatCents(-remaining, currency, locale)} over`
+                      : `${formatCents(remaining, currency, locale)} left`}
                   </span>
                   <span className="text-muted-foreground capitalize">{b.period}</span>
                 </p>
@@ -89,7 +91,7 @@ export function DashboardBudgetProgress({
                   <p className="mt-1 text-xs text-muted-foreground">
                     Limit in budget currency:{" "}
                     <span className="font-mono font-medium">
-                      {formatCents(b.limitOriginalCents, budgetCur)}
+                      {formatCents(b.limitOriginalCents, budgetCur, locale)}
                     </span>
                   </p>
                 )}
@@ -97,7 +99,7 @@ export function DashboardBudgetProgress({
                   <p className="mt-1 text-xs text-muted-foreground">
                     Upcoming recurring (est.):{" "}
                     <span className="font-mono font-medium">
-                      {formatCents(b.recurringImpactHomeCents, currency)}
+                      {formatCents(b.recurringImpactHomeCents, currency, locale)}
                     </span>
                     {projectedPct > 100 && (
                       <span className="font-semibold text-warning">

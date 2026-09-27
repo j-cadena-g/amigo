@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, type ComponentProps, type Ref } from "react";
 import type { CurrencyCode } from "@amigo/db";
 import { Input } from "@/app/components/ui/input";
-import { currencyFractionDigits } from "@/app/lib/currency";
-import { amountValidationMessage } from "@/app/lib/decimal-input";
+import { amountPlaceholder, amountValidationMessage } from "@/app/lib/decimal-input";
+import { useLocale } from "@/app/lib/use-locale";
 import { cn } from "@/app/lib/utils";
 
 type AmountInputProps = Omit<
@@ -40,12 +40,14 @@ export function AmountInput({
   ref,
   ...props
 }: AmountInputProps) {
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const message = amountValidationMessage(value, {
     allowNegative,
     positive,
     max,
     currency,
+    locale,
   });
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export function AmountInput({
       autoComplete="off"
       value={value}
       onChange={(e) => onValueChange(e.target.value)}
-      placeholder={placeholder ?? (currencyFractionDigits(currency) === 0 ? "0" : "0.00")}
+      placeholder={placeholder ?? amountPlaceholder(currency, locale)}
       className={cn("font-mono font-medium", className)}
     />
   );

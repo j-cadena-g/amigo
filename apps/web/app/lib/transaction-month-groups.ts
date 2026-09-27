@@ -1,3 +1,4 @@
+import { capitalizeFirst } from "@/app/lib/format-dates";
 import type { CurrencyCode } from "@amigo/db";
 
 export interface MonthGroupTransaction {
@@ -30,12 +31,15 @@ export function monthKey(date: string): string {
   return date.split("T")[0]!.slice(0, 7);
 }
 
-export function formatMonthHeading(month: string): string {
-  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+export function formatMonthHeading(month: string, locale: string): string {
+  return capitalizeFirst(
+    new Date(`${month}-01T00:00:00Z`).toLocaleDateString(locale, {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+    locale
+  );
 }
 
 export function monthTotals(
@@ -64,7 +68,11 @@ export function monthTotals(
  */
 export function groupTransactionsByMonth<T extends MonthGroupTransaction>(
   transactions: readonly T[],
-  { homeCurrency, hasMore }: { homeCurrency: CurrencyCode; hasMore: boolean }
+  {
+    homeCurrency,
+    hasMore,
+    locale,
+  }: { homeCurrency: CurrencyCode; hasMore: boolean; locale: string }
 ): TransactionMonthGroup<T>[] {
   const byMonth = new Map<string, T[]>();
   for (const t of transactions) {
@@ -79,7 +87,7 @@ export function groupTransactionsByMonth<T extends MonthGroupTransaction>(
     const complete = !hasMore || index < months.length - 1;
     return {
       month,
-      label: formatMonthHeading(month),
+      label: formatMonthHeading(month, locale),
       transactions: rows,
       totals: complete ? monthTotals(rows, homeCurrency) : null,
     };

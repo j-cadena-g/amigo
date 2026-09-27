@@ -20,6 +20,7 @@ import {
   AddRecurringDialog,
   EditRecurringDialog,
 } from "@/app/components/recurring-dialogs";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface RecurringRule {
   id: string;
@@ -65,6 +66,7 @@ function RecurringRuleRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const locale = useLocale();
   const isIncome = rule.type === "income";
   const title = rule.description || rule.category;
 
@@ -86,7 +88,7 @@ function RecurringRuleRow({
               isIncome && rule.isActive && "text-success"
             )}
           >
-            {formatSignedCents(isIncome ? rule.amount : -rule.amount, rule.currency, {
+            {formatSignedCents(isIncome ? rule.amount : -rule.amount, rule.currency, locale, {
               showPlus: true,
             })}
           </span>
@@ -96,7 +98,7 @@ function RecurringRuleRow({
           {getFrequencyLabel(rule)} ·{" "}
           {rule.isActive ? (
             <>
-              Next <span className="font-mono">{formatLedgerDate(rule.nextRunDate)}</span>
+              Next <span className="font-mono">{formatLedgerDate(rule.nextRunDate, locale)}</span>
             </>
           ) : (
             "Paused"

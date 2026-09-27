@@ -6,7 +6,9 @@ import { DayDetailDialog } from "@/app/components/day-detail-dialog";
 import { LedgerSection } from "@/app/components/ledger";
 import { formatCents, formatShortCents } from "@/app/lib/currency";
 import {
+  formatMonthInSentence,
   formatMonthLabel,
+  weekdayHeaders,
   leadingBlankDays,
   scheduledAhead,
   shiftMonth,
@@ -17,8 +19,8 @@ import {
   type CalendarEvent,
 } from "@/app/lib/month-strip";
 import { cn } from "@/app/lib/utils";
+import { useLocale } from "@/app/lib/use-locale";
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface MonthCalendarProps {
   events: CalendarEvent[];
@@ -32,11 +34,12 @@ function aheadLine(
   dueCents: number,
   expectedCents: number,
   currency: CurrencyCode,
+  locale: string,
   period: string
 ): string {
   const parts = [];
-  if (dueCents > 0) parts.push(`${formatCents(dueCents, currency)} due`);
-  if (expectedCents > 0) parts.push(`${formatCents(expectedCents, currency)} expected`);
+  if (dueCents > 0) parts.push(`${formatCents(dueCents, currency, locale)} due`);
+  if (expectedCents > 0) parts.push(`${formatCents(expectedCents, currency, locale)} expected`);
   if (parts.length === 0) return `Nothing scheduled ${period}.`;
   return `${parts.join(" and ")} ${period}.`;
 }
@@ -48,6 +51,7 @@ export function MonthCalendar({
   currency,
   className,
 }: MonthCalendarProps) {
+  const locale = useLocale();
   const [month, setMonth] = useState(initialMonth);
   const [eventsByMonth, setEventsByMonth] = useState<Record<string, CalendarEvent[]>>({
     [initialMonth]: initialEvents,
@@ -87,10 +91,10 @@ export function MonthCalendar({
     } catch {
       if (requestId !== requestIdRef.current) return;
       setLoadError(
-        `Couldn't load ${formatMonthLabel(target)}. Check your connection and try again.`
+        `Couldn't load ${formatMonthLabel(target, locale)}. Check your connection and try again.`
       );
     }
-  }, []);
+  }, [locale]);
 
   const events = eventsByMonth[month];
 
@@ -107,7 +111,7 @@ export function MonthCalendar({
     [events, month, todayStr, currency]
   );
   const todayMonth = todayStr.slice(0, 7);
-  const monthLabel = formatMonthLabel(month);
+  const monthLabel = formatMonthLabel(month, locale);
 
   function goTo(target: string) {
     // Ignore responses and errors for the month being left.
@@ -119,7 +123,9 @@ export function MonthCalendar({
   const ahead =
     month >= todayMonth ? scheduledAhead(strip.days, todayStr) : null;
   const period =
-    month === todayMonth ? `for the rest of ${monthLabel.split(" ")[0]}` : `in ${monthLabel}`;
+    month === todayMonth
+      ? `for the rest of ${formatMonthInSentence(month, locale)}`
+      : `in ${formatMonthInSentence(month, locale, { withYear: true })}`;
 
   return (
     <LedgerSection
@@ -189,7 +195,7 @@ export function MonthCalendar({
       </div>
 
       <div aria-hidden="true" className="grid grid-cols-7 text-xs text-muted-foreground">
-        {WEEKDAYS.map((weekday) => (
+        {weekdayHeaders(locale).map((weekday) => (
           <div key={weekday} className="px-0.5 py-1 md:px-1.5">
             {weekday}
           </div>
@@ -206,7 +212,7 @@ export function MonthCalendar({
             type="button"
             disabled={day.events.length === 0}
             onClick={() => setOpenDate(day.date)}
-            aria-label={describeStripDay(day, currency)}
+            aria-label={describeStripDay(day, currency, locale)}
             className={cn(
               "flex min-h-16 min-w-0 flex-col items-start gap-0.5 overflow-hidden border-r border-b border-border p-0.5 text-left md:min-h-24 md:p-1.5",
               "hover:bg-secondary focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent",
@@ -224,22 +230,22 @@ export function MonthCalendar({
             <span className="flex max-w-full flex-col items-start gap-0.5 font-mono text-xs font-medium leading-tight">
               {day.spentCents > 0 && (
                 <span className="max-w-full truncate text-foreground">
-                  {formatShortCents(day.spentCents, currency)}
+                  {formatShortCents(day.spentCents, currency, locale)}
                 </span>
               )}
               {day.scheduledSpentCents > 0 && (
                 <span className="max-w-full truncate border border-foreground text-foreground md:px-0.5">
-                  {formatShortCents(day.scheduledSpentCents, currency)}
+                  {formatShortCents(day.scheduledSpentCents, currency, locale)}
                 </span>
               )}
               {day.receivedCents > 0 && (
                 <span className="max-w-full truncate text-success">
-                  {formatShortCents(day.receivedCents, currency)}
+                  {formatShortCents(day.receivedCents, currency, locale)}
                 </span>
               )}
               {day.scheduledReceivedCents > 0 && (
                 <span className="max-w-full truncate border border-success text-success md:px-0.5">
-                  {formatShortCents(day.scheduledReceivedCents, currency)}
+                  {formatShortCents(day.scheduledReceivedCents, currency, locale)}
                 </span>
               )}
             </span>
@@ -249,7 +255,7 @@ export function MonthCalendar({
 
       {ahead && events !== undefined && (
         <p className="mt-3 text-sm">
-          {aheadLine(ahead.dueCents, ahead.expectedCents, currency, period)}
+          {aheadLine(ahead.dueCents, ahead.expectedCents, currency, locale, period)}
         </p>
       )}
 

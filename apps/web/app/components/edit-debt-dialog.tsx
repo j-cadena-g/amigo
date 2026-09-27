@@ -19,6 +19,7 @@ import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface EditDebtDialogProps {
   debt: Debt;
@@ -27,6 +28,7 @@ interface EditDebtDialogProps {
 }
 
 export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps) {
+  const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
   const nameId = useId();
@@ -44,18 +46,18 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   // Loan fields
   const [loanAmount, setLoanAmount] = useState(
-    isLoan ? centsToInputString(debt.balanceInitial, debt.currency) : ""
+    isLoan ? centsToInputString(debt.balanceInitial, debt.currency, locale) : ""
   );
   const [totalPaid, setTotalPaid] = useState(
-    isLoan ? centsToInputString(debt.balanceCurrent, debt.currency) : ""
+    isLoan ? centsToInputString(debt.balanceCurrent, debt.currency, locale) : ""
   );
 
   // Credit card fields
   const [creditLimit, setCreditLimit] = useState(
-    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceInitial, debt.currency) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceInitial, debt.currency, locale) : ""
   );
   const [availableCredit, setAvailableCredit] = useState(
-    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceCurrent, debt.currency) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceCurrent, debt.currency, locale) : ""
   );
 
   async function handleSubmit(e: React.FormEvent) {

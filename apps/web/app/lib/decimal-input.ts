@@ -1,5 +1,6 @@
 import type { CurrencyCode } from "@amigo/db";
 import { currencyFractionDigits, formatCents } from "@/app/lib/currency";
+import { DEFAULT_LOCALE } from "@/app/lib/locale";
 
 const GROUPED_WHOLE: Record<"." | ",", RegExp> = {
   ".": /^\d{1,3}(?:\.\d{3})+$/,
@@ -74,29 +75,58 @@ export function amountValidationMessage(
     positive?: boolean;
     max?: number;
     currency?: CurrencyCode;
+    locale?: string;
   } = {}
 ): string {
   if (raw.trim() === "") return "";
+  const locale = options.locale ?? DEFAULT_LOCALE;
   const amount = parseAmount(raw);
-  if (amount === null) return "Enter an amount, like 1250.50 or 1.250,50.";
+  if (amount === null) return `Enter an amount, like ${exampleAmount(locale)}.`;
   if (options.positive && amount <= 0) return "Enter an amount greater than 0.";
   if (!options.allowNegative && amount < 0) return "Enter 0 or more.";
   if (options.max !== undefined && amount > options.max) {
-    return `Enter no more than ${formatCents(Math.round(options.max * 100), options.currency)}.`;
+    return `Enter no more than ${formatCents(Math.round(options.max * 100), options.currency, locale)}.`;
   }
   return "";
 }
 
+/** "," for locales that write 1,5 and "." otherwise; `parseAmount` reads either. */
+export function decimalSeparator(locale: string): "." | "," {
+  try {
+    const part = new Intl.NumberFormat(locale)
+      .formatToParts(1.5)
+      .find((p) => p.type === "decimal");
+    return part?.value === "," ? "," : ".";
+  } catch {
+    return ".";
+  }
+}
+
+/** "1,250.50" or "1.250,50": an amount written the viewer's way, for hints. */
+function exampleAmount(locale: string): string {
+  return decimalSeparator(locale) === "," ? "1.250,50" : "1,250.50";
+}
+
+/** Placeholder for an empty amount field, e.g. "0.00", "0,00", or "0" for pesos. */
+export function amountPlaceholder(
+  currency: string | null | undefined,
+  locale: string
+): string {
+  return currencyFractionDigits(currency) === 0 ? "0" : `0${decimalSeparator(locale)}00`;
+}
+
 /**
- * Format integer cents for a money input: "10.50", or "45000" for a currency
- * shown without decimals when there are no leftover cents.
+ * Format integer cents for a money input, ungrouped with the viewer's decimal
+ * separator: "10.50" or "10,50", or "45000" for a currency shown without
+ * decimals when there are no leftover cents.
  */
 export function centsToInputString(
   cents: number,
-  currency?: string | null
+  currency: string | null | undefined,
+  locale: string
 ): string {
   if (currencyFractionDigits(currency) === 0 && cents % 100 === 0) {
     return String(cents / 100);
   }
-  return (cents / 100).toFixed(2);
+  return (cents / 100).toFixed(2).replace(".", decimalSeparator(locale));
 }

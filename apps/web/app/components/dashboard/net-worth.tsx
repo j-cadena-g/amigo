@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import type { CurrencyCode } from "@amigo/db";
 import { formatSignedCents } from "@/app/lib/currency";
 import { LedgerSection } from "@/app/components/ledger";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface DashboardNetWorthProps {
   netWorthCents: number;
@@ -22,6 +23,7 @@ function NetWorthRow({
   cents: number;
   currency: CurrencyCode;
 }) {
+  const locale = useLocale();
   return (
     <li>
       <Link
@@ -30,7 +32,7 @@ function NetWorthRow({
       >
         <span className="font-semibold group-hover:underline">{label}</span>
         <span className="font-mono font-medium">
-          {formatSignedCents(cents, currency)}
+          {formatSignedCents(cents, currency, locale)}
         </span>
       </Link>
     </li>
@@ -44,12 +46,13 @@ export function DashboardNetWorth({
   currency,
   className,
 }: DashboardNetWorthProps) {
+  const locale = useLocale();
   return (
     <LedgerSection
       title="Net worth"
       aside={
         <span className="font-mono text-heading font-medium">
-          {formatSignedCents(netWorthCents, currency)}
+          {formatSignedCents(netWorthCents, currency, locale)}
         </span>
       }
       className={className}

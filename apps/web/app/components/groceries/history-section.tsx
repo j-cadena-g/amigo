@@ -4,6 +4,7 @@ import type { GroceryItemWithTags } from "./types";
 import { formatHistoryDate } from "./constants";
 import { CheckButton } from "./check-button";
 import { TagBadge } from "./tag-badge";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface HistorySectionProps {
   items: GroceryItemWithTags[];
@@ -24,6 +25,7 @@ export function HistorySection({
   onToggle,
   onUpdatePurchaseDate,
 }: HistorySectionProps) {
+  const locale = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
   const listId = useId();
 
@@ -32,7 +34,7 @@ export function HistorySection({
 
     for (const item of items) {
       const purchasedAt = item.purchasedAt ? new Date(item.purchasedAt) : new Date();
-      const label = formatHistoryDate(purchasedAt);
+      const label = formatHistoryDate(purchasedAt, locale);
       const dateOnly = new Date(
         purchasedAt.getFullYear(),
         purchasedAt.getMonth(),
@@ -49,7 +51,7 @@ export function HistorySection({
     }
 
     return Array.from(groupMap.values()).sort((a, b) => b.sortKey - a.sortKey);
-  }, [items]);
+  }, [items, locale]);
 
   if (items.length === 0) return null;
 

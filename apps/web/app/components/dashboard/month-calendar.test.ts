@@ -46,7 +46,7 @@ describe("MonthCalendar", () => {
 
     expect(html).toContain("September 2026");
     expect(html.match(/class="border-r border-b border-border"><\/div>/g)?.length).toBe(2);
-    expect(html).toContain(`aria-label="${describeStripDay(strip.days[11]!, "CAD")}"`);
+    expect(html).toContain(`aria-label="${describeStripDay(strip.days[11]!, "CAD", "en-CA")}"`);
     expect(html).toContain("bg-tag");
     expect(html).toContain("$1.3K");
     expect(html).toContain("$1,250.00 due for the rest of September.");

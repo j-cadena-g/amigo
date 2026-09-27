@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  amountPlaceholder,
   amountValidationMessage,
   centsToInputString,
   isPositiveAmount,
@@ -93,34 +94,59 @@ describe("amountValidationMessage", () => {
     expect(amountValidationMessage("600", { max: 500, currency: "CAD" })).toMatch(
       /^Enter no more than .*500\.00\.$/
     );
+    expect(
+      amountValidationMessage("600.000", { max: 500_000, currency: "COP", locale: "es-CO" })
+    ).toBe("Enter no more than $\u00a0500.000.");
+    expect(amountValidationMessage("abc", { locale: "es-CO" })).toBe(
+      "Enter an amount, like 1.250,50."
+    );
+    expect(amountValidationMessage("abc", { locale: "en-US" })).toBe(
+      "Enter an amount, like 1,250.50."
+    );
     expect(amountValidationMessage("500", { max: 500 })).toBe("");
   });
 });
 
 describe("centsToInputString", () => {
   it("formats integer cents with two decimal places", () => {
-    expect(centsToInputString(1050)).toBe("10.50");
-    expect(centsToInputString(0)).toBe("0.00");
-    expect(centsToInputString(5)).toBe("0.05");
-    expect(centsToInputString(123456, "CAD")).toBe("1234.56");
-    expect(centsToInputString(-1050, "CAD")).toBe("-10.50");
+    expect(centsToInputString(1050, "CAD", "en-CA")).toBe("10.50");
+    expect(centsToInputString(0, "CAD", "en-CA")).toBe("0.00");
+    expect(centsToInputString(5, "CAD", "en-CA")).toBe("0.05");
+    expect(centsToInputString(123456, "CAD", "en-CA")).toBe("1234.56");
+    expect(centsToInputString(-1050, "CAD", "en-CA")).toBe("-10.50");
+  });
+
+  it("uses the viewer's decimal comma, without grouping", () => {
+    expect(centsToInputString(123456, "CAD", "es-CO")).toBe("1234,56");
+    expect(centsToInputString(123456, "USD", "de-DE")).toBe("1234,56");
   });
 
   it("drops the decimals for whole amounts in currencies shown without them", () => {
-    expect(centsToInputString(4_500_000, "COP")).toBe("45000");
-    expect(centsToInputString(4_500_050, "COP")).toBe("45000.50");
+    expect(centsToInputString(4_500_000, "COP", "es-CO")).toBe("45000");
+    expect(centsToInputString(4_500_050, "COP", "es-CO")).toBe("45000,50");
   });
 
   it("round-trips through parseAmount", () => {
-    for (const [cents, currency] of [
-      [123456, "CAD"],
-      [4_500_000, "COP"],
-      [100_000, "COP"],
-      [-99, "USD"],
-    ] as const) {
-      expect(Math.round(parseAmount(centsToInputString(cents, currency))! * 100)).toBe(
-        cents
-      );
+    for (const locale of ["en-CA", "es-CO", "de-DE"]) {
+      for (const [cents, currency] of [
+        [123456, "CAD"],
+        [4_500_000, "COP"],
+        [4_500_050, "COP"],
+        [100_000, "COP"],
+        [-99, "USD"],
+      ] as const) {
+        expect(
+          Math.round(parseAmount(centsToInputString(cents, currency, locale))! * 100)
+        ).toBe(cents);
+      }
     }
+  });
+});
+
+describe("amountPlaceholder", () => {
+  it("shows the viewer's decimal separator, or none for whole-unit currencies", () => {
+    expect(amountPlaceholder("CAD", "en-CA")).toBe("0.00");
+    expect(amountPlaceholder("CAD", "es-CO")).toBe("0,00");
+    expect(amountPlaceholder("COP", "es-CO")).toBe("0");
   });
 });

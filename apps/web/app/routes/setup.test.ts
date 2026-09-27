@@ -4,8 +4,14 @@ import { createRouterLoadContext } from "../../router-context";
 import type { SessionStatus } from "../../server/env";
 import { loader } from "./setup";
 
-function makeLoaderArgs(sessionStatus: SessionStatus): LoaderFunctionArgs {
+function makeLoaderArgs(
+  sessionStatus: SessionStatus,
+  acceptLanguage?: string
+): LoaderFunctionArgs {
   return {
+    request: new Request("http://localhost/setup", {
+      headers: acceptLanguage ? { "Accept-Language": acceptLanguage } : {},
+    }),
     context: createRouterLoadContext({
       app: {
         cspNonce: "test-nonce",
@@ -37,6 +43,17 @@ describe("setup route loader", () => {
   });
 
   it("allows needs_setup sessions to access setup", () => {
-    expect(loader(makeLoaderArgs("needs_setup"))).toBeNull();
+    expect(loader(makeLoaderArgs("needs_setup"))).toEqual({ regionCurrency: null });
+  });
+
+  it("suggests a home currency from the browser's region", () => {
+    expect(loader(makeLoaderArgs("needs_setup", "en-US,en;q=0.9"))).toEqual({
+      regionCurrency: "USD",
+    });
+    expect(loader(makeLoaderArgs("needs_setup", "es,es-CO;q=0.9"))).toEqual({
+      regionCurrency: "COP",
+    });
+    expect(loader(makeLoaderArgs("needs_setup", "en-GB"))).toEqual({ regionCurrency: "GBP" });
+    expect(loader(makeLoaderArgs("needs_setup", "es"))).toEqual({ regionCurrency: null });
   });
 });

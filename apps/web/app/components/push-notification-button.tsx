@@ -2,15 +2,18 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/toast-provider";
 import {
-  subscribeToPush,
-  unsubscribeFromPush,
   getNotificationPermissionStatus,
   isSubscribed,
+  pushErrorCode,
+  subscribeToPush,
+  unsubscribeFromPush,
 } from "@/app/lib/push/client";
+import { useT } from "@/app/i18n";
 
 type Status = "loading" | "subscribed" | "unsubscribed" | "denied" | "unsupported";
 
 export function PushNotificationButton() {
+  const t = useT();
   const toast = useToast();
   const [status, setStatus] = useState<Status>("loading");
   const [isToggling, setIsToggling] = useState(false);
@@ -49,13 +52,9 @@ export function PushNotificationButton() {
       }
     } catch (error) {
       console.error("Failed to toggle notifications:", error);
-      const action = turningOff ? "turn off" : "turn on";
-      toast(
-        error instanceof Error
-          ? `Couldn't ${action} alerts: ${error.message}`
-          : `Couldn't ${action} alerts. Try again.`,
-        { variant: "error" }
-      );
+      toast(t.notifications.alertsFailed(turningOff, t.notifications.reason[pushErrorCode(error)]), {
+        variant: "error",
+      });
       await checkStatus();
     } finally {
       setIsToggling(false);
@@ -68,10 +67,7 @@ export function PushNotificationButton() {
 
   if (status === "denied") {
     return (
-      <p className="max-w-56 shrink-0 text-sm text-muted-foreground">
-        Alerts are blocked. Allow notifications for this site in your browser
-        settings.
-      </p>
+      <p className="max-w-56 shrink-0 text-sm text-muted-foreground">{t.notifications.alertsBlocked}</p>
     );
   }
 
@@ -84,19 +80,15 @@ export function PushNotificationButton() {
       onClick={() => void handleToggle()}
       disabled={isToggling}
       className="shrink-0"
-      title={
-        subscribed
-          ? "Turn off grocery list alerts"
-          : "Get a notification when the grocery list changes"
-      }
+      title={subscribed ? t.notifications.alertsOffTitle : t.notifications.promptTitle}
     >
       {isToggling
         ? subscribed
-          ? "Turning off…"
-          : "Turning on…"
+          ? t.notifications.turningOff
+          : t.notifications.turningOn
         : subscribed
-          ? "Alerts on"
-          : "Turn on alerts"}
+          ? t.notifications.alertsOn
+          : t.notifications.turnOnAlerts}
     </Button>
   );
 }

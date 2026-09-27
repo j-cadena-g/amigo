@@ -9,6 +9,7 @@ import { cn } from "@/app/lib/utils";
 import { tagColorKey, type TagColorKey } from "./constants";
 import { TagBadge } from "./tag-badge";
 import { TagColorPicker } from "./tag-color-picker";
+import { useT } from "@/app/i18n";
 
 interface TagSelectorProps {
   mode: "global" | "item";
@@ -36,6 +37,7 @@ export function TagSelector({
   onFilterToggle,
   itemName,
 }: TagSelectorProps) {
+  const t = useT();
   const confirm = useConfirm();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -104,10 +106,10 @@ export function TagSelector({
 
   async function handleDelete(tagId: string) {
     const ok = await confirm({
-      title: "Delete this tag?",
-      description: "It will be removed from every item on the list.",
-      confirmText: "Delete tag",
-      cancelText: "Cancel",
+      title: t.groceries.tags.deleteThisTitle,
+      description: t.groceries.tags.deleteThisBody,
+      confirmText: t.groceries.tags.delete,
+      cancelText: t.common.cancel,
       variant: "destructive",
     });
     if (ok) {
@@ -140,7 +142,7 @@ export function TagSelector({
           className="-ml-2 inline-flex h-10 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground"
         >
           <Tag className="h-4 w-4" aria-hidden="true" />
-          Filter by tag
+          {t.groceries.tags.filterByTag}
           {activeFilterCount > 0 && (
             <span className="font-mono text-foreground">({activeFilterCount})</span>
           )}
@@ -152,7 +154,7 @@ export function TagSelector({
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-controls={popoverId}
-          aria-label={itemName ? `Tags for ${itemName}` : "Tags"}
+          aria-label={itemName ? t.groceries.tags.tagsFor(itemName) : t.groceries.tags.tags}
           className="relative flex rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-foreground"
         >
           <Tag className="h-4 w-4" aria-hidden="true" />
@@ -170,12 +172,12 @@ export function TagSelector({
         >
           {editingTag ? (
             <div className="space-y-3">
-              <h4 className="font-semibold">Edit tag</h4>
+              <h4 className="font-semibold">{t.groceries.tags.editTag}</h4>
               <Input
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                aria-label="Tag name"
+                aria-label={t.groceries.tags.tagName}
                 autoFocus
               />
               <TagColorPicker value={editColor} onChange={setEditColor} />
@@ -187,7 +189,7 @@ export function TagSelector({
                   onClick={() => handleDelete(editingTag.id)}
                   className="-ml-3 text-destructive hover:text-destructive"
                 >
-                  Delete
+                  {t.common.delete}
                 </Button>
                 <div className="flex gap-2">
                   <Button
@@ -196,7 +198,7 @@ export function TagSelector({
                     size="sm"
                     onClick={() => setEditingTag(null)}
                   >
-                    Cancel
+                    {t.common.cancel}
                   </Button>
                   <Button
                     type="button"
@@ -204,7 +206,7 @@ export function TagSelector({
                     onClick={handleEditSave}
                     disabled={!editName.trim()}
                   >
-                    Save tag
+                    {t.groceries.tags.save}
                   </Button>
                 </div>
               </div>
@@ -213,13 +215,13 @@ export function TagSelector({
             <>
               <Input
                 type="text"
-                placeholder="Search or create a tag"
+                placeholder={t.groceries.tags.searchOrCreate}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && canCreate && !isCreating) handleCreate();
                 }}
-                aria-label="Search or create a tag"
+                aria-label={t.groceries.tags.searchOrCreate}
                 autoFocus
               />
 
@@ -234,7 +236,7 @@ export function TagSelector({
                     className="w-full"
                   >
                     <span className="min-w-0 truncate">
-                      {isCreating ? "Creating…" : <>Create &ldquo;{search.trim()}&rdquo;</>}
+                      {isCreating ? t.groceries.tags.creating : t.groceries.tags.create(search.trim())}
                     </span>
                   </Button>
                 </div>
@@ -280,7 +282,7 @@ export function TagSelector({
                       <button
                         type="button"
                         onClick={() => startEdit(tag)}
-                        aria-label={`Edit tag ${tag.name}`}
+                        aria-label={t.groceries.tags.editNamed(tag.name)}
                         className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-background hover:text-foreground"
                       >
                         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -291,7 +293,7 @@ export function TagSelector({
               </ul>
               {filteredTags.length === 0 && !canCreate && (
                 <p className="py-2 text-sm text-muted-foreground">
-                  No tags yet. Type a name to create one.
+                  {t.groceries.tags.noneYet}
                 </p>
               )}
               {allTags.length > 0 && (
@@ -300,7 +302,7 @@ export function TagSelector({
                     to="/settings#grocery-tags"
                     className="text-sm font-semibold underline decoration-muted-foreground/60 underline-offset-4 hover:decoration-foreground"
                   >
-                    Manage tags
+                    {t.groceries.tags.manage}
                   </Link>
                 </div>
               )}

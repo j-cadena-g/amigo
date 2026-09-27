@@ -1,4 +1,4 @@
-import { FORMAT_LOCALES, type FormatLocale } from "@amigo/db";
+import { FORMAT_LOCALES, UI_LANGUAGES, type FormatLocale, type UiLanguage } from "@amigo/db";
 import { currencyHomeLocale } from "@/app/lib/currency";
 
 /** Used when nothing else is known, matching the app's CAD default. */
@@ -81,22 +81,37 @@ function matchFormatLocale(tag: string): FormatLocale | null {
  * 1. The user's saved choice.
  * 2. The household's conventions (from its home currency), so an English
  *    browser in a Canadian household keeps "$1,234.56".
- * 3. The browser's language instead, when it differs from the household's,
- *    so a Spanish browser gets "1.234,56" without visiting Settings.
+ * 3. The viewer's language instead, when it differs from the household's,
+ *    so a Spanish reader gets "1.234,56" and "27 sept" without picking a
+ *    format. A saved interface language counts as their first choice, ahead
+ *    of the browser's.
  */
 export function resolveLocale({
   preferred,
   homeCurrency,
   acceptLanguage,
+  language,
 }: {
   preferred?: string | null;
   homeCurrency?: string | null;
   acceptLanguage?: string | null;
+  /** The saved interface language, if any. */
+  language?: string | null;
 }): FormatLocale {
   if (isFormatLocale(preferred)) return preferred;
 
   const householdLocale = homeCurrency ? currencyHomeLocale(homeCurrency) : DEFAULT_LOCALE;
-  for (const tag of parseAcceptLanguage(acceptLanguage)) {
+  // A saved language goes first, but a browser tag in that same language
+  // ("es-MX" for "es") keeps its region ahead of the bare language.
+  const browserTags = parseAcceptLanguage(acceptLanguage);
+  const tags = language
+    ? [
+        ...browserTags.filter((tag) => languageOf(tag) === language),
+        language,
+        ...browserTags.filter((tag) => languageOf(tag) !== language),
+      ]
+    : browserTags;
+  for (const tag of tags) {
     const browserLocale = matchFormatLocale(tag);
     if (!browserLocale) continue;
     return languageOf(browserLocale) === languageOf(householdLocale)
@@ -104,4 +119,25 @@ export function resolveLocale({
       : browserLocale;
   }
   return householdLocale;
+}
+
+function isSupportedLanguage(value: unknown): value is UiLanguage {
+  return (UI_LANGUAGES as readonly unknown[]).includes(value);
+}
+
+/**
+ * Pick the interface language: the user's saved choice, else the language of
+ * their resolved number and date format (so "es-CO" reads in Spanish), else
+ * English for formats whose language isn't translated yet.
+ */
+export function resolveLanguage({
+  preferred,
+  locale,
+}: {
+  preferred?: string | null;
+  locale: string;
+}): UiLanguage {
+  if (isSupportedLanguage(preferred)) return preferred;
+  const language = languageOf(locale);
+  return isSupportedLanguage(language) ? language : "en";
 }

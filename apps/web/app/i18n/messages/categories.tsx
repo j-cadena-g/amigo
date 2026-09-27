@@ -1,0 +1,76 @@
+import { defineMessages } from "../define";
+
+/** Financial categories: the picker, the management panel, and budget links. */
+export const categories = defineMessages({
+  en: {
+    select: "Select category",
+    typeLabel: "Category type",
+    namePlaceholder: "e.g. Streaming",
+    parentOptional: "Parent category (optional)",
+    topLevel: "None (top level)",
+    add: "Add category",
+    loading: "Loading categories…",
+    loadFailed: "Couldn't load categories. Reload the page to try again.",
+    none: "No categories yet.",
+    archived: "Archived",
+    archive: "Archive",
+    archiveNamed: (name: string) => `Archive ${name}`,
+    removeNamed: (name: string) => `Remove ${name}`,
+    archiveTitle: "Archive category?",
+    archiveBody:
+      "It and its subcategories will disappear from pickers. Existing transactions keep their category history.",
+    removeTitle: "Remove category?",
+    removeBody:
+      "If it's used by transactions or recurring rules, it will be archived instead so history is preserved. Otherwise it and its subcategories are permanently removed.",
+    addAction: "add the category",
+    archiveAction: "archive the category",
+    removeAction: "remove the category",
+    links: {
+      loading: "Loading budget links…",
+      loadFailed: "Couldn't load budget links. Reload the page to try again.",
+      override: "Subcategories override their parent when set.",
+      noExpenseCategories: "No expense categories yet.",
+      parentDefault: "Default for unlinked subcategories",
+      save: "Save links",
+      saved: "Links saved.",
+      saveAction: "save the links",
+      shared: "(shared)",
+    },
+  },
+  es: {
+    select: "Elige una categoría",
+    typeLabel: "Tipo de categoría",
+    namePlaceholder: "p. ej. Streaming",
+    parentOptional: "Categoría principal (opcional)",
+    topLevel: "Ninguna (nivel superior)",
+    add: "Agregar categoría",
+    loading: "Cargando categorías…",
+    loadFailed: "No se pudieron cargar las categorías. Recarga la página para intentarlo de nuevo.",
+    none: "Todavía no hay categorías.",
+    archived: "Archivada",
+    archive: "Archivar",
+    archiveNamed: (name: string) => `Archivar ${name}`,
+    removeNamed: (name: string) => `Quitar ${name}`,
+    archiveTitle: "¿Archivar la categoría?",
+    archiveBody:
+      "Ella y sus subcategorías dejarán de aparecer en las listas. Los movimientos existentes conservan su categoría en el historial.",
+    removeTitle: "¿Quitar la categoría?",
+    removeBody:
+      "Si la usan movimientos o reglas recurrentes, se archivará para conservar el historial. Si no, ella y sus subcategorías se eliminan de forma permanente.",
+    addAction: "agregar la categoría",
+    archiveAction: "archivar la categoría",
+    removeAction: "quitar la categoría",
+    links: {
+      loading: "Cargando vínculos con presupuestos…",
+      loadFailed:
+        "No se pudieron cargar los vínculos con presupuestos. Recarga la página para intentarlo de nuevo.",
+      override: "Las subcategorías reemplazan a su categoría principal cuando tienen uno.",
+      noExpenseCategories: "Todavía no hay categorías de gastos.",
+      parentDefault: "Predeterminado para subcategorías sin vínculo",
+      save: "Guardar vínculos",
+      saved: "Vínculos guardados.",
+      saveAction: "guardar los vínculos",
+      shared: "(compartido)",
+    },
+  },
+});

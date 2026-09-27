@@ -1,4 +1,10 @@
-export type AcceptInviteResult = { ok: true } | { ok: false; error: string };
+/**
+ * `error` is the server's message when it sent one; `network` means the
+ * request never arrived. The page words the fallback in the viewer's language.
+ */
+export type AcceptInviteResult =
+  | { ok: true }
+  | { ok: false; error: string | null; network: boolean };
 
 const acceptInFlight = new Map<string, Promise<AcceptInviteResult>>();
 
@@ -34,9 +40,9 @@ export async function acceptInvite(
       const data = (await res.json().catch(() => null)) as {
         error?: string;
       } | null;
-      return { ok: false, error: data?.error ?? "Could not accept invite" };
+      return { ok: false, error: data?.error ?? null, network: false };
     } catch {
-      return { ok: false, error: "Network error. Please try again." };
+      return { ok: false, error: null, network: true };
     }
   })();
 

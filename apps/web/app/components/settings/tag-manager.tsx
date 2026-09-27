@@ -10,6 +10,7 @@ import { TagDot } from "@/app/components/groceries/tag-badge";
 import { TagColorPicker } from "@/app/components/groceries/tag-color-picker";
 import { tagColorKey, type TagColorKey } from "@/app/components/groceries/constants";
 import { connectionFailedMessage, toastMutationFailure } from "@/app/lib/api-error";
+import { useT } from "@/app/i18n";
 
 export interface ManagedTag {
   id: string;
@@ -20,15 +21,8 @@ export interface ManagedTag {
 
 const NEW_TAG = "new";
 
-function duplicateNameMessage(name: string): string {
-  return `“${name}” already exists. Choose another name.`;
-}
-
-function itemsLabel(count: number): string {
-  return `${count} ${count === 1 ? "item" : "items"}`;
-}
-
 export function TagManager({ tags }: { tags: ManagedTag[] }) {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
@@ -54,8 +48,8 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
     e.preventDefault();
     const name = newName.trim();
     if (!name || busyRef.current) return;
-    if (tags.some((t) => t.name.toLowerCase() === name.toLowerCase())) {
-      setCreateError(duplicateNameMessage(name));
+    if (tags.some((tag) => tag.name.toLowerCase() === name.toLowerCase())) {
+      setCreateError(t.groceries.tags.duplicate(name));
       return;
     }
     busyRef.current = true;
@@ -68,18 +62,18 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
         body: JSON.stringify({ name, color: newColor }),
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Add tag");
+        await toastMutationFailure(toast, res, t.groceries.actions.addTag, t.common);
         return;
       }
       revalidator.revalidate();
       // 200 means another member added the same name first.
       if (res.status !== 201) {
-        setCreateError(duplicateNameMessage(name));
+        setCreateError(t.groceries.tags.duplicate(name));
         return;
       }
       closeAdd();
     } catch {
-      toast(connectionFailedMessage("Add tag"), { variant: "error" });
+      toast(connectionFailedMessage(t.common, t.groceries.actions.addTag), { variant: "error" });
     } finally {
       busyRef.current = false;
       setBusyId(null);
@@ -104,14 +98,14 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
         body: JSON.stringify({ name, color: editColor }),
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Save tag");
+        await toastMutationFailure(toast, res, t.groceries.actions.saveTag, t.common);
         return;
       }
       // Leave another tag's editor open if one was started mid-save.
       setEditingId((current) => (current === tag.id ? null : current));
       revalidator.revalidate();
     } catch {
-      toast(connectionFailedMessage("Save tag"), { variant: "error" });
+      toast(connectionFailedMessage(t.common, t.groceries.actions.saveTag), { variant: "error" });
     } finally {
       busyRef.current = false;
       setBusyId(null);
@@ -120,13 +114,10 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
 
   async function remove(tag: ManagedTag) {
     const ok = await confirm({
-      title: `Delete “${tag.name}”?`,
-      description:
-        tag.itemCount > 0
-          ? `It comes off ${itemsLabel(tag.itemCount)} on your list and in history. The items stay.`
-          : "No items use it.",
-      confirmText: "Delete tag",
-      cancelText: "Cancel",
+      title: t.groceries.tags.deleteTitle(tag.name),
+      description: t.groceries.tags.deleteBody(tag.itemCount),
+      confirmText: t.groceries.tags.delete,
+      cancelText: t.common.cancel,
       variant: "destructive",
     });
     if (!ok || busyRef.current) return;
@@ -135,13 +126,13 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
     try {
       const res = await fetch(`/api/tags/${tag.id}`, { method: "DELETE" });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Delete tag");
+        await toastMutationFailure(toast, res, t.groceries.actions.deleteTag, t.common);
         return;
       }
       setEditingId((current) => (current === tag.id ? null : current));
       revalidator.revalidate();
     } catch {
-      toast(connectionFailedMessage("Delete tag"), { variant: "error" });
+      toast(connectionFailedMessage(t.common, t.groceries.actions.deleteTag), { variant: "error" });
     } finally {
       busyRef.current = false;
       setBusyId(null);
@@ -151,7 +142,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
   return (
     <LedgerSection
       id="grocery-tags"
-      title="Grocery tags"
+      title={t.groceries.tags.title}
       aside={
         !adding && (
           <Button
@@ -161,7 +152,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
             onClick={() => setAdding(true)}
           >
             <Plus />
-            Add tag
+            {t.groceries.tags.add}
           </Button>
         )
       }
@@ -181,9 +172,9 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
               setNewName(e.target.value);
               setCreateError(null);
             }}
-            placeholder="Costco, Produce, Kids…"
+            placeholder={t.groceries.tags.newTagPlaceholder}
             maxLength={50}
-            aria-label="New tag name"
+            aria-label={t.groceries.tags.newTagName}
             aria-describedby={createError ? "new-tag-error" : undefined}
             autoFocus
           />
@@ -195,14 +186,14 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
           )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={closeAdd}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button
               type="submit"
               size="sm"
               disabled={!newName.trim() || busyId !== null}
             >
-              {busyId === NEW_TAG ? "Adding…" : "Add tag"}
+              {busyId === NEW_TAG ? t.common.adding : t.groceries.tags.add}
             </Button>
           </div>
         </form>
@@ -210,15 +201,14 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
 
       {tags.length === 0 ? (
         <p className="py-4 text-sm text-muted-foreground">
-          No grocery tags yet. Add one here, or from the tag button on any item
-          in{" "}
-          <Link
-            to="/groceries"
-            className="underline decoration-muted-foreground/60 underline-offset-4 hover:text-foreground hover:decoration-foreground"
-          >
-            Groceries
-          </Link>
-          .
+          {t.groceries.tags.emptyHint((text) => (
+            <Link
+              to="/groceries"
+              className="underline decoration-muted-foreground/60 underline-offset-4 hover:text-foreground hover:decoration-foreground"
+            >
+              {text}
+            </Link>
+          ))}
         </p>
       ) : (
         <ul className="divide-y divide-border">
@@ -235,7 +225,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                   }}
                   maxLength={50}
                   disabled={busyId === tag.id}
-                  aria-label="Tag name"
+                  aria-label={t.groceries.tags.tagName}
                   autoFocus
                 />
                 <TagColorPicker value={editColor} onChange={setEditColor} />
@@ -246,7 +236,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                     size="sm"
                     onClick={() => setEditingId(null)}
                   >
-                    Cancel
+                    {t.common.cancel}
                   </Button>
                   <Button
                     type="button"
@@ -254,7 +244,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                     onClick={() => void save(tag)}
                     disabled={!editName.trim() || busyId !== null}
                   >
-                    {busyId === tag.id ? "Saving…" : "Save tag"}
+                    {busyId === tag.id ? t.common.saving : t.groceries.tags.save}
                   </Button>
                 </div>
               </li>
@@ -264,7 +254,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                   <TagDot color={tag.color} className="h-3 w-3" />
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{tag.name}</p>
-                    <p className="text-sm text-muted-foreground">{itemsLabel(tag.itemCount)}</p>
+                    <p className="text-sm text-muted-foreground">{t.groceries.tags.itemCount(tag.itemCount)}</p>
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -274,7 +264,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                     size="icon"
                     onClick={() => startEdit(tag)}
                     disabled={busyId !== null}
-                    aria-label={`Edit tag ${tag.name}`}
+                    aria-label={t.groceries.tags.editNamed(tag.name)}
                   >
                     <Pencil />
                   </Button>
@@ -284,7 +274,7 @@ export function TagManager({ tags }: { tags: ManagedTag[] }) {
                     size="icon"
                     onClick={() => void remove(tag)}
                     disabled={busyId !== null}
-                    aria-label={`Delete tag ${tag.name}`}
+                    aria-label={t.groceries.tags.deleteNamed(tag.name)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 />

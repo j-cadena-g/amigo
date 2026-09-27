@@ -3,6 +3,7 @@ import {
   eq,
   FORMAT_LOCALES,
   getDb,
+  UI_LANGUAGES,
   households,
   scopeToHousehold,
   users,
@@ -13,15 +14,21 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { AppSession } from "../env";
 import type { ApiHandler } from "./route";
 
-const patchMeSchema = z.object({
-  /** A supported format, or null to follow the household and browser. */
-  locale: z.enum(FORMAT_LOCALES).nullable(),
-});
+const patchMeSchema = z
+  .object({
+    /** A supported format, or null to follow the household and browser. */
+    locale: z.enum(FORMAT_LOCALES).nullable().optional(),
+    /** An interface language, or null to follow the format. */
+    language: z.enum(UI_LANGUAGES).nullable().optional(),
+  })
+  .refine((body) => body.locale !== undefined || body.language !== undefined, {
+    message: "Nothing to update",
+  });
 
 async function meBody(db: ReturnType<typeof getDb>, session: AppSession) {
   const [user, household] = await Promise.all([
     db.query.users.findFirst({
-      columns: { locale: true },
+      columns: { locale: true, language: true },
       where: and(
         eq(users.id, session.userId),
         scopeToHousehold(users.householdId, session.householdId)
@@ -39,6 +46,7 @@ async function meBody(db: ReturnType<typeof getDb>, session: AppSession) {
       name: session.name,
       role: session.role,
       locale: user?.locale ?? null,
+      language: user?.language ?? null,
     },
     household: household
       ? {
@@ -55,7 +63,7 @@ async function meBody(db: ReturnType<typeof getDb>, session: AppSession) {
  * Returns the authenticated user's identity, household role, and household
  * settings as JSON. Mirrors the session that page loaders resolve server-side,
  * so non-browser clients have a single endpoint to bootstrap from. PATCH sets
- * the user's own preferences (their number and date format).
+ * the user's own preferences: interface language and number and date format.
  */
 export const handleMeRequest: ApiHandler = async ({ env, request, session }) => {
   const db = getDb(env.DB);
@@ -77,10 +85,13 @@ export const handleMeRequest: ApiHandler = async ({ env, request, session }) => 
     );
     await assertSessionStillValid(db, session!);
 
-    const { locale } = patchMeSchema.parse(await request.json());
+    const { locale, language } = patchMeSchema.parse(await request.json());
     await db
       .update(users)
-      .set({ locale })
+      .set({
+        ...(locale !== undefined && { locale }),
+        ...(language !== undefined && { language }),
+      })
       .where(
         and(
           eq(users.id, session!.userId),

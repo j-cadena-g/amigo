@@ -7,6 +7,7 @@ import { CheckButton } from "./check-button";
 import { checkOffDelayMs, prefersReducedMotion } from "./check-off";
 import { TagBadge } from "./tag-badge";
 import { TagSelector } from "./tag-selector";
+import { useT } from "@/app/i18n";
 
 interface GroceryItemProps {
   item: GroceryItemWithTags;
@@ -33,6 +34,7 @@ function GroceryItemComponent({
   onDeleteTag,
   onEditTag,
 }: GroceryItemProps) {
+  const t = useT();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(item.itemName);
   const [isCheckingOff, setIsCheckingOff] = useState(false);
@@ -128,7 +130,7 @@ function GroceryItemComponent({
         onPointerLeave={clearLongPressTimer}
         onPointerCancel={clearLongPressTimer}
         className="mt-0.5"
-        aria-label={`Mark ${item.itemName} as bought`}
+        aria-label={t.groceries.markBought(item.itemName)}
       />
 
       <div className="min-w-0 flex-1">
@@ -143,7 +145,7 @@ function GroceryItemComponent({
               if (e.key === "Enter") handleSaveEdit();
               if (e.key === "Escape") setIsEditing(false);
             }}
-            aria-label={`Edit name for ${item.itemName}`}
+            aria-label={t.groceries.editName(item.itemName)}
             className="-ml-1 block w-full rounded-md border border-foreground bg-background px-1 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         ) : (
@@ -184,7 +186,7 @@ function GroceryItemComponent({
         <button
           type="button"
           onClick={() => onDelete(item.id)}
-          aria-label={`Delete ${item.itemName}`}
+          aria-label={t.groceries.deleteNamed(item.itemName)}
           className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />

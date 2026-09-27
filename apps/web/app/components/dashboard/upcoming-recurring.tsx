@@ -5,6 +5,7 @@ import { formatLedgerDate } from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
 import { LedgerRow, LedgerSection, SectionLink } from "@/app/components/ledger";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface DashboardUpcomingRecurringProps {
   items: UpcomingRecurring[];
@@ -15,17 +16,19 @@ export function DashboardUpcomingRecurring({
   items,
   className,
 }: DashboardUpcomingRecurringProps) {
+  const t = useT();
+  const frequencies: Record<string, string> = t.common.frequencies;
+  const frequencyLabel = (frequency: string) =>
+    (frequencies[frequency] ?? frequency).toLocaleLowerCase();
   const locale = useLocale();
   return (
     <LedgerSection
-      title="Coming up"
-      aside={<SectionLink to="/financial/recurring">Recurring</SectionLink>}
+      title={t.dashboard.comingUp}
+      aside={<SectionLink to="/financial/recurring">{t.nav.recurring}</SectionLink>}
       className={className}
     >
       {items.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">
-          No recurring bills or pay scheduled.
-        </p>
+        <p className="py-4 text-sm text-muted-foreground">{t.dashboard.nothingScheduled}</p>
       ) : (
         <ul className="divide-y divide-border">
           {items.map((r) => (
@@ -33,7 +36,7 @@ export function DashboardUpcomingRecurring({
               key={r.id}
               date={formatLedgerDate(r.nextRunDate, locale)}
               label={r.description || r.category}
-              meta={`${r.description ? `${r.category} · ` : ""}${r.frequency.toLowerCase()}`}
+              meta={`${r.description ? `${r.category} · ` : ""}${frequencyLabel(r.frequency)}`}
               figure={
                 <span className={cn(r.type === "income" && "text-success")}>
                   {formatSignedCents(

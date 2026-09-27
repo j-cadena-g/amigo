@@ -99,6 +99,21 @@ describe("me integration", () => {
       expect((await readLocale(Promise.resolve(cleared)))).toBeNull();
     });
 
+    it("saves the language on its own without touching the format", async () => {
+      await call("PATCH", { locale: "en-CA" });
+      const saved = await call("PATCH", { language: "es" });
+      const body = (await saved.json()) as {
+        user: { locale: string | null; language: string | null };
+      };
+      expect(body.user).toMatchObject({ locale: "en-CA", language: "es" });
+
+      const cleared = await call("PATCH", { language: null });
+      expect(
+        ((await cleared.json()) as { user: { language: string | null } }).user.language
+      ).toBeNull();
+      await expect(call("PATCH", { language: "fr" })).rejects.toThrow();
+    });
+
     it("rejects formats outside the supported list", async () => {
       await expect(call("PATCH", { locale: "xx-YY" })).rejects.toThrow();
       await expect(call("PATCH", {})).rejects.toThrow();

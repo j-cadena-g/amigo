@@ -28,6 +28,7 @@
   "dependencies": {
     "@amigo/db": "workspace:*",
     "@clerk/backend": "^3.18.1",
+    "@clerk/localizations": "^4.20.0",
     "@clerk/react-router": "^3.6.24",
     "@fontsource-variable/archivo": "^5.3.0",
     "@fontsource-variable/atkinson-hyperlegible-mono": "^5.3.0",

@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb } from "@amigo/db";
 import { MonthHero } from "@/app/components/dashboard/month-hero";
@@ -12,6 +12,7 @@ import { WhereItWent } from "@/app/components/dashboard/where-it-went";
 import { loadDashboardData } from "@/server/lib/dashboard-data";
 import { capitalizeFirst } from "@/app/lib/format-dates";
 import { useLocale } from "@/app/lib/use-locale";
+import { pageTitle } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -20,8 +21,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
   return loadDashboardData(db, env, session);
 }
 
-export function meta() {
-  return [{ title: "Home · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.home);
 }
 
 function monthOf(

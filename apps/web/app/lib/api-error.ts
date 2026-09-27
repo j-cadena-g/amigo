@@ -1,16 +1,19 @@
 import type { ToastFn } from "@/app/components/toast-provider";
+import type { Messages } from "@/app/i18n";
 
-export const RATE_LIMIT_MESSAGE =
-  "Too many changes at once. Wait a moment and try again.";
+type CommonMessages = Messages["common"];
 
-/** Fallback when the server rejected a request without a message. */
-export function requestFailedMessage(label: string): string {
-  return `${label} failed. Try again.`;
+/**
+ * Fallback when the server rejected a request without a message. `action` is
+ * a translated verb phrase such as "save the tag" / "guardar la etiqueta".
+ */
+export function requestFailedMessage(common: CommonMessages, action: string): string {
+  return common.couldNot(action);
 }
 
 /** The request never reached the server. */
-export function connectionFailedMessage(label: string): string {
-  return `${label} failed. Check your connection and try again.`;
+export function connectionFailedMessage(common: CommonMessages, action: string): string {
+  return common.couldNotConnection(action);
 }
 
 export async function readApiErrorMessage(
@@ -32,18 +35,19 @@ export async function readApiErrorMessage(
 export async function toastMutationFailure(
   toast: ToastFn,
   res: Response | null,
-  label: string
+  action: string,
+  common: CommonMessages
 ): Promise<void> {
   if (res === null) {
-    toast(connectionFailedMessage(label), { variant: "error" });
+    toast(connectionFailedMessage(common, action), { variant: "error" });
     return;
   }
 
   if (res.status === 429) {
-    toast(RATE_LIMIT_MESSAGE, { variant: "error" });
+    toast(common.rateLimited, { variant: "error" });
     return;
   }
 
   const message = await readApiErrorMessage(res);
-  toast(message ?? requestFailedMessage(label), { variant: "error" });
+  toast(message ?? requestFailedMessage(common, action), { variant: "error" });
 }

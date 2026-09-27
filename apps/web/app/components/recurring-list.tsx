@@ -21,6 +21,7 @@ import {
   EditRecurringDialog,
 } from "@/app/components/recurring-dialogs";
 import { useLocale } from "@/app/lib/use-locale";
+import { useLanguage, useT } from "@/app/i18n";
 
 interface RecurringRule {
   id: string;
@@ -66,6 +67,8 @@ function RecurringRuleRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
+  const language = useLanguage();
   const locale = useLocale();
   const isIncome = rule.type === "income";
   const title = rule.description || rule.category;
@@ -76,7 +79,7 @@ function RecurringRuleRow({
         checked={rule.isActive}
         disabled={toggling}
         onCheckedChange={onToggle}
-        aria-label={rule.isActive ? `Pause ${title}` : `Resume ${title}`}
+        aria-label={rule.isActive ? t.recurring.pause(title) : t.recurring.resume(title)}
       />
 
       <div className={cn("min-w-0 flex-1", !rule.isActive && "text-muted-foreground")}>
@@ -95,27 +98,27 @@ function RecurringRuleRow({
         </div>
         <p className="text-sm text-muted-foreground">
           {rule.description ? `${rule.category} · ` : ""}
-          {getFrequencyLabel(rule)} ·{" "}
+          {getFrequencyLabel(rule, language)} ·{" "}
           {rule.isActive ? (
             <>
-              Next <span className="font-mono">{formatLedgerDate(rule.nextRunDate, locale)}</span>
+              {t.recurring.next} <span className="font-mono">{formatLedgerDate(rule.nextRunDate, locale)}</span>
             </>
           ) : (
-            "Paused"
+            t.recurring.paused
           )}
           {rule.currency !== homeCurrency ? ` · ${rule.currency}` : ""}
         </p>
       </div>
 
       <div className="-mr-2 flex shrink-0">
-        <RowIconButton onClick={onEdit} aria-label={`Edit ${title}`}>
+        <RowIconButton onClick={onEdit} aria-label={t.recurring.editNamed(title)}>
           <Pencil />
         </RowIconButton>
         <RowIconButton
           tone="destructive"
           onClick={onDelete}
           disabled={deleting}
-          aria-label={`Delete ${title}`}
+          aria-label={t.recurring.deleteNamed(title)}
         >
           <Trash2 />
         </RowIconButton>
@@ -125,6 +128,7 @@ function RecurringRuleRow({
 }
 
 export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
+  const t = useT();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
   const toast = useToast();
@@ -143,9 +147,9 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         revalidator.revalidate();
         return;
       }
-      await toastMutationFailure(toast, res, "Update recurring transaction");
+      await toastMutationFailure(toast, res, t.recurring.updateAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Update recurring transaction");
+      await toastMutationFailure(toast, null, t.recurring.updateAction, t.common);
     } finally {
       setToggling(null);
     }
@@ -156,10 +160,9 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
     setDeleting(rule.id);
     try {
       const ok = await confirm({
-        title: "Delete recurring transaction?",
-        description:
-          "It stops creating new transactions. Ones it already posted stay.",
-        confirmText: "Delete",
+        title: t.recurring.deleteTitle,
+        description: t.recurring.deleteBody,
+        confirmText: t.common.delete,
         variant: "destructive",
       });
       if (!ok) return false;
@@ -171,9 +174,9 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         revalidator.revalidate();
         return true;
       }
-      await toastMutationFailure(toast, res, "Delete recurring transaction");
+      await toastMutationFailure(toast, res, t.recurring.deleteAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Delete recurring transaction");
+      await toastMutationFailure(toast, null, t.recurring.deleteAction, t.common);
     } finally {
       setDeleting(null);
     }
@@ -192,24 +195,24 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
     <div className="space-y-10">
       <div>
         <FinancialSectionHeader
-          title="Recurring"
-          description="Each one posts automatically on its next date."
+          title={t.nav.recurring}
+          description={t.recurring.intro}
           className="border-b border-foreground pb-3"
           action={
             <Button type="button" onClick={openAdd}>
               <Plus />
-              Add recurring
+              {t.recurring.add}
             </Button>
           }
         />
 
         {rules.length === 0 ? (
           <EmptyState
-            message="No recurring transactions yet. Add rent, pay, or a subscription and it will post on schedule."
+            message={t.recurring.empty}
             action={
               <Button type="button" onClick={openAdd}>
                 <Plus />
-                Add recurring
+                {t.recurring.add}
               </Button>
             }
           />
@@ -231,7 +234,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         )}
       </div>
 
-      <FinancialCollapsiblePanel title="Manage categories">
+      <FinancialCollapsiblePanel title={t.transactions.manageCategories}>
         <CategoryManagementPanel />
       </FinancialCollapsiblePanel>
 

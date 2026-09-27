@@ -5,6 +5,7 @@ import { formatSignedCents } from "@/app/lib/currency";
 import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
 import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
 import { useLocale } from "@/app/lib/use-locale";
+import { type Messages, useT } from "@/app/i18n";
 
 export interface Asset {
   id: string;
@@ -30,11 +31,13 @@ function byTypeOrder(a: Asset, b: Asset): number {
   return TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type);
 }
 
-function assetTypeLabel(type: Asset["type"]): string {
-  return type.charAt(0) + type.slice(1).toLowerCase();
+function assetTypeLabel(type: Asset["type"], t: Messages): string {
+  const labels: Record<string, string> = t.accounts.assetTypes;
+  return labels[type] ?? type.charAt(0) + type.slice(1).toLowerCase();
 }
 
 export function AssetCards({ assets, homeCurrency, session: _session }: AssetCardsProps) {
+  const t = useT();
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   const shared = assets.filter((a) => a.isShared).sort(byTypeOrder);
@@ -53,10 +56,10 @@ export function AssetCards({ assets, homeCurrency, session: _session }: AssetCar
   return (
     <>
       {shared.length > 0 && (
-        <LedgerSubgroup title="Shared">{renderRows(shared)}</LedgerSubgroup>
+        <LedgerSubgroup title={t.accounts.shared}>{renderRows(shared)}</LedgerSubgroup>
       )}
       {personal.length > 0 && (
-        <LedgerSubgroup title="Personal">{renderRows(personal)}</LedgerSubgroup>
+        <LedgerSubgroup title={t.accounts.personal}>{renderRows(personal)}</LedgerSubgroup>
       )}
 
       {editingAsset && (
@@ -81,10 +84,11 @@ function AssetRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const t = useT();
   const locale = useLocale();
   const meta = [
-    assetTypeLabel(asset.type),
-    asset.isShared ? "Shared" : "Personal",
+    assetTypeLabel(asset.type, t),
+    asset.isShared ? t.accounts.asset.sharedTag : t.accounts.asset.personalTag,
     asset.currency !== homeCurrency ? asset.currency : null,
   ]
     .filter(Boolean)
@@ -104,7 +108,7 @@ function AssetRow({
       <RowIconButton
         className="-mr-2"
         onClick={onEdit}
-        aria-label={`Edit asset ${asset.name}`}
+        aria-label={t.accounts.asset.editNamed(asset.name)}
       >
         <Pencil />
       </RowIconButton>

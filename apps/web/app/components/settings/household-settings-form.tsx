@@ -3,6 +3,8 @@ import { useRevalidator } from "react-router";
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { buildTimezoneOptions } from "@/app/lib/timezones";
+import { currencyName } from "@/app/lib/currency";
+import { useLanguage, useT } from "@/app/i18n";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
@@ -24,6 +26,8 @@ export function HouseholdSettingsForm({
   timezone,
   canEdit,
 }: HouseholdSettingsFormProps) {
+  const t = useT();
+  const language = useLanguage();
   const revalidator = useRevalidator();
   const toast = useToast();
   const confirm = useConfirm();
@@ -53,10 +57,9 @@ export function HouseholdSettingsForm({
 
     if (currencyValue !== homeCurrency) {
       const confirmed = await confirm({
-        title: "Change home currency?",
-        description:
-          "This updates household totals and conversion rates for accounts, debts, assets, transactions, and budgets. Native amounts in each record’s own currency are not changed.",
-        confirmText: "Change currency",
+        title: t.settings.household.confirmCurrencyTitle,
+        description: t.settings.household.confirmCurrencyBody,
+        confirmText: t.settings.household.confirmCurrency,
       });
       if (!confirmed) return;
     }
@@ -78,13 +81,13 @@ export function HouseholdSettingsForm({
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Save household settings");
+        await toastMutationFailure(toast, res, t.settings.household.saveAction, t.common);
         return;
       }
-      toast("Household settings saved");
+      toast(t.settings.household.saved);
       revalidator.revalidate();
     } catch {
-      await toastMutationFailure(toast, null, "Save household settings");
+      await toastMutationFailure(toast, null, t.settings.household.saveAction, t.common);
     } finally {
       setSaving(false);
     }
@@ -101,14 +104,12 @@ export function HouseholdSettingsForm({
       className="space-y-5"
     >
       {!canEdit && (
-        <p className="text-sm text-muted-foreground">
-          Only the owner or an admin can change these.
-        </p>
+        <p className="text-sm text-muted-foreground">{t.settings.household.readOnly}</p>
       )}
 
       <div>
         <label htmlFor="household-name" className="block text-sm font-semibold">
-          Name
+          {t.common.name}
         </label>
         <Input
           id="household-name"
@@ -127,14 +128,13 @@ export function HouseholdSettingsForm({
           htmlFor="household-home-currency"
           className="block text-sm font-semibold"
         >
-          Home currency
+          {t.settings.household.homeCurrency}
         </label>
         <p
           id="household-home-currency-hint"
           className="text-sm text-muted-foreground"
         >
-          Used for household totals. Changing it refreshes conversion rates; native
-          amounts stay the same.
+          {t.settings.household.homeCurrencyHint}
         </p>
         <select
           id="household-home-currency"
@@ -146,7 +146,7 @@ export function HouseholdSettingsForm({
         >
           {CURRENCY_CODES.map((code) => (
             <option key={code} value={code}>
-              {code}
+              {`${code} – ${currencyName(code, language)}`}
             </option>
           ))}
         </select>
@@ -154,11 +154,10 @@ export function HouseholdSettingsForm({
 
       <div>
         <label htmlFor="household-timezone" className="block text-sm font-semibold">
-          Timezone
+          {t.settings.household.timezone}
         </label>
         <p id="household-timezone-hint" className="text-sm text-muted-foreground">
-          Budget periods and transaction dates use your household&apos;s local
-          calendar day.
+          {t.settings.household.timezoneHint}
         </p>
         <select
           id="household-timezone"
@@ -178,7 +177,7 @@ export function HouseholdSettingsForm({
 
       {canEdit && (
         <Button type="submit" disabled={!canSave}>
-          {saving ? "Saving…" : "Save changes"}
+          {saving ? t.common.saving : t.settings.household.saveChanges}
         </Button>
       )}
     </form>

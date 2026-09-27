@@ -1,5 +1,6 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
 import { getPendingCount, isOfflineSupported } from "@/app/lib/offline";
+import { useT } from "@/app/i18n";
 
 function subscribeOnlineStatus(onStoreChange: () => void) {
   window.addEventListener("online", onStoreChange);
@@ -20,6 +21,7 @@ function getServerOnlineSnapshot() {
 }
 
 export function OfflineIndicator() {
+  const t = useT();
   const isOnline = useSyncExternalStore(
     subscribeOnlineStatus,
     getOnlineSnapshot,
@@ -56,10 +58,10 @@ export function OfflineIndicator() {
   if (isOnline && pendingCount === 0) return null;
 
   const label = isOnline
-    ? `${pendingCount} change${pendingCount === 1 ? "" : "s"} pending sync`
+    ? t.common.pendingSync(pendingCount)
     : pendingCount > 0
-      ? `Offline — ${pendingCount} change${pendingCount === 1 ? "" : "s"} pending`
-      : "You're offline";
+      ? t.common.offlinePending(pendingCount)
+      : t.common.offline;
 
   return (
     <div

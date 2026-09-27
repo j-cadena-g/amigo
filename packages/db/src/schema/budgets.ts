@@ -48,3 +48,4 @@ export const budgets = sqliteTable(
 
 export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
+export type BudgetPeriod = (typeof BUDGET_PERIODS)[number];

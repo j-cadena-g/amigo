@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
@@ -13,6 +13,7 @@ import {
   parseHomeCurrency,
 } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
+import { pageTitle } from "@/app/i18n";
 
 function dayOfWeekFromStartDate(startDate: string): number {
   return new Date(startDate + "T00:00:00").getDay();
@@ -51,8 +52,8 @@ export async function loader({ context }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Recurring · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.recurring);
 }
 
 export default function Recurring() {

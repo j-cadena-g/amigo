@@ -1,5 +1,6 @@
 import type { CurrencyCode } from "@amigo/db";
 import { currencyFractionDigits, formatCents } from "@/app/lib/currency";
+import { messagesFor, type Messages } from "@/app/i18n";
 import { DEFAULT_LOCALE } from "@/app/lib/locale";
 
 const GROUPED_WHOLE: Record<"." | ",", RegExp> = {
@@ -76,16 +77,19 @@ export function amountValidationMessage(
     max?: number;
     currency?: CurrencyCode;
     locale?: string;
+    /** Copy in the viewer's language; English when omitted. */
+    messages?: Messages["common"];
   } = {}
 ): string {
   if (raw.trim() === "") return "";
   const locale = options.locale ?? DEFAULT_LOCALE;
+  const m = options.messages ?? messagesFor("en").common;
   const amount = parseAmount(raw);
-  if (amount === null) return `Enter an amount, like ${exampleAmount(locale)}.`;
-  if (options.positive && amount <= 0) return "Enter an amount greater than 0.";
-  if (!options.allowNegative && amount < 0) return "Enter 0 or more.";
+  if (amount === null) return m.amountInvalid(exampleAmount(locale));
+  if (options.positive && amount <= 0) return m.amountPositive;
+  if (!options.allowNegative && amount < 0) return m.amountNonNegative;
   if (options.max !== undefined && amount > options.max) {
-    return `Enter no more than ${formatCents(Math.round(options.max * 100), options.currency, locale)}.`;
+    return m.amountMax(formatCents(Math.round(options.max * 100), options.currency, locale));
   }
   return "";
 }

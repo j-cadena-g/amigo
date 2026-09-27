@@ -12,6 +12,7 @@ import {
   RowIconButton,
 } from "@/app/components/financial/ledger-group";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 export interface Debt {
   id: string;
@@ -68,6 +69,7 @@ function MeterBar({
 }
 
 export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsProps) {
+  const t = useT();
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
   const creditCardSummary = getCreditCardSummary(debts);
@@ -97,10 +99,10 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
     return (
       <>
         {shared.length > 0 && (
-          <LedgerSubgroup title="Shared">{shared.map(renderRow)}</LedgerSubgroup>
+          <LedgerSubgroup title={t.debts.shared}>{shared.map(renderRow)}</LedgerSubgroup>
         )}
         {personal.length > 0 && (
-          <LedgerSubgroup title="Personal">{personal.map(renderRow)}</LedgerSubgroup>
+          <LedgerSubgroup title={t.debts.personal}>{personal.map(renderRow)}</LedgerSubgroup>
         )}
       </>
     );
@@ -113,10 +115,10 @@ export function DebtCards({ debts, homeCurrency, session: _session }: DebtCardsP
           <CreditCardSummary summary={creditCardSummary} homeCurrency={homeCurrency} />
         ) : null}
         {creditCards.length > 0 && (
-          <LedgerGroup title="Credit cards">{renderBySharing(creditCards)}</LedgerGroup>
+          <LedgerGroup title={t.debts.creditCards}>{renderBySharing(creditCards)}</LedgerGroup>
         )}
         {loans.length > 0 && (
-          <LedgerGroup title="Loans">{renderBySharing(loans)}</LedgerGroup>
+          <LedgerGroup title={t.debts.loans}>{renderBySharing(loans)}</LedgerGroup>
         )}
       </div>
 
@@ -140,13 +142,14 @@ function CreditCardSummary({
   summary: NonNullable<ReturnType<typeof getCreditCardSummary>>;
   homeCurrency: CurrencyCode;
 }) {
+  const t = useT();
   const locale = useLocale();
   const headingId = useId();
 
   return (
     <section aria-labelledby={headingId}>
       <h3 id={headingId} className="text-sm font-semibold text-muted-foreground">
-        Available credit
+        {t.debts.availableCredit}
       </h3>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <PriceTag
@@ -156,7 +159,7 @@ function CreditCardSummary({
           size="large"
         />
         <p className="font-mono text-sm font-medium">
-          {summary.percentageUsed.toFixed(0)}% used
+          {t.debts.percentUsed(summary.percentageUsed.toFixed(0))}
         </p>
       </div>
       <MeterBar
@@ -165,14 +168,15 @@ function CreditCardSummary({
         className="mt-3"
       />
       <p className="mt-2 text-sm text-muted-foreground">
-        <span className="font-mono font-medium text-foreground">
-          {formatCents(summary.usedCreditCents, homeCurrency, locale)}
-        </span>{" "}
-        used of{" "}
-        <span className="font-mono font-medium text-foreground">
-          {formatCents(summary.totalLimitCents, homeCurrency, locale)}
-        </span>{" "}
-        across {summary.cardCount} {summary.cardCount === 1 ? "card" : "cards"}
+        {t.debts.usedAcross(
+          <span className="font-mono font-medium text-foreground">
+            {formatCents(summary.usedCreditCents, homeCurrency, locale)}
+          </span>,
+          <span className="font-mono font-medium text-foreground">
+            {formatCents(summary.totalLimitCents, homeCurrency, locale)}
+          </span>,
+          summary.cardCount
+        )}
       </p>
     </section>
   );
@@ -191,6 +195,7 @@ function DebtRowLayout({
   details: [string, string];
   onEdit: () => void;
 }) {
+  const t = useT();
   return (
     <li className="flex items-start gap-2 py-3">
       <div className="min-w-0 flex-1">
@@ -204,7 +209,7 @@ function DebtRowLayout({
           <span>{details[1]}</span>
         </div>
       </div>
-      <RowIconButton className="-mr-2" onClick={onEdit} aria-label={`Edit ${name}`}>
+      <RowIconButton className="-mr-2" onClick={onEdit} aria-label={t.debts.editNamed(name)}>
         <Pencil />
       </RowIconButton>
     </li>
@@ -224,6 +229,7 @@ function LoanRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const t = useT();
   const locale = useLocale();
   const loanAmount = debt.balanceInitial;
   const totalPaid = debt.balanceCurrent;
@@ -233,11 +239,14 @@ function LoanRow({
   return (
     <DebtRowLayout
       name={debt.name}
-      figure={`${formatCents(totalPaid, debt.currency, locale)} of ${formatCents(loanAmount, debt.currency, locale)}`}
+      figure={t.debts.paidOf(
+        formatCents(totalPaid, debt.currency, locale),
+        formatCents(loanAmount, debt.currency, locale)
+      )}
       meter={<MeterBar percent={percentage} className="mt-2" />}
       details={[
-        `${formatCents(Math.max(0, remaining), debt.currency, locale)} left`,
-        `${Math.min(100, percentage).toFixed(0)}% paid${currencyNote(debt, homeCurrency)}`,
+        t.debts.left(formatCents(Math.max(0, remaining), debt.currency, locale)),
+        t.debts.percentPaid(Math.min(100, percentage).toFixed(0)) + currencyNote(debt, homeCurrency),
       ]}
       onEdit={onEdit}
     />
@@ -253,6 +262,7 @@ function CreditCardRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const t = useT();
   const locale = useLocale();
   const creditLimit = debt.balanceInitial;
   const availableCredit = debt.balanceCurrent;
@@ -264,15 +274,18 @@ function CreditCardRow({
       name={debt.name}
       figure={
         usedAmount < 0
-          ? `${formatCents(Math.abs(usedAmount), debt.currency, locale)} unused credit`
-          : `${formatCents(usedAmount, debt.currency, locale)} of ${formatCents(creditLimit, debt.currency, locale)}`
+          ? t.debts.unusedCredit(formatCents(Math.abs(usedAmount), debt.currency, locale))
+          : t.debts.paidOf(
+              formatCents(usedAmount, debt.currency, locale),
+              formatCents(creditLimit, debt.currency, locale)
+            )
       }
       meter={
         <MeterBar percent={utilization} tone={utilizationTone(utilization)} className="mt-2" />
       }
       details={[
-        `${formatCents(availableCredit, debt.currency, locale)} available`,
-        `${Math.max(0, utilization).toFixed(0)}% utilization${currencyNote(debt, homeCurrency)}`,
+        t.debts.available(formatCents(availableCredit, debt.currency, locale)),
+        t.debts.utilization(Math.max(0, utilization).toFixed(0)) + currencyNote(debt, homeCurrency),
       ]}
       onEdit={onEdit}
     />

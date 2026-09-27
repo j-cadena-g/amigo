@@ -22,9 +22,10 @@ import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { AccountRow } from "@/app/components/account-cards";
 import type { CurrencyCode } from "@amigo/db";
-import { getAccountTypeSelectOptions } from "@/app/lib/financial-account-types";
+import { getAccountTypeSelectValues } from "@/app/lib/financial-account-types";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface EditAccountDialogProps {
   account: AccountRow;
@@ -37,6 +38,7 @@ export function EditAccountDialog({
   open,
   onOpenChange,
 }: EditAccountDialogProps) {
+  const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
@@ -53,7 +55,7 @@ export function EditAccountDialog({
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const typeOptions = getAccountTypeSelectOptions(account.type);
+  const typeOptions = getAccountTypeSelectValues(account.type);
   const isArchived = account.archived === true;
 
   function parseBalanceInput(): number | null {
@@ -61,7 +63,7 @@ export function EditAccountDialog({
     if (trimmed === "") return 0;
     const parsed = parseAmount(trimmed);
     if (parsed === null) {
-      setError("Enter the balance as a number, like 1250.50 or 1.250,50.");
+      setError(t.accounts.balanceInvalid);
       return null;
     }
     return parsed;
@@ -87,13 +89,13 @@ export function EditAccountDialog({
         }),
       });
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't save the account. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.saveAction));
         return;
       }
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError("Couldn't save the account. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.saveAction));
     } finally {
       setLoading(false);
     }
@@ -102,15 +104,13 @@ export function EditAccountDialog({
   async function handleArchiveToggle() {
     const nextArchived = !isArchived;
     const ok = await confirm({
-      title: nextArchived ? "Archive account?" : "Restore account?",
-      description: nextArchived
-        ? "It leaves your lists but stays in history. You can restore it later."
-        : "It goes back to your active accounts.",
-      confirmText: nextArchived ? "Archive" : "Restore",
+      title: nextArchived ? t.accounts.archiveTitle : t.accounts.restoreTitle,
+      description: nextArchived ? t.accounts.archiveBody : t.accounts.restoreBody,
+      confirmText: nextArchived ? t.accounts.archive : t.accounts.restore,
     });
     if (!ok) return;
 
-    const verb = nextArchived ? "archive" : "restore";
+    const action = nextArchived ? t.accounts.archiveAction : t.accounts.restoreAction;
     setArchiving(true);
     setError(null);
     try {
@@ -120,13 +120,13 @@ export function EditAccountDialog({
         body: JSON.stringify({ archived: nextArchived }),
       });
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? `Couldn't ${verb} the account. Try again.`);
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(action));
         return;
       }
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError(`Couldn't ${verb} the account. Check your connection and try again.`);
+      setError(t.common.couldNotConnection(action));
     } finally {
       setArchiving(false);
     }
@@ -134,10 +134,9 @@ export function EditAccountDialog({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: "Delete account?",
-      description:
-        "Linked transactions keep their reference, but the account won't appear in lists anymore.",
-      confirmText: "Delete",
+      title: t.accounts.deleteTitle,
+      description: t.accounts.deleteBody,
+      confirmText: t.common.delete,
       variant: "destructive",
     });
     if (!ok) return;
@@ -146,13 +145,13 @@ export function EditAccountDialog({
     try {
       const res = await fetch(`/api/accounts/${account.id}`, { method: "DELETE" });
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't delete the account. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.deleteAction));
         return;
       }
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError("Couldn't delete the account. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.deleteAction));
     } finally {
       setDeleting(false);
     }
@@ -161,22 +160,22 @@ export function EditAccountDialog({
   const busy = deleting || loading || archiving;
   const archiveLabel = archiving
     ? isArchived
-      ? "Restoring…"
-      : "Archiving…"
+      ? t.accounts.restoring
+      : t.accounts.archiving
     : isArchived
-      ? "Restore"
-      : "Archive";
+      ? t.accounts.restore
+      : t.accounts.archive;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{isArchived ? "Edit archived account" : "Edit account"}</DialogTitle>
+          <DialogTitle>{isArchived ? t.accounts.editArchived : t.accounts.edit}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-semibold" htmlFor={nameId}>
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
@@ -187,16 +186,16 @@ export function EditAccountDialog({
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-semibold" htmlFor={typeId}>
-              Type
+              {t.common.type}
             </label>
             <NativeSelect
               id={typeId}
               value={type}
               onChange={(e) => setType(e.target.value as typeof type)}
             >
-              {typeOptions.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {typeOptions.map((value) => (
+                <option key={value} value={value}>
+                  {t.accounts.types[value]}
                 </option>
               ))}
             </NativeSelect>
@@ -204,7 +203,7 @@ export function EditAccountDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold" htmlFor={balanceId}>
-                Balance
+                {t.common.balance}
               </label>
               <AmountInput
                 id={balanceId}
@@ -216,7 +215,7 @@ export function EditAccountDialog({
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-semibold" htmlFor={currencyId}>
-                Currency
+                {t.common.currency}
               </label>
               <CurrencySelect
                 id={currencyId}
@@ -234,7 +233,7 @@ export function EditAccountDialog({
             <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
               <DeleteButton disabled={busy} onClick={() => void handleDelete()}>
                 <Trash2 />
-                {deleting ? "Deleting…" : "Delete"}
+                {deleting ? t.common.deleting : t.common.delete}
               </DeleteButton>
               <Button
                 type="button"
@@ -252,10 +251,10 @@ export function EditAccountDialog({
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={busy || !name.trim()}>
-              {loading ? "Saving…" : "Save account"}
+              {loading ? t.common.saving : t.accounts.save}
             </Button>
           </DialogFooter>
         </form>

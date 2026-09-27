@@ -12,13 +12,10 @@ import {
 import { parseApiError } from "@/app/lib/parse-api-error";
 import type { FinancialCategoryType } from "@/app/lib/financial-category-types";
 import { cn } from "@/app/lib/utils";
-
-const CATEGORY_TYPE_OPTIONS = [
-  { value: "expense", label: "Expense" },
-  { value: "income", label: "Income" },
-] as const;
+import { useT } from "@/app/i18n";
 
 export function CategoryManagementPanel() {
+  const t = useT();
   const nameId = useId();
   const parentId = useId();
   const confirm = useConfirm();
@@ -60,14 +57,14 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Couldn't add the category. Try again."));
+        setFeedback(parseApiError(body, t.common.couldNot(t.categories.addAction)));
         return;
       }
       setName("");
       setParentCategoryId("");
       await reload();
     } catch {
-      setFeedback("Couldn't add the category. Check your connection and try again.");
+      setFeedback(t.common.couldNotConnection(t.categories.addAction));
     } finally {
       setSubmitting(false);
     }
@@ -75,10 +72,9 @@ export function CategoryManagementPanel() {
 
   async function handleArchive(categoryId: string) {
     const confirmed = await confirm({
-      title: "Archive category?",
-      description:
-        "It and its subcategories will disappear from pickers. Existing transactions keep their category history.",
-      confirmText: "Archive",
+      title: t.categories.archiveTitle,
+      description: t.categories.archiveBody,
+      confirmText: t.categories.archive,
     });
     if (!confirmed) return;
     setFeedback(null);
@@ -93,21 +89,20 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Couldn't archive the category. Try again."));
+        setFeedback(parseApiError(body, t.common.couldNot(t.categories.archiveAction)));
         return;
       }
       await reload();
     } catch {
-      setFeedback("Couldn't archive the category. Check your connection and try again.");
+      setFeedback(t.common.couldNotConnection(t.categories.archiveAction));
     }
   }
 
   async function handleDelete(categoryId: string) {
     const confirmed = await confirm({
-      title: "Remove category?",
-      description:
-        "If it's used by transactions or recurring rules, it will be archived instead so history is preserved. Otherwise it and its subcategories are permanently removed.",
-      confirmText: "Remove",
+      title: t.categories.removeTitle,
+      description: t.categories.removeBody,
+      confirmText: t.common.remove,
       variant: "destructive",
     });
     if (!confirmed) return;
@@ -119,12 +114,12 @@ export function CategoryManagementPanel() {
           error?: string;
           message?: string;
         } | null;
-        setFeedback(parseApiError(body, "Couldn't remove the category. Try again."));
+        setFeedback(parseApiError(body, t.common.couldNot(t.categories.removeAction)));
         return;
       }
       await reload();
     } catch {
-      setFeedback("Couldn't remove the category. Check your connection and try again.");
+      setFeedback(t.common.couldNotConnection(t.categories.removeAction));
     }
   }
 
@@ -134,18 +129,21 @@ export function CategoryManagementPanel() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Streaming"
+              placeholder={t.categories.namePlaceholder}
             />
           </div>
           <TypeToggle
-            label="Category type"
-            options={CATEGORY_TYPE_OPTIONS}
+            label={t.categories.typeLabel}
+            options={[
+              { value: "expense", label: t.common.expense },
+              { value: "income", label: t.common.income },
+            ] as const}
             value={type}
             onChange={selectType}
           />
@@ -153,14 +151,14 @@ export function CategoryManagementPanel() {
         {parentOptions.length > 0 ? (
           <div className="space-y-1.5">
             <label htmlFor={parentId} className="text-sm font-semibold">
-              Parent category (optional)
+              {t.categories.parentOptional}
             </label>
             <NativeSelect
               id={parentId}
               value={parentCategoryId}
               onChange={(e) => setParentCategoryId(e.target.value)}
             >
-              <option value="">None (top level)</option>
+              <option value="">{t.categories.topLevel}</option>
               {parentOptions.map((row) => (
                 <option key={row.parent.id} value={row.parent.id}>
                   {row.parent.name}
@@ -171,16 +169,16 @@ export function CategoryManagementPanel() {
         ) : null}
         <Button type="submit" size="sm" disabled={submitting || !name.trim()}>
           <Plus />
-          {submitting ? "Adding…" : "Add category"}
+          {submitting ? t.common.adding : t.categories.add}
         </Button>
       </form>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading categories…</p>
+        <p className="text-sm text-muted-foreground">{t.categories.loading}</p>
       ) : error ? (
         <p className="text-sm text-destructive" role="alert">{error}</p>
       ) : tree.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No categories yet.</p>
+        <p className="text-sm text-muted-foreground">{t.categories.none}</p>
       ) : (
         <ul className="divide-y divide-border border-t border-border">
           {tree.flatMap((row) => [
@@ -227,6 +225,7 @@ function CategoryRow({
   onArchive: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   return (
     <li
       className={cn(
@@ -238,8 +237,8 @@ function CategoryRow({
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{name}</p>
         <p className="text-xs text-muted-foreground">
-          {type === "income" ? "Income" : "Expense"}
-          {archived ? " · Archived" : ""}
+          {type === "income" ? t.common.income : t.common.expense}
+          {archived ? ` · ${t.categories.archived}` : ""}
         </p>
       </div>
       {!archived ? (
@@ -249,12 +248,12 @@ function CategoryRow({
             variant="ghost"
             size="sm"
             onClick={onArchive}
-            aria-label={`Archive ${name}`}
+            aria-label={t.categories.archiveNamed(name)}
           >
-            Archive
+            {t.categories.archive}
           </Button>
-          <DeleteButton size="sm" onClick={onDelete} aria-label={`Remove ${name}`}>
-            Remove
+          <DeleteButton size="sm" onClick={onDelete} aria-label={t.categories.removeNamed(name)}>
+            {t.common.remove}
           </DeleteButton>
         </div>
       ) : null}

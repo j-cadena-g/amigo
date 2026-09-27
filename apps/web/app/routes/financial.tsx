@@ -1,28 +1,30 @@
-import { Link, Outlet, useLocation } from "react-router";
+import { Link, type MetaArgs, Outlet, useLocation } from "react-router";
 import { cn } from "@/app/lib/utils";
+import { type Messages, pageTitle, useT } from "@/app/i18n";
 
 const tabs = [
-  { href: "/financial", label: "Transactions", exact: true },
-  { href: "/financial/recurring", label: "Recurring" },
-  { href: "/financial/budgets", label: "Budgets" },
-  { href: "/financial/accounts", label: "Accounts" },
-  { href: "/financial/debts", label: "Debts" },
+  { href: "/financial", label: (t: Messages) => t.nav.transactions, exact: true },
+  { href: "/financial/recurring", label: (t: Messages) => t.nav.recurring },
+  { href: "/financial/budgets", label: (t: Messages) => t.nav.budgets },
+  { href: "/financial/accounts", label: (t: Messages) => t.nav.accounts },
+  { href: "/financial/debts", label: (t: Messages) => t.nav.debts },
 ];
 
-export function meta() {
-  return [{ title: "Money · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.money);
 }
 
 export default function FinancialLayout() {
+  const t = useT();
   const location = useLocation();
 
   return (
     <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
-      <h1 className="type-display mb-6 text-title-sm md:text-title">Money</h1>
+      <h1 className="type-display mb-6 text-title-sm md:text-title">{t.nav.money}</h1>
 
       {/* The padding keeps focus outlines inside the scroll container's clip. */}
       <nav
-        aria-label="Money"
+        aria-label={t.nav.money}
         className="-mx-1 mb-5 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="flex w-max min-w-full gap-6 border-b border-border">
@@ -43,7 +45,7 @@ export default function FinancialLayout() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {tab.label}
+                {tab.label(t)}
               </Link>
             );
           })}

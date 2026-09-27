@@ -5,6 +5,7 @@ import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface PendingInvite {
   id: string;
@@ -40,6 +41,7 @@ function formatExpiry(expiresAt: string, locale: string): string {
 }
 
 export function InviteManager() {
+  const t = useT();
   const locale = useLocale();
   const toast = useToast();
   const confirm = useConfirm();
@@ -54,32 +56,35 @@ export function InviteManager() {
     try {
       const res = await fetch("/api/invites");
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Load invites");
+        await toastMutationFailure(toast, res, t.household.invites.loadAction, t.common);
         return;
       }
       const data = (await res.json()) as PendingInvite[];
       setInvites(data);
     } catch {
-      await toastMutationFailure(toast, null, "Load invites");
+      await toastMutationFailure(toast, null, t.household.invites.loadAction, t.common);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     void loadInvites();
   }, [loadInvites]);
 
-  async function copyText(label: string, value: string) {
+  async function copyText(value: string, copied: string, failed: string) {
     try {
       await navigator.clipboard.writeText(value);
-      toast(`${label} copied`, { variant: "success" });
+      toast(copied, { variant: "success" });
     } catch {
-      toast(`Couldn't copy the ${label.toLowerCase()}. Try again.`, {
-        variant: "error",
-      });
+      toast(failed, { variant: "error" });
     }
   }
+
+  const copyLink = (url: string) =>
+    copyText(url, t.household.invites.linkCopied, t.household.invites.copyLinkFailed);
+  const copyCode = (code: string) =>
+    copyText(code, t.household.invites.codeCopied, t.household.invites.copyCodeFailed);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -93,7 +98,7 @@ export function InviteManager() {
         body: JSON.stringify(trimmed ? { email: trimmed } : {}),
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Create invite");
+        await toastMutationFailure(toast, res, t.household.invites.createAction, t.common);
         return;
       }
       const data = (await res.json()) as CreatedInvite;
@@ -101,21 +106,16 @@ export function InviteManager() {
       setEmail("");
       if (data.invitedEmail) {
         if (data.emailSent) {
-          toast("Invite created and email sent", { variant: "success" });
+          toast(t.household.invites.createdAndSent, { variant: "success" });
         } else {
-          toast(
-            data.emailError
-              ? `Invite created, but the email didn't send: ${data.emailError}`
-              : "Invite created, but the email didn't send. Share the code instead.",
-            { variant: "error" }
-          );
+          toast(t.household.invites.createdNotSent(data.emailError), { variant: "error" });
         }
       } else {
-        toast("Invite created", { variant: "success" });
+        toast(t.household.invites.created, { variant: "success" });
       }
       await loadInvites();
     } catch {
-      await toastMutationFailure(toast, null, "Create invite");
+      await toastMutationFailure(toast, null, t.household.invites.createAction, t.common);
     } finally {
       setCreating(false);
     }
@@ -123,9 +123,9 @@ export function InviteManager() {
 
   async function handleRevoke(invite: PendingInvite) {
     const confirmed = await confirm({
-      title: "Revoke this invite?",
-      description: `${invite.codeDisplay} will stop working right away.`,
-      confirmText: "Revoke invite",
+      title: t.household.invites.revokeTitle,
+      description: t.household.invites.revokeBody(invite.codeDisplay),
+      confirmText: t.household.invites.revokeConfirm,
       variant: "destructive",
     });
     if (!confirmed) return;
@@ -136,16 +136,16 @@ export function InviteManager() {
         method: "DELETE",
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Revoke invite");
+        await toastMutationFailure(toast, res, t.household.invites.revokeAction, t.common);
         return;
       }
       if (created?.id === invite.id) {
         setCreated(null);
       }
-      toast("Invite revoked", { variant: "success" });
+      toast(t.household.invites.revoked, { variant: "success" });
       await loadInvites();
     } catch {
-      await toastMutationFailure(toast, null, "Revoke invite");
+      await toastMutationFailure(toast, null, t.household.invites.revokeAction, t.common);
     } finally {
       setBusyId(null);
     }
@@ -158,7 +158,7 @@ export function InviteManager() {
         method: "POST",
       });
       if (!res.ok) {
-        await toastMutationFailure(toast, res, "Resend invite");
+        await toastMutationFailure(toast, res, t.household.invites.resendAction, t.common);
         return;
       }
       const data = (await res.json()) as {
@@ -166,18 +166,13 @@ export function InviteManager() {
         emailError?: string;
       };
       if (data.emailSent) {
-        toast("Invite email sent again", { variant: "success" });
+        toast(t.household.invites.resent, { variant: "success" });
       } else {
-        toast(
-          data.emailError
-            ? `The email didn't send: ${data.emailError}`
-            : "The email didn't send. Share the code instead.",
-          { variant: "error" }
-        );
+        toast(t.household.invites.resendFailed(data.emailError), { variant: "error" });
       }
       await loadInvites();
     } catch {
-      await toastMutationFailure(toast, null, "Resend invite");
+      await toastMutationFailure(toast, null, t.household.invites.resendAction, t.common);
     } finally {
       setBusyId(null);
     }
@@ -187,11 +182,11 @@ export function InviteManager() {
     <div className="space-y-8">
       <form onSubmit={handleCreate}>
         <label htmlFor="invite-email" className="block text-sm font-semibold">
-          Email <span className="font-normal text-muted-foreground">(optional)</span>
+          {t.household.invites.email}{" "}
+          <span className="font-normal text-muted-foreground">{t.household.invites.optional}</span>
         </label>
         <p id="invite-email-hint" className="text-sm text-muted-foreground">
-          Add an email to send the link, or leave it blank and share the code
-          yourself.
+          {t.household.invites.emailHint}
         </p>
         <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
           <Input
@@ -199,62 +194,60 @@ export function InviteManager() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
+            placeholder={t.household.invites.emailPlaceholder}
             autoComplete="email"
             aria-describedby="invite-email-hint"
             className="min-w-0 flex-1"
           />
           <Button type="submit" disabled={creating} className="shrink-0">
-            {creating ? "Creating…" : "Create invite"}
+            {creating ? t.household.invites.creating : t.household.invites.create}
           </Button>
         </div>
       </form>
 
       {created && (
         <div className="rounded-xl border border-border p-4">
-          <p className="text-sm font-semibold">New invite code</p>
+          <p className="text-sm font-semibold">{t.household.invites.newCode}</p>
           <p className="mt-1 break-all font-mono text-lg font-medium">
             {created.code}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Expires {formatExpiry(created.expiresAt, locale)}
+            {t.household.invites.expires(formatExpiry(created.expiresAt, locale))}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => void copyText("Invite link", created.joinUrl)}
+              onClick={() => void copyLink(created.joinUrl)}
             >
-              Copy link
+              {t.household.invites.copyLink}
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              onClick={() => void copyText("Invite code", created.code)}
+              onClick={() => void copyCode(created.code)}
             >
-              Copy code
+              {t.household.invites.copyCode}
             </Button>
           </div>
           {created.invitedEmail && (
             <p className="mt-3 text-sm text-muted-foreground">
               {created.emailSent
-                ? `Email sent to ${created.invitedEmail}`
-                : `The email to ${created.invitedEmail} didn't send${
-                    created.emailError ? `: ${created.emailError}` : ""
-                  }`}
+                ? t.household.invites.emailSentTo(created.invitedEmail)
+                : t.household.invites.emailNotSentTo(created.invitedEmail, created.emailError)}
             </p>
           )}
         </div>
       )}
 
       <div>
-        <h3 className="font-semibold">Pending invites</h3>
+        <h3 className="font-semibold">{t.household.invites.pending}</h3>
         {loading ? (
-          <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t.common.loading}</p>
         ) : invites.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">No pending invites.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t.household.invites.none}</p>
         ) : (
           <ul className="mt-2 divide-y divide-border border-y border-border">
             {invites.map((invite) => (
@@ -267,16 +260,16 @@ export function InviteManager() {
                     {invite.codeDisplay}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Expires {formatExpiry(invite.expiresAt, locale)}
+                    {t.household.invites.expires(formatExpiry(invite.expiresAt, locale))}
                     {invite.invitedEmail ? ` · ${invite.invitedEmail}` : ""}
                   </p>
                   {invite.invitedEmail && (
                     <p className="text-sm text-muted-foreground">
                       {invite.emailSentAt
-                        ? "Email sent"
+                        ? t.household.invites.emailSent
                         : invite.emailLastError
-                          ? `Email didn't send: ${invite.emailLastError}`
-                          : "Email not sent"}
+                          ? t.household.invites.emailFailed(invite.emailLastError)
+                          : t.household.invites.emailNotSent}
                     </p>
                   )}
                 </div>
@@ -286,9 +279,9 @@ export function InviteManager() {
                     size="sm"
                     variant="ghost"
                     disabled={busyId === invite.id}
-                    onClick={() => void copyText("Invite link", invite.joinUrl)}
+                    onClick={() => void copyLink(invite.joinUrl)}
                   >
-                    Copy link
+                    {t.household.invites.copyLink}
                   </Button>
                   {invite.invitedEmail && (
                     <Button
@@ -298,7 +291,7 @@ export function InviteManager() {
                       disabled={busyId === invite.id}
                       onClick={() => void handleResend(invite)}
                     >
-                      Resend email
+                      {t.household.invites.resend}
                     </Button>
                   )}
                   <Button
@@ -309,7 +302,7 @@ export function InviteManager() {
                     disabled={busyId === invite.id}
                     onClick={() => void handleRevoke(invite)}
                   >
-                    Revoke
+                    {t.household.invites.revoke}
                   </Button>
                 </div>
               </li>

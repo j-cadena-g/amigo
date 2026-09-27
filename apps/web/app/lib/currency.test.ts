@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CURRENCY_CODES } from "@amigo/db";
 import {
-  SUPPORTED_CURRENCIES,
   currencyFractionDigits,
+  currencyName,
   currencyHomeLocale,
   formatCents,
   formatCentsParts,
@@ -137,9 +137,16 @@ describe("currencyFractionDigits", () => {
   });
 });
 
-describe("SUPPORTED_CURRENCIES", () => {
-  it("lists every currency the database accepts, in order", () => {
-    expect(SUPPORTED_CURRENCIES.map((c) => c.code)).toEqual([...CURRENCY_CODES]);
+describe("currencyName", () => {
+  it("names every supported currency in the viewer's language", () => {
+    for (const code of CURRENCY_CODES) {
+      expect(currencyName(code, "en")).not.toBe(code);
+      expect(currencyName(code, "es")).not.toBe(code);
+    }
+    // Exact names come from the runtime's locale data, so check shape, not wording.
+    expect(currencyName("CAD", "en")).not.toBe(currencyName("CAD", "es"));
+    expect(currencyName("COP", "es")).toMatch(/^\p{Lu}/u);
+    expect(currencyName("XYZ" as never, "es")).toBe("XYZ");
   });
 });
 

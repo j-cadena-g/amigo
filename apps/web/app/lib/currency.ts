@@ -1,8 +1,7 @@
 import type { CurrencyCode, FormatLocale } from "@amigo/db";
-import { CURRENCY_CODES, DEFAULT_HOME_CURRENCY } from "@amigo/db";
+import { DEFAULT_HOME_CURRENCY } from "@amigo/db";
 
 interface CurrencyConfig {
-  name: string;
   /**
    * Formatting conventions a household using this currency most likely
    * expects; the default display locale until a user picks their own.
@@ -16,16 +15,27 @@ interface CurrencyConfig {
 }
 
 const CURRENCY_CONFIG: Record<CurrencyCode, CurrencyConfig> = {
-  CAD: { name: "Canadian dollar", homeLocale: "en-CA", fractionDigits: 2 },
-  USD: { name: "US dollar", homeLocale: "en-US", fractionDigits: 2 },
-  EUR: { name: "Euro", homeLocale: "de-DE", fractionDigits: 2 },
-  GBP: { name: "British pound", homeLocale: "en-GB", fractionDigits: 2 },
-  MXN: { name: "Mexican peso", homeLocale: "es-MX", fractionDigits: 2 },
-  COP: { name: "Colombian peso", homeLocale: "es-CO", fractionDigits: 0 },
+  CAD: { homeLocale: "en-CA", fractionDigits: 2 },
+  USD: { homeLocale: "en-US", fractionDigits: 2 },
+  EUR: { homeLocale: "de-DE", fractionDigits: 2 },
+  GBP: { homeLocale: "en-GB", fractionDigits: 2 },
+  MXN: { homeLocale: "es-MX", fractionDigits: 2 },
+  COP: { homeLocale: "es-CO", fractionDigits: 0 },
 };
 
-export const SUPPORTED_CURRENCIES: { code: CurrencyCode; name: string }[] =
-  CURRENCY_CODES.map((code) => ({ code, name: CURRENCY_CONFIG[code].name }));
+/**
+ * The currency's name in the viewer's language, "Canadian Dollar" or "Dólar
+ * canadiense", from Intl so every interface language is covered.
+ */
+export function currencyName(currency: CurrencyCode, language: string): string {
+  try {
+    const name = new Intl.DisplayNames([language], { type: "currency" }).of(currency);
+    if (name) return name.charAt(0).toLocaleUpperCase(language) + name.slice(1);
+  } catch {
+    // Fall through to the code.
+  }
+  return currency;
+}
 
 /** Decimal places a currency is shown with; unknown codes fall back to 2. */
 export function currencyFractionDigits(currency: string | null | undefined): number {
@@ -54,6 +64,27 @@ function isSupportedLocale(locale: string): boolean {
 /** Formatters are costly to build; the cap only matters if callers pass unusual locales. */
 const FORMATTER_CACHE_LIMIT = 256;
 const formatterCache = new Map<string, Intl.NumberFormat>();
+
+const CURRENCY_BY_REGION: Partial<Record<string, CurrencyCode>> = {
+  CA: "CAD",
+  US: "USD",
+  GB: "GBP",
+  MX: "MXN",
+  CO: "COP",
+  DE: "EUR",
+  ES: "EUR",
+  FR: "EUR",
+};
+
+/** A sensible first home currency for someone reading in `locale` ("es-CO" → COP). */
+export function defaultCurrencyForLocale(locale: string): CurrencyCode {
+  try {
+    const region = new Intl.Locale(locale).region;
+    return (region && CURRENCY_BY_REGION[region]) || DEFAULT_HOME_CURRENCY;
+  } catch {
+    return DEFAULT_HOME_CURRENCY;
+  }
+}
 
 /**
  * Cached currency formatter. `locale` is the viewer's (see `useLocale`), so a

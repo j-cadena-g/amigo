@@ -7,6 +7,7 @@ import { cn } from "@/app/lib/utils";
 import { EditAccountDialog } from "@/app/components/edit-account-dialog";
 import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 export type AccountRow = {
   id: string;
@@ -33,11 +34,12 @@ function AccountListRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const t = useT();
   const locale = useLocale();
   const meta = [
-    accountTypeLabel(account.type),
-    account.isShared ? "Shared" : "Personal",
-    account.archived ? "Archived" : null,
+    accountTypeLabel(account.type, t),
+    account.isShared ? t.accounts.sharedTag : t.accounts.personalTag,
+    account.archived ? t.accounts.archived : null,
     account.currency !== homeCurrency ? account.currency : null,
   ]
     .filter(Boolean)
@@ -62,7 +64,7 @@ function AccountListRow({
       <RowIconButton
         className="-mr-2"
         onClick={onEdit}
-        aria-label={`Edit account ${account.name}`}
+        aria-label={t.accounts.editNamed(account.name)}
       >
         <Pencil />
       </RowIconButton>
@@ -71,6 +73,7 @@ function AccountListRow({
 }
 
 export function AccountCards({ accounts, homeCurrency }: AccountCardsProps) {
+  const t = useT();
   const [editing, setEditing] = useState<AccountRow | null>(null);
   const shared = accounts.filter((a) => a.isShared === true);
   const personal = accounts.filter((a) => a.isShared !== true);
@@ -88,10 +91,10 @@ export function AccountCards({ accounts, homeCurrency }: AccountCardsProps) {
   return (
     <>
       {shared.length > 0 && (
-        <LedgerSubgroup title="Shared">{renderRows(shared)}</LedgerSubgroup>
+        <LedgerSubgroup title={t.accounts.shared}>{renderRows(shared)}</LedgerSubgroup>
       )}
       {personal.length > 0 && (
-        <LedgerSubgroup title="Personal">{renderRows(personal)}</LedgerSubgroup>
+        <LedgerSubgroup title={t.accounts.personal}>{renderRows(personal)}</LedgerSubgroup>
       )}
       {editing && (
         <EditAccountDialog

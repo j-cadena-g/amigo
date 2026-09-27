@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { redirect, useNavigate } from "react-router";
+import { type MetaArgs, redirect, useNavigate } from "react-router";
 import { useClerk } from "@clerk/react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Wordmark } from "@/app/components/wordmark";
 import { useToast } from "@/app/components/toast-provider";
 import { getSessionStatus } from "@/app/lib/session.server";
+import { pageTitle, useT } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -24,11 +25,12 @@ export async function loader({ context }: LoaderFunctionArgs) {
   return null;
 }
 
-export function meta() {
-  return [{ title: "Restore your household · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.restoreHousehold);
 }
 
 export default function RestoreAccount() {
+  const t = useT();
   const navigate = useNavigate();
   const { signOut } = useClerk();
   const toast = useToast();
@@ -56,10 +58,7 @@ export default function RestoreAccount() {
         setHouseholdName(data.householdName ?? null);
       } catch {
         if (!cancelled) {
-          toast(
-            "Couldn't check whether your household can be restored. Reload to try again.",
-            { variant: "error" }
-          );
+          toast(t.onboarding.pendingCheckFailed, { variant: "error" });
         }
       } finally {
         if (!cancelled) {
@@ -70,7 +69,7 @@ export default function RestoreAccount() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, toast]);
+  }, [navigate, toast, t]);
 
   const handleRestore = async () => {
     setIsLoading("restore");
@@ -81,13 +80,9 @@ export default function RestoreAccount() {
         return;
       }
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast(body?.error ?? "Couldn't restore your access. Try again.", {
-        variant: "error",
-      });
+      toast(body?.error ?? t.common.couldNot(t.onboarding.restoreAction), { variant: "error" });
     } catch {
-      toast("Couldn't restore your access. Check your connection and try again.", {
-        variant: "error",
-      });
+      toast(t.common.couldNotConnection(t.onboarding.restoreAction), { variant: "error" });
     } finally {
       setIsLoading(null);
     }
@@ -102,13 +97,9 @@ export default function RestoreAccount() {
         return;
       }
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast(body?.error ?? "Couldn't rejoin the household. Try again.", {
-        variant: "error",
-      });
+      toast(body?.error ?? t.common.couldNot(t.onboarding.rejoinAction), { variant: "error" });
     } catch {
-      toast("Couldn't rejoin the household. Check your connection and try again.", {
-        variant: "error",
-      });
+      toast(t.common.couldNotConnection(t.onboarding.rejoinAction), { variant: "error" });
     } finally {
       setIsLoading(null);
     }
@@ -117,7 +108,7 @@ export default function RestoreAccount() {
   if (!checkedPending) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">{t.common.loading}</p>
       </main>
     );
   }
@@ -126,16 +117,15 @@ export default function RestoreAccount() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
-        <h1 className="type-display mt-6 text-title-sm">Restore your household?</h1>
+        <h1 className="type-display mt-6 text-title-sm">{t.onboarding.restoreTitle}</h1>
         <p className="mt-2">
-          You&apos;re no longer a member of{" "}
-          {householdName ? (
-            <span className="font-semibold">{householdName}</span>
-          ) : (
-            "your household"
+          {t.onboarding.noLongerMember(
+            householdName ? (
+              <span className="font-semibold">{householdName}</span>
+            ) : (
+              t.onboarding.yourHousehold
+            )
           )}
-          . For up to 14 days, you can restore your access and keep everything you
-          added.
         </p>
 
         <div className="mt-8 space-y-3">
@@ -144,7 +134,7 @@ export default function RestoreAccount() {
             onClick={handleRestore}
             disabled={isLoading !== null}
           >
-            {isLoading === "restore" ? "Restoring…" : "Restore household"}
+            {isLoading === "restore" ? t.onboarding.restoring : t.onboarding.restore}
           </Button>
           <Button
             variant="outline"
@@ -152,12 +142,9 @@ export default function RestoreAccount() {
             onClick={handleFreshStart}
             disabled={isLoading !== null}
           >
-            {isLoading === "fresh" ? "Rejoining…" : "Rejoin as a new member"}
+            {isLoading === "fresh" ? t.onboarding.rejoining : t.onboarding.rejoin}
           </Button>
-          <p className="text-sm text-muted-foreground">
-            Rejoining as a new member hands everything you added to the household
-            owner.
-          </p>
+          <p className="text-sm text-muted-foreground">{t.onboarding.rejoinHint}</p>
         </div>
 
         <Button
@@ -166,7 +153,7 @@ export default function RestoreAccount() {
           onClick={() => void signOut()}
           disabled={isLoading !== null}
         >
-          Sign out
+          {t.nav.signOut}
         </Button>
       </div>
     </main>

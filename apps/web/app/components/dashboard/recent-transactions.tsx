@@ -5,6 +5,7 @@ import { formatLedgerDate } from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
 import { LedgerRow, LedgerSection, SectionLink } from "@/app/components/ledger";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface DashboardRecentTransactionsProps {
   transactions: RecentTransaction[];
@@ -15,28 +16,29 @@ export function DashboardRecentTransactions({
   transactions,
   className,
 }: DashboardRecentTransactionsProps) {
+  const t = useT();
   const locale = useLocale();
   return (
     <LedgerSection
-      title="Recent"
-      aside={<SectionLink to="/financial">View all</SectionLink>}
+      title={t.dashboard.recent}
+      aside={<SectionLink to="/financial">{t.dashboard.viewAll}</SectionLink>}
       className={className}
     >
       {transactions.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">No transactions yet.</p>
+        <p className="py-4 text-sm text-muted-foreground">{t.dashboard.noTransactions}</p>
       ) : (
         <ul className="divide-y divide-border">
-          {transactions.map((t) => (
+          {transactions.map((tx) => (
             <LedgerRow
-              key={t.id}
-              date={formatLedgerDate(t.date, locale)}
-              label={t.description || t.category}
-              meta={t.description ? t.category : undefined}
+              key={tx.id}
+              date={formatLedgerDate(tx.date, locale)}
+              label={tx.description || tx.category}
+              meta={tx.description ? tx.category : undefined}
               figure={
-                <span className={cn(t.type === "income" && "text-success")}>
+                <span className={cn(tx.type === "income" && "text-success")}>
                   {formatSignedCents(
-                    t.type === "income" ? t.amount : -t.amount,
-                    t.currency as CurrencyCode,
+                    tx.type === "income" ? tx.amount : -tx.amount,
+                    tx.currency as CurrencyCode,
                     locale,
                     { showPlus: true }
                   )}

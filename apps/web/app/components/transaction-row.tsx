@@ -18,6 +18,7 @@ import {
 import { cn } from "@/app/lib/utils";
 import { EditTransactionForm, type TransactionFormState } from "./transaction-form";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 export interface TransactionDTO {
   id: string;
@@ -64,6 +65,7 @@ export function TransactionRow({
   editForm,
   onEditFormChange,
 }: TransactionRowProps) {
+  const t = useT();
   const locale = useLocale();
   const detailsId = useId();
 
@@ -136,13 +138,13 @@ export function TransactionRow({
       {expanded && (
         <div id={detailsId} className="pb-3 pl-17">
           <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Date</dt>
+            <dt className="text-muted-foreground">{t.common.date}</dt>
             <dd>{formatTransactionDate(transaction.date, locale)}</dd>
-            <dt className="text-muted-foreground">Category</dt>
+            <dt className="text-muted-foreground">{t.common.category}</dt>
             <dd>{transaction.category}</dd>
             {transaction.description && (
               <>
-                <dt className="text-muted-foreground">Description</dt>
+                <dt className="text-muted-foreground">{t.common.description}</dt>
                 <dd className="wrap-break-word">{transaction.description}</dd>
               </>
             )}
@@ -150,11 +152,11 @@ export function TransactionRow({
           <div className="mt-3 flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onStartEdit}>
               <Pencil />
-              Edit
+              {t.common.edit}
             </Button>
             <DeleteButton size="sm" onClick={onDelete}>
               <Trash2 />
-              Delete
+              {t.common.delete}
             </DeleteButton>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useId, type ComponentProps } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button, type ButtonProps } from "@/app/components/ui/button";
 import { cn } from "@/app/lib/utils";
+import { useT } from "@/app/i18n";
 
 interface NativeSelectProps extends ComponentProps<"select"> {
   /** Tighter padding for narrow columns, e.g. a currency code beside an amount. */
@@ -43,6 +44,7 @@ export function SharedCheckbox({
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const id = useId();
 
   return (
@@ -56,7 +58,7 @@ export function SharedCheckbox({
         className="h-4 w-4 shrink-0 accent-primary"
       />
       <label htmlFor={id} className="text-sm font-semibold">
-        Shared with household
+        {t.common.sharedWithHousehold}
       </label>
     </div>
   );

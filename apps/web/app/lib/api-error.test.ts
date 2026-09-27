@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+import { messagesFor } from "@/app/i18n";
 import {
   connectionFailedMessage,
-  RATE_LIMIT_MESSAGE,
   readApiErrorMessage,
   requestFailedMessage,
   toastMutationFailure,
 } from "./api-error";
+
+const en = messagesFor("en").common;
+const es = messagesFor("es").common;
 
 describe("readApiErrorMessage", () => {
   it("reads error string from JSON", async () => {
@@ -35,9 +38,12 @@ describe("readApiErrorMessage", () => {
 
 describe("failure messages", () => {
   it("says what failed and what to do", () => {
-    expect(requestFailedMessage("Add item")).toBe("Add item failed. Try again.");
-    expect(connectionFailedMessage("Add item")).toBe(
-      "Add item failed. Check your connection and try again."
+    expect(requestFailedMessage(en, "add the item")).toBe("Couldn't add the item. Try again.");
+    expect(connectionFailedMessage(en, "add the item")).toBe(
+      "Couldn't add the item. Check your connection and try again."
+    );
+    expect(requestFailedMessage(es, "agregar el artículo")).toBe(
+      "No se pudo agregar el artículo. Inténtalo de nuevo."
     );
   });
 });
@@ -50,18 +56,18 @@ describe("toastMutationFailure", () => {
       headers: { "Content-Type": "application/json" },
     });
 
-    await toastMutationFailure(toast, res, "Update role");
+    await toastMutationFailure(toast, res, "update the role", en);
 
     expect(toast).toHaveBeenCalledWith("Nope", { variant: "error" });
   });
 
-  it("falls back to the label when the API sends no message", async () => {
+  it("falls back to the action when the API sends no message", async () => {
     const toast = vi.fn();
     const res = new Response(null, { status: 500 });
 
-    await toastMutationFailure(toast, res, "Update role");
+    await toastMutationFailure(toast, res, "update the role", en);
 
-    expect(toast).toHaveBeenCalledWith("Update role failed. Try again.", {
+    expect(toast).toHaveBeenCalledWith("Couldn't update the role. Try again.", {
       variant: "error",
     });
   });
@@ -69,10 +75,10 @@ describe("toastMutationFailure", () => {
   it("reports a network failure", async () => {
     const toast = vi.fn();
 
-    await toastMutationFailure(toast, null, "Update role");
+    await toastMutationFailure(toast, null, "actualizar el rol", es);
 
     expect(toast).toHaveBeenCalledWith(
-      "Update role failed. Check your connection and try again.",
+      "No se pudo actualizar el rol. Revisa tu conexión e inténtalo de nuevo.",
       { variant: "error" }
     );
   });
@@ -81,11 +87,11 @@ describe("toastMutationFailure", () => {
     const toast = vi.fn();
     const res = new Response(null, { status: 429 });
 
-    await toastMutationFailure(toast, res, "Update role");
+    await toastMutationFailure(toast, res, "update the role", en);
 
-    expect(toast).toHaveBeenCalledWith(RATE_LIMIT_MESSAGE, { variant: "error" });
-    expect(RATE_LIMIT_MESSAGE).toBe(
-      "Too many changes at once. Wait a moment and try again."
+    expect(toast).toHaveBeenCalledWith(
+      "Too many changes at once. Wait a moment and try again.",
+      { variant: "error" }
     );
   });
 });

@@ -13,10 +13,10 @@ import { useToast } from "@/app/components/toast-provider";
 import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
 import {
   connectionFailedMessage,
-  RATE_LIMIT_MESSAGE,
   readApiErrorMessage,
   requestFailedMessage,
 } from "@/app/lib/api-error";
+import { useT } from "@/app/i18n";
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
@@ -112,6 +112,7 @@ export function useGroceryLogic({
   allTags,
   userId,
 }: UseGroceryLogicOptions) {
+  const t = useT();
   const revalidator = useRevalidator();
   const toast = useToast();
 
@@ -179,21 +180,11 @@ export function useGroceryLogic({
 
         if (result.processed > 0) {
           revalidator.revalidate();
-          toast(
-            `Synced ${result.processed} offline change${
-              result.processed === 1 ? "" : "s"
-            }`,
-            { variant: "success" }
-          );
+          toast(t.groceries.synced(result.processed), { variant: "success" });
         }
 
         if (result.discarded > 0) {
-          toast(
-            result.discarded === 1
-              ? "1 offline change couldn't sync and was dropped. Make that change again."
-              : `${result.discarded} offline changes couldn't sync and were dropped. Make those changes again.`,
-            { variant: "error", duration: 8000 }
-          );
+          toast(t.groceries.dropped(result.discarded), { variant: "error", duration: 8000 });
           revalidator.revalidate();
         }
       } catch {
@@ -223,7 +214,7 @@ export function useGroceryLogic({
       window.removeEventListener("online", handleOnline);
       sw?.removeEventListener("message", handleSwMessage);
     };
-  }, [revalidator, toast]);
+  }, [revalidator, toast, t]);
 
   // --- Core mutation runner ---
   //
@@ -272,11 +263,11 @@ export function useGroceryLogic({
 
           dropOverlay();
           if (res.status === 429) {
-            toast(RATE_LIMIT_MESSAGE, { variant: "error" });
+            toast(t.common.rateLimited, { variant: "error" });
             return;
           }
           const message = await readApiErrorMessage(res);
-          toast(message ?? requestFailedMessage(label), { variant: "error" });
+          toast(message ?? requestFailedMessage(t.common, label), { variant: "error" });
         } catch {
           // Network failure (likely offline). Queue supported operations so
           // they replay on reconnect, and keep the optimistic change visible.
@@ -289,18 +280,18 @@ export function useGroceryLogic({
               await queueMutation(queued);
               setBaseItems((prev) => applyOptimisticAction(prev, action));
               dropOverlay();
-              toast("Saved offline. It will sync when you're back online.");
+              toast(t.groceries.savedOffline);
               return;
             } catch {
               // Couldn't queue; fall through to revert.
             }
           }
           dropOverlay();
-          toast(connectionFailedMessage(label), { variant: "error" });
+          toast(connectionFailedMessage(t.common, label), { variant: "error" });
         }
       })();
     },
-    [toast]
+    [toast, t]
   );
 
   // --- Item actions ---
@@ -323,7 +314,7 @@ export function useGroceryLogic({
         createdAt: now,
         updatedAt: now,
         groceryItemTags: tagIds.flatMap((tagId) => {
-          const tag = allTags.find((t) => t.id === tagId);
+          const tag = allTags.find((candidate) => candidate.id === tagId);
           if (!tag) return [];
           return [
             {
@@ -336,7 +327,7 @@ export function useGroceryLogic({
         createdByUser: null,
       };
 
-      runAction({ type: "add", item: tempItem }, "Add item", () =>
+      runAction({ type: "add", item: tempItem }, t.groceries.actions.addItem, () =>
         fetch("/api/groceries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -344,12 +335,12 @@ export function useGroceryLogic({
         })
       );
     },
-    [allTags, userId, runAction]
+    [allTags, userId, runAction, t]
   );
 
   const toggleItem = useCallback(
     (id: string) => {
-      runAction({ type: "toggle", id }, "Update item", () =>
+      runAction({ type: "toggle", id }, t.groceries.actions.updateItem, () =>
         fetch(`/api/groceries/${id}/toggle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -357,7 +348,7 @@ export function useGroceryLogic({
         })
       );
     },
-    [runAction]
+    [runAction, t]
   );
 
   const toggleItemWithDate = useCallback((id: string) => {
@@ -366,7 +357,7 @@ export function useGroceryLogic({
 
   const confirmToggleWithDate = useCallback(
     (id: string, purchasedAt: Date) => {
-      runAction({ type: "toggle_with_date", id, purchasedAt }, "Update item", () =>
+      runAction({ type: "toggle_with_date", id, purchasedAt }, t.groceries.actions.updateItem, () =>
         fetch(`/api/groceries/${id}/toggle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -375,14 +366,14 @@ export function useGroceryLogic({
       );
       setDatePickerItemId(null);
     },
-    [runAction]
+    [runAction, t]
   );
 
   const confirmUpdatePurchaseDate = useCallback(
     (id: string, purchasedAt: Date) => {
       runAction(
         { type: "update_purchase_date", id, purchasedAt },
-        "Update purchase date",
+        t.groceries.actions.updatePurchaseDate,
         () =>
           fetch(`/api/groceries/${id}/purchase-date`, {
             method: "PATCH",
@@ -392,23 +383,23 @@ export function useGroceryLogic({
       );
       setDatePickerItemId(null);
     },
-    [runAction]
+    [runAction, t]
   );
 
   const deleteItem = useCallback(
     (id: string) => {
-      runAction({ type: "delete", id }, "Delete item", () =>
+      runAction({ type: "delete", id }, t.groceries.actions.deleteItem, () =>
         fetch(`/api/groceries/${id}`, { method: "DELETE" })
       );
     },
-    [runAction]
+    [runAction, t]
   );
 
   const updateTags = useCallback(
     (id: string, tagIds: string[]) => {
       runAction(
         { type: "update_tags", id, tagIds, allTags },
-        "Update tags",
+        t.groceries.actions.updateTags,
         () =>
           fetch(`/api/groceries/${id}/tags`, {
             method: "PUT",
@@ -417,12 +408,12 @@ export function useGroceryLogic({
           })
       );
     },
-    [allTags, runAction]
+    [allTags, runAction, t]
   );
 
   const editName = useCallback(
     (id: string, name: string) => {
-      runAction({ type: "edit_name", id, name }, "Rename item", () =>
+      runAction({ type: "edit_name", id, name }, t.groceries.actions.renameItem, () =>
         fetch(`/api/groceries/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -430,7 +421,7 @@ export function useGroceryLogic({
         })
       );
     },
-    [runAction]
+    [runAction, t]
   );
 
   // --- Tag actions (low frequency; revalidate to refresh the shared list) ---
@@ -444,18 +435,18 @@ export function useGroceryLogic({
           body: JSON.stringify({ name, color }),
         });
         if (!res.ok) {
-          toast(requestFailedMessage("Create tag"), { variant: "error" });
+          toast(requestFailedMessage(t.common, t.groceries.actions.createTag), { variant: "error" });
           return undefined;
         }
         const tag = (await res.json()) as GroceryTag;
         revalidator.revalidate();
         return tag;
       } catch {
-        toast(connectionFailedMessage("Create tag"), { variant: "error" });
+        toast(connectionFailedMessage(t.common, t.groceries.actions.createTag), { variant: "error" });
         return undefined;
       }
     },
-    [revalidator, toast]
+    [revalidator, toast, t]
   );
 
   const deleteTag = useCallback(
@@ -463,15 +454,15 @@ export function useGroceryLogic({
       try {
         const res = await fetch(`/api/tags/${tagId}`, { method: "DELETE" });
         if (!res.ok) {
-          toast(requestFailedMessage("Delete tag"), { variant: "error" });
+          toast(requestFailedMessage(t.common, t.groceries.actions.deleteTag), { variant: "error" });
           return;
         }
         revalidator.revalidate();
       } catch {
-        toast(connectionFailedMessage("Delete tag"), { variant: "error" });
+        toast(connectionFailedMessage(t.common, t.groceries.actions.deleteTag), { variant: "error" });
       }
     },
-    [revalidator, toast]
+    [revalidator, toast, t]
   );
 
   const editTag = useCallback(
@@ -483,15 +474,15 @@ export function useGroceryLogic({
           body: JSON.stringify({ name, color }),
         });
         if (!res.ok) {
-          toast(requestFailedMessage("Update tag"), { variant: "error" });
+          toast(requestFailedMessage(t.common, t.groceries.actions.updateTag), { variant: "error" });
           return;
         }
         revalidator.revalidate();
       } catch {
-        toast(connectionFailedMessage("Update tag"), { variant: "error" });
+        toast(connectionFailedMessage(t.common, t.groceries.actions.updateTag), { variant: "error" });
       }
     },
-    [revalidator, toast]
+    [revalidator, toast, t]
   );
 
   // --- Filtering ---

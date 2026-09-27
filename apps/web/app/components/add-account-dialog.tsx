@@ -17,9 +17,10 @@ import { readApiErrorMessage } from "@/app/lib/api-error";
 import { parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import {
-  ACCOUNT_TYPE_SELECT_OPTIONS,
+  ACCOUNT_TYPE_SELECT_VALUES,
   type AccountTypeSelectValue,
 } from "@/app/lib/financial-account-types";
+import { useT } from "@/app/i18n";
 
 interface AddAccountDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ export function AddAccountDialog({
   onOpenChange,
   defaultCurrency,
 }: AddAccountDialogProps) {
+  const t = useT();
   const revalidator = useRevalidator();
   const nameId = useId();
   const typeId = useId();
@@ -67,7 +69,7 @@ export function AddAccountDialog({
     if (trimmed !== "") {
       const parsed = parseAmount(trimmed);
       if (parsed === null) {
-        setError("Enter the balance as a number, like 1250.50 or 1.250,50.");
+        setError(t.accounts.balanceInvalid);
         return;
       }
       balanceNum = parsed;
@@ -86,14 +88,14 @@ export function AddAccountDialog({
         }),
       });
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? "Couldn't add the account. Try again.");
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.accounts.addAction));
         return;
       }
       revalidator.revalidate();
       resetForm();
       onOpenChange(false);
     } catch {
-      setError("Couldn't add the account. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.accounts.addAction));
     } finally {
       setLoading(false);
     }
@@ -103,37 +105,36 @@ export function AddAccountDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add account</DialogTitle>
+          <DialogTitle>{t.accounts.add}</DialogTitle>
           <DialogDescription>
-            Transactions and imports link to checking, savings, and cash accounts. Add
-            credit cards under Debts.
+            {t.accounts.addHint}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-semibold" htmlFor={nameId}>
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Main checking"
+              placeholder={t.accounts.namePlaceholder}
               required
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-semibold" htmlFor={typeId}>
-              Type
+              {t.common.type}
             </label>
             <NativeSelect
               id={typeId}
               value={type}
               onChange={(e) => setType(e.target.value as typeof type)}
             >
-              {ACCOUNT_TYPE_SELECT_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {ACCOUNT_TYPE_SELECT_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {t.accounts.types[value]}
                 </option>
               ))}
             </NativeSelect>
@@ -141,7 +142,7 @@ export function AddAccountDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold" htmlFor={balanceId}>
-                Balance
+                {t.common.balance}
               </label>
               <AmountInput
                 id={balanceId}
@@ -153,7 +154,7 @@ export function AddAccountDialog({
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-semibold" htmlFor={currencyId}>
-                Currency
+                {t.common.currency}
               </label>
               <CurrencySelect
                 id={currencyId}
@@ -166,10 +167,10 @@ export function AddAccountDialog({
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={loading || !name}>
-              {loading ? "Adding…" : "Add account"}
+              {loading ? t.common.adding : t.accounts.add}
             </Button>
           </DialogFooter>
         </form>

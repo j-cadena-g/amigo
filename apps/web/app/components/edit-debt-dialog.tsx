@@ -20,6 +20,7 @@ import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { useLocale } from "@/app/lib/use-locale";
+import { useT } from "@/app/i18n";
 
 interface EditDebtDialogProps {
   debt: Debt;
@@ -28,6 +29,7 @@ interface EditDebtDialogProps {
 }
 
 export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps) {
+  const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
@@ -42,7 +44,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isLoan = debt.type === "LOAN";
-  const noun = isLoan ? "loan" : "credit card";
+  const kind = isLoan ? "LOAN" : "CREDIT_CARD";
 
   // Loan fields
   const [loanAmount, setLoanAmount] = useState(
@@ -91,14 +93,14 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? `Couldn't save the ${noun}. Try again.`);
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.debts.saveAction[kind]));
         return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError(`Couldn't save the ${noun}. Check your connection and try again.`);
+      setError(t.common.couldNotConnection(t.debts.saveAction[kind]));
     } finally {
       setLoading(false);
     }
@@ -106,9 +108,9 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   async function handleDelete() {
     const ok = await confirm({
-      title: `Delete ${noun}?`,
-      description: "This can't be undone.",
-      confirmText: "Delete",
+      title: t.debts.deleteTitle[kind],
+      description: t.common.cantBeUndone,
+      confirmText: t.common.delete,
       variant: "destructive",
     });
     if (!ok) return;
@@ -122,14 +124,14 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? `Couldn't delete the ${noun}. Try again.`);
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.debts.deleteAction[kind]));
         return;
       }
 
       revalidator.revalidate();
       onOpenChange(false);
     } catch {
-      setError(`Couldn't delete the ${noun}. Check your connection and try again.`);
+      setError(t.common.couldNotConnection(t.debts.deleteAction[kind]));
     } finally {
       setDeleting(false);
     }
@@ -141,13 +143,13 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{isLoan ? "Edit loan" : "Edit credit card"}</DialogTitle>
+          <DialogTitle>{t.debts.editKind[kind]}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
-              Name
+              {t.common.name}
             </label>
             <Input
               id={nameId}
@@ -159,7 +161,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
           <div className="space-y-1.5">
             <label htmlFor={currencyId} className="text-sm font-semibold">
-              Currency
+              {t.common.currency}
             </label>
             <CurrencySelect
               id={currencyId}
@@ -172,7 +174,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
-                  Loan amount
+                  {t.debts.loanAmount}
                 </label>
                 <AmountInput
                   id={firstAmountId}
@@ -185,7 +187,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               </div>
               <div className="space-y-1.5">
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
-                  Total paid
+                  {t.debts.totalPaid}
                 </label>
                 <AmountInput
                   id={secondAmountId}
@@ -201,7 +203,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
-                  Credit limit
+                  {t.debts.creditLimit}
                 </label>
                 <AmountInput
                   id={firstAmountId}
@@ -214,7 +216,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               </div>
               <div className="space-y-1.5">
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
-                  Available credit
+                  {t.debts.availableCredit}
                 </label>
                 <AmountInput
                   id={secondAmountId}
@@ -238,7 +240,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
           <DialogFooter>
             <DeleteButton onClick={() => void handleDelete()} disabled={busy} className="sm:mr-auto">
               <Trash2 />
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? t.common.deleting : t.common.delete}
             </DeleteButton>
             <Button
               type="button"
@@ -246,10 +248,10 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={busy || !name.trim()}>
-              {loading ? "Saving…" : isLoan ? "Save loan" : "Save credit card"}
+              {loading ? t.common.saving : t.debts.saveKind[kind]}
             </Button>
           </DialogFooter>
         </form>

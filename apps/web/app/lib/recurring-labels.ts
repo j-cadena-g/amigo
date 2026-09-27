@@ -1,3 +1,6 @@
+import type { UiLanguage } from "@amigo/db";
+import { messagesFor } from "@/app/i18n";
+
 export type RecurringFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 
 export interface RecurringFrequencyInput {
@@ -7,60 +10,38 @@ export interface RecurringFrequencyInput {
   dayOfWeek: number | null;
 }
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
+/** "Monday" / "lunes" for 0 = Sunday … 6 = Saturday. */
+function weekdayName(dayOfWeek: number, language: UiLanguage): string {
+  // 2026-09-06 is a Sunday.
+  return new Date(Date.UTC(2026, 8, 6 + dayOfWeek)).toLocaleDateString(language, {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+}
 
-export function getFrequencyLabel(rule: RecurringFrequencyInput): string {
+export function getFrequencyLabel(rule: RecurringFrequencyInput, language: UiLanguage): string {
   const { frequency, interval, dayOfMonth, dayOfWeek } = rule;
+  const label = messagesFor(language).recurring.label;
 
   switch (frequency) {
     case "DAILY":
-      return interval === 1 ? "Daily" : `Every ${interval} days`;
-    case "WEEKLY": {
-      const dayName =
-        dayOfWeek !== null && dayOfWeek !== undefined
-          ? DAY_NAMES[dayOfWeek]
-          : undefined;
-      if (interval === 1) {
-        return dayName ? `Every ${dayName}` : "Weekly";
-      }
-      return dayName
-        ? `Every ${interval} weeks on ${dayName}`
-        : `Every ${interval} weeks`;
-    }
-    case "MONTHLY": {
+      return label.daily(interval);
+    case "WEEKLY":
+      return label.weekly(
+        interval,
+        dayOfWeek !== null && dayOfWeek !== undefined ? weekdayName(dayOfWeek, language) : null
+      );
+    case "MONTHLY":
       // The scheduler clamps day 31 to each month's last day.
-      const dayLabel =
-        dayOfMonth === 31
-          ? "Last day"
-          : dayOfMonth !== null && dayOfMonth !== undefined
-            ? ordinal(dayOfMonth)
-            : null;
-      if (interval === 1) {
-        return dayLabel ? `${dayLabel} of every month` : "Monthly";
-      }
-      return dayLabel
-        ? `${dayLabel} every ${interval} months`
-        : `Every ${interval} months`;
-    }
+      return label.monthly(
+        interval,
+        dayOfMonth === 31 ? "last" : dayOfMonth !== null && dayOfMonth !== undefined ? dayOfMonth : null
+      );
     case "YEARLY":
-      return interval === 1 ? "Yearly" : `Every ${interval} years`;
+      return label.yearly(interval);
     default: {
       const _exhaustive: never = frequency;
       return _exhaustive;
     }
   }
-}
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0] ?? "th");
 }

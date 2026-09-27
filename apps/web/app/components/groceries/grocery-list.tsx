@@ -12,6 +12,7 @@ import { PushNotificationButton } from "@/app/components/push-notification-butto
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { groupGroceriesByAisle } from "@/app/lib/grocery-categories";
+import { useT } from "@/app/i18n";
 
 interface GroceryListProps {
   items: GroceryItemWithTags[];
@@ -22,6 +23,7 @@ interface GroceryListProps {
 }
 
 export function GroceryList({ items, allTags, userId, fromOffline }: GroceryListProps) {
+  const t = useT();
   const [newItemName, setNewItemName] = useState("");
   const [newItemTagIds, setNewItemTagIds] = useState<string[]>([]);
   const [recentTags, setRecentTags] = useState<GroceryTag[]>([]);
@@ -107,10 +109,10 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
     <div className="max-w-2xl">
       <div className="flex min-h-10 items-start justify-between gap-4">
         <h1 className="type-display min-w-0 text-title-sm md:text-title">
-          Groceries{" "}
+          {t.nav.groceries}{" "}
           <span className="text-muted-foreground">
             <span aria-hidden="true">·</span> {toBuyCount}
-            <span className="sr-only"> to buy</span>
+            <span className="sr-only"> {t.groceries.toBuy}</span>
           </span>
         </h1>
         <PushNotificationButton />
@@ -121,7 +123,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
         className={fromOffline ? "mt-2 text-sm font-semibold" : "sr-only"}
       >
         {fromOffline
-          ? "You're offline, so this is the last saved list. New items, check-offs, deletions, and tag changes will sync when you reconnect."
+          ? t.groceries.offlineNotice
           : ""}
       </p>
 
@@ -131,13 +133,13 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
             type="text"
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
-            placeholder="Add an item"
-            aria-label="Add a grocery item"
+            placeholder={t.groceries.addPlaceholder}
+            aria-label={t.groceries.addLabel}
             autoComplete="off"
             className="min-w-0 flex-1"
           />
           <Button type="submit" disabled={!newItemName.trim()}>
-            Add
+            {t.groceries.addItem}
           </Button>
         </div>
         <div className="mt-2">
@@ -168,35 +170,35 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
             onClick={clearFilters}
             className="px-3 text-muted-foreground"
           >
-            Clear filters
+            {t.groceries.clearFilters}
           </Button>
         )}
         <p role="status" className="ml-auto text-sm text-muted-foreground">
-          {isPending ? "Saving…" : ""}
+          {isPending ? t.common.saving : ""}
         </p>
       </div>
 
       {!hasAnyItems ? (
-        <EmptyState message="The list is empty. Add what you need above." />
+        <EmptyState message={t.groceries.empty} />
       ) : activeItems.length === 0 ? (
         filterTagIds.length > 0 ? (
           <EmptyState
-            message="Nothing left to buy has these tags."
+            message={t.groceries.noneWithTags}
             action={
               <Button type="button" variant="outline" onClick={clearFilters}>
-                Clear filters
+                {t.groceries.clearFilters}
               </Button>
             }
           />
         ) : (
-          <EmptyState message="Nothing left to buy." />
+          <EmptyState message={t.groceries.nothingLeft} />
         )
       ) : (
         <div className="mt-2 flex flex-col gap-4">
           {activeGroups.map((group) => (
             <section key={group.category}>
               <h2 className="mb-1 text-sm font-semibold text-muted-foreground">
-                {group.category}
+                {t.groceries.aisles[group.category]}
               </h2>
               <ul className="divide-y divide-border border-y border-border">
                 {group.items.map((item) => (

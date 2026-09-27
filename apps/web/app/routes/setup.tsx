@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
-import { redirect, useNavigate, type LoaderFunctionArgs } from "react-router";
+import {
+  type LoaderFunctionArgs,
+  type MetaArgs,
+  redirect,
+  useLoaderData,
+  useNavigate,
+} from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -11,11 +17,15 @@ import {
   getBrowserTimezone,
 } from "@/app/lib/timezones";
 import { getSessionStatus } from "@/app/lib/session.server";
+import { pageTitle, useLanguage, useT } from "@/app/i18n";
+import { parseAcceptLanguage } from "@/app/lib/locale";
+import { useLocale } from "@/app/lib/use-locale";
+import { currencyName, defaultCurrencyForLocale } from "@/app/lib/currency";
 
 const SELECT_CLASS =
   "mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base";
 
-export function loader({ context }: LoaderFunctionArgs) {
+export function loader({ context, request }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
 
   if (status === "unauthenticated") {
@@ -30,18 +40,33 @@ export function loader({ context }: LoaderFunctionArgs) {
     throw redirect("/restore-account");
   }
 
-  return null;
+  // The browser's region ("en-US" → USD), not the display format, which may
+  // keep a household default.
+  const regional = parseAcceptLanguage(request.headers.get("Accept-Language")).find((tag) => {
+    try {
+      return Boolean(new Intl.Locale(tag).region);
+    } catch {
+      return false;
+    }
+  });
+  return { regionCurrency: regional ? defaultCurrencyForLocale(regional) : null };
 }
 
-export function meta() {
-  return [{ title: "Set up your household · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.setUpHousehold);
 }
 
 export default function Setup() {
+  const t = useT();
+  const language = useLanguage();
+  const locale = useLocale();
   const navigate = useNavigate();
   const { getToken } = useAuth();
-  const [householdName, setHouseholdName] = useState("My household");
-  const [currency, setCurrency] = useState("CAD");
+  const [householdName, setHouseholdName] = useState(t.onboarding.defaultHouseholdName);
+  const { regionCurrency } = useLoaderData<typeof loader>();
+  const [currency, setCurrency] = useState<string>(
+    () => regionCurrency ?? defaultCurrencyForLocale(locale)
+  );
   const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,9 +101,9 @@ export default function Setup() {
       }
 
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(data?.error ?? "Couldn't create the household. Try again.");
+      setError(data?.error ?? t.common.couldNot(t.onboarding.createAction));
     } catch {
-      setError("Couldn't create the household. Check your connection and try again.");
+      setError(t.common.couldNotConnection(t.onboarding.createAction));
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +120,7 @@ export default function Setup() {
       return;
     }
 
-    setInviteError(result.error);
+    setInviteError(result.error ?? (result.network ? t.onboarding.networkError : t.onboarding.acceptFailed));
     setAcceptingInvite(false);
   }
 
@@ -103,7 +128,7 @@ export default function Setup() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
-        <h1 className="type-display mt-6 text-title-sm">Set up your household</h1>
+        <h1 className="type-display mt-6 text-title-sm">{t.nav.setUpHousehold}</h1>
 
         <div className="mt-1">
           <button
@@ -113,16 +138,13 @@ export default function Setup() {
             aria-controls="invite-code-form"
             className="block py-2 text-left text-muted-foreground hover:text-foreground"
           >
-            {showInviteCode ? (
-              "Hide invite code"
-            ) : (
-              <>
-                Joining someone&apos;s household?{" "}
-                <span className="font-semibold text-foreground underline decoration-muted-foreground/60 underline-offset-4">
-                  Enter an invite code
-                </span>
-              </>
-            )}
+            {showInviteCode
+              ? t.onboarding.hideInviteCode
+              : t.onboarding.joiningSomeone(
+                  <span className="font-semibold text-foreground underline decoration-muted-foreground/60 underline-offset-4">
+                    {t.onboarding.enterInviteCode}
+                  </span>
+                )}
           </button>
 
           {showInviteCode && (
@@ -132,7 +154,7 @@ export default function Setup() {
               className="mt-4 border-b border-border pb-8"
             >
               <label htmlFor="inviteCode" className="block text-sm font-semibold">
-                Invite code
+                {t.onboarding.inviteCode}
               </label>
               <Input
                 id="inviteCode"
@@ -156,7 +178,7 @@ export default function Setup() {
                 disabled={acceptingInvite || inviteCode.trim().length === 0}
                 className="mt-4 w-full"
               >
-                {acceptingInvite ? "Joining…" : "Join household"}
+                {acceptingInvite ? t.onboarding.joining : t.onboarding.join}
               </Button>
             </form>
           )}
@@ -165,7 +187,7 @@ export default function Setup() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <div>
             <label htmlFor="householdName" className="block text-sm font-semibold">
-              Household name
+              {t.onboarding.householdName}
             </label>
             <Input
               id="householdName"
@@ -178,14 +200,13 @@ export default function Setup() {
               className="mt-1.5"
             />
             <p id="householdName-hint" className="mt-1.5 text-sm text-muted-foreground">
-              Everyone you invite sees this name. You can change it later in
-              Settings.
+              {t.onboarding.householdNameHint}
             </p>
           </div>
 
           <div>
             <label htmlFor="currency" className="block text-sm font-semibold">
-              Home currency
+              {t.settings.household.homeCurrency}
             </label>
             <select
               id="currency"
@@ -195,7 +216,7 @@ export default function Setup() {
             >
               {CURRENCY_CODES.map((code) => (
                 <option key={code} value={code}>
-                  {code}
+                  {`${code} – ${currencyName(code, language)}`}
                 </option>
               ))}
             </select>
@@ -203,7 +224,7 @@ export default function Setup() {
 
           <div>
             <label htmlFor="timezone" className="block text-sm font-semibold">
-              Timezone
+              {t.settings.household.timezone}
             </label>
             <select
               id="timezone"
@@ -219,8 +240,7 @@ export default function Setup() {
               ))}
             </select>
             <p id="timezone-hint" className="mt-1.5 text-sm text-muted-foreground">
-              Budget periods and transaction dates use your household&apos;s local
-              calendar day.
+              {t.settings.household.timezoneHint}
             </p>
           </div>
 
@@ -235,7 +255,7 @@ export default function Setup() {
             disabled={submitting || householdName.trim().length === 0}
             className="w-full"
           >
-            {submitting ? "Creating…" : "Create household"}
+            {submitting ? t.onboarding.creating : t.onboarding.create}
           </Button>
         </form>
       </div>

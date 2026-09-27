@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/app/components/ui/alert-dialog";
 import { describeMemberData, type MemberDataSummary } from "./member-data-summary";
+import { useLanguage, useT } from "@/app/i18n";
 
 interface Member {
   id: string;
@@ -39,6 +40,8 @@ export function MemberRoleManager({
   currentUserRole,
   currentUserId,
 }: MemberRoleManagerProps) {
+  const t = useT();
+  const language = useLanguage();
   const revalidator = useRevalidator();
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -68,9 +71,9 @@ export function MemberRoleManager({
         revalidator.revalidate();
         return;
       }
-      await toastMutationFailure(toast, res, "Update role");
+      await toastMutationFailure(toast, res, t.household.members.roleAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Update role");
+      await toastMutationFailure(toast, null, t.household.members.roleAction, t.common);
     } finally {
       setSubmitting(false);
     }
@@ -89,9 +92,9 @@ export function MemberRoleManager({
         revalidator.revalidate();
         return;
       }
-      await toastMutationFailure(toast, res, "Transfer ownership");
+      await toastMutationFailure(toast, res, t.household.members.transferAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Transfer ownership");
+      await toastMutationFailure(toast, null, t.household.members.transferAction, t.common);
     } finally {
       setSubmitting(false);
     }
@@ -107,9 +110,9 @@ export function MemberRoleManager({
         setDataSummary(data);
         return;
       }
-      await toastMutationFailure(toast, res, "Load member summary");
+      await toastMutationFailure(toast, res, t.household.members.summaryAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Load member summary");
+      await toastMutationFailure(toast, null, t.household.members.summaryAction, t.common);
     } finally {
       setLoadingSummary(false);
     }
@@ -126,40 +129,40 @@ export function MemberRoleManager({
         revalidator.revalidate();
         return;
       }
-      await toastMutationFailure(toast, res, "Remove member");
+      await toastMutationFailure(toast, res, t.household.members.removeAction, t.common);
     } catch {
-      await toastMutationFailure(toast, null, "Remove member");
+      await toastMutationFailure(toast, null, t.household.members.removeAction, t.common);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const dataDescription = dataSummary ? describeMemberData(dataSummary) : "";
+  const dataDescription = dataSummary ? describeMemberData(dataSummary, language) : "";
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" disabled={submitting}>
-            Manage
+            {t.household.members.manage}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {member.role === "member" && (
             <DropdownMenuItem onClick={() => handleRoleChange("admin")}>
-              Make admin
+              {t.household.members.makeAdmin}
             </DropdownMenuItem>
           )}
           {member.role === "admin" && isOwner && (
             <DropdownMenuItem onClick={() => handleRoleChange("member")}>
-              Make member
+              {t.household.members.makeMember}
             </DropdownMenuItem>
           )}
           {isOwner && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setTransferOpen(true)}>
-                Transfer ownership
+                {t.household.members.transfer}
               </DropdownMenuItem>
             </>
           )}
@@ -168,7 +171,7 @@ export function MemberRoleManager({
             onClick={openRemoveDialog}
             className="text-destructive focus:text-destructive"
           >
-            Remove member
+            {t.household.members.remove}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -176,21 +179,18 @@ export function MemberRoleManager({
       <AlertDialog open={transferOpen} onOpenChange={setTransferOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Transfer ownership to {member.displayName}?
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t.household.members.transferTitle(member.displayName)}</AlertDialogTitle>
             <AlertDialogDescription>
-              You&apos;ll become an admin, and only {member.displayName} will be able
-              to transfer ownership back.
+              {t.household.members.transferBody(member.displayName)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={submitting}>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleTransferOwnership}
               disabled={submitting}
             >
-              {submitting ? "Transferring…" : "Transfer ownership"}
+              {submitting ? t.household.members.transferring : t.household.members.transfer}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -207,32 +207,26 @@ export function MemberRoleManager({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {member.displayName}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              They&apos;ll lose access to the household right away.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t.household.members.removeTitle(member.displayName)}</AlertDialogTitle>
+            <AlertDialogDescription>{t.household.members.removeBody}</AlertDialogDescription>
           </AlertDialogHeader>
 
           {loadingSummary ? (
-            <p className="text-sm text-muted-foreground">
-              Loading what they&apos;ve added…
-            </p>
+            <p className="text-sm text-muted-foreground">{t.household.members.loadingData}</p>
           ) : dataSummary ? (
             <p className="text-sm">
-              {dataDescription
-                ? `What they added stays in the household: ${dataDescription}.`
-                : "They haven't added anything yet."}
+              {dataDescription ? t.household.members.dataStays(dataDescription) : t.household.members.nothingAdded}
             </p>
           ) : null}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={submitting}>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
               disabled={submitting || loadingSummary}
               className={buttonVariants({ variant: "destructive" })}
             >
-              {submitting ? "Removing…" : "Remove member"}
+              {submitting ? t.household.members.removing : t.household.members.remove}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

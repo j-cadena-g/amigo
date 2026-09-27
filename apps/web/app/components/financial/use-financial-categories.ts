@@ -3,8 +3,10 @@ import type {
   FinancialCategoryItem,
   FinancialCategoryType,
 } from "@/app/lib/financial-category-types";
+import { useT } from "@/app/i18n";
 
 export function useFinancialCategories(options?: { includeArchived?: boolean }) {
+  const t = useT();
   const [categories, setCategories] = useState<FinancialCategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +26,11 @@ export function useFinancialCategories(options?: { includeArchived?: boolean }) 
       }
       setCategories((await res.json()) as FinancialCategoryItem[]);
     } catch {
-      setError("Couldn't load categories. Reload the page to try again.");
+      setError(t.categories.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [options?.includeArchived]);
+  }, [options?.includeArchived, t]);
 
   useEffect(() => {
     void reload();

@@ -16,18 +16,10 @@ import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
 import { parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
+import { useT } from "@/app/i18n";
 
 type DebtKind = "LOAN" | "CREDIT_CARD";
 
-const DEBT_KIND_OPTIONS = [
-  { value: "LOAN", label: "Loan" },
-  { value: "CREDIT_CARD", label: "Credit card" },
-] as const;
-
-const DEBT_KIND_NOUNS: Record<DebtKind, string> = {
-  LOAN: "loan",
-  CREDIT_CARD: "credit card",
-};
 
 interface AddDebtDialogProps {
   open: boolean;
@@ -40,6 +32,7 @@ export function AddDebtDialog({
   onOpenChange,
   defaultCurrency = "CAD",
 }: AddDebtDialogProps) {
+  const t = useT();
   const revalidator = useRevalidator();
   const nameId = useId();
   const currencyId = useId();
@@ -63,7 +56,6 @@ export function AddDebtDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const noun = DEBT_KIND_NOUNS[kind];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +89,7 @@ export function AddDebtDialog({
       });
 
       if (!res.ok) {
-        setError((await readApiErrorMessage(res)) ?? `Couldn't add the ${noun}. Try again.`);
+        setError((await readApiErrorMessage(res)) ?? t.common.couldNot(t.debts.addAction[kind]));
         return;
       }
 
@@ -105,7 +97,7 @@ export function AddDebtDialog({
       resetForm();
       onOpenChange(false);
     } catch {
-      setError(`Couldn't add the ${noun}. Check your connection and try again.`);
+      setError(t.common.couldNotConnection(t.debts.addAction[kind]));
     } finally {
       setLoading(false);
     }
@@ -135,20 +127,23 @@ export function AddDebtDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Add debt</DialogTitle>
+          <DialogTitle>{t.debts.add}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <TypeToggle
-            label="Debt type"
-            options={DEBT_KIND_OPTIONS}
+            label={t.debts.typeLabel}
+            options={[
+              { value: "LOAN", label: t.debts.kinds.LOAN },
+              { value: "CREDIT_CARD", label: t.debts.kinds.CREDIT_CARD },
+            ] as const}
             value={kind}
             onChange={setKind}
           />
 
           <div className="space-y-1.5">
             <label htmlFor={nameId} className="text-sm font-semibold">
-              Name
+              {t.common.name}
             </label>
             {kind === "LOAN" ? (
               <Input
@@ -156,7 +151,7 @@ export function AddDebtDialog({
                 id={nameId}
                 value={loanName}
                 onChange={(e) => setLoanName(e.target.value)}
-                placeholder="e.g. Car loan"
+                placeholder={t.debts.loanPlaceholder}
                 required
               />
             ) : (
@@ -165,7 +160,7 @@ export function AddDebtDialog({
                 id={nameId}
                 value={ccName}
                 onChange={(e) => setCcName(e.target.value)}
-                placeholder="e.g. Visa"
+                placeholder={t.debts.cardPlaceholder}
                 required
               />
             )}
@@ -173,7 +168,7 @@ export function AddDebtDialog({
 
           <div className="space-y-1.5">
             <label htmlFor={currencyId} className="text-sm font-semibold">
-              Currency
+              {t.common.currency}
             </label>
             <CurrencySelect
               id={currencyId}
@@ -190,7 +185,7 @@ export function AddDebtDialog({
             <div key="loan-amounts" className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
-                  Loan amount
+                  {t.debts.loanAmount}
                 </label>
                 <AmountInput
                   id={firstAmountId}
@@ -203,7 +198,7 @@ export function AddDebtDialog({
               </div>
               <div className="space-y-1.5">
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
-                  Total paid
+                  {t.debts.totalPaid}
                 </label>
                 <AmountInput
                   id={secondAmountId}
@@ -219,7 +214,7 @@ export function AddDebtDialog({
             <div key="cc-amounts" className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
-                  Credit limit
+                  {t.debts.creditLimit}
                 </label>
                 <AmountInput
                   id={firstAmountId}
@@ -232,7 +227,7 @@ export function AddDebtDialog({
               </div>
               <div className="space-y-1.5">
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
-                  Available credit
+                  {t.debts.availableCredit}
                 </label>
                 <AmountInput
                   id={secondAmountId}
@@ -258,10 +253,10 @@ export function AddDebtDialog({
               onClick={() => handleOpenChange(false)}
               disabled={loading}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button type="submit" disabled={loading || !currentName.trim()}>
-              {loading ? "Adding…" : kind === "LOAN" ? "Add loan" : "Add credit card"}
+              {loading ? t.common.adding : t.debts.addKind[kind]}
             </Button>
           </DialogFooter>
         </form>

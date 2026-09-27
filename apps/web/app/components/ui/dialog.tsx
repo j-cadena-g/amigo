@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/app/lib/utils";
+import { useT } from "@/app/i18n";
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -50,30 +51,33 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      style={{
-        backgroundColor: "var(--color-card)",
-        color: "var(--color-card-foreground)",
-        borderColor: "var(--color-border)",
-      }}
-      className={cn(
-        "fixed left-1/2 top-1/2 z-[51] grid w-[calc(100%-2rem)] max-w-lg grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg animate-appear",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none">
-        <XIcon className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+>(({ className, children, ...props }, ref) => {
+  const t = useT();
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        style={{
+          backgroundColor: "var(--color-card)",
+          color: "var(--color-card-foreground)",
+          borderColor: "var(--color-border)",
+        }}
+        className={cn(
+          "fixed left-1/2 top-1/2 z-[51] grid w-[calc(100%-2rem)] max-w-lg grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg animate-appear",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none">
+          <XIcon className="h-4 w-4" />
+          <span className="sr-only">{t.common.close}</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({

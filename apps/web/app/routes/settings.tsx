@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
@@ -15,11 +15,13 @@ import {
   sql,
   parseHomeCurrency,
   scopeToHousehold,
+  type FormatLocale,
+  type UiLanguage,
 } from "@amigo/db";
 import { LedgerSection } from "@/app/components/ledger";
 import { AccountSettings } from "@/app/components/settings/account-settings";
-import { FormatSettings } from "@/app/components/settings/format-settings";
-import { resolveLocale } from "@/app/lib/locale";
+import { RegionSettings } from "@/app/components/settings/region-settings";
+import { resolveLanguage, resolveLocale } from "@/app/lib/locale";
 import { HouseholdSettingsForm } from "@/app/components/settings/household-settings-form";
 import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
@@ -27,6 +29,30 @@ import { MemberRoleManager } from "@/app/components/settings/member-role-manager
 import { NotificationSettings } from "@/app/components/settings/notification-settings";
 import { TagManager } from "@/app/components/settings/tag-manager";
 import { SettingsThemeToggle } from "@/app/components/settings/theme-toggle";
+import { pageTitle, useT } from "@/app/i18n";
+
+/** Saved choices plus what "Automatic" would resolve to, for the region controls. */
+function regionChoices({
+  savedLocale,
+  savedLanguage,
+  homeCurrency,
+  acceptLanguage,
+}: {
+  savedLocale: FormatLocale | null;
+  savedLanguage: UiLanguage | null;
+  homeCurrency: string | undefined;
+  acceptLanguage: string | null;
+}) {
+  // Automatic format honors a saved language; automatic language ignores it.
+  const automaticLocale = resolveLocale({ homeCurrency, acceptLanguage, language: savedLanguage });
+  const effectiveLocale = resolveLocale({ preferred: savedLocale, homeCurrency, acceptLanguage });
+  return {
+    savedLocale,
+    automaticLocale,
+    savedLanguage,
+    automaticLanguage: resolveLanguage({ locale: effectiveLocale }),
+  };
+}
 
 export async function loader({ context, request }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -42,7 +68,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
         eq(users.id, session.userId),
         scopeToHousehold(users.householdId, session.householdId)
       ),
-      columns: { locale: true },
+      columns: { locale: true, language: true },
     }),
     db.query.users.findMany({
       where: and(
@@ -76,8 +102,9 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
 
   return {
     household: household!,
-    savedLocale: currentUser?.locale ?? null,
-    automaticLocale: resolveLocale({
+    ...regionChoices({
+      savedLocale: currentUser?.locale ?? null,
+      savedLanguage: currentUser?.language ?? null,
       homeCurrency: household?.homeCurrency,
       acceptLanguage: request.headers.get("Accept-Language"),
     }),
@@ -90,23 +117,32 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Settings · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.settings);
 }
 
 export default function Settings() {
-  const { household, savedLocale, automaticLocale, members, tags, session } =
-    useLoaderData<typeof loader>();
+  const t = useT();
+  const {
+    household,
+    savedLocale,
+    automaticLocale,
+    savedLanguage,
+    automaticLanguage,
+    members,
+    tags,
+    session,
+  } = useLoaderData<typeof loader>();
   const canManageHousehold =
     session.role === "owner" || session.role === "admin";
 
   return (
     <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
       <div className="max-w-2xl">
-        <h1 className="type-display text-title-sm md:text-title">Settings</h1>
+        <h1 className="type-display text-title-sm md:text-title">{t.nav.settings}</h1>
 
         <div className="mt-8 space-y-10">
-          <LedgerSection title="Household">
+          <LedgerSection title={t.settings.sections.household}>
             <div className="pt-4">
               <HouseholdSettingsForm
                 name={household.name}
@@ -118,7 +154,7 @@ export default function Settings() {
           </LedgerSection>
 
           <LedgerSection
-            title="Members"
+            title={t.settings.sections.members}
             aside={
               <span className="font-mono text-sm text-muted-foreground">
                 {members.length}
@@ -137,12 +173,12 @@ export default function Settings() {
                       {member.id === session.userId && (
                         <span className="font-normal text-muted-foreground">
                           {" "}
-                          (you)
+                          {t.settings.you}
                         </span>
                       )}
                     </p>
-                    <p className="text-sm text-muted-foreground capitalize">
-                      {member.role}
+                    <p className="text-sm text-muted-foreground">
+                      {t.settings.roles[member.role]}
                     </p>
                   </div>
                   {member.id !== session.userId && canManageHousehold && (
@@ -162,7 +198,7 @@ export default function Settings() {
           </LedgerSection>
 
           {canManageHousehold && (
-            <LedgerSection title="Invites">
+            <LedgerSection title={t.settings.sections.invites}>
               <div className="pt-4">
                 <InviteManager />
               </div>
@@ -171,38 +207,40 @@ export default function Settings() {
 
           <TagManager tags={tags} />
 
-          <LedgerSection title="Notifications">
+          <LedgerSection title={t.settings.sections.notifications}>
             <div className="pt-4">
               <NotificationSettings />
             </div>
           </LedgerSection>
 
-          <LedgerSection title="Formats">
+          <LedgerSection title={t.settings.sections.region}>
             <div className="pt-4">
-              <FormatSettings
+              <RegionSettings
                 savedLocale={savedLocale}
                 automaticLocale={automaticLocale}
+                savedLanguage={savedLanguage}
+                automaticLanguage={automaticLanguage}
                 homeCurrency={parseHomeCurrency(household.homeCurrency)}
               />
             </div>
           </LedgerSection>
 
-          <LedgerSection title="Appearance">
+          <LedgerSection title={t.settings.sections.appearance}>
             <div className="pt-4">
               <SettingsThemeToggle />
               <p className="mt-2 text-sm text-muted-foreground">
-                Applies to this device only.
+                {t.settings.appearanceHint}
               </p>
             </div>
           </LedgerSection>
 
-          <LedgerSection title="Account">
+          <LedgerSection title={t.settings.sections.account}>
             <div className="pt-4">
               <AccountSettings />
             </div>
           </LedgerSection>
 
-          <LedgerSection title="Leave household">
+          <LedgerSection title={t.settings.sections.leaveHousehold}>
             <div className="pt-4">
               <LeaveHousehold role={session.role} />
             </div>

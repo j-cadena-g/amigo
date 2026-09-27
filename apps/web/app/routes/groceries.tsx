@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb, groceryItems, groceryTags, scopeToHousehold, and, isNull } from "@amigo/db";
 import { GroceryList } from "@/app/components/groceries/grocery-list";
@@ -11,6 +11,7 @@ import {
   isOfflineSupported,
 } from "@/app/lib/offline";
 import type { GroceryItemWithTags } from "@/app/components/groceries/types";
+import { pageTitle } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -184,8 +185,8 @@ export async function clientLoader({
 
 clientLoader.hydrate = true;
 
-export function meta() {
-  return [{ title: "Groceries · amigo" }];
+export function meta({ matches }: MetaArgs) {
+  return pageTitle(matches, (t) => t.nav.groceries);
 }
 
 export default function Groceries() {

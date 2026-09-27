@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useId } from "react";
+import { Link } from "react-router";
 import type { GroceryTag } from "@amigo/db";
 import { Check, Pencil, Tag } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
@@ -292,6 +293,16 @@ export function TagSelector({
                 <p className="py-2 text-sm text-muted-foreground">
                   No tags yet. Type a name to create one.
                 </p>
+              )}
+              {allTags.length > 0 && (
+                <div className="mt-2 border-t border-border pt-2">
+                  <Link
+                    to="/settings#grocery-tags"
+                    className="text-sm font-semibold underline decoration-muted-foreground/60 underline-offset-4 hover:decoration-foreground"
+                  >
+                    Manage tags
+                  </Link>
+                </div>
               )}
             </>
           )}

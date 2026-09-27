@@ -94,6 +94,13 @@
     --tag-orange: #e07a1f;
     --tag-pink: #d5508e;
     --tag-gray: #8c8c86;
+    --tag-lime: #6f9e12;
+    --tag-teal: #12918a;
+    --tag-cyan: #1592c2;
+    --tag-indigo: #4a4fc6;
+    --tag-magenta: #b52d9c;
+    --tag-brown: #8a5a36;
+    --tag-ink: #151515;
   }
 
   html {
@@ -150,6 +157,13 @@
     --tag-orange: #f59e4b;
     --tag-pink: #f08bbd;
     --tag-gray: #a1a19a;
+    --tag-lime: #a6d648;
+    --tag-teal: #3fc4ba;
+    --tag-cyan: #5cc6ee;
+    --tag-indigo: #8f93f3;
+    --tag-magenta: #e072cc;
+    --tag-brown: #c49a72;
+    --tag-ink: #edede7;
   }
 
   :focus-visible {

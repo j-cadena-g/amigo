@@ -1,20 +1,9 @@
-import { and, eq, getDb, groceryTags, sql } from "@amigo/db";
+import { and, eq, getDb, GROCERY_TAG_COLORS, groceryTags, sql } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
-
-const TAG_COLORS = [
-  "blue",
-  "red",
-  "green",
-  "yellow",
-  "purple",
-  "pink",
-  "orange",
-  "gray",
-] as const;
 
 const trimmedNameSchema = z.preprocess(
   (value) => (typeof value === "string" ? value.trim() : value),
@@ -23,12 +12,12 @@ const trimmedNameSchema = z.preprocess(
 
 const createTagSchema = z.object({
   name: trimmedNameSchema,
-  color: z.enum(TAG_COLORS).optional(),
+  color: z.enum(GROCERY_TAG_COLORS).optional(),
 });
 
 const updateTagSchema = z.object({
   name: trimmedNameSchema,
-  color: z.enum(TAG_COLORS),
+  color: z.enum(GROCERY_TAG_COLORS),
 });
 
 async function broadcastTagChange(

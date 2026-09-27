@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatCents, formatCentsParts, formatSignedCents } from "./currency";
+import {
+  formatCents,
+  formatCentsParts,
+  formatShortCents,
+  formatSignedCents,
+} from "./currency";
 
 describe("formatCentsParts", () => {
   it("splits CAD into symbol, grouped whole units, and cents", () => {
@@ -63,5 +68,20 @@ describe("formatSignedCents", () => {
     expect(formatSignedCents(0, "CAD", { showPlus: true })).toBe(
       formatCents(0, "CAD")
     );
+  });
+});
+
+describe("formatShortCents", () => {
+  it("drops cents and abbreviates from a thousand up", () => {
+    expect(formatShortCents(84_50, "CAD")).toBe("$85");
+    expect(formatShortCents(1_250_00, "CAD")).toBe("$1.3K");
+    expect(formatShortCents(-45_00, "USD")).toBe("−$45");
+    expect(formatShortCents(999_60, "CAD")).toBe("$1K");
+    expect(formatShortCents(2_500_000_00, "CAD")).toBe("$2.5M");
+  });
+
+  it("abbreviates thousands in locales whose compact notation doesn't", () => {
+    expect(formatShortCents(1_250_00, "EUR")).toBe("1,3K\u00a0€");
+    expect(formatShortCents(12_500_00, "EUR")).toBe("12,5K\u00a0€");
   });
 });

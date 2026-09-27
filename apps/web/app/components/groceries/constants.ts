@@ -1,16 +1,25 @@
-/** Stored tag color names mapped to the `--tag-*` dot colors in app.css. */
-export const tagColors = {
-  blue: "bg-(--tag-blue)",
-  green: "bg-(--tag-green)",
-  red: "bg-(--tag-red)",
-  yellow: "bg-(--tag-yellow)",
-  purple: "bg-(--tag-purple)",
-  orange: "bg-(--tag-orange)",
-  pink: "bg-(--tag-pink)",
-  gray: "bg-(--tag-gray)",
-} as const;
+import type { GroceryTagColor } from "@amigo/db";
 
-export type TagColorKey = keyof typeof tagColors;
+/** Stored tag color names mapped to the `--tag-*` dot colors in app.css. */
+export const tagColors: Record<GroceryTagColor, string> = {
+  red: "bg-(--tag-red)",
+  orange: "bg-(--tag-orange)",
+  yellow: "bg-(--tag-yellow)",
+  lime: "bg-(--tag-lime)",
+  green: "bg-(--tag-green)",
+  teal: "bg-(--tag-teal)",
+  cyan: "bg-(--tag-cyan)",
+  blue: "bg-(--tag-blue)",
+  indigo: "bg-(--tag-indigo)",
+  purple: "bg-(--tag-purple)",
+  magenta: "bg-(--tag-magenta)",
+  pink: "bg-(--tag-pink)",
+  brown: "bg-(--tag-brown)",
+  gray: "bg-(--tag-gray)",
+  ink: "bg-(--tag-ink)",
+};
+
+export type TagColorKey = GroceryTagColor;
 
 export function tagColorKey(color: string): TagColorKey {
   return color in tagColors ? (color as TagColorKey) : "gray";

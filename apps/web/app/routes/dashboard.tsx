@@ -3,7 +3,7 @@ import { useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import { getDb } from "@amigo/db";
 import { MonthHero } from "@/app/components/dashboard/month-hero";
-import { MonthStrip } from "@/app/components/dashboard/month-strip";
+import { MonthCalendar } from "@/app/components/dashboard/month-calendar";
 import { DashboardRecentTransactions } from "@/app/components/dashboard/recent-transactions";
 import { DashboardBudgetProgress } from "@/app/components/dashboard/budget-progress";
 import { DashboardUpcomingRecurring } from "@/app/components/dashboard/upcoming-recurring";
@@ -63,7 +63,7 @@ export default function Dashboard() {
         currency={currency}
       />
 
-      <MonthStrip
+      <MonthCalendar
         events={calendarEvents}
         month={calendarMonth}
         todayStr={todayStr}

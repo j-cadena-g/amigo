@@ -1,4 +1,4 @@
-import { eq, getDb, households } from "@amigo/db";
+import { getDb, households, scopeToHousehold } from "@amigo/db";
 import { isValidTimeZone } from "./dates";
 
 export async function getHouseholdTimezone(
@@ -6,7 +6,7 @@ export async function getHouseholdTimezone(
   householdId: string
 ): Promise<string> {
   const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
+    where: scopeToHousehold(households.id, householdId),
     columns: { timezone: true },
   });
   const tz = household?.timezone ?? "UTC";

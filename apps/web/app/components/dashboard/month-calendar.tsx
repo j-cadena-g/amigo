@@ -1,0 +1,263 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { CurrencyCode } from "@amigo/db";
+import { Button } from "@/app/components/ui/button";
+import { DayDetailDialog } from "@/app/components/day-detail-dialog";
+import { LedgerSection } from "@/app/components/ledger";
+import { formatCents, formatShortCents } from "@/app/lib/currency";
+import {
+  formatMonthLabel,
+  leadingBlankDays,
+  scheduledAhead,
+  shiftMonth,
+} from "@/app/lib/month-calendar";
+import {
+  buildMonthStrip,
+  describeStripDay,
+  type CalendarEvent,
+} from "@/app/lib/month-strip";
+import { cn } from "@/app/lib/utils";
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+interface MonthCalendarProps {
+  events: CalendarEvent[];
+  month: string; // YYYY-MM
+  todayStr: string;
+  currency: CurrencyCode;
+  className?: string;
+}
+
+function aheadLine(
+  dueCents: number,
+  expectedCents: number,
+  currency: CurrencyCode,
+  period: string
+): string {
+  const parts = [];
+  if (dueCents > 0) parts.push(`${formatCents(dueCents, currency)} due`);
+  if (expectedCents > 0) parts.push(`${formatCents(expectedCents, currency)} expected`);
+  if (parts.length === 0) return `Nothing scheduled ${period}.`;
+  return `${parts.join(" and ")} ${period}.`;
+}
+
+export function MonthCalendar({
+  events: initialEvents,
+  month: initialMonth,
+  todayStr,
+  currency,
+  className,
+}: MonthCalendarProps) {
+  const [month, setMonth] = useState(initialMonth);
+  const [eventsByMonth, setEventsByMonth] = useState<Record<string, CalendarEvent[]>>({
+    [initialMonth]: initialEvents,
+  });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [openDate, setOpenDate] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+
+  const loaderMonthRef = useRef(initialMonth);
+
+  // Loader revalidation (a new transaction, a realtime update) replaces the
+  // dashboard's month and drops other cached months, so the viewed month
+  // refetches below and in-flight requests can't restore pre-change data.
+  // When the loader rolls over to a new month, follow it unless the viewer moved.
+  useEffect(() => {
+    setEventsByMonth((prev) =>
+      prev[initialMonth] === initialEvents ? prev : { [initialMonth]: initialEvents }
+    );
+    requestIdRef.current++;
+    const previousLoaderMonth = loaderMonthRef.current;
+    loaderMonthRef.current = initialMonth;
+    if (previousLoaderMonth !== initialMonth) {
+      setMonth((current) => (current === previousLoaderMonth ? initialMonth : current));
+    }
+  }, [initialMonth, initialEvents]);
+
+  const load = useCallback(async (target: string) => {
+    const requestId = ++requestIdRef.current;
+    setLoadError(null);
+    const [year, monthNumber] = target.split("-").map(Number) as [number, number];
+    try {
+      const res = await fetch(`/api/calendar?year=${year}&month=${monthNumber}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as { events?: CalendarEvent[] };
+      if (requestId !== requestIdRef.current) return;
+      setEventsByMonth((prev) => ({ ...prev, [target]: data.events ?? [] }));
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      setLoadError(
+        `Couldn't load ${formatMonthLabel(target)}. Check your connection and try again.`
+      );
+    }
+  }, []);
+
+  const events = eventsByMonth[month];
+
+  // Fetch the viewed month whenever it isn't cached: after navigating, or after
+  // a revalidation dropped it (also mid-fetch, since that response is now
+  // ignored). A failed load waits for "Try again".
+  useEffect(() => {
+    if (eventsByMonth[month] === undefined && loadError === null) void load(month);
+  }, [eventsByMonth, loadError, load, month]);
+
+  const strip = useMemo(
+    () =>
+      buildMonthStrip({ events: events ?? [], month, todayStr, homeCurrency: currency }),
+    [events, month, todayStr, currency]
+  );
+  const todayMonth = todayStr.slice(0, 7);
+  const monthLabel = formatMonthLabel(month);
+
+  function goTo(target: string) {
+    // Ignore responses and errors for the month being left.
+    requestIdRef.current++;
+    setLoadError(null);
+    setMonth(target);
+  }
+
+  const ahead =
+    month >= todayMonth ? scheduledAhead(strip.days, todayStr) : null;
+  const period =
+    month === todayMonth ? `for the rest of ${monthLabel.split(" ")[0]}` : `in ${monthLabel}`;
+
+  return (
+    <LedgerSection
+      title={monthLabel}
+      className={className}
+      aside={
+        <div className="flex items-center gap-1">
+          {month !== todayMonth && (
+            <Button type="button" variant="outline" size="sm" onClick={() => goTo(todayMonth)}>
+              This month
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => goTo(shiftMonth(month, -1))}
+          >
+            <ChevronLeft />
+            <span className="sr-only">Previous month</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => goTo(shiftMonth(month, 1))}
+          >
+            <ChevronRight />
+            <span className="sr-only">Next month</span>
+          </Button>
+        </div>
+      }
+    >
+      <div className="mt-3 mb-2 flex min-h-5 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <p aria-live="polite">
+          {loadError ? (
+            <span className="text-foreground">
+              {loadError}{" "}
+              <button
+                type="button"
+                onClick={() => void load(month)}
+                className="font-semibold underline underline-offset-4"
+              >
+                Try again
+              </button>
+            </span>
+          ) : events === undefined ? (
+            "Loading…"
+          ) : null}
+        </p>
+        <div className="flex gap-4">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-2.5 w-2 bg-foreground" />
+            Spent
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-2.5 w-2 border border-foreground" />
+            Due
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-2.5 w-2 bg-success" />
+            Received
+          </span>
+        </div>
+      </div>
+
+      <div aria-hidden="true" className="grid grid-cols-7 text-xs text-muted-foreground">
+        {WEEKDAYS.map((weekday) => (
+          <div key={weekday} className="px-0.5 py-1 md:px-1.5">
+            {weekday}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 border-t border-l border-border">
+        {Array.from({ length: leadingBlankDays(month) }, (_, i) => (
+          <div key={`blank-${i}`} className="border-r border-b border-border" />
+        ))}
+        {strip.days.map((day) => (
+          <button
+            key={day.date}
+            type="button"
+            disabled={day.events.length === 0}
+            onClick={() => setOpenDate(day.date)}
+            aria-label={describeStripDay(day, currency)}
+            className={cn(
+              "flex min-h-16 min-w-0 flex-col items-start gap-0.5 overflow-hidden border-r border-b border-border p-0.5 text-left md:min-h-24 md:p-1.5",
+              "hover:bg-secondary focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent",
+              day.date < todayStr && "text-muted-foreground"
+            )}
+          >
+            <span
+              className={cn(
+                "font-mono text-xs",
+                day.isToday && "rounded-xs bg-tag px-1 font-semibold text-tag-foreground"
+              )}
+            >
+              {day.day}
+            </span>
+            <span className="flex max-w-full flex-col items-start gap-0.5 font-mono text-xs font-medium leading-tight">
+              {day.spentCents > 0 && (
+                <span className="max-w-full truncate text-foreground">
+                  {formatShortCents(day.spentCents, currency)}
+                </span>
+              )}
+              {day.scheduledSpentCents > 0 && (
+                <span className="max-w-full truncate border border-foreground text-foreground md:px-0.5">
+                  {formatShortCents(day.scheduledSpentCents, currency)}
+                </span>
+              )}
+              {day.receivedCents > 0 && (
+                <span className="max-w-full truncate text-success">
+                  {formatShortCents(day.receivedCents, currency)}
+                </span>
+              )}
+              {day.scheduledReceivedCents > 0 && (
+                <span className="max-w-full truncate border border-success text-success md:px-0.5">
+                  {formatShortCents(day.scheduledReceivedCents, currency)}
+                </span>
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {ahead && events !== undefined && (
+        <p className="mt-3 text-sm">
+          {aheadLine(ahead.dueCents, ahead.expectedCents, currency, period)}
+        </p>
+      )}
+
+      <DayDetailDialog
+        date={openDate}
+        events={strip.days.find((d) => d.date === openDate)?.events ?? []}
+        onClose={() => setOpenDate(null)}
+      />
+    </LedgerSection>
+  );
+}

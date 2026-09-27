@@ -110,6 +110,38 @@ export function formatCents(
 }
 
 /**
+ * Whole units, abbreviated from 1,000 up ("$84", "$1.3K", "1,3K €"), for
+ * figures that must fit a calendar cell. Scaled by hand because some locales
+ * (de-DE) leave thousands unabbreviated in compact notation.
+ */
+export function formatShortCents(
+  cents: number,
+  currency: CurrencyCode | null | undefined
+): string {
+  const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
+  const units = Math.abs(cents) / 100;
+  const [scale, suffix] =
+    units >= 999_950 ? [1_000_000, "M"] : units >= 999.5 ? [1_000, "K"] : [1, ""];
+  const parts = new Intl.NumberFormat(CURRENCY_CONFIG[safeCurrency].locale, {
+    style: "currency",
+    currency: safeCurrency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: scale === 1 ? 0 : 1,
+  }).formatToParts(units / scale);
+
+  let formatted = "";
+  let lastNumberIndex = -1;
+  parts.forEach((part, i) => {
+    if (part.type === "integer" || part.type === "fraction") lastNumberIndex = i;
+  });
+  parts.forEach((part, i) => {
+    formatted += part.value;
+    if (i === lastNumberIndex) formatted += suffix;
+  });
+  return cents < 0 ? `−${formatted}` : formatted;
+}
+
+/**
  * Format with original and converted amounts.
  */
 export function formatWithConversion(

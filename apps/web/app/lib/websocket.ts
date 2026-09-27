@@ -23,6 +23,8 @@ export function buildWebSocketUrl(
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.pathname = "/ws";
   url.search = "";
+  // WebSocket URLs reject fragments, e.g. from /settings#grocery-tags.
+  url.hash = "";
 
   if (userId) {
     url.searchParams.set("userId", userId);

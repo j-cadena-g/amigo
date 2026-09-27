@@ -10,6 +10,27 @@ import { households } from "./households";
 import { groceryItems } from "./grocery-items";
 import { users } from "./users";
 
+/** Stored tag color names, in picker order (by hue, then neutrals). */
+export const GROCERY_TAG_COLORS = [
+  "red",
+  "orange",
+  "yellow",
+  "lime",
+  "green",
+  "teal",
+  "cyan",
+  "blue",
+  "indigo",
+  "purple",
+  "magenta",
+  "pink",
+  "brown",
+  "gray",
+  "ink",
+] as const;
+
+export type GroceryTagColor = (typeof GROCERY_TAG_COLORS)[number];
+
 export const groceryTags = sqliteTable(
   "grocery_tags",
   {

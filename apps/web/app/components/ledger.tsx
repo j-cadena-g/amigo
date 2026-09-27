@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { cn } from "@/app/lib/utils";
 
 interface LedgerSectionProps {
+  /** Anchor for links into the page, e.g. /settings#grocery-tags. */
+  id?: string;
   title: string;
   /** Right side of the heading row: a link or a figure. */
   aside?: React.ReactNode;
@@ -12,6 +14,7 @@ interface LedgerSectionProps {
 
 /** A section heading over an ink rule, followed by hairline-divided rows. */
 export function LedgerSection({
+  id,
   title,
   aside,
   children,
@@ -20,7 +23,7 @@ export function LedgerSection({
   const headingId = useId();
 
   return (
-    <section aria-labelledby={headingId} className={className}>
+    <section id={id} aria-labelledby={headingId} className={cn("scroll-mt-20", className)}>
       <div className="flex items-baseline justify-between gap-4 border-b border-foreground pb-2">
         <h2 id={headingId} className="text-heading font-semibold">
           {title}

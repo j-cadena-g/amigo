@@ -20,6 +20,12 @@ describe("buildWebSocketUrl", () => {
       buildWebSocketUrl("https://mi-amigo.com/groceries", "user_123")
     ).toBe("wss://mi-amigo.com/ws?userId=user_123");
   });
+
+  it("drops the page's hash, which WebSocket URLs reject", () => {
+    expect(
+      buildWebSocketUrl("https://mi-amigo.com/settings#grocery-tags", "user_123")
+    ).toBe("wss://mi-amigo.com/ws?userId=user_123");
+  });
 });
 
 describe("computeReconnectDelay", () => {

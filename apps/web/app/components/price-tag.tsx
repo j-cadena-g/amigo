@@ -1,6 +1,7 @@
 import type { CurrencyCode } from "@amigo/db";
 import { formatCentsParts, formatSignedCents } from "@/app/lib/currency";
 import { cn } from "@/app/lib/utils";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface PriceTagProps {
   cents: number;
@@ -31,7 +32,8 @@ export function PriceTag({
   size = "hero",
   className,
 }: PriceTagProps) {
-  const parts = formatCentsParts(cents, currency);
+  const locale = useLocale();
+  const parts = formatCentsParts(cents, currency, locale);
   const sizes = SIZES[size];
   const small = cn("type-display font-bold", sizes.small);
 
@@ -43,7 +45,7 @@ export function PriceTag({
         className
       )}
     >
-      <span className="sr-only">{formatSignedCents(cents, currency)}</span>
+      <span className="sr-only">{formatSignedCents(cents, currency, locale)}</span>
       <span aria-hidden="true" className="inline-flex items-start">
         {parts.sign && (
           <span className={cn("type-display", sizes.whole)}>{parts.sign}</span>

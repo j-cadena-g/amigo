@@ -121,8 +121,8 @@ export function buildMonthStrip({
   return { days, maxSpentCents };
 }
 
-export function formatStripDate(date: string): string {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+export function formatStripDate(date: string, locale: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString(locale, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -132,18 +132,19 @@ export function formatStripDate(date: string): string {
 /** One line for the selected day, also used as the scrubber's spoken value. */
 export function describeStripDay(
   day: MonthStripDay,
-  currency: CurrencyCode
+  currency: CurrencyCode,
+  locale: string
 ): string {
-  const parts = [formatStripDate(day.date)];
-  if (day.spentCents > 0) parts.push(`spent ${formatCents(day.spentCents, currency)}`);
+  const parts = [formatStripDate(day.date, locale)];
+  if (day.spentCents > 0) parts.push(`spent ${formatCents(day.spentCents, currency, locale)}`);
   if (day.receivedCents > 0) {
-    parts.push(`received ${formatCents(day.receivedCents, currency)}`);
+    parts.push(`received ${formatCents(day.receivedCents, currency, locale)}`);
   }
   if (day.scheduledSpentCents > 0) {
-    parts.push(`${formatCents(day.scheduledSpentCents, currency)} due`);
+    parts.push(`${formatCents(day.scheduledSpentCents, currency, locale)} due`);
   }
   if (day.scheduledReceivedCents > 0) {
-    parts.push(`${formatCents(day.scheduledReceivedCents, currency)} expected`);
+    parts.push(`${formatCents(day.scheduledReceivedCents, currency, locale)} expected`);
   }
   const count = day.events.length;
   parts.push(

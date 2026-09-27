@@ -1,6 +1,7 @@
 import type { CurrencyCode } from "@amigo/db";
 import { formatCents } from "@/app/lib/currency";
 import { LedgerSection } from "@/app/components/ledger";
+import { useLocale } from "@/app/lib/use-locale";
 
 const SHOWN_CATEGORIES = 6;
 
@@ -25,6 +26,7 @@ export function WhereItWent({
   lastMonthShort,
   className,
 }: WhereItWentProps) {
+  const locale = useLocale();
   const sorted = [...categoryData].sort((a, b) => b.amount - a.amount);
   const shown = sorted.slice(0, SHOWN_CATEGORIES);
   const rest = sorted.slice(SHOWN_CATEGORIES);
@@ -78,11 +80,11 @@ export function WhereItWent({
                 />
               </span>
               <span className="w-24 shrink-0 text-right font-mono font-medium">
-                {formatCents(row.amount, currency)}
+                {formatCents(row.amount, currency, locale)}
               </span>
               {monthlyComparison && (
                 <span className="hidden w-24 shrink-0 text-right font-mono font-medium text-muted-foreground sm:inline">
-                  {formatCents(previous, currency)}
+                  {formatCents(previous, currency, locale)}
                 </span>
               )}
             </li>

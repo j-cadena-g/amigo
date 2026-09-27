@@ -11,8 +11,10 @@ import {
   transactionTotalsForDay,
 } from "@/app/lib/calendar-day-totals";
 import { formatSignedCents } from "@/app/lib/currency";
+import { capitalizeFirst } from "@/app/lib/format-dates";
 import type { CalendarEvent } from "@/app/lib/month-strip";
 import { cn } from "@/app/lib/utils";
+import { useLocale } from "@/app/lib/use-locale";
 
 const ENTRY_KIND_LABELS: Record<CalendarEvent["type"], string | null> = {
   transaction: null,
@@ -21,6 +23,7 @@ const ENTRY_KIND_LABELS: Record<CalendarEvent["type"], string | null> = {
 };
 
 export function DayEntries({ events }: { events: CalendarEvent[] }) {
+  const locale = useLocale();
   const totals = transactionTotalsForDay(events);
 
   return (
@@ -36,7 +39,7 @@ export function DayEntries({ events }: { events: CalendarEvent[] }) {
                   total.netCents > 0 && "text-success"
                 )}
               >
-                {formatDayTotal(total.netCents, total.currency)}
+                {formatDayTotal(total.netCents, total.currency, locale)}
               </span>
             </span>
           ))}
@@ -74,6 +77,7 @@ export function DayEntries({ events }: { events: CalendarEvent[] }) {
                   {formatSignedCents(
                     isIncome ? amount : -amount,
                     (event.metadata?.currency ?? "CAD") as CurrencyCode,
+                    locale,
                     { showPlus: true }
                   )}
                 </span>
@@ -94,6 +98,7 @@ interface DayDetailDialogProps {
 }
 
 export function DayDetailDialog({ date, events, onClose }: DayDetailDialogProps) {
+  const locale = useLocale();
   return (
     <Dialog
       open={date !== null && events.length > 0}
@@ -105,12 +110,15 @@ export function DayDetailDialog({ date, events, onClose }: DayDetailDialogProps)
         <DialogHeader>
           <DialogTitle>
             {date &&
-              new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              capitalizeFirst(
+                new Date(`${date}T12:00:00`).toLocaleDateString(locale, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                locale
+              )}
           </DialogTitle>
           <DialogDescription>
             {events.length === 1 ? "1 entry" : `${events.length} entries`}

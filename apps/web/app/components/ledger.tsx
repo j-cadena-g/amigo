@@ -1,6 +1,8 @@
 import { useId } from "react";
 import { Link } from "react-router";
+import { ledgerDateColumnWidth } from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface LedgerSectionProps {
   /** Anchor for links into the page, e.g. /settings#grocery-tags. */
@@ -60,10 +62,14 @@ export function LedgerRow({
   figure: React.ReactNode;
   className?: string;
 }) {
+  const locale = useLocale();
   return (
     <li className={cn("flex items-baseline gap-3 py-2.5", className)}>
       {date && (
-        <span className="w-14 shrink-0 font-mono text-sm text-muted-foreground">
+        <span
+          className="shrink-0 whitespace-nowrap font-mono text-sm text-muted-foreground"
+          style={{ width: ledgerDateColumnWidth(locale) }}
+        >
           {date}
         </span>
       )}

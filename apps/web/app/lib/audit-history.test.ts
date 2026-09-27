@@ -37,17 +37,17 @@ describe("audit history helpers", () => {
   it("formats monetary cents fields with denomination-aware currency", () => {
     expect(
       formatAuditValue(100, { field: "balance", currency: "CAD" })
-    ).toBe(formatCents(100, "CAD"));
+    ).toBe(formatCents(100, "CAD", "en-CA"));
     expect(
       formatAuditValue(200, { field: "amount", currency: "USD" })
-    ).toBe(formatCents(200, "USD"));
+    ).toBe(formatCents(200, "USD", "en-CA"));
     expect(
       formatAuditValue(300, {
         field: "limitAmountHome",
         currency: "USD",
         homeCurrency: "CAD",
       })
-    ).toBe(formatCents(300, "CAD"));
+    ).toBe(formatCents(300, "CAD", "en-CA"));
     // Without home currency, avoid mislabeling with record currency.
     expect(formatAuditValue(400, { field: "limitAmountHome", currency: "USD" })).toBe(
       "4.00"
@@ -91,7 +91,7 @@ describe("audit history helpers", () => {
           { from: "USD", to: "USD" }
         ).to,
       })
-    ).toBe(formatCents(200, "USD"));
+    ).toBe(formatCents(200, "USD", "en-CA"));
   });
 
   it("hides noise fields from change lists", () => {

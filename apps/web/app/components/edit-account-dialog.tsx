@@ -24,6 +24,7 @@ import type { AccountRow } from "@/app/components/account-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { getAccountTypeSelectOptions } from "@/app/lib/financial-account-types";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface EditAccountDialogProps {
   account: AccountRow;
@@ -36,6 +37,7 @@ export function EditAccountDialog({
   open,
   onOpenChange,
 }: EditAccountDialogProps) {
+  const locale = useLocale();
   const confirm = useConfirm();
   const revalidator = useRevalidator();
   const nameId = useId();
@@ -44,7 +46,7 @@ export function EditAccountDialog({
   const currencyId = useId();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
-  const [balance, setBalance] = useState(centsToInputString(account.balance, account.currency));
+  const [balance, setBalance] = useState(centsToInputString(account.balance, account.currency, locale));
   const [currency, setCurrency] = useState<CurrencyCode>(account.currency as CurrencyCode);
   const [isShared, setIsShared] = useState(account.userId === null);
   const [loading, setLoading] = useState(false);

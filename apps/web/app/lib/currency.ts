@@ -1,10 +1,13 @@
-import type { CurrencyCode } from "@amigo/db";
+import type { CurrencyCode, FormatLocale } from "@amigo/db";
 import { CURRENCY_CODES, DEFAULT_HOME_CURRENCY } from "@amigo/db";
 
 interface CurrencyConfig {
   name: string;
-  locale: string;
-  symbol: string;
+  /**
+   * Formatting conventions a household using this currency most likely
+   * expects; the default display locale until a user picks their own.
+   */
+  homeLocale: FormatLocale;
   /**
    * Decimal places shown. Storage is always integer cents; pesos are shown
    * whole because centavos aren't used day to day.
@@ -13,12 +16,12 @@ interface CurrencyConfig {
 }
 
 const CURRENCY_CONFIG: Record<CurrencyCode, CurrencyConfig> = {
-  CAD: { name: "Canadian dollar", locale: "en-CA", symbol: "CA$", fractionDigits: 2 },
-  USD: { name: "US dollar", locale: "en-US", symbol: "$", fractionDigits: 2 },
-  EUR: { name: "Euro", locale: "de-DE", symbol: "€", fractionDigits: 2 },
-  GBP: { name: "British pound", locale: "en-GB", symbol: "£", fractionDigits: 2 },
-  MXN: { name: "Mexican peso", locale: "es-MX", symbol: "MX$", fractionDigits: 2 },
-  COP: { name: "Colombian peso", locale: "es-CO", symbol: "COL$", fractionDigits: 0 },
+  CAD: { name: "Canadian dollar", homeLocale: "en-CA", fractionDigits: 2 },
+  USD: { name: "US dollar", homeLocale: "en-US", fractionDigits: 2 },
+  EUR: { name: "Euro", homeLocale: "de-DE", fractionDigits: 2 },
+  GBP: { name: "British pound", homeLocale: "en-GB", fractionDigits: 2 },
+  MXN: { name: "Mexican peso", homeLocale: "es-MX", fractionDigits: 2 },
+  COP: { name: "Colombian peso", homeLocale: "es-CO", fractionDigits: 0 },
 };
 
 export const SUPPORTED_CURRENCIES: { code: CurrencyCode; name: string }[] =
@@ -30,20 +33,55 @@ export function currencyFractionDigits(currency: string | null | undefined): num
   return config?.fractionDigits ?? 2;
 }
 
+/** Display locale that fits a household's home currency, e.g. COP → "es-CO". */
+export function currencyHomeLocale(currency: string | null | undefined): FormatLocale {
+  const config = CURRENCY_CONFIG[(currency ?? DEFAULT_HOME_CURRENCY) as CurrencyCode];
+  return (config ?? CURRENCY_CONFIG[DEFAULT_HOME_CURRENCY]).homeLocale;
+}
+
+/** Formatters are costly to build; the cap only matters if callers pass unusual locales. */
+const FORMATTER_CACHE_LIMIT = 256;
+const formatterCache = new Map<string, Intl.NumberFormat>();
+
+/**
+ * Cached currency formatter. `locale` is the viewer's (see `useLocale`), so a
+ * Canadian sees "US$12.50" while a Colombian sees "US$ 12,50"; the currency
+ * only decides the symbol and decimal places.
+ */
 function currencyFormatter(
   currency: CurrencyCode | null | undefined,
-  options?: { compact?: boolean }
+  locale: string,
+  digits: { min: number; max: number },
+  currencyDisplay: "symbol" | "narrowSymbol" = "symbol"
 ): Intl.NumberFormat {
   const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
-  const config = CURRENCY_CONFIG[safeCurrency];
-  const digits = options?.compact ? 0 : config.fractionDigits;
+  const key = `${locale}|${safeCurrency}|${digits.min}|${digits.max}|${currencyDisplay}`;
+  let formatter = formatterCache.get(key);
+  if (!formatter) {
+    const options: Intl.NumberFormatOptions = {
+      style: "currency",
+      currency: safeCurrency,
+      currencyDisplay,
+      minimumFractionDigits: digits.min,
+      maximumFractionDigits: digits.max,
+    };
+    try {
+      formatter = new Intl.NumberFormat(locale, options);
+    } catch {
+      formatter = new Intl.NumberFormat(currencyHomeLocale(safeCurrency), options);
+    }
+    if (formatterCache.size >= FORMATTER_CACHE_LIMIT) formatterCache.clear();
+    formatterCache.set(key, formatter);
+  }
+  return formatter;
+}
 
-  return new Intl.NumberFormat(config.locale, {
-    style: "currency",
-    currency: safeCurrency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+function displayDigits(
+  currency: CurrencyCode | null | undefined,
+  options?: { compact?: boolean }
+): { min: number; max: number } {
+  const digits = options?.compact ? 0 : currencyFractionDigits(currency);
+  return { min: digits, max: digits };
 }
 
 /**
@@ -53,9 +91,10 @@ function currencyFormatter(
 export function formatCurrency(
   value: number,
   currency: CurrencyCode | null | undefined,
+  locale: string,
   options?: { compact?: boolean }
 ): string {
-  return currencyFormatter(currency, options).format(value);
+  return currencyFormatter(currency, locale, displayDigits(currency, options)).format(value);
 }
 
 export interface CentsParts {
@@ -75,11 +114,14 @@ export interface CentsParts {
 export function formatCentsParts(
   cents: number,
   currency: CurrencyCode | null | undefined,
+  locale: string,
   options?: { compact?: boolean }
 ): CentsParts {
-  const parts = currencyFormatter(currency, options).formatToParts(
-    Math.abs(cents) / 100
-  );
+  const parts = currencyFormatter(
+    currency,
+    locale,
+    displayDigits(currency, options)
+  ).formatToParts(Math.abs(cents) / 100);
   let symbol = "";
   let symbolPosition: CentsParts["symbolPosition"] = "before";
   let whole = "";
@@ -103,9 +145,10 @@ export function formatCentsParts(
 export function formatSignedCents(
   cents: number,
   currency: CurrencyCode | null | undefined,
+  locale: string,
   options?: { showPlus?: boolean; compact?: boolean }
 ): string {
-  const formatted = formatCents(Math.abs(cents), currency, options);
+  const formatted = formatCents(Math.abs(cents), currency, locale, options);
   if (cents < 0) return `−${formatted}`;
   if (cents > 0 && options?.showPlus) return `+${formatted}`;
   return formatted;
@@ -117,30 +160,33 @@ export function formatSignedCents(
 export function formatCents(
   cents: number,
   currency: CurrencyCode | null | undefined,
+  locale: string,
   options?: { compact?: boolean }
 ): string {
-  return formatCurrency(cents / 100, currency, options);
+  return formatCurrency(cents / 100, currency, locale, options);
 }
 
 /**
- * Whole units, abbreviated from 1,000 up ("$84", "$1.3K", "1,3K €"), for
+ * Whole units, abbreviated from 1,000 up ("$84", "$1.3K", "1,3K€"), for
  * figures that must fit a calendar cell. Scaled by hand because some locales
- * (de-DE) leave thousands unabbreviated in compact notation.
+ * (de-DE) leave thousands unabbreviated in compact notation. Uses the narrow
+ * symbol ("$", not "CAD") since cells only show the household's own currency,
+ * and drops the space between symbol and number.
  */
 export function formatShortCents(
   cents: number,
-  currency: CurrencyCode | null | undefined
+  currency: CurrencyCode | null | undefined,
+  locale: string
 ): string {
-  const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
   const units = Math.abs(cents) / 100;
   const [scale, suffix] =
     units >= 999_950 ? [1_000_000, "M"] : units >= 999.5 ? [1_000, "K"] : [1, ""];
-  const parts = new Intl.NumberFormat(CURRENCY_CONFIG[safeCurrency].locale, {
-    style: "currency",
-    currency: safeCurrency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: scale === 1 ? 0 : 1,
-  }).formatToParts(units / scale);
+  const parts = currencyFormatter(
+    currency,
+    locale,
+    { min: 0, max: scale === 1 ? 0 : 1 },
+    "narrowSymbol"
+  ).formatToParts(units / scale);
 
   let formatted = "";
   let lastNumberIndex = -1;
@@ -148,41 +194,12 @@ export function formatShortCents(
     if (part.type === "integer" || part.type === "fraction") lastNumberIndex = i;
   });
   parts.forEach((part, i) => {
+    // Cells are tight: "$ 2,9K" loses its space so it fits like "$2.9K".
+    if (part.type === "literal" && part.value.trim() === "") return;
     formatted += part.value;
     if (i === lastNumberIndex) formatted += suffix;
   });
   return cents < 0 ? `−${formatted}` : formatted;
-}
-
-/**
- * Format with original and converted amounts.
- */
-export function formatWithConversion(
-  originalCents: number,
-  originalCurrency: CurrencyCode,
-  homeCents: number,
-  homeCurrency: CurrencyCode
-): { original: string; converted: string | null } {
-  const original = formatCents(originalCents, originalCurrency);
-
-  if (originalCurrency === homeCurrency) {
-    return { original, converted: null };
-  }
-
-  return {
-    original,
-    converted: formatCents(homeCents, homeCurrency),
-  };
-}
-
-/**
- * Get currency symbol only.
- */
-export function getCurrencySymbol(
-  currency: CurrencyCode | null | undefined
-): string {
-  const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
-  return CURRENCY_CONFIG[safeCurrency].symbol;
 }
 
 /**

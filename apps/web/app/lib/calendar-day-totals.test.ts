@@ -120,19 +120,19 @@ describe("day entries", () => {
       })
     );
 
-    expect(html).toContain(formatDayTotal(2000 - 450 - 1799, "CAD"));
-    expect(html).toContain(`−${formatCents(450, "CAD")}`);
-    expect(html).toContain(`+${formatCents(2000, "CAD")}`);
+    expect(html).toContain(formatDayTotal(2000 - 450 - 1799, "CAD", "en-CA"));
+    expect(html).toContain(`−${formatCents(450, "CAD", "en-CA")}`);
+    expect(html).toContain(`+${formatCents(2000, "CAD", "en-CA")}`);
     expect(html).toContain("Scheduled · monthly");
   });
 });
 
 describe("formatDayTotal", () => {
   it("prefixes a plus on a positive net and a true minus on a negative one", () => {
-    expect(formatDayTotal(10000, "CAD")).toBe(`+${formatCents(10000, "CAD")}`);
-    expect(formatDayTotal(-2500, "CAD")).toBe(`−${formatCents(2500, "CAD")}`);
-    expect(formatDayTotal(0, "CAD", { compact: true })).toBe(
-      formatCents(0, "CAD", { compact: true })
+    expect(formatDayTotal(10000, "CAD", "en-CA")).toBe(`+${formatCents(10000, "CAD", "en-CA")}`);
+    expect(formatDayTotal(-2500, "CAD", "en-CA")).toBe(`−${formatCents(2500, "CAD", "en-CA")}`);
+    expect(formatDayTotal(0, "CAD", "en-CA", { compact: true })).toBe(
+      formatCents(0, "CAD", "en-CA", { compact: true })
     );
   });
 });

@@ -13,6 +13,9 @@ import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { getCspNonce } from "@/app/lib/session.server";
+import { loadLocale } from "@/app/lib/locale.server";
+import { DEFAULT_LOCALE } from "@/app/lib/locale";
+import { LocaleContext } from "@/app/lib/use-locale";
 import { appContextMiddleware } from "@/server/middleware/app-context";
 import { ToastProvider } from "@/app/components/toast-provider";
 import { buttonVariants } from "@/app/components/ui/button";
@@ -23,12 +26,15 @@ export const middleware: Route.MiddlewareFunction[] = [
 ];
 
 export const loader = (args: Route.LoaderArgs) =>
-  rootAuthLoader(args, () => ({
+  rootAuthLoader(args, async () => ({
     cspNonce: getCspNonce(args.context) ?? "",
+    locale: await loadLocale(args.context, args.request),
   }));
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const rootData = useRouteLoaderData("root") as { cspNonce?: string } | undefined;
+  const rootData = useRouteLoaderData("root") as
+    | { cspNonce?: string; locale?: string }
+    | undefined;
   const cspNonce = rootData?.cspNonce || undefined;
 
   return (
@@ -60,7 +66,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
           }}
         />
-        {children}
+        <LocaleContext.Provider value={rootData?.locale ?? DEFAULT_LOCALE}>
+          {children}
+        </LocaleContext.Provider>
         <ScrollRestoration nonce={cspNonce} />
         <Scripts nonce={cspNonce} />
       </body>

@@ -4,6 +4,7 @@ import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface PendingInvite {
   id: string;
@@ -26,12 +27,12 @@ interface CreatedInvite {
   emailError?: string;
 }
 
-function formatExpiry(expiresAt: string): string {
+function formatExpiry(expiresAt: string, locale: string): string {
   const date = new Date(expiresAt);
   if (Number.isNaN(date.getTime())) {
     return expiresAt;
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -39,6 +40,7 @@ function formatExpiry(expiresAt: string): string {
 }
 
 export function InviteManager() {
+  const locale = useLocale();
   const toast = useToast();
   const confirm = useConfirm();
   const [email, setEmail] = useState("");
@@ -215,7 +217,7 @@ export function InviteManager() {
             {created.code}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Expires {formatExpiry(created.expiresAt)}
+            Expires {formatExpiry(created.expiresAt, locale)}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
@@ -265,7 +267,7 @@ export function InviteManager() {
                     {invite.codeDisplay}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Expires {formatExpiry(invite.expiresAt)}
+                    Expires {formatExpiry(invite.expiresAt, locale)}
                     {invite.invitedEmail ? ` · ${invite.invitedEmail}` : ""}
                   </p>
                   {invite.invitedEmail && (

@@ -18,6 +18,7 @@ import {
 } from "@amigo/db";
 import { LedgerSection } from "@/app/components/ledger";
 import { AccountSettings } from "@/app/components/settings/account-settings";
+import { FormatSettings } from "@/app/components/settings/format-settings";
 import { HouseholdSettingsForm } from "@/app/components/settings/household-settings-form";
 import { InviteManager } from "@/app/components/settings/invite-manager";
 import { LeaveHousehold } from "@/app/components/settings/leave-household";
@@ -31,9 +32,16 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const env = getEnv(context);
   const db = getDb(env.DB);
 
-  const [household, members, tags] = await Promise.all([
+  const [household, currentUser, members, tags] = await Promise.all([
     db.query.households.findFirst({
       where: eq(households.id, session.householdId),
+    }),
+    db.query.users.findFirst({
+      where: and(
+        eq(users.id, session.userId),
+        scopeToHousehold(users.householdId, session.householdId)
+      ),
+      columns: { locale: true },
     }),
     db.query.users.findMany({
       where: and(
@@ -67,6 +75,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
 
   return {
     household: household!,
+    savedLocale: currentUser?.locale ?? null,
     members,
     tags,
     session: {
@@ -81,7 +90,8 @@ export function meta() {
 }
 
 export default function Settings() {
-  const { household, members, tags, session } = useLoaderData<typeof loader>();
+  const { household, savedLocale, members, tags, session } =
+    useLoaderData<typeof loader>();
   const canManageHousehold =
     session.role === "owner" || session.role === "admin";
 
@@ -159,6 +169,15 @@ export default function Settings() {
           <LedgerSection title="Notifications">
             <div className="pt-4">
               <NotificationSettings />
+            </div>
+          </LedgerSection>
+
+          <LedgerSection title="Formats">
+            <div className="pt-4">
+              <FormatSettings
+                savedLocale={savedLocale}
+                homeCurrency={parseHomeCurrency(household.homeCurrency)}
+              />
             </div>
           </LedgerSection>
 

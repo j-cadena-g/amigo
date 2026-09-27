@@ -10,6 +10,8 @@ import { DashboardUpcomingRecurring } from "@/app/components/dashboard/upcoming-
 import { DashboardNetWorth } from "@/app/components/dashboard/net-worth";
 import { WhereItWent } from "@/app/components/dashboard/where-it-went";
 import { loadDashboardData } from "@/server/lib/dashboard-data";
+import { capitalizeFirst } from "@/app/lib/format-dates";
+import { useLocale } from "@/app/lib/use-locale";
 
 export async function loader({ context }: LoaderFunctionArgs) {
   const session = requireSession(context);
@@ -22,22 +24,27 @@ export function meta() {
   return [{ title: "Home · amigo" }];
 }
 
-function shortMonth(calendarMonth: string, offset: number): string {
-  const [year, month] = calendarMonth.split("-").map(Number) as [number, number];
-  return new Date(Date.UTC(year, month - 1 + offset, 1)).toLocaleDateString("en-US", {
-    month: "short",
+function monthOf(
+  calendarMonth: string,
+  offset: number,
+  locale: string,
+  month: "short" | "long"
+): string {
+  const [year, monthNumber] = calendarMonth.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(year, monthNumber - 1 + offset, 1)).toLocaleDateString(locale, {
+    month,
     timeZone: "UTC",
   });
 }
 
 export default function Dashboard() {
+  const locale = useLocale();
   const {
     spendingCents,
     incomeCents,
     netCents,
     groceryCount,
     currency,
-    monthName,
     recentTransactions,
     budgetsWithSpending,
     upcomingRecurring,
@@ -54,7 +61,7 @@ export default function Dashboard() {
   return (
     <main className="container mx-auto px-4 py-6 md:px-6 md:py-8">
       <MonthHero
-        monthName={monthName}
+        monthName={capitalizeFirst(monthOf(calendarMonth, 0, locale, "long"), locale)}
         todayStr={todayStr}
         spendingCents={spendingCents}
         incomeCents={incomeCents}
@@ -88,8 +95,8 @@ export default function Dashboard() {
           categoryData={categoryData}
           monthlyComparison={monthlyComparison}
           currency={currency}
-          monthShort={shortMonth(calendarMonth, 0)}
-          lastMonthShort={shortMonth(calendarMonth, -1)}
+          monthShort={monthOf(calendarMonth, 0, locale, "short")}
+          lastMonthShort={monthOf(calendarMonth, -1, locale, "short")}
           className="mt-10"
         />
       )}

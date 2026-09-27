@@ -37,7 +37,7 @@ export function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatHistoryDate(date: Date | string): string {
+export function formatHistoryDate(date: Date | string, locale: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -47,5 +47,5 @@ export function formatHistoryDate(date: Date | string): string {
 
   if (dateOnly.getTime() === today.getTime()) return "Today";
   if (dateOnly.getTime() === yesterday.getTime()) return "Yesterday";
-  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(locale, { month: "long", day: "numeric", year: "numeric" });
 }

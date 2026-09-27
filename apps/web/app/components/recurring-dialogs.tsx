@@ -21,6 +21,7 @@ import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+import { useLocale } from "@/app/lib/use-locale";
 
 const TRANSACTION_TYPE_OPTIONS = [
   { value: "expense", label: "Expense" },
@@ -554,11 +555,11 @@ function ruleToPreset(rule: RecurringRule): SchedulePreset {
   return "custom";
 }
 
-function ruleToForm(rule: RecurringRule): RecurringFormData {
+function ruleToForm(rule: RecurringRule, locale: string): RecurringFormData {
   const preset = ruleToPreset(rule);
   return {
     type: rule.type,
-    amount: centsToInputString(rule.amount, rule.currency),
+    amount: centsToInputString(rule.amount, rule.currency, locale),
     currency: rule.currency,
     categoryId: rule.categoryId ?? "",
     description: rule.description ?? "",
@@ -579,6 +580,7 @@ export function EditRecurringDialog({
   onDelete,
   deleting,
 }: EditRecurringDialogProps) {
+  const locale = useLocale();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() =>
     emptyForm(rule?.currency ?? "CAD")
@@ -591,7 +593,7 @@ export function EditRecurringDialog({
 
   // Sync form state when the rule changes
   if (rule && initialized !== rule.id) {
-    setForm(ruleToForm(rule));
+    setForm(ruleToForm(rule, locale));
     setError(null);
     setInitialized(rule.id);
   }

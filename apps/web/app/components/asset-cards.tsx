@@ -4,6 +4,7 @@ import type { CurrencyCode } from "@amigo/db";
 import { formatSignedCents } from "@/app/lib/currency";
 import { EditAssetDialog } from "@/app/components/edit-asset-dialog";
 import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
+import { useLocale } from "@/app/lib/use-locale";
 
 export interface Asset {
   id: string;
@@ -80,6 +81,7 @@ function AssetRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const locale = useLocale();
   const meta = [
     assetTypeLabel(asset.type),
     asset.isShared ? "Shared" : "Personal",
@@ -96,7 +98,7 @@ function AssetRow({
           <p className="truncate text-sm text-muted-foreground">{meta}</p>
         </div>
         <span className="shrink-0 font-mono font-medium">
-          {formatSignedCents(asset.balance, asset.currency)}
+          {formatSignedCents(asset.balance, asset.currency, locale)}
         </span>
       </div>
       <RowIconButton

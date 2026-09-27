@@ -15,6 +15,7 @@ import {
   type AuditRecordCurrency,
 } from "@/app/lib/audit-history";
 import type { CurrencyCode } from "@amigo/db";
+import { useLocale } from "@/app/lib/use-locale";
 
 export type AuditTableName =
   | "grocery_items"
@@ -49,6 +50,7 @@ export function AuditHistoryPanel({
   timeZone,
   homeCurrency,
 }: AuditHistoryPanelProps) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -144,7 +146,8 @@ export function AuditHistoryPanel({
                 );
                 const formattedTime = formatAuditTimestamp(
                   entry.timestamp,
-                  resolvedTimeZone
+                  resolvedTimeZone,
+                  locale
                 );
                 const isoTime = auditTimestampIso(entry.timestamp);
                 return (
@@ -184,12 +187,14 @@ export function AuditHistoryPanel({
                               field: key,
                               currency: sideCurrencies.from,
                               homeCurrency,
+                              locale,
                             })}{" "}
                             →{" "}
                             {formatAuditValue((change as AuditChange).to, {
                               field: key,
                               currency: sideCurrencies.to,
                               homeCurrency,
+                              locale,
                             })}
                           </li>
                         ))}

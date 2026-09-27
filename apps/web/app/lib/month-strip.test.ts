@@ -126,10 +126,10 @@ describe("describeStripDay", () => {
       homeCurrency: "CAD",
     });
 
-    expect(describeStripDay(strip.days[19]!, "CAD")).toBe(
+    expect(describeStripDay(strip.days[19]!, "CAD", "en-CA")).toBe(
       "Sun, Sep 20 · spent $98.12 · received $20.00 · 2 entries"
     );
-    expect(describeStripDay(strip.days[20]!, "CAD")).toBe(
+    expect(describeStripDay(strip.days[20]!, "CAD", "en-CA")).toBe(
       "Mon, Sep 21 · nothing recorded"
     );
   });
@@ -145,10 +145,10 @@ describe("describeStripDay", () => {
       homeCurrency: "CAD",
     });
 
-    expect(describeStripDay(strip.days[27]!, "CAD")).toBe(
+    expect(describeStripDay(strip.days[27]!, "CAD", "en-CA")).toBe(
       "Mon, Sep 28 · $142.00 due · 1 entry"
     );
-    expect(describeStripDay(strip.days[29]!, "CAD")).toBe(
+    expect(describeStripDay(strip.days[29]!, "CAD", "en-CA")).toBe(
       "Wed, Sep 30 · $2,850.00 expected · 1 entry"
     );
   });

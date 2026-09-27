@@ -52,7 +52,8 @@ export function transactionTotalsForDay(
 export function formatDayTotal(
   netCents: number,
   currency: CurrencyCode,
+  locale: string,
   options?: { compact?: boolean }
 ): string {
-  return formatSignedCents(netCents, currency, { ...options, showPlus: true });
+  return formatSignedCents(netCents, currency, locale, { ...options, showPlus: true });
 }

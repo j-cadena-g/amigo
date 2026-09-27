@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { formatCents } from "@/app/lib/currency";
 import { NativeSelect } from "@/app/components/financial/form-controls";
 import type { CurrencyCode } from "@amigo/db";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface Budget {
   id: string;
@@ -25,6 +26,7 @@ export function BudgetSelect({
   id,
   "aria-label": ariaLabel,
 }: BudgetSelectProps) {
+  const locale = useLocale();
   const [budgets, setBudgets] = useState<Budget[]>([]);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export function BudgetSelect({
         <optgroup label="Shared">
           {shared.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.name} ({formatCents(b.limitAmount, b.currency, { compact: true })}/{b.period})
+              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{b.period})
             </option>
           ))}
         </optgroup>
@@ -58,7 +60,7 @@ export function BudgetSelect({
         <optgroup label="Personal">
           {personal.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.name} ({formatCents(b.limitAmount, b.currency, { compact: true })}/{b.period})
+              {b.name} ({formatCents(b.limitAmount, b.currency, locale, { compact: true })}/{b.period})
             </option>
           ))}
         </optgroup>

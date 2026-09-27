@@ -10,9 +10,14 @@ import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { DeleteButton } from "@/app/components/financial/form-controls";
 import { formatSignedCents } from "@/app/lib/currency";
-import { formatLedgerDate, formatTransactionDate } from "@/app/lib/format-dates";
+import {
+  formatLedgerDate,
+  formatTransactionDate,
+  ledgerDateColumnWidth,
+} from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
 import { EditTransactionForm, type TransactionFormState } from "./transaction-form";
+import { useLocale } from "@/app/lib/use-locale";
 
 export interface TransactionDTO {
   id: string;
@@ -59,6 +64,7 @@ export function TransactionRow({
   editForm,
   onEditFormChange,
 }: TransactionRowProps) {
+  const locale = useLocale();
   const detailsId = useId();
 
   if (isEditing) {
@@ -94,8 +100,11 @@ export function TransactionRow({
         aria-controls={expanded ? detailsId : undefined}
         className="group flex w-full items-baseline gap-3 py-2.5 text-left"
       >
-        <span className="w-14 shrink-0 font-mono text-sm text-muted-foreground">
-          {formatLedgerDate(transaction.date)}
+        <span
+          className="shrink-0 whitespace-nowrap font-mono text-sm text-muted-foreground"
+          style={{ width: ledgerDateColumnWidth(locale) }}
+        >
+          {formatLedgerDate(transaction.date, locale)}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold group-hover:underline">
@@ -111,6 +120,7 @@ export function TransactionRow({
           {formatSignedCents(
             isIncome ? transaction.amount : -transaction.amount,
             transaction.currency,
+            locale,
             { showPlus: true }
           )}
         </span>
@@ -127,7 +137,7 @@ export function TransactionRow({
         <div id={detailsId} className="pb-3 pl-17">
           <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">Date</dt>
-            <dd>{formatTransactionDate(transaction.date)}</dd>
+            <dd>{formatTransactionDate(transaction.date, locale)}</dd>
             <dt className="text-muted-foreground">Category</dt>
             <dd>{transaction.category}</dd>
             {transaction.description && (

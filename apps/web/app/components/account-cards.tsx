@@ -6,6 +6,7 @@ import { accountTypeLabel } from "@/app/lib/financial-account-types";
 import { cn } from "@/app/lib/utils";
 import { EditAccountDialog } from "@/app/components/edit-account-dialog";
 import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger-group";
+import { useLocale } from "@/app/lib/use-locale";
 
 export type AccountRow = {
   id: string;
@@ -32,6 +33,7 @@ function AccountListRow({
   homeCurrency: CurrencyCode;
   onEdit: () => void;
 }) {
+  const locale = useLocale();
   const meta = [
     accountTypeLabel(account.type),
     account.isShared ? "Shared" : "Personal",
@@ -54,7 +56,7 @@ function AccountListRow({
           <p className="truncate text-sm text-muted-foreground">{meta}</p>
         </div>
         <span className="shrink-0 font-mono font-medium">
-          {formatSignedCents(account.balance, account.currency)}
+          {formatSignedCents(account.balance, account.currency, locale)}
         </span>
       </div>
       <RowIconButton

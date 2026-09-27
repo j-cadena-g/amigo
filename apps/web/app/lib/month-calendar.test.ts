@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatMonthInSentence,
   formatMonthLabel,
   leadingBlankDays,
   scheduledAhead,
   shiftMonth,
+  weekdayHeaders,
 } from "./month-calendar";
 import { buildMonthStrip, type CalendarEvent } from "./month-strip";
 
@@ -32,7 +34,7 @@ describe("shiftMonth", () => {
 
 describe("formatMonthLabel", () => {
   it("names the month and year", () => {
-    expect(formatMonthLabel("2026-09")).toBe("September 2026");
+    expect(formatMonthLabel("2026-09", "en-CA")).toBe("September 2026");
   });
 });
 
@@ -62,5 +64,21 @@ describe("scheduledAhead", () => {
       dueCents: 1_295_00,
       expectedCents: 2_000_00,
     });
+  });
+});
+
+describe("localized month and weekday names", () => {
+  it("capitalizes headings but not mid-sentence months", () => {
+    expect(formatMonthLabel("2026-09", "es-CO")).toBe("Septiembre de 2026");
+    expect(formatMonthInSentence("2026-09", "es-CO")).toBe("septiembre");
+    expect(formatMonthInSentence("2026-10", "es-CO", { withYear: true })).toBe(
+      "octubre de 2026"
+    );
+    expect(formatMonthInSentence("2026-09", "en-CA")).toBe("September");
+  });
+
+  it("lists weekdays Sunday first in the viewer's language", () => {
+    expect(weekdayHeaders("en-CA")).toEqual(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+    expect(weekdayHeaders("es-CO")).toEqual(["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]);
   });
 });

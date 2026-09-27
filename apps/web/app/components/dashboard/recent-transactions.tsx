@@ -4,6 +4,7 @@ import { formatSignedCents } from "@/app/lib/currency";
 import { formatLedgerDate } from "@/app/lib/format-dates";
 import { cn } from "@/app/lib/utils";
 import { LedgerRow, LedgerSection, SectionLink } from "@/app/components/ledger";
+import { useLocale } from "@/app/lib/use-locale";
 
 interface DashboardRecentTransactionsProps {
   transactions: RecentTransaction[];
@@ -14,6 +15,7 @@ export function DashboardRecentTransactions({
   transactions,
   className,
 }: DashboardRecentTransactionsProps) {
+  const locale = useLocale();
   return (
     <LedgerSection
       title="Recent"
@@ -27,7 +29,7 @@ export function DashboardRecentTransactions({
           {transactions.map((t) => (
             <LedgerRow
               key={t.id}
-              date={formatLedgerDate(t.date)}
+              date={formatLedgerDate(t.date, locale)}
               label={t.description || t.category}
               meta={t.description ? t.category : undefined}
               figure={
@@ -35,6 +37,7 @@ export function DashboardRecentTransactions({
                   {formatSignedCents(
                     t.type === "income" ? t.amount : -t.amount,
                     t.currency as CurrencyCode,
+                    locale,
                     { showPlus: true }
                   )}
                 </span>

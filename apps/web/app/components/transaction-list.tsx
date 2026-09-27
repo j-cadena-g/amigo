@@ -28,6 +28,7 @@ import {
   TransactionRow,
   type TransactionDTO,
 } from "@/app/components/transaction-row";
+import { useLocale } from "@/app/lib/use-locale";
 
 export type { TransactionDTO };
 
@@ -53,6 +54,7 @@ function MonthTotalsLine({
   currency: CurrencyCode;
   typeFilter?: "income" | "expense" | null;
 }) {
+  const locale = useLocale();
   const showOut = typeFilter !== "income";
   const showIn = typeFilter !== "expense";
 
@@ -62,7 +64,7 @@ function MonthTotalsLine({
         {showOut && (
           <>
             <span className="font-medium text-foreground">
-              {formatSignedCents(-totals.outCents, currency)}
+              {formatSignedCents(-totals.outCents, currency, locale)}
             </span>{" "}
             out
           </>
@@ -76,7 +78,7 @@ function MonthTotalsLine({
                 totals.inCents > 0 ? "text-success" : "text-foreground"
               )}
             >
-              {formatSignedCents(totals.inCents, currency, { showPlus: true })}
+              {formatSignedCents(totals.inCents, currency, locale, { showPlus: true })}
             </span>{" "}
             in
           </>
@@ -96,6 +98,7 @@ export function TransactionList({
   homeCurrency,
   todayStr,
 }: TransactionListProps) {
+  const locale = useLocale();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
   const toast = useToast();
@@ -280,7 +283,7 @@ export function TransactionList({
   const handleStartEdit = (t: TransactionDTO) => {
     setEditingId(t.id);
     setEditForm({
-      amount: centsToInputString(t.amount, t.currency),
+      amount: centsToInputString(t.amount, t.currency, locale),
       description: t.description || "",
       categoryId: t.categoryId ?? "",
       type: t.type,
@@ -347,7 +350,11 @@ export function TransactionList({
     }
   };
 
-  const groups = groupTransactionsByMonth(allTransactions, { homeCurrency, hasMore });
+  const groups = groupTransactionsByMonth(allTransactions, {
+    homeCurrency,
+    hasMore,
+    locale,
+  });
 
   return (
     <div className="space-y-6">

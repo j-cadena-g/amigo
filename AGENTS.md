@@ -1,6 +1,6 @@
 # Agent notes for amigo
 
-Short working loop. Human setup lives in [README Quick Start](./README.md#quick-start); playbooks in [CONTRIBUTING.md](./CONTRIBUTING.md). Cursor rules under `.cursor/rules/` apply when matching files are open.
+Short working loop. Human setup lives in [README Quick Start](./README.md#quick-start); playbooks in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Commands
 

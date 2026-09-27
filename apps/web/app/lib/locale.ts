@@ -24,6 +24,10 @@ export const FORMAT_LOCALE_OPTIONS = FORMAT_LOCALES.map((value) => ({
   label: FORMAT_LOCALE_LABELS[value],
 }));
 
+export function formatLocaleLabel(locale: FormatLocale): string {
+  return FORMAT_LOCALE_LABELS[locale];
+}
+
 export function isFormatLocale(value: unknown): value is FormatLocale {
   return (FORMAT_LOCALES as readonly unknown[]).includes(value);
 }

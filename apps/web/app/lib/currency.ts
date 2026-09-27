@@ -39,6 +39,18 @@ export function currencyHomeLocale(currency: string | null | undefined): FormatL
   return (config ?? CURRENCY_CONFIG[DEFAULT_HOME_CURRENCY]).homeLocale;
 }
 
+/**
+ * True when Intl can format `locale` itself. Malformed tags throw and
+ * well-formed unknown ones ("zz-ZZ") would silently use the runtime's locale.
+ */
+function isSupportedLocale(locale: string): boolean {
+  try {
+    return Intl.NumberFormat.supportedLocalesOf(locale).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** Formatters are costly to build; the cap only matters if callers pass unusual locales. */
 const FORMATTER_CACHE_LIMIT = 256;
 const formatterCache = new Map<string, Intl.NumberFormat>();
@@ -65,11 +77,10 @@ function currencyFormatter(
       minimumFractionDigits: digits.min,
       maximumFractionDigits: digits.max,
     };
-    try {
-      formatter = new Intl.NumberFormat(locale, options);
-    } catch {
-      formatter = new Intl.NumberFormat(currencyHomeLocale(safeCurrency), options);
-    }
+    formatter = new Intl.NumberFormat(
+      isSupportedLocale(locale) ? locale : currencyHomeLocale(safeCurrency),
+      options
+    );
     if (formatterCache.size >= FORMATTER_CACHE_LIMIT) formatterCache.clear();
     formatterCache.set(key, formatter);
   }

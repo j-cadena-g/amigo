@@ -6,23 +6,27 @@ import { useToast } from "@/app/components/toast-provider";
 import { toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
 import { capitalizeFirst } from "@/app/lib/format-dates";
-import { FORMAT_LOCALE_OPTIONS, isFormatLocale } from "@/app/lib/locale";
-import { useLocale } from "@/app/lib/use-locale";
+import { FORMAT_LOCALE_OPTIONS, formatLocaleLabel, isFormatLocale } from "@/app/lib/locale";
 
 interface FormatSettingsProps {
   /** The saved choice; null follows the household's currency and the browser. */
   savedLocale: FormatLocale | null;
+  /** What "Automatic" resolves to for this household and browser. */
+  automaticLocale: FormatLocale;
   homeCurrency: CurrencyCode;
 }
 
 const PREVIEW_DATE = new Date(Date.UTC(2026, 8, 27));
 
-export function FormatSettings({ savedLocale, homeCurrency }: FormatSettingsProps) {
+export function FormatSettings({
+  savedLocale,
+  automaticLocale,
+  homeCurrency,
+}: FormatSettingsProps) {
   const selectId = useId();
   const previewId = useId();
   const revalidator = useRevalidator();
   const toast = useToast();
-  const locale = useLocale();
   const [value, setValue] = useState<FormatLocale | "">(savedLocale ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -54,15 +58,17 @@ export function FormatSettings({ savedLocale, homeCurrency }: FormatSettingsProp
     }
   }
 
-  const preview = `${formatCents(123_456_78, homeCurrency, locale)} · ${capitalizeFirst(
-    PREVIEW_DATE.toLocaleDateString(locale, {
+  // Follow the selection right away, before the save and revalidation finish.
+  const previewLocale = value === "" ? automaticLocale : value;
+  const preview = `${formatCents(123_456_78, homeCurrency, previewLocale)} · ${capitalizeFirst(
+    PREVIEW_DATE.toLocaleDateString(previewLocale, {
       weekday: "long",
       month: "long",
       day: "numeric",
       year: "numeric",
       timeZone: "UTC",
     }),
-    locale
+    previewLocale
   )}`;
 
   return (
@@ -81,7 +87,7 @@ export function FormatSettings({ savedLocale, homeCurrency }: FormatSettingsProp
         }}
         className="max-w-sm"
       >
-        <option value="">Automatic</option>
+        <option value="">Automatic · {formatLocaleLabel(automaticLocale)}</option>
         {FORMAT_LOCALE_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

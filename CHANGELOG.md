@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Number and date format** in Settings: money and dates follow each user's locale instead of the currency's, so a Colombian reader sees `US$ 12,50` and `23 de sept` while a Canadian sees `US$12.50` and `Sep 23`. Automatic (the default) uses the household's currency, or the browser's language when it differs; amount fields take the same decimal separator
+- **Number and date format** in Settings: money and dates follow each user's locale instead of the currency's, so a Colombian reader sees `US$ 12,50` and `23 sept` while a Canadian sees `US$12.50` and `Sep 23`. Automatic (the default) uses the household's currency, or the browser's language when it differs; amount fields take the same decimal separator
 - **Colombian peso (COP)** as a transaction, account, budget, and home currency; pesos display whole with Colombian grouping (`$ 45.000`) while storage stays integer cents
 - **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
 - `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work; `--ticket` skips the Agent Task for browsers that block Clerk's domain

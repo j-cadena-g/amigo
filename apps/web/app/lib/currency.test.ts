@@ -123,6 +123,8 @@ describe("formatCents", () => {
 
   it("falls back to the currency's home locale for an unusable tag", () => {
     expect(formatCents(123456, "CAD", "not a locale")).toBe("$1,234.56");
+    expect(formatCents(123456, "CAD", "zz-ZZ")).toBe("$1,234.56");
+    expect(formatCents(4_500_000, "COP", "zz-ZZ")).toBe("$\u00a045.000");
   });
 });
 

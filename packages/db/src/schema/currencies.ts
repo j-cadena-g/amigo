@@ -7,7 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 // Supported currencies — no pgEnum in SQLite, use text with enum constraint
-export const CURRENCY_CODES = ["CAD", "USD", "EUR", "GBP", "MXN"] as const;
+export const CURRENCY_CODES = ["CAD", "USD", "EUR", "GBP", "MXN", "COP"] as const;
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 

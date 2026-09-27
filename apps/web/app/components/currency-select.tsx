@@ -1,4 +1,5 @@
 import { NativeSelect } from "@/app/components/financial/form-controls";
+import { SUPPORTED_CURRENCIES } from "@/app/lib/currency";
 
 interface CurrencySelectProps {
   value: string;
@@ -11,14 +12,6 @@ interface CurrencySelectProps {
   /** Show 3-letter codes only — for narrow columns beside amount fields. */
   compact?: boolean;
 }
-
-const CURRENCIES = [
-  { code: "CAD", label: "CAD – Canadian dollar" },
-  { code: "USD", label: "USD – US dollar" },
-  { code: "EUR", label: "EUR – Euro" },
-  { code: "GBP", label: "GBP – British pound" },
-  { code: "MXN", label: "MXN – Mexican peso" },
-];
 
 export function CurrencySelect({
   value,
@@ -37,9 +30,9 @@ export function CurrencySelect({
       compact={compact}
       className={className}
     >
-      {CURRENCIES.map((c) => (
+      {SUPPORTED_CURRENCIES.map((c) => (
         <option key={c.code} value={c.code}>
-          {compact ? c.code : c.label}
+          {compact ? c.code : `${c.code} – ${c.name}`}
         </option>
       ))}
     </NativeSelect>

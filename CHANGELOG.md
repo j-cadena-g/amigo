@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Colombian peso (COP)** as a transaction, account, budget, and home currency; pesos display whole with Colombian grouping (`$ 45.000`) while storage stays integer cents
 - **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
 - `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work; `--ticket` skips the Agent Task for browsers that block Clerk's domain
 - `/dev/agent-signin` signs a local browser in as `AGENT_LOGIN_EMAIL`: the server mints the Clerk sign-in token and redirects the browser to the sign-in form with it, so agents never copy a token and never leave localhost (development, `sk_test_` key, and direct connections from this machine only)
@@ -39,6 +40,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Amount fields accept both `1,234.56` and `1.234,56`: `45.000` is read as forty-five thousand instead of 45, and the add-transaction field no longer trims a third digit after a separator while typing
 - `pnpm run agent:signin-url`'s sign-in ticket fallback puts `__clerk_ticket` in the query string; after a `#`, Clerk's sign-in form ignored it
 - Transaction history shows field-level diffs instead of JSON character indexes ([#138](https://github.com/j-cadena-g/amigo/pull/138))
 - Recurring and transaction amount edits when a linked budget was later deleted ([#135](https://github.com/j-cadena-g/amigo/pull/135))

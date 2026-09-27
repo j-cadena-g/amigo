@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { CURRENCY_CODES } from "@amigo/db";
 import {
+  SUPPORTED_CURRENCIES,
+  currencyFractionDigits,
   formatCents,
   formatCentsParts,
   formatShortCents,
@@ -44,6 +47,16 @@ describe("formatCentsParts", () => {
     });
   });
 
+  it("shows Colombian pesos whole, grouped with periods", () => {
+    expect(formatCentsParts(4_500_000, "COP")).toEqual({
+      sign: "",
+      symbol: "$",
+      symbolPosition: "before",
+      whole: "45.000",
+      fraction: "",
+    });
+  });
+
   it("keeps a zero amount readable", () => {
     expect(formatCentsParts(0, "GBP")).toEqual({
       sign: "",
@@ -83,5 +96,26 @@ describe("formatShortCents", () => {
   it("abbreviates thousands in locales whose compact notation doesn't", () => {
     expect(formatShortCents(1_250_00, "EUR")).toBe("1,3K\u00a0€");
     expect(formatShortCents(12_500_00, "EUR")).toBe("12,5K\u00a0€");
+  });
+});
+
+describe("formatCents", () => {
+  it("rounds pesos to whole units", () => {
+    expect(formatCents(123_456_750, "COP")).toBe("$\u00a01.234.568");
+  });
+});
+
+describe("currencyFractionDigits", () => {
+  it("is 0 for pesos and 2 otherwise", () => {
+    expect(currencyFractionDigits("COP")).toBe(0);
+    expect(currencyFractionDigits("CAD")).toBe(2);
+    expect(currencyFractionDigits(null)).toBe(2);
+    expect(currencyFractionDigits("XYZ")).toBe(2);
+  });
+});
+
+describe("SUPPORTED_CURRENCIES", () => {
+  it("lists every currency the database accepts, in order", () => {
+    expect(SUPPORTED_CURRENCIES.map((c) => c.code)).toEqual([...CURRENCY_CODES]);
   });
 });

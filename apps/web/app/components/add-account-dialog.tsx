@@ -10,9 +10,11 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { NativeSelect, SharedCheckbox } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
+import { parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import {
   ACCOUNT_TYPE_SELECT_OPTIONS,
@@ -63,9 +65,9 @@ export function AddAccountDialog({
     const trimmed = balance.trim();
     let balanceNum = 0;
     if (trimmed !== "") {
-      const parsed = parseFloat(trimmed);
-      if (!Number.isFinite(parsed)) {
-        setError("Enter the balance as a number, like 1250.00.");
+      const parsed = parseAmount(trimmed);
+      if (parsed === null) {
+        setError("Enter the balance as a number, like 1250.50 or 1.250,50.");
         return;
       }
       balanceNum = parsed;
@@ -141,14 +143,12 @@ export function AddAccountDialog({
               <label className="text-sm font-semibold" htmlFor={balanceId}>
                 Balance
               </label>
-              <Input
+              <AmountInput
                 id={balanceId}
-                type="number"
-                step="0.01"
+                currency={currency}
+                allowNegative
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                placeholder="0.00"
-                className="font-mono font-medium"
+                onValueChange={setBalance}
               />
             </div>
             <div className="space-y-1.5">

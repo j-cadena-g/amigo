@@ -1,22 +1,34 @@
 import type { CurrencyCode } from "@amigo/db";
-import { DEFAULT_HOME_CURRENCY } from "@amigo/db";
+import { CURRENCY_CODES, DEFAULT_HOME_CURRENCY } from "@amigo/db";
 
-const CURRENCY_CONFIG: Record<CurrencyCode, { locale: string; symbol: string }> =
-  {
-    CAD: { locale: "en-CA", symbol: "CA$" },
-    USD: { locale: "en-US", symbol: "$" },
-    EUR: { locale: "de-DE", symbol: "€" },
-    GBP: { locale: "en-GB", symbol: "£" },
-    MXN: { locale: "es-MX", symbol: "MX$" },
-  };
+interface CurrencyConfig {
+  name: string;
+  locale: string;
+  symbol: string;
+  /**
+   * Decimal places shown. Storage is always integer cents; pesos are shown
+   * whole because centavos aren't used day to day.
+   */
+  fractionDigits: 0 | 2;
+}
 
-export const SUPPORTED_CURRENCIES: { code: CurrencyCode; label: string }[] = [
-  { code: "CAD", label: "Canadian Dollar (CAD)" },
-  { code: "USD", label: "US Dollar (USD)" },
-  { code: "EUR", label: "Euro (EUR)" },
-  { code: "GBP", label: "British Pound (GBP)" },
-  { code: "MXN", label: "Mexican Peso (MXN)" },
-];
+const CURRENCY_CONFIG: Record<CurrencyCode, CurrencyConfig> = {
+  CAD: { name: "Canadian dollar", locale: "en-CA", symbol: "CA$", fractionDigits: 2 },
+  USD: { name: "US dollar", locale: "en-US", symbol: "$", fractionDigits: 2 },
+  EUR: { name: "Euro", locale: "de-DE", symbol: "€", fractionDigits: 2 },
+  GBP: { name: "British pound", locale: "en-GB", symbol: "£", fractionDigits: 2 },
+  MXN: { name: "Mexican peso", locale: "es-MX", symbol: "MX$", fractionDigits: 2 },
+  COP: { name: "Colombian peso", locale: "es-CO", symbol: "COL$", fractionDigits: 0 },
+};
+
+export const SUPPORTED_CURRENCIES: { code: CurrencyCode; name: string }[] =
+  CURRENCY_CODES.map((code) => ({ code, name: CURRENCY_CONFIG[code].name }));
+
+/** Decimal places a currency is shown with; unknown codes fall back to 2. */
+export function currencyFractionDigits(currency: string | null | undefined): number {
+  const config = CURRENCY_CONFIG[(currency ?? DEFAULT_HOME_CURRENCY) as CurrencyCode];
+  return config?.fractionDigits ?? 2;
+}
 
 function currencyFormatter(
   currency: CurrencyCode | null | undefined,
@@ -24,12 +36,13 @@ function currencyFormatter(
 ): Intl.NumberFormat {
   const safeCurrency: CurrencyCode = currency ?? DEFAULT_HOME_CURRENCY;
   const config = CURRENCY_CONFIG[safeCurrency];
+  const digits = options?.compact ? 0 : config.fractionDigits;
 
   return new Intl.NumberFormat(config.locale, {
     style: "currency",
     currency: safeCurrency,
-    minimumFractionDigits: options?.compact ? 0 : 2,
-    maximumFractionDigits: options?.compact ? 0 : 2,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   });
 }
 

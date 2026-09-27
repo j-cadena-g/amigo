@@ -11,6 +11,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { CurrencySelect } from "@/app/components/currency-select";
 import {
   DeleteButton,
@@ -18,7 +19,7 @@ import {
   SharedCheckbox,
 } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { Asset } from "@/app/components/asset-cards";
 import type { CurrencyCode, FinancialAccount } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
@@ -51,7 +52,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const currencyId = useId();
   const [name, setName] = useState(asset.name);
   const [type, setType] = useState(asset.type);
-  const [balance, setBalance] = useState(centsToInputString(asset.balance));
+  const [balance, setBalance] = useState(centsToInputString(asset.balance, asset.currency));
   const [currency, setCurrency] = useState<CurrencyCode>(asset.currency);
   const [isShared, setIsShared] = useState(asset.userId === null);
   const [accountType, setAccountType] = useState<FinancialAccount["type"]>(() =>
@@ -63,15 +64,13 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
   const [error, setError] = useState<string | null>(null);
 
   const busy = loading || deleting || converting;
-  const trimmedBalance = balance.trim();
-  // Exact decimal shape (non-negative, ≤2 fraction digits) — avoids float tolerance gaps.
-  const hasInvalidBalance = !/^\d+(\.\d{1,2})?$/.test(trimmedBalance);
-  const parsedBalance = Number(trimmedBalance);
+  const parsedBalance = parseAmount(balance);
+  const hasInvalidBalance = parsedBalance === null || parsedBalance < 0;
   const hasUnsavedChanges =
     name.trim() !== asset.name ||
     type !== asset.type ||
     hasInvalidBalance ||
-    Math.round(parsedBalance * 100) !== asset.balance ||
+    Math.round((parsedBalance ?? 0) * 100) !== asset.balance ||
     currency !== asset.currency ||
     isShared !== (asset.userId === null);
 
@@ -92,7 +91,7 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
         body: JSON.stringify({
           name,
           type,
-          balance: Number(trimmedBalance),
+          balance: parsedBalance,
           currency,
           isShared,
         }),
@@ -270,14 +269,11 @@ export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogPr
               <label htmlFor={balanceId} className="text-sm font-semibold">
                 Balance
               </label>
-              <Input
+              <AmountInput
                 id={balanceId}
-                type="number"
-                step="0.01"
-                min="0"
+                currency={currency}
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                className="font-mono font-medium"
+                onValueChange={setBalance}
                 required
               />
             </div>

@@ -1,4 +1,4 @@
-import type { CurrencyCode } from "@amigo/db";
+import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import { formatCents } from "@/app/lib/currency";
 
 const HIDDEN_AUDIT_FIELDS = new Set([
@@ -51,13 +51,7 @@ export function formatAuditFieldName(key: string): string {
 }
 
 function isCurrencyCode(value: unknown): value is CurrencyCode {
-  return (
-    value === "CAD" ||
-    value === "USD" ||
-    value === "EUR" ||
-    value === "GBP" ||
-    value === "MXN"
-  );
+  return (CURRENCY_CODES as readonly unknown[]).includes(value);
 }
 
 function currencySideFromChange(

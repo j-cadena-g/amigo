@@ -11,6 +11,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { CurrencySelect } from "@/app/components/currency-select";
 import {
   DeleteButton,
@@ -18,7 +19,7 @@ import {
   SharedCheckbox,
 } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { AccountRow } from "@/app/components/account-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { getAccountTypeSelectOptions } from "@/app/lib/financial-account-types";
@@ -43,7 +44,7 @@ export function EditAccountDialog({
   const currencyId = useId();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
-  const [balance, setBalance] = useState(centsToInputString(account.balance));
+  const [balance, setBalance] = useState(centsToInputString(account.balance, account.currency));
   const [currency, setCurrency] = useState<CurrencyCode>(account.currency as CurrencyCode);
   const [isShared, setIsShared] = useState(account.userId === null);
   const [loading, setLoading] = useState(false);
@@ -56,9 +57,9 @@ export function EditAccountDialog({
   function parseBalanceInput(): number | null {
     const trimmed = balance.trim();
     if (trimmed === "") return 0;
-    const parsed = parseFloat(trimmed);
-    if (!Number.isFinite(parsed)) {
-      setError("Enter the balance as a number, like 1250.00.");
+    const parsed = parseAmount(trimmed);
+    if (parsed === null) {
+      setError("Enter the balance as a number, like 1250.50 or 1.250,50.");
       return null;
     }
     return parsed;
@@ -203,13 +204,12 @@ export function EditAccountDialog({
               <label className="text-sm font-semibold" htmlFor={balanceId}>
                 Balance
               </label>
-              <Input
+              <AmountInput
                 id={balanceId}
-                type="number"
-                step="0.01"
+                currency={currency}
+                allowNegative
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                className="font-mono font-medium"
+                onValueChange={setBalance}
               />
             </div>
             <div className="space-y-1.5">

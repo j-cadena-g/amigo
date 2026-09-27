@@ -11,10 +11,11 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { DeleteButton, SharedCheckbox } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
@@ -43,18 +44,18 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
   // Loan fields
   const [loanAmount, setLoanAmount] = useState(
-    isLoan ? centsToInputString(debt.balanceInitial) : ""
+    isLoan ? centsToInputString(debt.balanceInitial, debt.currency) : ""
   );
   const [totalPaid, setTotalPaid] = useState(
-    isLoan ? centsToInputString(debt.balanceCurrent) : ""
+    isLoan ? centsToInputString(debt.balanceCurrent, debt.currency) : ""
   );
 
   // Credit card fields
   const [creditLimit, setCreditLimit] = useState(
-    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceInitial) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceInitial, debt.currency) : ""
   );
   const [availableCredit, setAvailableCredit] = useState(
-    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceCurrent) : ""
+    debt.type === "CREDIT_CARD" ? centsToInputString(debt.balanceCurrent, debt.currency) : ""
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,16 +68,16 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
         ? {
             type: "LOAN" as const,
             name,
-            loanAmount: parseFloat(loanAmount) || 0,
-            totalPaid: parseFloat(totalPaid) || 0,
+            loanAmount: parseAmount(loanAmount) ?? 0,
+            totalPaid: parseAmount(totalPaid) ?? 0,
             currency,
             isShared,
           }
         : {
             type: "CREDIT_CARD" as const,
             name,
-            creditLimit: parseFloat(creditLimit) || 0,
-            availableCredit: parseFloat(availableCredit) || 0,
+            creditLimit: parseAmount(creditLimit) ?? 0,
+            availableCredit: parseAmount(availableCredit) ?? 0,
             currency,
             isShared,
           };
@@ -171,14 +172,12 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
                   Loan amount
                 </label>
-                <Input
+                <AmountInput
                   id={firstAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  currency={currency}
+                  positive
                   value={loanAmount}
-                  onChange={(e) => setLoanAmount(e.target.value)}
-                  className="font-mono font-medium"
+                  onValueChange={setLoanAmount}
                   required
                 />
               </div>
@@ -186,15 +185,12 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
                   Total paid
                 </label>
-                <Input
+                <AmountInput
                   id={secondAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={loanAmount || undefined}
+                  currency={currency}
+                  max={parseAmount(loanAmount) ?? undefined}
                   value={totalPaid}
-                  onChange={(e) => setTotalPaid(e.target.value)}
-                  className="font-mono font-medium"
+                  onValueChange={setTotalPaid}
                   required
                 />
               </div>
@@ -205,14 +201,12 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
                   Credit limit
                 </label>
-                <Input
+                <AmountInput
                   id={firstAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  currency={currency}
+                  positive
                   value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
-                  className="font-mono font-medium"
+                  onValueChange={setCreditLimit}
                   required
                 />
               </div>
@@ -220,14 +214,11 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
                   Available credit
                 </label>
-                <Input
+                <AmountInput
                   id={secondAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  currency={currency}
                   value={availableCredit}
-                  onChange={(e) => setAvailableCredit(e.target.value)}
-                  className="font-mono font-medium"
+                  onValueChange={setAvailableCredit}
                   required
                 />
               </div>

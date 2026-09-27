@@ -9,7 +9,7 @@ import { useConfirm } from "@/app/components/confirm-provider";
 import { useToast } from "@/app/components/toast-provider";
 import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
 import { formatSignedCents } from "@/app/lib/currency";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import {
   groupTransactionsByMonth,
   type MonthTotals,
@@ -218,7 +218,7 @@ export function TransactionList({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: parseFloat(newTransaction.amount),
+          amount: parseAmount(newTransaction.amount),
           description: newTransaction.description || undefined,
           categoryId: newTransaction.categoryId,
           type: newTransaction.type,
@@ -280,7 +280,7 @@ export function TransactionList({
   const handleStartEdit = (t: TransactionDTO) => {
     setEditingId(t.id);
     setEditForm({
-      amount: centsToInputString(t.amount),
+      amount: centsToInputString(t.amount, t.currency),
       description: t.description || "",
       categoryId: t.categoryId ?? "",
       type: t.type,
@@ -325,7 +325,7 @@ export function TransactionList({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: parseFloat(editForm.amount),
+          amount: parseAmount(editForm.amount),
           description: editForm.description || null,
           categoryId: editForm.categoryId,
           type: editForm.type,

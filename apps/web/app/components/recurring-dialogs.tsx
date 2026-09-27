@@ -3,6 +3,7 @@ import { useRevalidator } from "react-router";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import { useFinancialCategories } from "@/app/components/financial/use-financial
 import { DeleteButton, NativeSelect } from "@/app/components/financial/form-controls";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 
@@ -231,15 +232,11 @@ function RecurringFields({
           <label htmlFor={amountId} className="text-sm font-semibold">
             Amount
           </label>
-          <Input
+          <AmountInput
             id={amountId}
-            type="number"
-            step="0.01"
-            min="0"
+            currency={form.currency as CurrencyCode}
             value={form.amount}
-            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-            placeholder="0.00"
-            className="font-mono font-medium"
+            onValueChange={(amount) => setForm((f) => ({ ...f, amount }))}
           />
         </div>
         <div className="space-y-1.5">
@@ -425,7 +422,7 @@ function requestBody(form: RecurringFormData) {
   return {
     type: form.type,
     // API expects dollars; server applies toCents() (same contract as transactions).
-    amount: parseFloat(form.amount),
+    amount: parseAmount(form.amount),
     currency: form.currency,
     categoryId: form.categoryId,
     description: form.description || null,
@@ -559,7 +556,7 @@ function ruleToForm(rule: RecurringRule): RecurringFormData {
   const preset = ruleToPreset(rule);
   return {
     type: rule.type,
-    amount: centsToInputString(rule.amount),
+    amount: centsToInputString(rule.amount, rule.currency),
     currency: rule.currency,
     categoryId: rule.categoryId ?? "",
     description: rule.description ?? "",

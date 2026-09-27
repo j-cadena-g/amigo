@@ -9,10 +9,12 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { SharedCheckbox } from "@/app/components/financial/form-controls";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
+import { parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 
 type DebtKind = "LOAN" | "CREDIT_CARD";
@@ -74,16 +76,16 @@ export function AddDebtDialog({
           ? {
               type: "LOAN" as const,
               name: loanName,
-              loanAmount: parseFloat(loanAmount) || 0,
-              totalPaid: parseFloat(totalPaid) || 0,
+              loanAmount: parseAmount(loanAmount) ?? 0,
+              totalPaid: parseAmount(totalPaid) ?? 0,
               currency: loanCurrency,
               isShared,
             }
           : {
               type: "CREDIT_CARD" as const,
               name: ccName,
-              creditLimit: parseFloat(creditLimit) || 0,
-              availableCredit: parseFloat(availableCredit) || 0,
+              creditLimit: parseAmount(creditLimit) ?? 0,
+              availableCredit: parseAmount(availableCredit) ?? 0,
               currency: ccCurrency,
               isShared,
             };
@@ -190,15 +192,12 @@ export function AddDebtDialog({
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
                   Loan amount
                 </label>
-                <Input
+                <AmountInput
                   id={firstAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  currency={loanCurrency}
+                  positive
                   value={loanAmount}
-                  onChange={(e) => setLoanAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="font-mono font-medium"
+                  onValueChange={setLoanAmount}
                   required
                 />
               </div>
@@ -206,16 +205,12 @@ export function AddDebtDialog({
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
                   Total paid
                 </label>
-                <Input
+                <AmountInput
                   id={secondAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={loanAmount || undefined}
+                  currency={loanCurrency}
+                  max={parseAmount(loanAmount) ?? undefined}
                   value={totalPaid}
-                  onChange={(e) => setTotalPaid(e.target.value)}
-                  placeholder="0.00"
-                  className="font-mono font-medium"
+                  onValueChange={setTotalPaid}
                   required
                 />
               </div>
@@ -226,15 +221,12 @@ export function AddDebtDialog({
                 <label htmlFor={firstAmountId} className="text-sm font-semibold">
                   Credit limit
                 </label>
-                <Input
+                <AmountInput
                   id={firstAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  currency={ccCurrency}
+                  positive
                   value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
-                  placeholder="0.00"
-                  className="font-mono font-medium"
+                  onValueChange={setCreditLimit}
                   required
                 />
               </div>
@@ -242,15 +234,11 @@ export function AddDebtDialog({
                 <label htmlFor={secondAmountId} className="text-sm font-semibold">
                   Available credit
                 </label>
-                <Input
+                <AmountInput
                   id={secondAmountId}
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  currency={ccCurrency}
                   value={availableCredit}
-                  onChange={(e) => setAvailableCredit(e.target.value)}
-                  placeholder="0.00"
-                  className="font-mono font-medium"
+                  onValueChange={setAvailableCredit}
                   required
                 />
               </div>

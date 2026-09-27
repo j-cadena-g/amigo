@@ -10,6 +10,7 @@ import {
 import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
@@ -17,7 +18,7 @@ import { CurrencySelect } from "@/app/components/currency-select";
 import { SectionLink } from "@/app/components/ledger";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
-import { isPositiveDecimal, parseDecimalInput } from "@/app/lib/decimal-input";
+import { isPositiveAmount } from "@/app/lib/decimal-input";
 
 const TRANSACTION_TYPE_OPTIONS = [
   { value: "expense", label: "Expense" },
@@ -89,21 +90,14 @@ function TransactionFields({
           <label htmlFor={amountId} className="text-sm font-semibold">
             Amount
           </label>
-          <Input
+          <AmountInput
             id={amountId}
             ref={amountRef}
             autoFocus
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
+            currency={form.currency}
+            positive
             value={form.amount}
-            onChange={(e) =>
-              onChange((prev) => ({
-                ...prev,
-                amount: parseDecimalInput(e.target.value),
-              }))
-            }
-            className="font-mono font-medium"
+            onValueChange={(amount) => onChange((prev) => ({ ...prev, amount }))}
             required
           />
         </div>
@@ -290,7 +284,7 @@ export function AddTransactionForm({
       <FormActions
         onCancel={onCancel}
         submitDisabled={
-          isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+          isSubmitting || !isPositiveAmount(form.amount) || !form.categoryId
         }
         submitLabel={isSubmitting ? "Adding…" : "Add transaction"}
       />
@@ -334,7 +328,7 @@ export function EditTransactionForm({
       <FormActions
         onCancel={onCancel}
         submitDisabled={
-          isSubmitting || !isPositiveDecimal(form.amount) || !form.categoryId
+          isSubmitting || !isPositiveAmount(form.amount) || !form.categoryId
         }
         submitLabel={isSubmitting ? "Saving…" : "Save transaction"}
       />

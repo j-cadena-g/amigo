@@ -4,7 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
 import { readApiErrorMessage, toastMutationFailure } from "@/app/lib/api-error";
 import { formatCents } from "@/app/lib/currency";
-import { centsToInputString } from "@/app/lib/decimal-input";
+import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
 import { cn } from "@/app/lib/utils";
 import { CurrencySelect } from "@/app/components/currency-select";
 import { useConfirm } from "@/app/components/confirm-provider";
@@ -22,6 +22,7 @@ import { LedgerSubgroup, RowIconButton } from "@/app/components/financial/ledger
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { AmountInput } from "@/app/components/amount-input";
 import {
   Dialog,
   DialogContent,
@@ -245,17 +246,11 @@ function BudgetFormDialog({
               <label htmlFor={limitId} className="text-sm font-semibold">
                 Limit
               </label>
-              <Input
+              <AmountInput
                 id={limitId}
-                type="number"
-                step="0.01"
-                min="0"
+                currency={form.currency as CurrencyCode}
                 value={form.limitAmount}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, limitAmount: e.target.value }))
-                }
-                placeholder="0.00"
-                className="font-mono font-medium"
+                onValueChange={(limitAmount) => setForm((f) => ({ ...f, limitAmount }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -347,7 +342,7 @@ export function BudgetList({
   function openEdit(budget: BudgetWithSpending) {
     setForm({
       name: budget.name,
-      limitAmount: centsToInputString(budget.limitAmount),
+      limitAmount: centsToInputString(budget.limitAmount, budget.currency),
       currency: budget.currency,
       period: budget.period,
       isShared: budget.isShared,
@@ -365,7 +360,7 @@ export function BudgetList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
-          limitAmount: parseFloat(form.limitAmount),
+          limitAmount: parseAmount(form.limitAmount),
           currency: form.currency,
           period: form.period,
           isShared: form.isShared,
@@ -394,7 +389,7 @@ export function BudgetList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
-          limitAmount: parseFloat(form.limitAmount),
+          limitAmount: parseAmount(form.limitAmount),
           currency: form.currency,
           period: form.period,
           isShared: form.isShared,

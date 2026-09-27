@@ -143,8 +143,10 @@ describe("currencyName", () => {
       expect(currencyName(code, "en")).not.toBe(code);
       expect(currencyName(code, "es")).not.toBe(code);
     }
-    expect(currencyName("CAD", "en")).toBe("Canadian Dollar");
-    expect(currencyName("COP", "es")).toBe("Peso colombiano");
+    // Exact names come from the runtime's locale data, so check shape, not wording.
+    expect(currencyName("CAD", "en")).not.toBe(currencyName("CAD", "es"));
+    expect(currencyName("COP", "es")).toMatch(/^\p{Lu}/u);
+    expect(currencyName("XYZ" as never, "es")).toBe("XYZ");
   });
 });
 

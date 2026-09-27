@@ -139,7 +139,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
             className="min-w-0 flex-1"
           />
           <Button type="submit" disabled={!newItemName.trim()}>
-            {t.common.add}
+            {t.groceries.addItem}
           </Button>
         </div>
         <div className="mt-2">

@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/react-router";
-import { type LoaderFunctionArgs, type MetaArgs, redirect, useNavigate } from "react-router";
+import {
+  type LoaderFunctionArgs,
+  type MetaArgs,
+  redirect,
+  useLoaderData,
+  useNavigate,
+} from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -12,13 +18,14 @@ import {
 } from "@/app/lib/timezones";
 import { getSessionStatus } from "@/app/lib/session.server";
 import { pageTitle, useLanguage, useT } from "@/app/i18n";
+import { parseAcceptLanguage } from "@/app/lib/locale";
 import { useLocale } from "@/app/lib/use-locale";
 import { currencyName, defaultCurrencyForLocale } from "@/app/lib/currency";
 
 const SELECT_CLASS =
   "mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base";
 
-export function loader({ context }: LoaderFunctionArgs) {
+export function loader({ context, request }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
 
   if (status === "unauthenticated") {
@@ -33,7 +40,16 @@ export function loader({ context }: LoaderFunctionArgs) {
     throw redirect("/restore-account");
   }
 
-  return null;
+  // The browser's region ("en-US" → USD), not the display format, which may
+  // keep a household default.
+  const regional = parseAcceptLanguage(request.headers.get("Accept-Language")).find((tag) => {
+    try {
+      return Boolean(new Intl.Locale(tag).region);
+    } catch {
+      return false;
+    }
+  });
+  return { regionCurrency: regional ? defaultCurrencyForLocale(regional) : null };
 }
 
 export function meta({ matches }: MetaArgs) {
@@ -47,7 +63,10 @@ export default function Setup() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [householdName, setHouseholdName] = useState(t.onboarding.defaultHouseholdName);
-  const [currency, setCurrency] = useState<string>(() => defaultCurrencyForLocale(locale));
+  const { regionCurrency } = useLoaderData<typeof loader>();
+  const [currency, setCurrency] = useState<string>(
+    () => regionCurrency ?? defaultCurrencyForLocale(locale)
+  );
   const [timezone, setTimezone] = useState(getBrowserTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

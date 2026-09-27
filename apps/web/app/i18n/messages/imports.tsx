@@ -33,9 +33,10 @@ export const imports = defineMessages({
     help: (code: Code) => (
       <>
         Pega un JSON con un arreglo {code("rows")}. Cada fila necesita {code("date")},{" "}
-        {code("type")}, {code("category")} y {code("amount")} en unidades enteras (por ejemplo
-        12.34). Campos opcionales: {code("description")}, {code("currency")}, {code("budgetId")},{" "}
-        {code("accountId")}, {code("externalId")}. Máximo 200 filas por solicitud.
+        {code("type")}, {code("category")} y {code("amount")} en la unidad principal de la moneda,
+        con decimales si hace falta (por ejemplo 12.34). Campos opcionales: {code("description")},{" "}
+        {code("currency")}, {code("budgetId")}, {code("accountId")}, {code("externalId")}. Máximo
+        200 filas por solicitud.
       </>
     ),
     textareaLabel: "JSON de movimientos para importar",

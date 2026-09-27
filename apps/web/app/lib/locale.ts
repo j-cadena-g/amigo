@@ -101,7 +101,16 @@ export function resolveLocale({
   if (isFormatLocale(preferred)) return preferred;
 
   const householdLocale = homeCurrency ? currencyHomeLocale(homeCurrency) : DEFAULT_LOCALE;
-  const tags = [...(language ? [language] : []), ...parseAcceptLanguage(acceptLanguage)];
+  // A saved language goes first, but a browser tag in that same language
+  // ("es-MX" for "es") keeps its region ahead of the bare language.
+  const browserTags = parseAcceptLanguage(acceptLanguage);
+  const tags = language
+    ? [
+        ...browserTags.filter((tag) => languageOf(tag) === language),
+        language,
+        ...browserTags.filter((tag) => languageOf(tag) !== language),
+      ]
+    : browserTags;
   for (const tag of tags) {
     const browserLocale = matchFormatLocale(tag);
     if (!browserLocale) continue;

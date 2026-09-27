@@ -78,6 +78,9 @@ describe("resolveLocale", () => {
       "en-CA"
     );
     expect(resolveLocale({ preferred: "en-US", language: "es" })).toBe("en-US");
+    expect(
+      resolveLocale({ homeCurrency: "CAD", acceptLanguage: "en-CA,es-MX;q=0.8", language: "es" })
+    ).toBe("es-MX");
   });
 
   it("defaults to en-CA when nothing is known", () => {

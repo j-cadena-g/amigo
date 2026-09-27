@@ -27,7 +27,10 @@ describe("buildNotificationPayload", () => {
         [event("purchase", "Ana", "pan"), event("purchase", "Luis", "arroz")],
         "es"
       ).body
-    ).toBe("Ana y Luis marcaron 2 artículos como comprados");
+    ).toBe("Ana y Luis compraron 2 artículos");
+    expect(buildNotificationPayload([event("purchase", "Ana", "leche")], "es").body).toBe(
+      "Ana compró leche"
+    );
     expect(
       buildNotificationPayload([event("add", "Ana", "pan"), event("purchase", "Ana", "arroz")], "es")
         .body

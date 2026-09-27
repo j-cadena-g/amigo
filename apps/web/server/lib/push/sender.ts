@@ -129,10 +129,10 @@ const COPY: Record<
     addedOne: (actors, many, item) => `${actors} ${many ? "agregaron" : "agregó"} ${item} a la lista`,
     addedMany: (actors, many, count) =>
       `${actors} ${many ? "agregaron" : "agregó"} ${count} artículos a la lista`,
-    boughtOne: (actors, many, item) =>
-      `${actors} ${many ? "marcaron" : "marcó"} ${item} como comprado`,
+    // "compró", not "marcó … como comprado", so the item's gender never has to agree.
+    boughtOne: (actors, many, item) => `${actors} ${many ? "compraron" : "compró"} ${item}`,
     boughtMany: (actors, many, count) =>
-      `${actors} ${many ? "marcaron" : "marcó"} ${count} artículos como comprados`,
+      `${actors} ${many ? "compraron" : "compró"} ${count} artículos`,
     updated: (actors, many) =>
       `${actors} ${many ? "actualizaron" : "actualizó"} la lista de compras`,
   },

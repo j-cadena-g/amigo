@@ -70,9 +70,14 @@ export const handleSyncRequest: ApiHandler = async ({
   const db = getDb(env.DB);
   const results: MutationResult[] = [];
   let processedCount = 0;
-  // At most one lookup for the whole batch, and only if Jev is asked.
+  // One lookup shared by the batch, only if Jev is asked; a failure isn't
+  // cached, so a later item can try again.
   let homeCurrencyLookup: Promise<CurrencyCode> | undefined;
-  const homeCurrency = () => (homeCurrencyLookup ??= getHomeCurrency(db, session!.householdId));
+  const homeCurrency = () =>
+    (homeCurrencyLookup ??= getHomeCurrency(db, session!.householdId).catch((error: unknown) => {
+      homeCurrencyLookup = undefined;
+      throw error;
+    }));
 
   for (const mutation of validated.mutations) {
     try {

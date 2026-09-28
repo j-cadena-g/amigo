@@ -57,16 +57,26 @@ function refineLiabilityFields(
 }
 
 /**
- * Next stored value for a type-specific amount on update: cleared when the type no longer
- * carries it or the request sends null, kept when the request leaves it out.
+ * Update fields for the type-specific amounts: cleared when the type no longer carries one
+ * or the request sends null, left out of the update when the request omits it.
  */
-function nextLiabilityCents(
-  applies: boolean,
-  requested: number | null | undefined,
-  stored: number | null
-): number | null {
-  if (!applies || requested === null) return null;
-  return requested === undefined ? stored : toCents(requested);
+function liabilityUpdateFields(validated: {
+  type: (typeof FINANCIAL_ACCOUNT_TYPES)[number];
+  creditLimit?: number | null;
+  originalAmount?: number | null;
+}): { creditLimit?: number | null; originalAmount?: number | null } {
+  const fields: { creditLimit?: number | null; originalAmount?: number | null } = {};
+  if (validated.type !== "CREDIT" || validated.creditLimit === null) {
+    fields.creditLimit = null;
+  } else if (validated.creditLimit !== undefined) {
+    fields.creditLimit = toCents(validated.creditLimit);
+  }
+  if (validated.type !== "LOAN" || validated.originalAmount === null) {
+    fields.originalAmount = null;
+  } else if (validated.originalAmount !== undefined) {
+    fields.originalAmount = toCents(validated.originalAmount);
+  }
+  return fields;
 }
 
 const createAccountSchema = z
@@ -354,16 +364,7 @@ export const handleAccountsRequest: ApiHandler = async ({
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
-            creditLimit: nextLiabilityCents(
-              validated.type === "CREDIT",
-              validated.creditLimit,
-              existing.creditLimit
-            ),
-            originalAmount: nextLiabilityCents(
-              validated.type === "LOAN",
-              validated.originalAmount,
-              existing.originalAmount
-            ),
+            ...liabilityUpdateFields(validated),
             currency,
             exchangeRateToHome,
             ...(validated.archived !== undefined ? { archived: validated.archived } : {}),

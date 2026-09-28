@@ -623,16 +623,31 @@ async function deleteOldPurchasedItems(
 export async function purgeOldPurchasedGroceryItems(
   env: Env,
   now = new Date()
-): Promise<{ deletedCount: number }> {
+): Promise<{ deletedCount: number; failed: number }> {
   const db = getDb(env.DB);
   const cutoff = oldPurchaseCutoff(now);
   const allHouseholds = await db.select({ id: households.id }).from(households);
 
   let deletedCount = 0;
+  let failed = 0;
   // broadcastToHousehold never throws; don't hold later households on it.
   const broadcasts: Promise<void>[] = [];
   for (const { id: householdId } of allHouseholds) {
-    const deleted = await deleteOldPurchasedItems(db, householdId, null, cutoff);
+    // One household's failure must not stop the purge for the rest.
+    let deleted: number;
+    try {
+      deleted = await deleteOldPurchasedItems(db, householdId, null, cutoff);
+    } catch (err) {
+      failed++;
+      console.error(
+        JSON.stringify({
+          message: "purgeOldPurchasedGroceryItems: household failed",
+          householdId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+      continue;
+    }
     deletedCount += deleted;
     if (deleted > 0) {
       broadcasts.push(
@@ -646,5 +661,5 @@ export async function purgeOldPurchasedGroceryItems(
   }
   await Promise.all(broadcasts);
 
-  return { deletedCount };
+  return { deletedCount, failed };
 }

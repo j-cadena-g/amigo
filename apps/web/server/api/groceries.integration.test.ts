@@ -333,7 +333,7 @@ describe("purgeOldPurchasedGroceryItems integration", () => {
 
     const result = await purgeOldPurchasedGroceryItems(getIntegrationEnv(), now);
 
-    expect(result.deletedCount).toBeGreaterThanOrEqual(61);
+    expect(result).toEqual({ deletedCount: 61, failed: 0 });
     expect(await remainingIds(first.householdId)).toEqual(
       [firstRecent, firstUnpurchased].sort()
     );
@@ -353,6 +353,45 @@ describe("purgeOldPurchasedGroceryItems integration", () => {
       [...secondOld].sort()
     );
     expect(audits.every((row) => row.changedBy === null)).toBe(true);
+  });
+
+  it("keeps purging other households when one household's delete fails", async () => {
+    const broken = await seedHousehold();
+    const healthy = await seedHousehold();
+    const brokenOld = await seedItem(broken, 91);
+    await seedItem(healthy, 91);
+
+    // Fail only the item delete bound to the broken household.
+    const realDb = getIntegrationEnv().DB;
+    const failingDb = {
+      ...realDb,
+      batch: realDb.batch.bind(realDb),
+      exec: realDb.exec.bind(realDb),
+      prepare(sql: string) {
+        const statement = realDb.prepare(sql);
+        const bind = statement.bind.bind(statement);
+        statement.bind = (...values: unknown[]) => {
+          if (/^delete from "grocery_items"/i.test(sql) && values.includes(broken.householdId)) {
+            throw new Error("D1 unavailable");
+          }
+          return bind(...values);
+        };
+        return statement;
+      },
+    } as D1Database;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await purgeOldPurchasedGroceryItems(
+      { ...getIntegrationEnv(), DB: failingDb },
+      now
+    );
+
+    expect(result.failed).toBe(1);
+    expect(await remainingIds(broken.householdId)).toEqual([brokenOld]);
+    expect(await remainingIds(healthy.householdId)).toEqual([]);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(broken.householdId)
+    );
   });
 });
 

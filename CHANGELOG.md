@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - **Spanish interface.** Every screen, dialog, and client-side message is translated, including Clerk's sign-in. The language follows the number and date format (so a Colombian household or a Spanish browser gets Spanish automatically), or pick it under Settings › Language and region. Copy lives in typed English/Spanish catalogs under `app/i18n/`, so a missing translation is a type error. API error messages, invite emails, and grocery push notifications follow the reader's language too
 - **Number and date format** in Settings: money and dates follow each user's locale instead of the currency's, so a Colombian reader sees `US$ 12,50` and `23 sept` while a Canadian sees `US$12.50` and `Sep 23`. Automatic (the default) uses the household's currency, or the browser's language when it differs; amount fields take the same decimal separator
 - **Colombian peso (COP)** as a transaction, account, budget, and home currency; pesos display whole with Colombian grouping (`$ 45.000`) while storage stays integer cents
-- **AGENTS.md** and Cursor rules for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
+- **AGENTS.md** for the local agent working loop; in development, first Clerk login whose email matches `AGENT_LOGIN_EMAIL` claims the seeded Demo Household
 - `pnpm run agent:signin-url` mints a one-time Clerk Agent Task (or sign-in ticket) URL for local browser work; `--ticket` skips the Agent Task for browsers that block Clerk's domain
 - `/dev/agent-signin` signs a local browser in as `AGENT_LOGIN_EMAIL`: the server mints the Clerk sign-in token and redirects the browser to the sign-in form with it, so agents never copy a token and never leave localhost (development, `sk_test_` key, and direct connections from this machine only)
 - **Household invites** — create/list/resend/revoke invite codes, email delivery, join link (`/join/:code`), and setup-page acceptance ([#115](https://github.com/j-cadena-g/amigo/pull/115))
@@ -34,7 +34,7 @@ All notable changes to this project will be documented in this file.
 - API hygiene: normalize `{ error, code }`, shared Clerk auth options, audit grocery sync + membership/invite writes, soft-delete recurring rules, shared `zCurrencyCode` ([#121](https://github.com/j-cadena-g/amigo/pull/121))
 - Local onboarding: contributor-owned 1Password Environments; first-run requires only Clerk + `APP_*`; optional Cloudflare/VAPID; agentic `AGENT_LOGIN_*` via Environment ([#122](https://github.com/j-cadena-g/amigo/pull/122), [#123](https://github.com/j-cadena-g/amigo/pull/123))
 - README first-login copy: `/setup` unless local `AGENT_LOGIN_EMAIL` claims the seed household
-- Track committed `AGENTS.md` and `.cursor/rules/` (local `.cursor/` state stays ignored)
+- Track committed `AGENTS.md`; editor rules under `.cursor/` stay local
 - Household timezone handling for transaction and grocery calendar days
 - Recurring cron isolates per-rule failures so one household/FX error cannot abort the run ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)

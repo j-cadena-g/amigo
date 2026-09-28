@@ -4,6 +4,7 @@ import {
   budgets,
   debts,
   eq,
+  financialAccounts,
   getDb,
   gt,
   groceryItems,
@@ -11,6 +12,7 @@ import {
   isNotNull,
   isNull,
   recurringTransactions,
+  scopeToHousehold,
   transactions,
   users,
 } from "@amigo/db";
@@ -145,6 +147,15 @@ export const handleRestoreRequest: ApiHandler = async ({
           .set({ userDisplayName: null })
           .where(eq(debts.userId, user.id)),
         db
+          .update(financialAccounts)
+          .set({ userDisplayName: null })
+          .where(
+            and(
+              scopeToHousehold(financialAccounts.householdId, user.householdId),
+              eq(financialAccounts.userId, user.id)
+            )
+          ),
+        db
           .update(groceryItems)
           .set({ createdByUserDisplayName: null })
           .where(eq(groceryItems.createdByUserId, user.id)),
@@ -239,6 +250,15 @@ export const handleRestoreRequest: ApiHandler = async ({
           .update(debts)
           .set({ userId: owner.id, transferredFromUserId: user.id })
           .where(eq(debts.userId, user.id)),
+        db
+          .update(financialAccounts)
+          .set({ userId: owner.id, transferredFromUserId: user.id })
+          .where(
+            and(
+              scopeToHousehold(financialAccounts.householdId, user.householdId),
+              eq(financialAccounts.userId, user.id)
+            )
+          ),
         db
           .update(groceryItems)
           .set({

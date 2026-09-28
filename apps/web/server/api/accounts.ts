@@ -26,24 +26,83 @@ import { zCurrencyCode } from "../lib/request-validation";
 
 const zAccountType = z.enum(FINANCIAL_ACCOUNT_TYPES);
 
-const createAccountSchema = z.object({
-  name: z.string().min(1),
-  type: zAccountType,
-  balance: z.number(),
-  currency: zCurrencyCode.optional(),
-  isShared: z.boolean().optional().default(false),
-  archived: z.boolean().optional(),
-});
+const liabilityFields = {
+  creditLimit: z.number().positive().nullable().optional(),
+  originalAmount: z.number().positive().nullable().optional(),
+};
 
-const updateAccountSchema = z.object({
-  name: z.string().min(1),
-  type: zAccountType,
-  balance: z.number(),
-  currency: zCurrencyCode.optional(),
-  isShared: z.boolean().optional(),
-  adminTakeover: z.boolean().optional(),
-  archived: z.boolean().optional(),
-});
+/** Only CREDIT carries a credit limit and only LOAN an original amount; both stay optional. */
+function refineLiabilityFields(
+  data: {
+    type: (typeof FINANCIAL_ACCOUNT_TYPES)[number];
+    creditLimit?: number | null;
+    originalAmount?: number | null;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (data.type !== "CREDIT" && data.creditLimit != null) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Credit limit only applies to credit cards",
+      path: ["creditLimit"],
+    });
+  }
+  if (data.type !== "LOAN" && data.originalAmount != null) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Original amount only applies to loans",
+      path: ["originalAmount"],
+    });
+  }
+}
+
+/**
+ * Update fields for the type-specific amounts: cleared when the type no longer carries one
+ * or the request sends null, left out of the update when the request omits it.
+ */
+function liabilityUpdateFields(validated: {
+  type: (typeof FINANCIAL_ACCOUNT_TYPES)[number];
+  creditLimit?: number | null;
+  originalAmount?: number | null;
+}): { creditLimit?: number | null; originalAmount?: number | null } {
+  const fields: { creditLimit?: number | null; originalAmount?: number | null } = {};
+  if (validated.type !== "CREDIT" || validated.creditLimit === null) {
+    fields.creditLimit = null;
+  } else if (validated.creditLimit !== undefined) {
+    fields.creditLimit = toCents(validated.creditLimit);
+  }
+  if (validated.type !== "LOAN" || validated.originalAmount === null) {
+    fields.originalAmount = null;
+  } else if (validated.originalAmount !== undefined) {
+    fields.originalAmount = toCents(validated.originalAmount);
+  }
+  return fields;
+}
+
+const createAccountSchema = z
+  .object({
+    name: z.string().min(1),
+    type: zAccountType,
+    balance: z.number(),
+    ...liabilityFields,
+    currency: zCurrencyCode.optional(),
+    isShared: z.boolean().optional().default(false),
+    archived: z.boolean().optional(),
+  })
+  .superRefine(refineLiabilityFields);
+
+const updateAccountSchema = z
+  .object({
+    name: z.string().min(1),
+    type: zAccountType,
+    balance: z.number(),
+    ...liabilityFields,
+    currency: zCurrencyCode.optional(),
+    isShared: z.boolean().optional(),
+    adminTakeover: z.boolean().optional(),
+    archived: z.boolean().optional(),
+  })
+  .superRefine(refineLiabilityFields);
 
 const archiveAccountSchema = z
   .object({
@@ -122,6 +181,10 @@ export const handleAccountsRequest: ApiHandler = async ({
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
+            creditLimit:
+              validated.creditLimit != null ? toCents(validated.creditLimit) : null,
+            originalAmount:
+              validated.originalAmount != null ? toCents(validated.originalAmount) : null,
             currency,
             exchangeRateToHome,
           })
@@ -301,6 +364,7 @@ export const handleAccountsRequest: ApiHandler = async ({
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
+            ...liabilityUpdateFields(validated),
             currency,
             exchangeRateToHome,
             ...(validated.archived !== undefined ? { archived: validated.archived } : {}),

@@ -7,12 +7,13 @@ import {
   assets,
   financialAccounts,
   households,
+  LIABILITY_ACCOUNT_TYPES,
   scopeToHousehold,
   eq,
-  ne,
   and,
   or,
   isNull,
+  notInArray,
   parseHomeCurrency,
 } from "@amigo/db";
 import { Plus } from "lucide-react";
@@ -55,7 +56,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
           visibility,
           isNull(financialAccounts.deletedAt),
           eq(financialAccounts.archived, false),
-          ne(financialAccounts.type, "CREDIT")
+          notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
         ),
         orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
       }),
@@ -65,7 +66,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
           visibility,
           isNull(financialAccounts.deletedAt),
           eq(financialAccounts.archived, true),
-          ne(financialAccounts.type, "CREDIT")
+          notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
         ),
         orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
       }),

@@ -5,6 +5,7 @@ const EMPTY: MemberDataSummary = {
   transactions: 0,
   recurringTransactions: 0,
   personalBudgets: 0,
+  accounts: 0,
   assets: 0,
   debts: 0,
   groceryItems: 0,
@@ -34,13 +35,21 @@ describe("describeMemberData", () => {
         transactions: 1,
         recurringTransactions: 1,
         personalBudgets: 1,
+        accounts: 1,
         assets: 1,
         debts: 1,
         groceryItems: 1,
       }, "en")
     ).toBe(
-      "1 transaction, 1 recurring rule, 1 budget, 1 asset, 1 debt, and 1 grocery item"
+      "1 transaction, 1 recurring rule, 1 budget, 1 account, 1 asset, 1 debt, and 1 grocery item"
     );
+  });
+
+  it("counts accounts before assets", () => {
+    expect(describeMemberData({ ...EMPTY, assets: 1, accounts: 3 }, "en")).toBe(
+      "3 accounts and 1 asset"
+    );
+    expect(describeMemberData({ ...EMPTY, accounts: 2 }, "es")).toBe("2 cuentas");
   });
 
   it("reads naturally in Spanish", () => {

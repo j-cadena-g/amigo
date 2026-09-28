@@ -37,6 +37,7 @@ export {
   lt,
   lte,
   inArray,
+  notInArray,
   isNull,
   isNotNull,
   and,

@@ -141,6 +141,8 @@ const ES: Record<string, string> = {
     "Elige una categoría al cambiar el tipo del movimiento recurrente",
   "categoryId is required when changing transaction type":
     "Elige una categoría al cambiar el tipo del movimiento",
+  "chargedCurrency must differ from the transaction currency":
+    "La moneda del cobro debe ser distinta de la del movimiento",
   "recordId must be a single path segment": "recordId debe ser un solo segmento de la ruta",
   "recordId path param required": "Falta el parámetro recordId",
   "table query param required": "Falta el parámetro table",

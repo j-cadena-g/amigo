@@ -23,10 +23,15 @@ function createMockDb(currenciesByTable: Record<string, CurrencyRow[]>) {
   }
 
   const db = {
-    selectDistinct: (_fields: unknown) => ({
+    selectDistinct: (fields: Record<string, unknown>) => ({
       from: (table: { [key: string]: unknown }) => ({
         where: () => ({
-          all: async () => currenciesByTable[tableName(table)] ?? [],
+          all: async () =>
+            "chargedCurrency" in fields
+              ? (currenciesByTable.transactions_charged ?? []).map((row) => ({
+                  chargedCurrency: row.currency,
+                }))
+              : (currenciesByTable[tableName(table)] ?? []),
         }),
       }),
     }),
@@ -82,6 +87,28 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
       ])
     );
     expect(batches.length).toBe(1);
+  });
+
+  it("re-snapshots recorded charges without rewriting them", async () => {
+    vi.mocked(getExchangeRateForRecord).mockResolvedValue(12.7);
+    const { db, updates } = createMockDb({
+      financial_accounts: [],
+      debts: [],
+      assets: [],
+      transactions: [{ currency: "USD" }],
+      transactions_charged: [{ currency: "CAD" }, { currency: "MXN" }],
+      budgets: [],
+    });
+
+    await refreshHouseholdHomeCurrencyRates({} as never, db as never, "hh-1", "MXN");
+
+    expect(getExchangeRateForRecord).toHaveBeenCalledWith(expect.anything(), "CAD", "MXN");
+    const chargedUpdates = updates.filter((u) => "chargedExchangeRateToHome" in u.set);
+    expect(chargedUpdates.map((u) => u.set.chargedExchangeRateToHome)).toEqual([12.7, null]);
+    for (const update of updates) {
+      expect(update.set).not.toHaveProperty("chargedAmount");
+      expect(update.set).not.toHaveProperty("chargedCurrency");
+    }
   });
 
   it("fetches rates and updates foreign-currency rows", async () => {

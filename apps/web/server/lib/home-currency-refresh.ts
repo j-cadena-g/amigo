@@ -5,6 +5,7 @@ import {
   debts,
   eq,
   financialAccounts,
+  isNotNull,
   isNull,
   scopeToHousehold,
   sql,
@@ -124,6 +125,59 @@ function buildFxUpdates(
   return statements;
 }
 
+async function listDistinctChargedCurrencies(
+  db: DrizzleD1,
+  householdId: string
+): Promise<CurrencyCode[]> {
+  const rows = await db
+    .selectDistinct({ chargedCurrency: transactions.chargedCurrency })
+    .from(transactions)
+    .where(
+      and(
+        scopeToHousehold(transactions.householdId, householdId),
+        isNotNull(transactions.chargedAmount),
+        isNotNull(transactions.chargedCurrency),
+        isNull(transactions.deletedAt)
+      )
+    )
+    .all();
+  return rows.map((row) => row.chargedCurrency as CurrencyCode);
+}
+
+/**
+ * Re-snapshot what recorded card charges are worth in the new home currency.
+ * The charged amount and its currency are what the user entered, so they are
+ * never rewritten; only `chargedExchangeRateToHome` changes.
+ */
+function buildChargedFxUpdates(
+  db: DrizzleD1,
+  householdId: string,
+  newHome: CurrencyCode,
+  currencies: CurrencyCode[],
+  rates: Map<CurrencyCode, number>,
+  now: Date
+): BatchStatement[] {
+  return currencies.map((currency) => {
+    const rate = currency === newHome ? null : rates.get(currency);
+    if (rate === undefined) {
+      throw new Error(
+        `Missing exchange rate from ${currency} to ${newHome} for home currency refresh`
+      );
+    }
+    return db
+      .update(transactions)
+      .set({ chargedExchangeRateToHome: rate, updatedAt: now })
+      .where(
+        and(
+          scopeToHousehold(transactions.householdId, householdId),
+          isNotNull(transactions.chargedAmount),
+          eq(transactions.chargedCurrency, currency),
+          isNull(transactions.deletedAt)
+        )
+      );
+  });
+}
+
 function buildBudgetUpdates(
   db: DrizzleD1,
   householdId: string,
@@ -218,6 +272,9 @@ export async function refreshHouseholdHomeCurrencyRates(
   currenciesByTable.set(budgets, budgetCurrencies);
   for (const currency of budgetCurrencies) allCurrencies.add(currency);
 
+  const chargedCurrencies = await listDistinctChargedCurrencies(db, householdId);
+  for (const currency of chargedCurrencies) allCurrencies.add(currency);
+
   // Fail before any writes if a required rate is missing.
   const rates = await resolveRatesForCurrencies(env, allCurrencies, newHome);
 
@@ -235,6 +292,16 @@ export async function refreshHouseholdHomeCurrencyRates(
       )
     );
   }
+  statements.push(
+    ...buildChargedFxUpdates(
+      db,
+      householdId,
+      newHome,
+      chargedCurrencies,
+      rates,
+      now
+    )
+  );
   statements.push(
     ...buildBudgetUpdates(
       db,

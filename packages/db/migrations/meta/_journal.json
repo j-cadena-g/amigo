@@ -162,6 +162,13 @@
       "when": 1790525851500,
       "tag": "0022_user_language",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1790566135875,
+      "tag": "0023_transaction_charged_amount",
+      "breakpoints": true
     }
   ]
 }

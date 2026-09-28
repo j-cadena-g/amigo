@@ -26,24 +26,73 @@ import { zCurrencyCode } from "../lib/request-validation";
 
 const zAccountType = z.enum(FINANCIAL_ACCOUNT_TYPES);
 
-const createAccountSchema = z.object({
-  name: z.string().min(1),
-  type: zAccountType,
-  balance: z.number(),
-  currency: zCurrencyCode.optional(),
-  isShared: z.boolean().optional().default(false),
-  archived: z.boolean().optional(),
-});
+const liabilityFields = {
+  creditLimit: z.number().positive().nullable().optional(),
+  originalAmount: z.number().positive().nullable().optional(),
+};
 
-const updateAccountSchema = z.object({
-  name: z.string().min(1),
-  type: zAccountType,
-  balance: z.number(),
-  currency: zCurrencyCode.optional(),
-  isShared: z.boolean().optional(),
-  adminTakeover: z.boolean().optional(),
-  archived: z.boolean().optional(),
-});
+/** Only CREDIT carries a credit limit and only LOAN an original amount; both stay optional. */
+function refineLiabilityFields(
+  data: {
+    type: (typeof FINANCIAL_ACCOUNT_TYPES)[number];
+    creditLimit?: number | null;
+    originalAmount?: number | null;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (data.type !== "CREDIT" && data.creditLimit != null) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Credit limit only applies to credit cards",
+      path: ["creditLimit"],
+    });
+  }
+  if (data.type !== "LOAN" && data.originalAmount != null) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Original amount only applies to loans",
+      path: ["originalAmount"],
+    });
+  }
+}
+
+/**
+ * Next stored value for a type-specific amount on update: cleared when the type no longer
+ * carries it or the request sends null, kept when the request leaves it out.
+ */
+function nextLiabilityCents(
+  applies: boolean,
+  requested: number | null | undefined,
+  stored: number | null
+): number | null {
+  if (!applies || requested === null) return null;
+  return requested === undefined ? stored : toCents(requested);
+}
+
+const createAccountSchema = z
+  .object({
+    name: z.string().min(1),
+    type: zAccountType,
+    balance: z.number(),
+    ...liabilityFields,
+    currency: zCurrencyCode.optional(),
+    isShared: z.boolean().optional().default(false),
+    archived: z.boolean().optional(),
+  })
+  .superRefine(refineLiabilityFields);
+
+const updateAccountSchema = z
+  .object({
+    name: z.string().min(1),
+    type: zAccountType,
+    balance: z.number(),
+    ...liabilityFields,
+    currency: zCurrencyCode.optional(),
+    isShared: z.boolean().optional(),
+    adminTakeover: z.boolean().optional(),
+    archived: z.boolean().optional(),
+  })
+  .superRefine(refineLiabilityFields);
 
 const archiveAccountSchema = z
   .object({
@@ -122,6 +171,10 @@ export const handleAccountsRequest: ApiHandler = async ({
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
+            creditLimit:
+              validated.creditLimit != null ? toCents(validated.creditLimit) : null,
+            originalAmount:
+              validated.originalAmount != null ? toCents(validated.originalAmount) : null,
             currency,
             exchangeRateToHome,
           })
@@ -301,6 +354,16 @@ export const handleAccountsRequest: ApiHandler = async ({
             name: validated.name.trim(),
             type: validated.type,
             balance: toCents(validated.balance),
+            creditLimit: nextLiabilityCents(
+              validated.type === "CREDIT",
+              validated.creditLimit,
+              existing.creditLimit
+            ),
+            originalAmount: nextLiabilityCents(
+              validated.type === "LOAN",
+              validated.originalAmount,
+              existing.originalAmount
+            ),
             currency,
             exchangeRateToHome,
             ...(validated.archived !== undefined ? { archived: validated.archived } : {}),

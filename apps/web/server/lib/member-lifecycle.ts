@@ -3,6 +3,7 @@ import {
   assets,
   debts,
   eq,
+  financialAccounts,
   groceryItems,
   isNull,
   ne,
@@ -78,6 +79,7 @@ export async function restoreSoftDeleteClaim(
 
 export async function cleanupDepartedMemberData(
   db: DrizzleD1,
+  householdId: string,
   userId: string,
   displayName: string
 ): Promise<void> {
@@ -98,6 +100,15 @@ export async function cleanupDepartedMemberData(
       .update(debts)
       .set({ userDisplayName: displayName })
       .where(eq(debts.userId, userId)),
+    db
+      .update(financialAccounts)
+      .set({ userDisplayName: displayName })
+      .where(
+        and(
+          scopeToHousehold(financialAccounts.householdId, householdId),
+          eq(financialAccounts.userId, userId)
+        )
+      ),
     db
       .update(groceryItems)
       .set({ createdByUserDisplayName: displayName })

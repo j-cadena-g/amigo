@@ -6,6 +6,7 @@ export interface MemberDataSummary {
   transactions: number;
   recurringTransactions: number;
   personalBudgets: number;
+  accounts: number;
   assets: number;
   debts: number;
   groceryItems: number;
@@ -15,6 +16,7 @@ const ORDER: (keyof MemberDataSummary)[] = [
   "transactions",
   "recurringTransactions",
   "personalBudgets",
+  "accounts",
   "assets",
   "debts",
   "groceryItems",

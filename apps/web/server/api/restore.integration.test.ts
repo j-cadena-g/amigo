@@ -1,4 +1,4 @@
-import { and, eq, getDb, transactions, users } from "@amigo/db";
+import { and, eq, financialAccounts, getDb, transactions, users } from "@amigo/db";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleRestoreRequest } from "./restore";
 import {
@@ -17,6 +17,7 @@ describe("restore integration", () => {
   let deletedUserId: string;
   let deletedAuthId: string;
   let deletedTxnId: string;
+  let deletedAccountId: string;
 
   beforeEach(async () => {
     const suffix = crypto.randomUUID();
@@ -26,6 +27,7 @@ describe("restore integration", () => {
     deletedUserId = `user-restore-deleted-${suffix}`;
     deletedAuthId = `clerk_restore_deleted_${suffix}`;
     deletedTxnId = `tx-restore-deleted-${suffix}`;
+    deletedAccountId = `acct-restore-deleted-${suffix}`;
 
     const db = createTestDb(getIntegrationEnv().DB);
     await seedHouseholdWithOwner(db, {
@@ -45,6 +47,15 @@ describe("restore integration", () => {
       userId: deletedUserId,
       amount: 1500,
       category: "groceries",
+      userDisplayName: "Deleted Member",
+    });
+    await db.insert(financialAccounts).values({
+      id: deletedAccountId,
+      householdId,
+      userId: deletedUserId,
+      name: "Deleted member card",
+      type: "CREDIT",
+      creditLimit: 100000,
       userDisplayName: "Deleted Member",
     });
   });
@@ -132,6 +143,17 @@ describe("restore integration", () => {
       .where(eq(transactions.id, deletedTxnId))
       .get();
     expect(txn?.userDisplayName).toBeNull();
+
+    const account = await db
+      .select({
+        userId: financialAccounts.userId,
+        userDisplayName: financialAccounts.userDisplayName,
+      })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.id, deletedAccountId))
+      .get();
+    expect(account?.userDisplayName).toBeNull();
+    expect(account?.userId).toBe(deletedUserId);
   });
 
   it("fresh-start transfers deleted member data to the household owner", async () => {
@@ -185,5 +207,16 @@ describe("restore integration", () => {
       );
     expect(transferred.length).toBeGreaterThan(0);
     expect(transferred.every((row) => row.userId === ownerId)).toBe(true);
+
+    const account = await db
+      .select({
+        userId: financialAccounts.userId,
+        transferredFromUserId: financialAccounts.transferredFromUserId,
+      })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.id, deletedAccountId))
+      .get();
+    expect(account?.userId).toBe(ownerId);
+    expect(account?.transferredFromUserId).toBe(deletedUserId);
   });
 });

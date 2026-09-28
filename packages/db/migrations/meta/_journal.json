@@ -169,6 +169,13 @@
       "when": 1790566135875,
       "tag": "0023_transaction_charged_amount",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1790626878600,
+      "tag": "0024_financial_accounts_liabilities",
+      "breakpoints": true
     }
   ]
 }

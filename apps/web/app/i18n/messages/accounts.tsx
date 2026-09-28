@@ -12,6 +12,7 @@ export const accounts = defineMessages({
       PROPERTY: "Property",
       OTHER: "Other",
       CREDIT: "Credit card",
+      LOAN: "Loan",
     },
     /** Legacy asset types. */
     assetTypes: {
@@ -90,6 +91,7 @@ export const accounts = defineMessages({
       PROPERTY: "Propiedad",
       OTHER: "Otro",
       CREDIT: "Tarjeta de crédito",
+      LOAN: "Préstamo",
     },
     assetTypes: {
       BANK: "Cuenta bancaria",

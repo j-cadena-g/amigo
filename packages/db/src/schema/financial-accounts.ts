@@ -8,10 +8,18 @@ export const FINANCIAL_ACCOUNT_TYPES = [
   "CHECKING",
   "SAVINGS",
   "CREDIT",
+  "LOAN",
   "INVESTMENT",
   "PROPERTY",
   "OTHER",
 ] as const;
+
+/** Liability balances are stored negative when money is owed (balance = what the account is worth to the household). */
+export const LIABILITY_ACCOUNT_TYPES = ["CREDIT", "LOAN"] as const;
+
+export function isLiabilityAccountType(type: string): boolean {
+  return (LIABILITY_ACCOUNT_TYPES as readonly string[]).includes(type);
+}
 
 /** Labels for account-type selects (display order). */
 export const FINANCIAL_ACCOUNT_TYPE_OPTIONS: readonly {
@@ -22,6 +30,7 @@ export const FINANCIAL_ACCOUNT_TYPE_OPTIONS: readonly {
   { value: "SAVINGS", label: "Savings" },
   { value: "CASH", label: "Cash" },
   { value: "CREDIT", label: "Credit card" },
+  { value: "LOAN", label: "Loan" },
   { value: "INVESTMENT", label: "Investment" },
   { value: "PROPERTY", label: "Property" },
   { value: "OTHER", label: "Other" },
@@ -37,11 +46,22 @@ export const financialAccounts = sqliteTable(
       .notNull()
       .references(() => households.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // Denormalized user info for display when user is deleted
+    userDisplayName: text("user_display_name"),
+    // Track original creator when data is transferred during "fresh start" restore
+    transferredFromUserId: text("transferred_from_user_id").references(
+      () => users.id,
+      { onDelete: "set null" }
+    ),
     name: text("name").notNull(),
     type: text("type", { enum: FINANCIAL_ACCOUNT_TYPES }).notNull().default("CASH"),
     /** ISO currency; default is CAD and should match the household's home currency when unset in API. */
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
     balance: integer("balance").notNull().default(0),
+    // Credit limit in integer cents (CREDIT accounts only)
+    creditLimit: integer("credit_limit"),
+    // Amount originally borrowed in integer cents (LOAN accounts only)
+    originalAmount: integer("original_amount"),
     exchangeRateToHome: real("exchange_rate_to_home"),
     /** Soft-hide from normal lists; row remains queryable for history. */
     archived: integer("archived", { mode: "boolean" }).notNull().default(false),

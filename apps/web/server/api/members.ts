@@ -5,6 +5,7 @@ import {
   budgets,
   debts,
   eq,
+  financialAccounts,
   getDb,
   groceryItems,
   households,
@@ -445,6 +446,7 @@ export const handleMembersRequest: ApiHandler = async ({
       transactionCount,
       recurringCount,
       budgetCount,
+      accountCount,
       assetCount,
       debtCount,
       groceryCount,
@@ -471,6 +473,17 @@ export const handleMembersRequest: ApiHandler = async ({
         .then((result) => result[0]?.count ?? 0),
       db
         .select({ count: sql<number>`count(*)` })
+        .from(financialAccounts)
+        .where(
+          and(
+            scopeToHousehold(financialAccounts.householdId, session!.householdId),
+            eq(financialAccounts.userId, userId),
+            isNull(financialAccounts.deletedAt)
+          )
+        )
+        .then((result) => result[0]?.count ?? 0),
+      db
+        .select({ count: sql<number>`count(*)` })
         .from(assets)
         .where(and(eq(assets.userId, userId), isNull(assets.deletedAt)))
         .then((result) => result[0]?.count ?? 0),
@@ -492,6 +505,7 @@ export const handleMembersRequest: ApiHandler = async ({
       transactions: transactionCount,
       recurringTransactions: recurringCount,
       personalBudgets: budgetCount,
+      accounts: accountCount,
       assets: assetCount,
       debts: debtCount,
       groceryItems: groceryCount,
@@ -577,7 +591,7 @@ export const handleMembersRequest: ApiHandler = async ({
     }
 
     try {
-      await cleanupDepartedMemberData(db, userId, displayName);
+      await cleanupDepartedMemberData(db, session!.householdId, userId, displayName);
     } catch (error) {
       await restoreMembershipAfterCleanupFailure({
         db,
@@ -695,7 +709,7 @@ export const handleMembersRequest: ApiHandler = async ({
     }
 
     try {
-      await cleanupDepartedMemberData(db, leavingUserId, displayName);
+      await cleanupDepartedMemberData(db, session!.householdId, leavingUserId, displayName);
     } catch (error) {
       await restoreMembershipAfterCleanupFailure({
         db,

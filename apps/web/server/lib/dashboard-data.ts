@@ -5,13 +5,14 @@ import {
   recurringTransactions,
   assets,
   financialAccounts,
+  LIABILITY_ACCOUNT_TYPES,
   debts,
   scopeToHousehold,
   eq,
-  ne,
   and,
   or,
   isNull,
+  notInArray,
   isNotNull,
   gte,
   lte,
@@ -246,7 +247,7 @@ export async function loadDashboardData(
           or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
           isNull(financialAccounts.deletedAt),
           eq(financialAccounts.archived, false),
-          ne(financialAccounts.type, "CREDIT")
+          notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
         )
       ),
     db

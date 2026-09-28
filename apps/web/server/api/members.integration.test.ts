@@ -1,4 +1,4 @@
-import { eq, getDb, users } from "@amigo/db";
+import { eq, financialAccounts, getDb, users } from "@amigo/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handleMembersRequest } from "./members";
 import { createTestDb, seedHouseholdWithOwner, testSession } from "../test/fixtures";
@@ -95,6 +95,15 @@ describe("members integration", () => {
   });
 
   it("claims soft-delete, clears Clerk metadata, then cleans up member data", async () => {
+    const accountId = `acct-members-${crypto.randomUUID()}`;
+    await getDb(getIntegrationEnv().DB).insert(financialAccounts).values({
+      id: accountId,
+      householdId,
+      userId: memberId,
+      name: "Member card",
+      type: "CHECKING",
+    });
+
     const response = await handleMembersRequest({
       env: getIntegrationEnv(),
       params: { "*": memberId },
@@ -124,6 +133,41 @@ describe("members integration", () => {
       .where(eq(users.id, memberId))
       .get();
     expect(removed?.deletedAt).toBeInstanceOf(Date);
+
+    const account = await getDb(getIntegrationEnv().DB)
+      .select({ userDisplayName: financialAccounts.userDisplayName })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.id, accountId))
+      .get();
+    expect(account?.userDisplayName).toBe("member@example.com");
+  });
+
+  it("counts the member's live financial accounts in the data summary", async () => {
+    const db = getDb(getIntegrationEnv().DB);
+    await db.insert(financialAccounts).values([
+      { id: `acct-summary-a-${crypto.randomUUID()}`, householdId, userId: memberId, name: "A" },
+      { id: `acct-summary-b-${crypto.randomUUID()}`, householdId, userId: memberId, name: "B" },
+      {
+        id: `acct-summary-deleted-${crypto.randomUUID()}`,
+        householdId,
+        userId: memberId,
+        name: "Gone",
+        deletedAt: new Date(),
+      },
+      { id: `acct-summary-other-${crypto.randomUUID()}`, householdId, userId: adminOneId, name: "C" },
+    ]);
+
+    const response = await handleMembersRequest({
+      env: getIntegrationEnv(),
+      params: { "*": `${memberId}/data-summary` },
+      request: new Request("http://localhost/api/members/member/data-summary"),
+      sessionStatus: "authenticated",
+      session: testSession({ userId: ownerId, householdId, role: "owner" }),
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ accounts: 2, assets: 0, debts: 0 });
   });
 
   it("sets restoreAllowedUntil to about 14 days when removing a member", async () => {

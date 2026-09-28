@@ -6,6 +6,7 @@ export const COMMON_TIMEZONES = [
   "America/Los_Angeles",
   "America/Toronto",
   "America/Vancouver",
+  "America/Bogota",
   "Europe/London",
   "Europe/Paris",
   "Europe/Berlin",

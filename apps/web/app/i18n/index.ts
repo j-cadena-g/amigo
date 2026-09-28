@@ -8,7 +8,6 @@ import { calendar } from "./messages/calendar";
 import { categories } from "./messages/categories";
 import { common } from "./messages/common";
 import { dashboard } from "./messages/dashboard";
-import { debts } from "./messages/debts";
 import { groceries } from "./messages/groceries";
 import { household } from "./messages/household";
 import { imports } from "./messages/imports";
@@ -27,7 +26,6 @@ const CATALOGS = {
   categories,
   common,
   dashboard,
-  debts,
   groceries,
   household,
   imports,

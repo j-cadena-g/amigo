@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { defineMessages } from "../define";
 
-/** Accounts on the Money › Accounts tab. */
+/** The Money › Accounts tab: one balance sheet of cash, cards, loans, investments and property. */
 export const accounts = defineMessages({
   en: {
-    /** Account types, including legacy OTHER and credit cards shown under Debts. */
+    /** Account types, including legacy OTHER. */
     types: {
       CHECKING: "Checking",
       SAVINGS: "Savings",
@@ -20,17 +21,25 @@ export const accounts = defineMessages({
     sharedTag: "Shared",
     personalTag: "Personal",
     archived: "Archived",
-    holdings: "Holdings",
-    creditCardsUnderDebts: "Credit cards are under Debts.",
     add: "Add account",
-    empty: "No accounts yet. Add a bank account, investment, or property to track its balance here.",
+    empty:
+      "No accounts yet. Add a bank account, credit card, loan, investment, or property to see your net worth here.",
+    assets: "Assets",
+    liabilities: "Liabilities",
+    cashAndBank: "Cash & bank",
     investmentsAndProperty: "Investments & property",
+    creditCards: "Credit cards",
+    loans: "Loans",
     hide: "Hide",
     show: (count: number) => `Show (${count})`,
     addHint:
-      "Transactions and imports link to checking, savings, and cash accounts. Add credit cards under Debts.",
+      "Transactions and imports link to checking, savings, and cash accounts. Credit cards and loans track what you owe.",
     namePlaceholder: "e.g. Main checking",
     balanceInvalid: "Enter the balance as a number, like 1250.50 or 1.250,50.",
+    amountInvalid: "Enter the amount as a number above zero, like 5000 or 5.000,50.",
+    amountOwed: "Amount owed",
+    creditLimit: "Credit limit",
+    originalAmount: "Original amount",
     edit: "Edit account",
     editArchived: "Edit archived account",
     editNamed: (name: string) => `Edit account ${name}`,
@@ -51,6 +60,19 @@ export const accounts = defineMessages({
     archiveAction: "archive the account",
     restoreAction: "restore the account",
     deleteAction: "delete the account",
+    availableCredit: "Available credit",
+    percentUsed: (percent: string) => `${percent}% used`,
+    usedAcross: (used: ReactNode, limit: ReactNode, cards: number) => (
+      <>
+        {used} used of {limit} across {cards} {cards === 1 ? "card" : "cards"}
+      </>
+    ),
+    amountOf: (amount: string, total: string) => `${amount} of ${total}`,
+    left: (amount: string) => `${amount} left`,
+    percentPaid: (percent: string) => `${percent}% paid`,
+    unusedCredit: (amount: string) => `${amount} unused credit`,
+    available: (amount: string) => `${amount} available`,
+    utilization: (percent: string) => `${percent}% utilization`,
   },
   es: {
     types: {
@@ -68,18 +90,25 @@ export const accounts = defineMessages({
     sharedTag: "Compartida",
     personalTag: "Personal",
     archived: "Archivada",
-    holdings: "Patrimonio",
-    creditCardsUnderDebts: "Las tarjetas de crédito están en Deudas.",
     add: "Agregar cuenta",
     empty:
-      "Todavía no hay cuentas. Agrega una cuenta bancaria, una inversión o una propiedad para seguir su saldo aquí.",
+      "Todavía no hay cuentas. Agrega una cuenta bancaria, una tarjeta de crédito, un préstamo, una inversión o una propiedad para ver tu patrimonio neto aquí.",
+    assets: "Activos",
+    liabilities: "Pasivos",
+    cashAndBank: "Efectivo y bancos",
     investmentsAndProperty: "Inversiones y propiedades",
+    creditCards: "Tarjetas de crédito",
+    loans: "Préstamos",
     hide: "Ocultar",
     show: (count: number) => `Mostrar (${count})`,
     addHint:
-      "Los movimientos y las importaciones se vinculan a cuentas corrientes, de ahorros y de efectivo. Agrega las tarjetas de crédito en Deudas.",
+      "Los movimientos y las importaciones se vinculan a cuentas corrientes, de ahorros y de efectivo. Las tarjetas de crédito y los préstamos siguen lo que debes.",
     namePlaceholder: "p. ej. Cuenta principal",
     balanceInvalid: "Escribe el saldo como un número, por ejemplo 1250.50 o 1.250,50.",
+    amountInvalid: "Escribe el monto como un número mayor que cero, por ejemplo 5000 o 5.000,50.",
+    amountOwed: "Monto adeudado",
+    creditLimit: "Cupo",
+    originalAmount: "Monto original",
     edit: "Editar cuenta",
     editArchived: "Editar cuenta archivada",
     editNamed: (name: string) => `Editar la cuenta ${name}`,
@@ -101,5 +130,18 @@ export const accounts = defineMessages({
     archiveAction: "archivar la cuenta",
     restoreAction: "restaurar la cuenta",
     deleteAction: "eliminar la cuenta",
+    availableCredit: "Cupo disponible",
+    percentUsed: (percent: string) => `${percent}% usado`,
+    usedAcross: (used: ReactNode, limit: ReactNode, cards: number) => (
+      <>
+        {used} usado de {limit} en {cards} {cards === 1 ? "tarjeta" : "tarjetas"}
+      </>
+    ),
+    amountOf: (amount: string, total: string) => `${amount} de ${total}`,
+    left: (amount: string) => `quedan ${amount}`,
+    percentPaid: (percent: string) => `${percent}% pagado`,
+    unusedCredit: (amount: string) => `${amount} de saldo a favor`,
+    available: (amount: string) => `${amount} disponible`,
+    utilization: (percent: string) => `${percent}% de uso`,
   },
 });

@@ -10,11 +10,10 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { AmountInput } from "@/app/components/amount-input";
-import { CurrencySelect } from "@/app/components/currency-select";
+import { AccountAmountFields } from "@/app/components/account-amount-fields";
 import { NativeSelect, SharedCheckbox } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { parseAmount } from "@/app/lib/decimal-input";
+import { parseAccountAmounts } from "@/app/lib/account-form";
 import type { CurrencyCode } from "@amigo/db";
 import {
   ACCOUNT_TYPE_SELECT_VALUES,
@@ -37,11 +36,11 @@ export function AddAccountDialog({
   const revalidator = useRevalidator();
   const nameId = useId();
   const typeId = useId();
-  const balanceId = useId();
-  const currencyId = useId();
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountTypeSelectValue>("CHECKING");
-  const [balance, setBalance] = useState("");
+  const [amount, setAmount] = useState("");
+  const [creditLimit, setCreditLimit] = useState("");
+  const [originalAmount, setOriginalAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [isShared, setIsShared] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,7 +49,9 @@ export function AddAccountDialog({
   function resetForm() {
     setName("");
     setType("CHECKING");
-    setBalance("");
+    setAmount("");
+    setCreditLimit("");
+    setOriginalAmount("");
     setCurrency(defaultCurrency);
     setIsShared(false);
     setError(null);
@@ -64,15 +65,10 @@ export function AddAccountDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const trimmed = balance.trim();
-    let balanceNum = 0;
-    if (trimmed !== "") {
-      const parsed = parseAmount(trimmed);
-      if (parsed === null) {
-        setError(t.accounts.balanceInvalid);
-        return;
-      }
-      balanceNum = parsed;
+    const amounts = parseAccountAmounts(type, { amount, creditLimit, originalAmount });
+    if ("error" in amounts) {
+      setError(amounts.error === "amount" ? t.accounts.balanceInvalid : t.accounts.amountInvalid);
+      return;
     }
     setLoading(true);
     try {
@@ -82,7 +78,7 @@ export function AddAccountDialog({
         body: JSON.stringify({
           name,
           type,
-          balance: balanceNum,
+          ...amounts,
           currency,
           isShared,
         }),
@@ -139,30 +135,17 @@ export function AddAccountDialog({
               ))}
             </NativeSelect>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold" htmlFor={balanceId}>
-                {t.common.balance}
-              </label>
-              <AmountInput
-                id={balanceId}
-                currency={currency}
-                allowNegative
-                value={balance}
-                onValueChange={setBalance}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold" htmlFor={currencyId}>
-                {t.common.currency}
-              </label>
-              <CurrencySelect
-                id={currencyId}
-                value={currency}
-                onChange={(v) => setCurrency(v as CurrencyCode)}
-              />
-            </div>
-          </div>
+          <AccountAmountFields
+            type={type}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            amount={amount}
+            onAmountChange={setAmount}
+            creditLimit={creditLimit}
+            onCreditLimitChange={setCreditLimit}
+            originalAmount={originalAmount}
+            onOriginalAmountChange={setOriginalAmount}
+          />
           <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <DialogFooter>

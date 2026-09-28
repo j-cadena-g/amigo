@@ -11,17 +11,17 @@ import {
 } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { AmountInput } from "@/app/components/amount-input";
-import { CurrencySelect } from "@/app/components/currency-select";
+import { AccountAmountFields } from "@/app/components/account-amount-fields";
 import {
   DeleteButton,
   NativeSelect,
   SharedCheckbox,
 } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
-import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
+import { parseAccountAmounts } from "@/app/lib/account-form";
+import { centsToInputString } from "@/app/lib/decimal-input";
 import type { AccountRow } from "@/app/components/account-cards";
-import type { CurrencyCode } from "@amigo/db";
+import { isLiabilityAccountType, type CurrencyCode } from "@amigo/db";
 import { getAccountTypeSelectValues } from "@/app/lib/financial-account-types";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { useLocale } from "@/app/lib/use-locale";
@@ -44,11 +44,24 @@ export function EditAccountDialog({
   const revalidator = useRevalidator();
   const nameId = useId();
   const typeId = useId();
-  const balanceId = useId();
-  const currencyId = useId();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
-  const [balance, setBalance] = useState(centsToInputString(account.balance, account.currency, locale));
+  // Cards and loans are edited as the amount owed, the negative of their balance.
+  const [amount, setAmount] = useState(
+    centsToInputString(
+      isLiabilityAccountType(account.type) ? -account.balance : account.balance,
+      account.currency,
+      locale
+    )
+  );
+  const [creditLimit, setCreditLimit] = useState(
+    account.creditLimit == null ? "" : centsToInputString(account.creditLimit, account.currency, locale)
+  );
+  const [originalAmount, setOriginalAmount] = useState(
+    account.originalAmount == null
+      ? ""
+      : centsToInputString(account.originalAmount, account.currency, locale)
+  );
   const [currency, setCurrency] = useState<CurrencyCode>(account.currency as CurrencyCode);
   const [isShared, setIsShared] = useState(account.userId === null);
   const [loading, setLoading] = useState(false);
@@ -58,23 +71,15 @@ export function EditAccountDialog({
   const typeOptions = getAccountTypeSelectValues(account.type);
   const isArchived = account.archived === true;
 
-  function parseBalanceInput(): number | null {
-    const trimmed = balance.trim();
-    if (trimmed === "") return 0;
-    const parsed = parseAmount(trimmed);
-    if (parsed === null) {
-      setError(t.accounts.balanceInvalid);
-      return null;
-    }
-    return parsed;
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (deleting || archiving) return;
     setError(null);
-    const balanceNum = parseBalanceInput();
-    if (balanceNum === null) return;
+    const amounts = parseAccountAmounts(type, { amount, creditLimit, originalAmount });
+    if ("error" in amounts) {
+      setError(amounts.error === "amount" ? t.accounts.balanceInvalid : t.accounts.amountInvalid);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`/api/accounts/${account.id}`, {
@@ -83,7 +88,7 @@ export function EditAccountDialog({
         body: JSON.stringify({
           name,
           type,
-          balance: balanceNum,
+          ...amounts,
           currency,
           isShared,
         }),
@@ -200,30 +205,17 @@ export function EditAccountDialog({
               ))}
             </NativeSelect>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold" htmlFor={balanceId}>
-                {t.common.balance}
-              </label>
-              <AmountInput
-                id={balanceId}
-                currency={currency}
-                allowNegative
-                value={balance}
-                onValueChange={setBalance}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold" htmlFor={currencyId}>
-                {t.common.currency}
-              </label>
-              <CurrencySelect
-                id={currencyId}
-                value={currency}
-                onChange={(v) => setCurrency(v as CurrencyCode)}
-              />
-            </div>
-          </div>
+          <AccountAmountFields
+            type={type}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            amount={amount}
+            onAmountChange={setAmount}
+            creditLimit={creditLimit}
+            onCreditLimitChange={setCreditLimit}
+            originalAmount={originalAmount}
+            onOriginalAmountChange={setOriginalAmount}
+          />
           <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
           <AuditHistoryPanel recordId={account.id} table="financial_accounts" />

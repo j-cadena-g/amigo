@@ -7,7 +7,6 @@ const tabs = [
   { href: "/financial/recurring", label: (t: Messages) => t.nav.recurring },
   { href: "/financial/budgets", label: (t: Messages) => t.nav.budgets },
   { href: "/financial/accounts", label: (t: Messages) => t.nav.accounts },
-  { href: "/financial/debts", label: (t: Messages) => t.nav.debts },
 ];
 
 export function meta({ matches }: MetaArgs) {

@@ -355,14 +355,16 @@ describe("purgeOldPurchasedGroceryItems integration", () => {
     expect(audits.every((row) => row.changedBy === null)).toBe(true);
   });
 
-  it("keeps purging other households when one household's delete fails", async () => {
+  it("counts and broadcasts committed batches when a household fails partway", async () => {
     const broken = await seedHousehold();
     const healthy = await seedHousehold();
-    const brokenOld = await seedItem(broken, 91);
+    // 51 items: the first batch of 50 commits, then the second delete fails.
+    await Promise.all(Array.from({ length: 51 }, () => seedItem(broken, 91)));
     await seedItem(healthy, 91);
 
-    // Fail only the item delete bound to the broken household.
+    // Fail the broken household's second item delete only.
     const realDb = getIntegrationEnv().DB;
+    let brokenDeletes = 0;
     const failingDb = {
       ...realDb,
       batch: realDb.batch.bind(realDb),
@@ -371,7 +373,11 @@ describe("purgeOldPurchasedGroceryItems integration", () => {
         const statement = realDb.prepare(sql);
         const bind = statement.bind.bind(statement);
         statement.bind = (...values: unknown[]) => {
-          if (/^delete from "grocery_items"/i.test(sql) && values.includes(broken.householdId)) {
+          if (
+            /^delete from "grocery_items"/i.test(sql) &&
+            values.includes(broken.householdId) &&
+            ++brokenDeletes === 2
+          ) {
             throw new Error("D1 unavailable");
           }
           return bind(...values);
@@ -379,18 +385,35 @@ describe("purgeOldPurchasedGroceryItems integration", () => {
         return statement;
       },
     } as D1Database;
+    const broadcasts: Array<{ householdId: string; count: unknown }> = [];
+    const household = {
+      idFromName: (name: string) => name,
+      get: (householdId: string) => ({
+        fetch: async (request: Request) => {
+          const payload = (await request.json()) as { count?: unknown };
+          broadcasts.push({ householdId, count: payload.count });
+          return new Response(null);
+        },
+      }),
+    } as unknown as DurableObjectNamespace;
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const result = await purgeOldPurchasedGroceryItems(
-      { ...getIntegrationEnv(), DB: failingDb },
+      { ...getIntegrationEnv(), DB: failingDb, HOUSEHOLD: household },
       now
     );
 
-    expect(result.failed).toBe(1);
-    expect(await remainingIds(broken.householdId)).toEqual([brokenOld]);
+    expect(result).toEqual({ deletedCount: 51, failed: 1 });
+    expect(await remainingIds(broken.householdId)).toHaveLength(1);
     expect(await remainingIds(healthy.householdId)).toEqual([]);
+    expect(broadcasts).toEqual(
+      expect.arrayContaining([
+        { householdId: broken.householdId, count: 50 },
+        { householdId: healthy.householdId, count: 1 },
+      ])
+    );
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining(broken.householdId)
+      expect.stringContaining(`"deletedBeforeFailure":50`)
     );
   });
 });

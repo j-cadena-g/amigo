@@ -566,13 +566,15 @@ const PURGE_BATCH_SIZE = 50;
 
 /**
  * Hard-deletes one household's items purchased before `cutoff` in bounded
- * batches, auditing each batch before starting the next.
+ * batches, auditing each batch before starting the next. `onBatch` hears each
+ * committed batch, so a caller keeps the count even if a later batch throws.
  */
 async function deleteOldPurchasedItems(
   db: DrizzleD1,
   householdId: string,
   changedBy: string | null,
-  cutoff: Date
+  cutoff: Date,
+  onBatch?: (deleted: number) => void
 ): Promise<number> {
   const scope = and(
     scopeToHousehold(groceryItems.householdId, householdId),
@@ -611,6 +613,7 @@ async function deleteOldPurchasedItems(
     );
 
     deletedCount += deletedRows.length;
+    onBatch?.(deletedRows.length);
     if (deletedRows.length < PURGE_BATCH_SIZE) return deletedCount;
   }
 }
@@ -633,20 +636,23 @@ export async function purgeOldPurchasedGroceryItems(
   // broadcastToHousehold never throws; don't hold later households on it.
   const broadcasts: Promise<void>[] = [];
   for (const { id: householdId } of allHouseholds) {
-    // One household's failure must not stop the purge for the rest.
-    let deleted: number;
+    // One household's failure must not stop the purge for the rest, and batches
+    // it committed before failing still count and still refresh its clients.
+    let deleted = 0;
     try {
-      deleted = await deleteOldPurchasedItems(db, householdId, null, cutoff);
+      await deleteOldPurchasedItems(db, householdId, null, cutoff, (count) => {
+        deleted += count;
+      });
     } catch (err) {
       failed++;
       console.error(
         JSON.stringify({
           message: "purgeOldPurchasedGroceryItems: household failed",
           householdId,
+          deletedBeforeFailure: deleted,
           error: err instanceof Error ? err.message : String(err),
         })
       );
-      continue;
     }
     deletedCount += deleted;
     if (deleted > 0) {

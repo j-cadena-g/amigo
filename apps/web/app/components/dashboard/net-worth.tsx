@@ -62,13 +62,13 @@ export function DashboardNetWorth({
       <ul className="divide-y divide-border">
         <NetWorthRow
           to="/financial/accounts"
-          label={t.nav.accounts}
+          label={t.accounts.assets}
           cents={assetsCents}
           currency={currency}
         />
         <NetWorthRow
-          to="/financial/debts"
-          label={t.nav.debts}
+          to="/financial/accounts"
+          label={t.accounts.liabilities}
           cents={-debtsCents}
           currency={currency}
         />

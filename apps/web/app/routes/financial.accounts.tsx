@@ -6,26 +6,27 @@ import {
   getDb,
   financialAccounts,
   households,
-  LIABILITY_ACCOUNT_TYPES,
   scopeToHousehold,
   eq,
   and,
   or,
   isNull,
-  notInArray,
   parseHomeCurrency,
+  type CurrencyCode,
 } from "@amigo/db";
 import { Plus } from "lucide-react";
 import { AccountCards } from "@/app/components/account-cards";
 import { AddAccountDialog } from "@/app/components/add-account-dialog";
+import { CreditUsageSummary, LiabilityRows } from "@/app/components/liability-rows";
 import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { LedgerGroup } from "@/app/components/financial/ledger-group";
-import {
-  isAssetHoldingType,
-  isTransactionalAccountType,
-} from "@/app/lib/financial-account-types";
+import { NetWorthSummary } from "@/app/components/net-worth-summary";
+import { summarizeAccounts, sumBalancesHomeCents } from "@/app/lib/account-summary";
+import { formatSignedCents } from "@/app/lib/currency";
+import { isAssetHoldingType, isCashAndBankType } from "@/app/lib/financial-account-types";
 import { Button } from "@/app/components/ui/button";
+import { useLocale } from "@/app/lib/use-locale";
 import { pageTitle, useT } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -37,49 +38,20 @@ export async function loader({ context }: LoaderFunctionArgs) {
     where: eq(households.id, session.householdId),
   });
 
-  const householdScope = scopeToHousehold(
-    financialAccounts.householdId,
-    session.householdId
-  );
-  const visibility = or(
-    eq(financialAccounts.userId, session.userId),
-    isNull(financialAccounts.userId)
-  );
+  const items = await db.query.financialAccounts.findMany({
+    where: and(
+      scopeToHousehold(financialAccounts.householdId, session.householdId),
+      or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
+      isNull(financialAccounts.deletedAt)
+    ),
+    orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+  });
 
-  const [accountItems, archivedAccountItems] = await Promise.all([
-    db.query.financialAccounts.findMany({
-      where: and(
-        householdScope,
-        visibility,
-        isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, false),
-        notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
-      ),
-      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-    }),
-    db.query.financialAccounts.findMany({
-      where: and(
-        householdScope,
-        visibility,
-        isNull(financialAccounts.deletedAt),
-        eq(financialAccounts.archived, true),
-        notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
-      ),
-      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-    }),
-  ]);
+  const rows = items.map((a) => ({ ...a, isShared: a.userId === null }));
 
   return {
-    accounts: accountItems.map((a) => ({
-      ...a,
-      isShared: a.userId === null,
-      archived: false as const,
-    })),
-    archivedAccounts: archivedAccountItems.map((a) => ({
-      ...a,
-      isShared: a.userId === null,
-      archived: true as const,
-    })),
+    accounts: rows.filter((a) => !a.archived).map((a) => ({ ...a, archived: false as const })),
+    archivedAccounts: rows.filter((a) => a.archived).map((a) => ({ ...a, archived: true as const })),
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
   };
 }
@@ -88,21 +60,43 @@ export function meta({ matches }: MetaArgs) {
   return pageTitle(matches, (t) => t.nav.accounts);
 }
 
+/** A section's signed balance in the home currency, beside its title. */
+function SectionTotal({
+  cents,
+  homeCurrency,
+}: {
+  cents: number;
+  homeCurrency: CurrencyCode;
+}) {
+  const locale = useLocale();
+  return (
+    <span className="font-mono font-medium">
+      {formatSignedCents(cents, homeCurrency, locale)}
+    </span>
+  );
+}
+
 export default function FinancialAccounts() {
   const t = useT();
   const { accounts, archivedAccounts, homeCurrency } = useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
-  const transactional = accounts.filter((a) => isTransactionalAccountType(a.type));
+  const cashAndBank = accounts.filter((a) => isCashAndBankType(a.type));
   const holdings = accounts.filter((a) => isAssetHoldingType(a.type));
+  const cards = accounts.filter((a) => a.type === "CREDIT");
+  const loans = accounts.filter((a) => a.type === "LOAN");
+  const summary = summarizeAccounts(accounts);
   const openAdd = () => setAddOpen(true);
+
+  const total = (items: typeof accounts) => (
+    <SectionTotal cents={sumBalancesHomeCents(items)} homeCurrency={homeCurrency} />
+  );
 
   return (
     <div className="space-y-8">
       <FinancialSectionHeader
-        title={t.accounts.holdings}
-        description={t.accounts.creditCardsUnderDebts}
+        title={t.nav.accounts}
         action={
           <Button type="button" onClick={openAdd}>
             <Plus />
@@ -111,7 +105,7 @@ export default function FinancialAccounts() {
         }
       />
 
-      {accounts.length === 0 && (
+      {accounts.length === 0 ? (
         <EmptyState
           message={t.accounts.empty}
           action={
@@ -121,17 +115,34 @@ export default function FinancialAccounts() {
             </Button>
           }
         />
+      ) : (
+        <NetWorthSummary summary={summary} homeCurrency={homeCurrency} />
       )}
 
-      {transactional.length > 0 && (
-        <LedgerGroup title={t.nav.accounts}>
-          <AccountCards accounts={transactional} homeCurrency={homeCurrency} />
+      {cashAndBank.length > 0 && (
+        <LedgerGroup title={t.accounts.cashAndBank} aside={total(cashAndBank)}>
+          <AccountCards accounts={cashAndBank} homeCurrency={homeCurrency} />
         </LedgerGroup>
       )}
 
       {holdings.length > 0 && (
-        <LedgerGroup title={t.accounts.investmentsAndProperty}>
+        <LedgerGroup title={t.accounts.investmentsAndProperty} aside={total(holdings)}>
           <AccountCards accounts={holdings} homeCurrency={homeCurrency} />
+        </LedgerGroup>
+      )}
+
+      {cards.length > 0 && (
+        <LedgerGroup title={t.accounts.creditCards} aside={total(cards)}>
+          {summary.creditUsage ? (
+            <CreditUsageSummary usage={summary.creditUsage} homeCurrency={homeCurrency} />
+          ) : null}
+          <LiabilityRows accounts={cards} homeCurrency={homeCurrency} />
+        </LedgerGroup>
+      )}
+
+      {loans.length > 0 && (
+        <LedgerGroup title={t.accounts.loans} aside={total(loans)}>
+          <LiabilityRows accounts={loans} homeCurrency={homeCurrency} />
         </LedgerGroup>
       )}
 

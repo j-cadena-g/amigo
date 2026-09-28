@@ -13,8 +13,14 @@ export type AccountRow = {
   id: string;
   name: string;
   type: string;
+  /** What the account is worth to the household, in cents: negative when money is owed. */
   balance: number;
+  /** Credit limit in cents (CREDIT accounts); null when unknown. */
+  creditLimit?: number | null;
+  /** Amount originally borrowed in cents (LOAN accounts); null when unknown. */
+  originalAmount?: number | null;
   currency: CurrencyCode;
+  exchangeRateToHome?: number | null;
   userId: string | null;
   isShared?: boolean;
   archived?: boolean;

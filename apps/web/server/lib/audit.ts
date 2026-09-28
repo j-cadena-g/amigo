@@ -81,9 +81,13 @@ export function buildAuditHistoryFilter(
   );
 }
 
+// D1 caps a query at 100 bound parameters and an audit row binds 9 columns.
+const AUDIT_INSERT_CHUNK_SIZE = 11;
+
 /**
- * Inserts many audit rows in one statement (e.g. after a bulk delete).
+ * Inserts many audit rows in one batch (e.g. after a bulk delete).
  * Failures are logged and swallowed so the committed mutation is not rolled back.
+ * `changedBy` is null for system jobs such as the weekly cron.
  */
 export async function insertManyAuditLogs(
   db: DrizzleD1,
@@ -94,22 +98,27 @@ export async function insertManyAuditLogs(
     operation: "INSERT" | "UPDATE" | "DELETE";
     oldValues?: unknown;
     newValues?: unknown;
-    changedBy: string;
+    changedBy: string | null;
   }>
 ): Promise<void> {
   if (rows.length === 0) return;
   try {
-    await db.insert(auditLogs).values(
-      rows.map((row) => ({
-        householdId: row.householdId,
-        tableName: row.tableName,
-        recordId: row.recordId,
-        operation: row.operation,
-        oldValues: row.oldValues ?? null,
-        newValues: row.newValues ?? null,
-        changedBy: row.changedBy,
-      }))
-    );
+    const values = rows.map((row) => ({
+      householdId: row.householdId,
+      tableName: row.tableName,
+      recordId: row.recordId,
+      operation: row.operation,
+      oldValues: row.oldValues ?? null,
+      newValues: row.newValues ?? null,
+      changedBy: row.changedBy,
+    }));
+    const statements = [];
+    for (let i = 0; i < values.length; i += AUDIT_INSERT_CHUNK_SIZE) {
+      statements.push(
+        db.insert(auditLogs).values(values.slice(i, i + AUDIT_INSERT_CHUNK_SIZE))
+      );
+    }
+    await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
   } catch (error) {
     console.error("Batch audit log write failed", {
       error,

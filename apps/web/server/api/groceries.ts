@@ -5,13 +5,16 @@ import {
   groceryItems,
   groceryItemTags,
   groceryTags,
+  households,
   inArray,
   isNotNull,
   isNull,
   lt,
   scopeToHousehold,
+  type DrizzleD1,
 } from "@amigo/db";
 import { getCloudflare } from "../../router-context";
+import type { Env } from "../env";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { queueGroceryPush } from "../lib/push/queue";
@@ -525,36 +528,14 @@ export const handleGroceriesRequest: ApiHandler = async ({
       return Response.json({ deleted: 0, skipped: true });
     }
 
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const deleted = await deleteOldPurchasedItems(
+      db,
+      session!.householdId,
+      session!.userId,
+      oldPurchaseCutoff(new Date())
+    );
 
-    const deletedRows = await db
-      .delete(groceryItems)
-      .where(
-        and(
-          scopeToHousehold(groceryItems.householdId, session!.householdId),
-          eq(groceryItems.isPurchased, true),
-          isNotNull(groceryItems.purchasedAt),
-          lt(groceryItems.purchasedAt, ninetyDaysAgo)
-        )
-      )
-      .returning();
-
-    if (deletedRows.length > 0) {
-      await insertManyAuditLogs(
-        db,
-        deletedRows.map((row) => ({
-          householdId: session!.householdId,
-          tableName: "grocery_items",
-          recordId: row.id,
-          operation: "DELETE",
-          oldValues: row,
-          changedBy: session!.userId,
-        }))
-      );
-    }
-
-    return Response.json({ deleted: deletedRows.length });
+    return Response.json({ deleted });
   }
 
   return new Response(null, {
@@ -562,3 +543,108 @@ export const handleGroceriesRequest: ApiHandler = async ({
     headers: { Allow: "GET, POST, PATCH, PUT, DELETE" },
   });
 };
+
+const PURCHASED_ITEM_RETENTION_DAYS = 90;
+
+function oldPurchaseCutoff(now: Date): Date {
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - PURCHASED_ITEM_RETENTION_DAYS);
+  return cutoff;
+}
+
+// Deliberately includes soft-deleted rows: retention removes them too, and deleted
+// grocery items are never restored or sent to clients.
+function isOldPurchase(cutoff: Date) {
+  return and(
+    eq(groceryItems.isPurchased, true),
+    isNotNull(groceryItems.purchasedAt),
+    lt(groceryItems.purchasedAt, cutoff)
+  );
+}
+
+const PURGE_BATCH_SIZE = 50;
+
+/**
+ * Hard-deletes one household's items purchased before `cutoff` in bounded
+ * batches, auditing each batch before starting the next.
+ */
+async function deleteOldPurchasedItems(
+  db: DrizzleD1,
+  householdId: string,
+  changedBy: string | null,
+  cutoff: Date
+): Promise<number> {
+  const scope = and(
+    scopeToHousehold(groceryItems.householdId, householdId),
+    isOldPurchase(cutoff)
+  );
+  let deletedCount = 0;
+
+  while (true) {
+    const deletedRows = await db
+      .delete(groceryItems)
+      .where(
+        and(
+          scope,
+          inArray(
+            groceryItems.id,
+            db
+              .select({ id: groceryItems.id })
+              .from(groceryItems)
+              .where(scope)
+              .limit(PURGE_BATCH_SIZE)
+          )
+        )
+      )
+      .returning();
+
+    await insertManyAuditLogs(
+      db,
+      deletedRows.map((row) => ({
+        householdId,
+        tableName: "grocery_items",
+        recordId: row.id,
+        operation: "DELETE",
+        oldValues: row,
+        changedBy,
+      }))
+    );
+
+    deletedCount += deletedRows.length;
+    if (deletedRows.length < PURGE_BATCH_SIZE) return deletedCount;
+  }
+}
+
+/**
+ * Weekly cron: clears items purchased more than 90 days ago in every household.
+ * The cron has no session, so it walks the households table and runs the same
+ * household-scoped delete as `POST /api/groceries/clear-old` for each one.
+ */
+export async function purgeOldPurchasedGroceryItems(
+  env: Env,
+  now = new Date()
+): Promise<{ deletedCount: number }> {
+  const db = getDb(env.DB);
+  const cutoff = oldPurchaseCutoff(now);
+  const allHouseholds = await db.select({ id: households.id }).from(households);
+
+  let deletedCount = 0;
+  // broadcastToHousehold never throws; don't hold later households on it.
+  const broadcasts: Promise<void>[] = [];
+  for (const { id: householdId } of allHouseholds) {
+    const deleted = await deleteOldPurchasedItems(db, householdId, null, cutoff);
+    deletedCount += deleted;
+    if (deleted > 0) {
+      broadcasts.push(
+        broadcastToHousehold(env, householdId, {
+          type: "GROCERY_UPDATE",
+          action: "clear_old",
+          count: deleted,
+        })
+      );
+    }
+  }
+  await Promise.all(broadcasts);
+
+  return { deletedCount };
+}

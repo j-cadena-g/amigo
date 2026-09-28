@@ -5,8 +5,6 @@ import { getExchangeRateForRecord } from "./exchange-rates";
 import { getHomeCurrency } from "./household-currency";
 
 export {
-  sqlAssetBalanceHomeCents,
-  sqlDebtLiabilityHomeCents,
   sqlFinancialAccountBalanceHomeCents,
   sqlTransactionAmountHomeCents,
 } from "@amigo/db";

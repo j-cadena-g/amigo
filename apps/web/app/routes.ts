@@ -35,12 +35,8 @@ export default [
   route("api/recurring/*", "routes/api.recurring.ts", {
     id: "api-recurring-splat",
   }),
-  route("api/assets", "routes/api.assets.ts", { id: "api-assets" }),
-  route("api/assets/*", "routes/api.assets.ts", { id: "api-assets-splat" }),
   route("api/accounts", "routes/api.accounts.ts", { id: "api-accounts" }),
   route("api/accounts/*", "routes/api.accounts.ts", { id: "api-accounts-splat" }),
-  route("api/debts", "routes/api.debts.ts", { id: "api-debts" }),
-  route("api/debts/*", "routes/api.debts.ts", { id: "api-debts-splat" }),
   route("api/members", "routes/api.members.ts", { id: "api-members" }),
   route("api/members/*", "routes/api.members.ts", { id: "api-members-splat" }),
   route("api/settings", "routes/api.settings.ts"),

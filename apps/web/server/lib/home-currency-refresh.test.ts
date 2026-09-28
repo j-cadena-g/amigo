@@ -14,11 +14,9 @@ function createMockDb(currenciesByTable: Record<string, CurrencyRow[]>) {
 
   function tableName(table: { [key: string]: unknown }): string {
     // drizzle table objects expose Symbol.toStringTag or we key by currency column identity
-    if ("balanceInitial" in table) return "debts";
     if ("limitAmount" in table) return "budgets";
     if ("postedAt" in table || "externalId" in table) return "transactions";
     if ("archived" in table) return "financial_accounts";
-    if ("balance" in table && !("archived" in table)) return "assets";
     return "unknown";
   }
 
@@ -60,8 +58,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
   it("sets null FX when record currency matches new home and skips rate fetch", async () => {
     const { db, updates, batches } = createMockDb({
       financial_accounts: [{ currency: "USD" }],
-      debts: [],
-      assets: [],
       transactions: [],
       budgets: [{ currency: "USD" }],
     });
@@ -93,8 +89,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
     vi.mocked(getExchangeRateForRecord).mockResolvedValue(12.7);
     const { db, updates } = createMockDb({
       financial_accounts: [],
-      debts: [],
-      assets: [],
       transactions: [{ currency: "USD" }],
       transactions_charged: [{ currency: "CAD" }, { currency: "MXN" }],
       budgets: [],
@@ -114,9 +108,7 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
   it("fetches rates and updates foreign-currency rows", async () => {
     vi.mocked(getExchangeRateForRecord).mockResolvedValue(1.35);
     const { db, updates } = createMockDb({
-      financial_accounts: [{ currency: "USD" }],
-      debts: [{ currency: "EUR" }],
-      assets: [],
+      financial_accounts: [{ currency: "USD" }, { currency: "EUR" }],
       transactions: [{ currency: "USD" }],
       budgets: [{ currency: "USD" }],
     });
@@ -155,8 +147,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
     vi.mocked(getExchangeRateForRecord).mockResolvedValue(null);
     const { db, batches } = createMockDb({
       financial_accounts: [{ currency: "USD" }],
-      debts: [],
-      assets: [],
       transactions: [],
       budgets: [],
     });
@@ -172,8 +162,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
     vi.mocked(getExchangeRateForRecord).mockResolvedValue(0);
     const { db, batches } = createMockDb({
       financial_accounts: [],
-      debts: [],
-      assets: [],
       transactions: [{ currency: "MXN" }],
       budgets: [],
     });
@@ -188,8 +176,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
   it("does nothing when there are no active rows", async () => {
     const { db, batches } = createMockDb({
       financial_accounts: [],
-      debts: [],
-      assets: [],
       transactions: [],
       budgets: [],
     });
@@ -209,8 +195,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
     vi.mocked(getExchangeRateForRecord).mockResolvedValue(1.2);
     const { db, batches } = createMockDb({
       financial_accounts: [{ currency: "USD" }],
-      debts: [],
-      assets: [],
       transactions: [],
       budgets: [],
     });
@@ -233,8 +217,6 @@ describe("refreshHouseholdHomeCurrencyRates", () => {
   it("still commits additional statements when there are no FX rows", async () => {
     const { db, batches } = createMockDb({
       financial_accounts: [],
-      debts: [],
-      assets: [],
       transactions: [],
       budgets: [],
     });

@@ -224,7 +224,7 @@ describe("accounts liabilities integration", () => {
     expect(row?.originalAmount).toBeNull();
   });
 
-  it("keeps liability accounts out of the dashboard assets and net worth", async () => {
+  it("counts liability accounts as debts, not assets, in the dashboard net worth", async () => {
     const env = getIntegrationEnv();
     const db = getDb(env.DB);
 
@@ -238,7 +238,11 @@ describe("accounts liabilities integration", () => {
         loadContext: {} as never,
       });
       expect(response.status).toBe(200);
-      return (await response.json()) as { assetsCents: number; netWorthCents: number };
+      return (await response.json()) as {
+        assetsCents: number;
+        debtsCents: number;
+        netWorthCents: number;
+      };
     };
 
     const before = await loadDashboard();
@@ -249,15 +253,16 @@ describe("accounts liabilities integration", () => {
       userId: ownerId,
       name: "Car loan",
       type: "LOAN",
-      balance: 5000000,
+      balance: -5000000,
       originalAmount: 6000000,
       currency: "CAD",
     });
     const withLoan = await loadDashboard();
     expect(withLoan.assetsCents).toBe(before.assetsCents);
-    expect(withLoan.netWorthCents).toBe(before.netWorthCents);
+    expect(withLoan.debtsCents).toBe(before.debtsCents + 5000000);
+    expect(withLoan.netWorthCents).toBe(before.netWorthCents - 5000000);
 
-    // Control: an ordinary account does count.
+    // Control: an ordinary account counts as an asset.
     await db.insert(financialAccounts).values({
       id: `acct-checking-${crypto.randomUUID()}`,
       householdId,
@@ -269,6 +274,7 @@ describe("accounts liabilities integration", () => {
     });
     const withChecking = await loadDashboard();
     expect(withChecking.assetsCents).toBe(before.assetsCents + 10000);
-    expect(withChecking.netWorthCents).toBe(before.netWorthCents + 10000);
+    expect(withChecking.debtsCents).toBe(withLoan.debtsCents);
+    expect(withChecking.netWorthCents).toBe(withLoan.netWorthCents + 10000);
   });
 });

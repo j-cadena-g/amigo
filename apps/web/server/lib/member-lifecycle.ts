@@ -1,7 +1,5 @@
 import {
   and,
-  assets,
-  debts,
   eq,
   financialAccounts,
   groceryItems,
@@ -92,14 +90,6 @@ export async function cleanupDepartedMemberData(
       .update(recurringTransactions)
       .set({ userDisplayName: displayName })
       .where(eq(recurringTransactions.userId, userId)),
-    db
-      .update(assets)
-      .set({ userDisplayName: displayName })
-      .where(eq(assets.userId, userId)),
-    db
-      .update(debts)
-      .set({ userDisplayName: displayName })
-      .where(eq(debts.userId, userId)),
     db
       .update(financialAccounts)
       .set({ userDisplayName: displayName })

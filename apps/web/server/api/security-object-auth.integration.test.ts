@@ -1,9 +1,7 @@
 import {
   and,
-  assets,
   auditLogs,
   budgets,
-  debts,
   eq,
   financialAccounts,
   groceryItems,
@@ -16,10 +14,8 @@ import {
 } from "@amigo/db";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleAccountsRequest } from "./accounts";
-import { handleAssetsRequest } from "./assets";
 import { handleAuditRequest } from "./audit";
 import { handleBudgetsRequest } from "./budgets";
-import { handleDebtsRequest } from "./debts";
 import { handleSyncRequest } from "./sync";
 import { handleTransactionsRequest } from "./transactions";
 import { createTestDb, seedFinancialCategory, seedHouseholdWithOwner } from "../test/fixtures";
@@ -483,30 +479,30 @@ describe("security object authorization integration", () => {
     });
   });
 
-  it("preserves shared ownership when PATCHing a shared debt without isShared", async () => {
-    const debtId = crypto.randomUUID();
-    await db.insert(debts).values({
-      id: debtId,
+  it("preserves shared ownership when PATCHing a shared loan account without isShared", async () => {
+    const accountId = crypto.randomUUID();
+    await db.insert(financialAccounts).values({
+      id: accountId,
       householdId,
       userId: null,
-      name: "Shared debt",
+      name: "Shared loan",
       type: "LOAN",
-      balanceInitial: 100000,
-      balanceCurrent: 1000,
+      balance: -99000,
+      originalAmount: 100000,
       currency: "CAD",
     });
 
-    const response = await handleDebtsRequest({
+    const response = await handleAccountsRequest({
       env: getIntegrationEnv(),
-      params: { "*": debtId },
-      request: new Request(`http://localhost/api/debts/${debtId}`, {
+      params: { "*": accountId },
+      request: new Request(`http://localhost/api/accounts/${accountId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "Shared debt updated",
+          name: "Shared loan updated",
           type: "LOAN",
-          loanAmount: 1000,
-          totalPaid: 10,
+          balance: -990,
+          originalAmount: 1000,
         }),
       }),
       sessionStatus: "authenticated",
@@ -516,9 +512,9 @@ describe("security object authorization integration", () => {
 
     expect(response.status).toBe(200);
     const updated = await db
-      .select({ userId: debts.userId })
-      .from(debts)
-      .where(eq(debts.id, debtId))
+      .select({ userId: financialAccounts.userId })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.id, accountId))
       .get();
     expect(updated?.userId).toBeNull();
   });
@@ -547,70 +543,6 @@ describe("security object authorization integration", () => {
               name: "Taken account",
               type: "CHECKING",
               balance: 10,
-              isShared: true,
-            }),
-          }),
-          sessionStatus: "authenticated",
-          session: sessionFor({ userId: adminId, householdId, role: "admin" }),
-          loadContext: {} as never,
-        }),
-    },
-    {
-      name: "asset",
-      seed: async (id: string) =>
-        db.insert(assets).values({
-          id,
-          householdId,
-          userId: memberOneId,
-          name: "Private asset",
-          type: "CASH",
-          balance: 1000,
-          currency: "CAD",
-        }),
-      request: (id: string) =>
-        handleAssetsRequest({
-          env: getIntegrationEnv(),
-          params: { "*": id },
-          request: new Request(`http://localhost/api/assets/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: "Taken asset",
-              type: "CASH",
-              balance: 10,
-              isShared: true,
-            }),
-          }),
-          sessionStatus: "authenticated",
-          session: sessionFor({ userId: adminId, householdId, role: "admin" }),
-          loadContext: {} as never,
-        }),
-    },
-    {
-      name: "debt",
-      seed: async (id: string) =>
-        db.insert(debts).values({
-          id,
-          householdId,
-          userId: memberOneId,
-          name: "Private debt",
-          type: "LOAN",
-          balanceInitial: 100000,
-          balanceCurrent: 1000,
-          currency: "CAD",
-        }),
-      request: (id: string) =>
-        handleDebtsRequest({
-          env: getIntegrationEnv(),
-          params: { "*": id },
-          request: new Request(`http://localhost/api/debts/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: "Taken debt",
-              type: "LOAN",
-              loanAmount: 1000,
-              totalPaid: 10,
               isShared: true,
             }),
           }),
@@ -662,28 +594,29 @@ describe("security object authorization integration", () => {
     });
   });
 
-  it("allows explicit audited admin takeover of another member's personal asset", async () => {
-    const assetId = `asset-takeover-${crypto.randomUUID()}`;
-    await db.insert(assets).values({
-      id: assetId,
+  it("allows explicit audited admin takeover of another member's personal account", async () => {
+    const accountId = `account-takeover-${crypto.randomUUID()}`;
+    await db.insert(financialAccounts).values({
+      id: accountId,
       householdId,
       userId: memberOneId,
-      name: "Private asset",
-      type: "CASH",
-      balance: 1000,
+      name: "Private card",
+      type: "CREDIT",
+      balance: -100000,
+      creditLimit: 500000,
       currency: "CAD",
     });
 
-    const response = await handleAssetsRequest({
+    const response = await handleAccountsRequest({
       env: getIntegrationEnv(),
-      params: { "*": assetId },
-      request: new Request(`http://localhost/api/assets/${assetId}`, {
+      params: { "*": accountId },
+      request: new Request(`http://localhost/api/accounts/${accountId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "Shared asset",
-          type: "CASH",
-          balance: 10,
+          name: "Shared card",
+          type: "CREDIT",
+          balance: -1000,
           isShared: true,
           adminTakeover: true,
         }),
@@ -695,11 +628,16 @@ describe("security object authorization integration", () => {
 
     expect(response.status).toBe(200);
     const updated = await db
-      .select({ userId: assets.userId })
-      .from(assets)
-      .where(eq(assets.id, assetId))
+      .select({
+        userId: financialAccounts.userId,
+        creditLimit: financialAccounts.creditLimit,
+      })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.id, accountId))
       .get();
     expect(updated?.userId).toBeNull();
+    // Omitting creditLimit keeps it.
+    expect(updated?.creditLimit).toBe(500000);
 
     const audit = await db
       .select()
@@ -707,8 +645,8 @@ describe("security object authorization integration", () => {
       .where(
         and(
           eq(auditLogs.householdId, householdId),
-          eq(auditLogs.tableName, "assets"),
-          eq(auditLogs.recordId, assetId),
+          eq(auditLogs.tableName, "financial_accounts"),
+          eq(auditLogs.recordId, accountId),
           isNull(auditLogs.oldValues)
         )
       );
@@ -720,8 +658,8 @@ describe("security object authorization integration", () => {
       .where(
         and(
           eq(auditLogs.householdId, householdId),
-          eq(auditLogs.tableName, "assets"),
-          eq(auditLogs.recordId, assetId)
+          eq(auditLogs.tableName, "financial_accounts"),
+          eq(auditLogs.recordId, accountId)
         )
       );
     expect(updateAudit).toHaveLength(1);

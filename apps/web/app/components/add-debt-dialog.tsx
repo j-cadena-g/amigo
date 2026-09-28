@@ -15,6 +15,7 @@ import { SharedCheckbox } from "@/app/components/financial/form-controls";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
 import { parseAmount } from "@/app/lib/decimal-input";
+import { debtAccountBody } from "@/app/lib/debt-accounts";
 import type { CurrencyCode } from "@amigo/db";
 import { useT } from "@/app/i18n";
 
@@ -65,24 +66,24 @@ export function AddDebtDialog({
     try {
       const body =
         kind === "LOAN"
-          ? {
-              type: "LOAN" as const,
+          ? debtAccountBody({
+              kind,
               name: loanName,
-              loanAmount: parseAmount(loanAmount) ?? 0,
-              totalPaid: parseAmount(totalPaid) ?? 0,
+              initial: parseAmount(loanAmount) ?? 0,
+              current: parseAmount(totalPaid) ?? 0,
               currency: loanCurrency,
               isShared,
-            }
-          : {
-              type: "CREDIT_CARD" as const,
+            })
+          : debtAccountBody({
+              kind,
               name: ccName,
-              creditLimit: parseAmount(creditLimit) ?? 0,
-              availableCredit: parseAmount(availableCredit) ?? 0,
+              initial: parseAmount(creditLimit) ?? 0,
+              current: parseAmount(availableCredit) ?? 0,
               currency: ccCurrency,
               isShared,
-            };
+            });
 
-      const res = await fetch("/api/debts", {
+      const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

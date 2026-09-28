@@ -123,6 +123,8 @@ const ES: Record<string, string> = {
   "Tag not found": "No se encontró la etiqueta",
   "Too many requests": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo",
   "Transaction not found": "No se encontró el movimiento",
+  "Transaction was modified concurrently; try again":
+    "El movimiento cambió al mismo tiempo; vuelve a intentarlo",
   Unauthorized: "No autorizado",
   "Unknown category in mappings": "Hay una categoría desconocida en los vínculos",
   "Unknown or archived category": "La categoría no existe o está archivada",

@@ -158,7 +158,7 @@ describe("transactions charged amount", () => {
     });
   });
 
-  it("keeps the charge's FX snapshot when the same charge is resent", async () => {
+  it("keeps both FX snapshots when the same currency and charge are resent", async () => {
     const { id } = await create({
       currency: "EUR",
       amount: 50,
@@ -173,8 +173,23 @@ describe("transactions charged amount", () => {
         and(scopeToHousehold(transactions.householdId, householdId), eq(transactions.id, id))
       );
 
-    await call("PATCH", { description: "Hotel", chargedAmount: 5800 }, id);
-    expect((await stored(id))?.chargedExchangeRateToHome).toBe(1.3);
+    await db
+      .update(transactions)
+      .set({ exchangeRateToHome: 1.45 })
+      .where(
+        and(scopeToHousehold(transactions.householdId, householdId), eq(transactions.id, id))
+      );
+
+    // The edit form resends the currency and the charge unchanged.
+    await call(
+      "PATCH",
+      { description: "Hotel", currency: "EUR", chargedAmount: 5800 },
+      id
+    );
+    expect(await stored(id)).toMatchObject({
+      exchangeRateToHome: 1.45,
+      chargedExchangeRateToHome: 1.3,
+    });
 
     await expect(
       call("PATCH", { currency: "USD", chargedAmount: 5800 }, id)

@@ -612,9 +612,13 @@ export const handleTransactionsRequest: ApiHandler = async ({
     if (validated.accountId !== undefined) {
       updateData.accountId = validated.accountId || null;
     }
-    if (validated.currency !== undefined || validated.chargedAmount != null) {
+    // The edit form resends the currency; only a real change takes a new FX
+    // snapshot, so the row's market rate (and a charge's fee) stays put.
+    const currencyChanged =
+      validated.currency !== undefined && validated.currency !== existing.currency;
+    if (currencyChanged || validated.chargedAmount != null) {
       const homeCurrency = await getHomeCurrency(db, session!.householdId);
-      if (validated.currency !== undefined) {
+      if (validated.currency !== undefined && currencyChanged) {
         updateData.currency = validated.currency;
         updateData.exchangeRateToHome = await getExchangeRateForRecord(
           env,
@@ -649,8 +653,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     if (
       validated.chargedAmount === null ||
       (validated.chargedAmount === undefined &&
-        ((validated.currency !== undefined &&
-          validated.currency !== existing.currency) ||
+        (currencyChanged ||
           (validated.amount !== undefined &&
             toCents(validated.amount) !== existing.amount)))
     ) {
@@ -663,6 +666,16 @@ export const handleTransactionsRequest: ApiHandler = async ({
     }
 
     await assertCanWriteTransaction(db, session!, existing, "modify");
+
+    // A charge was checked against the amount and currency read above; only
+    // write it if a concurrent edit hasn't changed them since.
+    const chargeGuards =
+      validated.chargedAmount != null
+        ? [
+            eq(transactions.currency, existing.currency),
+            eq(transactions.amount, existing.amount),
+          ]
+        : [];
 
     const updated = await withAudit(
       db,
@@ -683,7 +696,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
             and(
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
-              isNull(transactions.deletedAt)
+              isNull(transactions.deletedAt),
+              ...chargeGuards
             )
           )
           .returning()
@@ -691,6 +705,21 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     if (!updated) {
+      if (chargeGuards.length > 0) {
+        const current = await db.query.transactions.findFirst({
+          where: and(
+            eq(transactions.id, id),
+            scopeToHousehold(transactions.householdId, session!.householdId),
+            isNull(transactions.deletedAt)
+          ),
+        });
+        if (current) {
+          throw new ActionError(
+            "Transaction was modified concurrently; try again",
+            "CONFLICT"
+          );
+        }
+      }
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
 

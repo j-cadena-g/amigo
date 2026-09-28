@@ -1,9 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
 import {
   and,
-  assets,
   budgets,
-  debts,
   eq,
   financialAccounts,
   getDb,
@@ -447,8 +445,6 @@ export const handleMembersRequest: ApiHandler = async ({
       recurringCount,
       budgetCount,
       accountCount,
-      assetCount,
-      debtCount,
       groceryCount,
     ] = await Promise.all([
       db
@@ -484,16 +480,6 @@ export const handleMembersRequest: ApiHandler = async ({
         .then((result) => result[0]?.count ?? 0),
       db
         .select({ count: sql<number>`count(*)` })
-        .from(assets)
-        .where(and(eq(assets.userId, userId), isNull(assets.deletedAt)))
-        .then((result) => result[0]?.count ?? 0),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(debts)
-        .where(and(eq(debts.userId, userId), isNull(debts.deletedAt)))
-        .then((result) => result[0]?.count ?? 0),
-      db
-        .select({ count: sql<number>`count(*)` })
         .from(groceryItems)
         .where(
           and(eq(groceryItems.createdByUserId, userId), isNull(groceryItems.deletedAt))
@@ -506,8 +492,6 @@ export const handleMembersRequest: ApiHandler = async ({
       recurringTransactions: recurringCount,
       personalBudgets: budgetCount,
       accounts: accountCount,
-      assets: assetCount,
-      debts: debtCount,
       groceryItems: groceryCount,
     });
   }

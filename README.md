@@ -230,8 +230,7 @@ Notable API groups:
 - `/api/transactions`
 - `/api/budgets`
 - `/api/recurring`
-- `/api/assets`
-- `/api/debts`
+- `/api/accounts`
 - `/api/members`
 - `/api/settings`
 - `/api/sync`

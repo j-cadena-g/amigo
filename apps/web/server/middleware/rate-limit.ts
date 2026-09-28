@@ -14,13 +14,6 @@ export const RATE_LIMIT_PRESETS = {
 } as const;
 
 export const ROUTE_RATE_LIMITS = {
-  assets: {
-    list: RATE_LIMIT_PRESETS.READ,
-    create: RATE_LIMIT_PRESETS.MUTATION,
-    update: RATE_LIMIT_PRESETS.MUTATION,
-    delete: RATE_LIMIT_PRESETS.MUTATION,
-    convert: RATE_LIMIT_PRESETS.MUTATION,
-  },
   accounts: {
     list: RATE_LIMIT_PRESETS.READ,
     create: RATE_LIMIT_PRESETS.MUTATION,
@@ -48,12 +41,6 @@ export const ROUTE_RATE_LIMITS = {
   me: {
     get: RATE_LIMIT_PRESETS.READ,
     patch: RATE_LIMIT_PRESETS.MUTATION,
-  },
-  debts: {
-    list: RATE_LIMIT_PRESETS.READ,
-    create: RATE_LIMIT_PRESETS.MUTATION,
-    update: RATE_LIMIT_PRESETS.MUTATION,
-    delete: RATE_LIMIT_PRESETS.MUTATION,
   },
   groceries: {
     list: RATE_LIMIT_PRESETS.READ,

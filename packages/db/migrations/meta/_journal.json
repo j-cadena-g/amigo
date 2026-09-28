@@ -176,6 +176,13 @@
       "when": 1790626878600,
       "tag": "0024_financial_accounts_liabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1790700000000,
+      "tag": "0025_move_debts_and_assets_to_accounts",
+      "breakpoints": true
     }
   ]
 }

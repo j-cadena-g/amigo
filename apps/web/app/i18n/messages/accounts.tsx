@@ -1,6 +1,6 @@
 import { defineMessages } from "../define";
 
-/** Accounts and legacy assets on the Money › Accounts tab. */
+/** Accounts on the Money › Accounts tab. */
 export const accounts = defineMessages({
   en: {
     /** Account types, including legacy OTHER and credit cards shown under Debts. */
@@ -13,13 +13,6 @@ export const accounts = defineMessages({
       OTHER: "Other",
       CREDIT: "Credit card",
       LOAN: "Loan",
-    },
-    /** Legacy asset types. */
-    assetTypes: {
-      BANK: "Bank account",
-      INVESTMENT: "Investment",
-      CASH: "Cash",
-      PROPERTY: "Property",
     },
     shared: "Shared",
     personal: "Personal",
@@ -34,8 +27,6 @@ export const accounts = defineMessages({
     investmentsAndProperty: "Investments & property",
     hide: "Hide",
     show: (count: number) => `Show (${count})`,
-    legacyAssets: "Legacy assets",
-    legacyHint: "Older entries from before accounts. Convert each one to an account, or delete it.",
     addHint:
       "Transactions and imports link to checking, savings, and cash accounts. Add credit cards under Debts.",
     namePlaceholder: "e.g. Main checking",
@@ -60,27 +51,6 @@ export const accounts = defineMessages({
     archiveAction: "archive the account",
     restoreAction: "restore the account",
     deleteAction: "delete the account",
-    asset: {
-      edit: "Edit legacy asset",
-      editNamed: (name: string) => `Edit asset ${name}`,
-      sharedTag: "Shared",
-      personalTag: "Personal",
-      convertAs: "Convert as",
-      balanceInvalid: "Enter a balance of 0 or more, with up to two decimal places.",
-      saveFirst: "Save your changes before you convert this asset.",
-      unsavedHint: "Save your changes before converting this asset.",
-      convertTitle: "Convert to account?",
-      convertBody:
-        "This creates an account with the same balance and removes the legacy entry. Transactions were never linked to legacy assets, so none move.",
-      convert: "Convert",
-      converting: "Converting…",
-      convertToAccount: "Convert to account",
-      deleteTitle: "Delete asset?",
-      save: "Save asset",
-      saveAction: "save the asset",
-      convertAction: "convert the asset",
-      deleteAction: "delete the asset",
-    },
   },
   es: {
     types: {
@@ -92,12 +62,6 @@ export const accounts = defineMessages({
       OTHER: "Otro",
       CREDIT: "Tarjeta de crédito",
       LOAN: "Préstamo",
-    },
-    assetTypes: {
-      BANK: "Cuenta bancaria",
-      INVESTMENT: "Inversión",
-      CASH: "Efectivo",
-      PROPERTY: "Propiedad",
     },
     shared: "Compartidas",
     personal: "Personales",
@@ -112,9 +76,6 @@ export const accounts = defineMessages({
     investmentsAndProperty: "Inversiones y propiedades",
     hide: "Ocultar",
     show: (count: number) => `Mostrar (${count})`,
-    legacyAssets: "Activos anteriores",
-    legacyHint:
-      "Registros de antes de que existieran las cuentas. Convierte cada uno en una cuenta o elimínalo.",
     addHint:
       "Los movimientos y las importaciones se vinculan a cuentas corrientes, de ahorros y de efectivo. Agrega las tarjetas de crédito en Deudas.",
     namePlaceholder: "p. ej. Cuenta principal",
@@ -140,26 +101,5 @@ export const accounts = defineMessages({
     archiveAction: "archivar la cuenta",
     restoreAction: "restaurar la cuenta",
     deleteAction: "eliminar la cuenta",
-    asset: {
-      edit: "Editar activo anterior",
-      editNamed: (name: string) => `Editar el activo ${name}`,
-      sharedTag: "Compartido",
-      personalTag: "Personal",
-      convertAs: "Convertir como",
-      balanceInvalid: "Escribe un saldo de 0 o más, con hasta dos decimales.",
-      saveFirst: "Guarda tus cambios antes de convertir este activo.",
-      unsavedHint: "Guarda tus cambios antes de convertir este activo.",
-      convertTitle: "¿Convertir en cuenta?",
-      convertBody:
-        "Esto crea una cuenta con el mismo saldo y quita el registro anterior. Los movimientos nunca se vincularon a activos anteriores, así que ninguno cambia.",
-      convert: "Convertir",
-      converting: "Convirtiendo…",
-      convertToAccount: "Convertir en cuenta",
-      deleteTitle: "¿Eliminar el activo?",
-      save: "Guardar activo",
-      saveAction: "guardar el activo",
-      convertAction: "convertir el activo",
-      deleteAction: "eliminar el activo",
-    },
   },
 });

@@ -4,7 +4,6 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
-  assets,
   financialAccounts,
   households,
   LIABILITY_ACCOUNT_TYPES,
@@ -18,7 +17,6 @@ import {
 } from "@amigo/db";
 import { Plus } from "lucide-react";
 import { AccountCards } from "@/app/components/account-cards";
-import { AssetCards } from "@/app/components/asset-cards";
 import { AddAccountDialog } from "@/app/components/add-account-dialog";
 import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
@@ -48,37 +46,28 @@ export async function loader({ context }: LoaderFunctionArgs) {
     isNull(financialAccounts.userId)
   );
 
-  const [accountItems, archivedAccountItems, legacyAssetItems] =
-    await Promise.all([
-      db.query.financialAccounts.findMany({
-        where: and(
-          householdScope,
-          visibility,
-          isNull(financialAccounts.deletedAt),
-          eq(financialAccounts.archived, false),
-          notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
-        ),
-        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-      }),
-      db.query.financialAccounts.findMany({
-        where: and(
-          householdScope,
-          visibility,
-          isNull(financialAccounts.deletedAt),
-          eq(financialAccounts.archived, true),
-          notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
-        ),
-        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-      }),
-      db.query.assets.findMany({
-        where: and(
-          scopeToHousehold(assets.householdId, session.householdId),
-          or(eq(assets.userId, session.userId), isNull(assets.userId)),
-          isNull(assets.deletedAt)
-        ),
-        orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
-      }),
-    ]);
+  const [accountItems, archivedAccountItems] = await Promise.all([
+    db.query.financialAccounts.findMany({
+      where: and(
+        householdScope,
+        visibility,
+        isNull(financialAccounts.deletedAt),
+        eq(financialAccounts.archived, false),
+        notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
+      ),
+      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+    }),
+    db.query.financialAccounts.findMany({
+      where: and(
+        householdScope,
+        visibility,
+        isNull(financialAccounts.deletedAt),
+        eq(financialAccounts.archived, true),
+        notInArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
+      ),
+      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
+    }),
+  ]);
 
   return {
     accounts: accountItems.map((a) => ({
@@ -91,13 +80,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
       isShared: a.userId === null,
       archived: true as const,
     })),
-    legacyAssets: legacyAssetItems.map((a) => ({
-      ...a,
-      isShared: a.userId === null,
-    })),
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
-    userId: session.userId,
-    role: session.role,
   };
 }
 
@@ -107,8 +90,7 @@ export function meta({ matches }: MetaArgs) {
 
 export default function FinancialAccounts() {
   const t = useT();
-  const { accounts, archivedAccounts, legacyAssets, homeCurrency, userId, role } =
-    useLoaderData<typeof loader>();
+  const { accounts, archivedAccounts, homeCurrency } = useLoaderData<typeof loader>();
   const [addOpen, setAddOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
@@ -171,19 +153,6 @@ export default function FinancialAccounts() {
           {showArchived ? (
             <AccountCards accounts={archivedAccounts} homeCurrency={homeCurrency} />
           ) : null}
-        </LedgerGroup>
-      )}
-
-      {legacyAssets.length > 0 && (
-        <LedgerGroup title={t.accounts.legacyAssets}>
-          <p className="pt-3 text-sm text-muted-foreground">
-            {t.accounts.legacyHint}
-          </p>
-          <AssetCards
-            assets={legacyAssets}
-            homeCurrency={homeCurrency}
-            session={{ userId, role }}
-          />
         </LedgerGroup>
       )}
 

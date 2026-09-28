@@ -63,16 +63,6 @@ function collectMessages(): FoundMessage[] {
 
 /** Each templated message, with sample values that fill its slots. */
 const TEMPLATE_SAMPLES: Record<string, string[]> = {
-  "`Only owners and admins can ${action} shared assets`": [
-    "Only owners and admins can delete shared assets",
-    "Only owners and admins can convert shared assets",
-  ],
-  "`Cannot ${action} another user's personal asset`": [
-    "Cannot delete another user's personal asset",
-  ],
-  "`Legacy ${existing.type} assets convert to ${defaultType}`": [
-    "Legacy INVESTMENT assets convert to INVESTMENT",
-  ],
   "`Cannot ${action} another user's transaction`": ["Cannot modify another user's transaction"],
   "`Category type must be ${expectedType}`": ["Category type must be expense"],
   "`Only owners and admins can modify shared ${objectName}s`": [
@@ -80,7 +70,7 @@ const TEMPLATE_SAMPLES: Record<string, string[]> = {
     "Only owners and admins can modify shared accounts",
   ],
   "`Cannot modify another user's personal ${objectName}`": [
-    "Cannot modify another user's personal debt",
+    "Cannot modify another user's personal account",
   ],
   '`Unknown or inaccessible budget(s): ${missing.join(", ")}`': [
     "Unknown or inaccessible budget(s): b1, b2",
@@ -120,8 +110,8 @@ describe("server messages", () => {
     expect(translateServerMessage("Only owners and admins can modify shared budgets", "es")).toBe(
       "Solo los propietarios y administradores pueden modificar presupuestos compartidos"
     );
-    expect(translateServerMessage("Cannot delete another user's personal asset", "es")).toBe(
-      "No puedes eliminar el activo personal de otra persona"
+    expect(translateServerMessage("Cannot delete another user's personal account", "es")).toBe(
+      "No puedes eliminar la cuenta personal de otra persona"
     );
     expect(translateServerMessage("Item not found", "es")).toBe("No se encontró el artículo");
   });

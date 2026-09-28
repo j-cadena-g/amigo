@@ -16,6 +16,7 @@ import { CurrencySelect } from "@/app/components/currency-select";
 import { DeleteButton, SharedCheckbox } from "@/app/components/financial/form-controls";
 import { readApiErrorMessage } from "@/app/lib/api-error";
 import { centsToInputString, parseAmount } from "@/app/lib/decimal-input";
+import { debtAccountBody } from "@/app/lib/debt-accounts";
 import type { Debt } from "@/app/components/debt-cards";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
@@ -69,24 +70,24 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
     try {
       const body = isLoan
-        ? {
-            type: "LOAN" as const,
+        ? debtAccountBody({
+            kind,
             name,
-            loanAmount: parseAmount(loanAmount) ?? 0,
-            totalPaid: parseAmount(totalPaid) ?? 0,
+            initial: parseAmount(loanAmount) ?? 0,
+            current: parseAmount(totalPaid) ?? 0,
             currency,
             isShared,
-          }
-        : {
-            type: "CREDIT_CARD" as const,
+          })
+        : debtAccountBody({
+            kind,
             name,
-            creditLimit: parseAmount(creditLimit) ?? 0,
-            availableCredit: parseAmount(availableCredit) ?? 0,
+            initial: parseAmount(creditLimit) ?? 0,
+            current: parseAmount(availableCredit) ?? 0,
             currency,
             isShared,
-          };
+          });
 
-      const res = await fetch(`/api/debts/${debt.id}`, {
+      const res = await fetch(`/api/accounts/${debt.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -119,7 +120,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
     setError(null);
 
     try {
-      const res = await fetch(`/api/debts/${debt.id}`, {
+      const res = await fetch(`/api/accounts/${debt.id}`, {
         method: "DELETE",
       });
 
@@ -231,7 +232,7 @@ export function EditDebtDialog({ debt, open, onOpenChange }: EditDebtDialogProps
 
           <SharedCheckbox checked={isShared} onCheckedChange={setIsShared} />
 
-          <AuditHistoryPanel recordId={debt.id} table="debts" />
+          <AuditHistoryPanel recordId={debt.id} table="financial_accounts" />
 
           {error && (
             <p className="text-sm text-destructive" role="alert">{error}</p>

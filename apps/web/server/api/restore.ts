@@ -1,8 +1,6 @@
 import {
   and,
-  assets,
   budgets,
-  debts,
   eq,
   financialAccounts,
   getDb,
@@ -139,14 +137,6 @@ export const handleRestoreRequest: ApiHandler = async ({
           .set({ userDisplayName: null })
           .where(eq(recurringTransactions.userId, user.id)),
         db
-          .update(assets)
-          .set({ userDisplayName: null })
-          .where(eq(assets.userId, user.id)),
-        db
-          .update(debts)
-          .set({ userDisplayName: null })
-          .where(eq(debts.userId, user.id)),
-        db
           .update(financialAccounts)
           .set({ userDisplayName: null })
           .where(
@@ -242,14 +232,6 @@ export const handleRestoreRequest: ApiHandler = async ({
           .update(budgets)
           .set({ userId: owner.id, transferredFromUserId: user.id })
           .where(eq(budgets.userId, user.id)),
-        db
-          .update(assets)
-          .set({ userId: owner.id, transferredFromUserId: user.id })
-          .where(eq(assets.userId, user.id)),
-        db
-          .update(debts)
-          .set({ userId: owner.id, transferredFromUserId: user.id })
-          .where(eq(debts.userId, user.id)),
         db
           .update(financialAccounts)
           .set({ userId: owner.id, transferredFromUserId: user.id })

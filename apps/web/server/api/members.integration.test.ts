@@ -167,7 +167,7 @@ describe("members integration", () => {
     });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ accounts: 2, assets: 0, debts: 0 });
+    await expect(response.json()).resolves.toMatchObject({ accounts: 2 });
   });
 
   it("sets restoreAllowedUntil to about 14 days when removing a member", async () => {

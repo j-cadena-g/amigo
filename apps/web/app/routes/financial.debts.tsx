@@ -4,12 +4,14 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
-  debts,
+  financialAccounts,
   households,
+  LIABILITY_ACCOUNT_TYPES,
   scopeToHousehold,
   eq,
   and,
   or,
+  inArray,
   isNull,
   parseHomeCurrency,
 } from "@amigo/db";
@@ -19,6 +21,7 @@ import { AddDebtDialog } from "@/app/components/add-debt-dialog";
 import { EmptyState } from "@/app/components/empty-state";
 import { FinancialSectionHeader } from "@/app/components/financial-section-header";
 import { Button } from "@/app/components/ui/button";
+import { debtFromAccount } from "@/app/lib/debt-accounts";
 import { pageTitle, useT } from "@/app/i18n";
 
 export async function loader({ context }: LoaderFunctionArgs) {
@@ -27,13 +30,15 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const db = getDb(env.DB);
 
   const [items, household] = await Promise.all([
-    db.query.debts.findMany({
+    db.query.financialAccounts.findMany({
       where: and(
-        scopeToHousehold(debts.householdId, session.householdId),
-        or(eq(debts.userId, session.userId), isNull(debts.userId)),
-        isNull(debts.deletedAt)
+        scopeToHousehold(financialAccounts.householdId, session.householdId),
+        or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
+        isNull(financialAccounts.deletedAt),
+        eq(financialAccounts.archived, false),
+        inArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
       ),
-      orderBy: (d, { asc }) => [asc(d.type), asc(d.name)],
+      orderBy: (a, { asc }) => [asc(a.type), asc(a.name)],
     }),
     db.query.households.findFirst({
       where: eq(households.id, session.householdId),
@@ -41,7 +46,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
   ]);
 
   return {
-    debts: items.map((d) => ({ ...d, isShared: d.userId === null })),
+    debts: items.map(debtFromAccount),
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
     userId: session.userId,
     role: session.role,

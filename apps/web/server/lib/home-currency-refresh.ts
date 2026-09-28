@@ -1,8 +1,6 @@
 import {
   and,
-  assets,
   budgets,
-  debts,
   eq,
   financialAccounts,
   isNotNull,
@@ -16,11 +14,7 @@ import {
 import type { Env } from "../env";
 import { getExchangeRateForRecord } from "./exchange-rates";
 
-type FxRowTable =
-  | typeof financialAccounts
-  | typeof debts
-  | typeof assets
-  | typeof transactions;
+type FxRowTable = typeof financialAccounts | typeof transactions;
 
 type BatchStatement = Parameters<DrizzleD1["batch"]>[0][number];
 
@@ -252,12 +246,7 @@ export async function refreshHouseholdHomeCurrencyRates(
   options?: HomeCurrencyRefreshOptions
 ): Promise<void> {
   const now = new Date();
-  const fxTables: FxRowTable[] = [
-    financialAccounts,
-    debts,
-    assets,
-    transactions,
-  ];
+  const fxTables: FxRowTable[] = [financialAccounts, transactions];
 
   const currenciesByTable = new Map<FxRowTable | typeof budgets, CurrencyCode[]>();
   const allCurrencies = new Set<CurrencyCode>();

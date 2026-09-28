@@ -8,8 +8,6 @@ import type { UiLanguage } from "@amigo/db";
  */
 const ES: Record<string, string> = {
   "A category with this name already exists": "Ya existe una categoría con este nombre",
-  "A converted account for this asset already exists and was deleted. Restore it instead of converting again.":
-    "Ya existe una cuenta convertida a partir de este activo y fue eliminada. Restáurala en lugar de volver a convertirlo.",
   "A primary email address is required to join a household":
     "Se necesita un correo principal para unirse a un hogar",
   "A tag with this name already exists": "Ya existe una etiqueta con este nombre",
@@ -20,11 +18,7 @@ const ES: Record<string, string> = {
   "Admins cannot change another admin's role":
     "Los administradores no pueden cambiar el rol de otro administrador",
   "Admins cannot remove other admins": "Los administradores no pueden quitar a otros administradores",
-  "Asset not found": "No se encontró el activo",
-  "Asset was deleted and cannot be converted": "El activo fue eliminado y no se puede convertir",
   "Audit record not found": "No se encontró el registro del historial",
-  "BANK assets convert to CHECKING or SAVINGS":
-    "Las cuentas bancarias se convierten en cuenta corriente o de ahorros",
   "Budget not found": "No se encontró el presupuesto",
   "Cannot archive another user's personal account":
     "No puedes archivar la cuenta personal de otra persona",
@@ -34,15 +28,11 @@ const ES: Record<string, string> = {
     "No puedes eliminar la cuenta personal de otra persona",
   "Cannot delete another user's personal budget":
     "No puedes eliminar el presupuesto personal de otra persona",
-  "Cannot delete another user's personal debt":
-    "No puedes eliminar la deuda personal de otra persona",
   "Cannot remove the owner": "No se puede quitar al propietario",
   "Cannot remove this member — they may have become the owner":
     "No se puede quitar a este miembro: puede que ahora sea el propietario",
   "Cannot remove yourself": "No puedes quitarte a ti mismo",
   "Category not found": "No se encontró la categoría",
-  "Converted account not found": "No se encontró la cuenta convertida",
-  "Debt not found": "No se encontró la deuda",
   "Duplicate category mappings": "Hay vínculos de categoría repetidos",
   "End date must be on or after the first occurrence date":
     "La fecha de fin debe ser igual o posterior a la primera fecha",
@@ -87,18 +77,12 @@ const ES: Record<string, string> = {
     "Solo los propietarios y administradores pueden archivar cuentas compartidas",
   "Only owners and admins can create shared accounts":
     "Solo los propietarios y administradores pueden crear cuentas compartidas",
-  "Only owners and admins can create shared assets":
-    "Solo los propietarios y administradores pueden crear activos compartidos",
   "Only owners and admins can create shared budgets":
     "Solo los propietarios y administradores pueden crear presupuestos compartidos",
-  "Only owners and admins can create shared debts":
-    "Solo los propietarios y administradores pueden crear deudas compartidas",
   "Only owners and admins can delete shared accounts":
     "Solo los propietarios y administradores pueden eliminar cuentas compartidas",
   "Only owners and admins can delete shared budgets":
     "Solo los propietarios y administradores pueden eliminar presupuestos compartidos",
-  "Only owners and admins can delete shared debts":
-    "Solo los propietarios y administradores pueden eliminar deudas compartidas",
   "Only owners and admins can update household settings":
     "Solo los propietarios y administradores pueden cambiar la configuración del hogar",
   "Only the owner can transfer ownership": "Solo el propietario puede transferir la propiedad",
@@ -131,7 +115,6 @@ const ES: Record<string, string> = {
   "Unknown or inaccessible account": "La cuenta no existe o no tienes acceso",
   "Unknown or inaccessible budget": "El presupuesto no existe o no tienes acceso",
   "Unsafe push subscription endpoint": "La dirección de notificaciones no es segura",
-  "Unsupported legacy asset type": "Tipo de activo anterior no admitido",
   "User is already the owner": "Esa persona ya es la propietaria",
   "User not found": "No se encontró a la persona",
   "User not found in household": "No se encontró a esa persona en el hogar",
@@ -155,37 +138,24 @@ const ACTIONS_ES: Record<string, string> = {
   update: "actualizar",
   modify: "modificar",
   delete: "eliminar",
-  convert: "convertir",
   archive: "archivar",
 };
 
 /** Plural feminine/masculine phrases for "shared X" and "personal X". */
 const OBJECTS_ES: Record<string, { shared: string; personal: string }> = {
   account: { shared: "cuentas compartidas", personal: "la cuenta personal" },
-  asset: { shared: "activos compartidos", personal: "el activo personal" },
   budget: { shared: "presupuestos compartidos", personal: "el presupuesto personal" },
-  debt: { shared: "deudas compartidas", personal: "la deuda personal" },
 };
 
 const TYPES_ES: Record<string, string> = {
   income: "ingreso",
   expense: "gasto",
-  BANK: "cuenta bancaria",
-  INVESTMENT: "inversión",
-  CASH: "efectivo",
-  PROPERTY: "propiedad",
-  CHECKING: "cuenta corriente",
-  SAVINGS: "ahorros",
 };
 
 const word = (map: Record<string, string>, key: string) => map[key] ?? key;
 
 /** Messages built from templates in handlers; each capture is a template slot. */
 const PATTERNS_ES: [RegExp, (...slots: string[]) => string][] = [
-  [
-    /^Only owners and admins can (\w+) shared assets$/,
-    (action) => `Solo los propietarios y administradores pueden ${word(ACTIONS_ES, action)} activos compartidos`,
-  ],
   [
     /^Only owners and admins can modify shared (\w+)s$/,
     (object) =>
@@ -199,10 +169,6 @@ const PATTERNS_ES: [RegExp, (...slots: string[]) => string][] = [
   [
     /^Cannot (\w+) another user's transaction$/,
     (action) => `No puedes ${word(ACTIONS_ES, action)} el movimiento de otra persona`,
-  ],
-  [
-    /^Legacy (\w+) assets convert to (\w+)$/,
-    (from, to) => `Los activos de tipo ${word(TYPES_ES, from)} se convierten en ${word(TYPES_ES, to)}`,
   ],
   [/^Category type must be (\w+)$/, (type) => `La categoría debe ser de tipo ${word(TYPES_ES, type)}`],
   [

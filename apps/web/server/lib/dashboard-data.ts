@@ -3,10 +3,8 @@ import {
   groceryItems,
   households,
   recurringTransactions,
-  assets,
   financialAccounts,
   LIABILITY_ACCOUNT_TYPES,
-  debts,
   scopeToHousehold,
   eq,
   and,
@@ -25,9 +23,7 @@ import {
   type DrizzleD1,
 } from "@amigo/db";
 import {
-  sqlAssetBalanceHomeCents,
   sqlFinancialAccountBalanceHomeCents,
-  sqlDebtLiabilityHomeCents,
   sqlTransactionAmountHomeCents,
 } from "./money";
 import {
@@ -157,8 +153,7 @@ export async function loadDashboardData(
     allBudgetsWithSpending,
     upcomingRecurring,
     totalAssets,
-    totalAccounts,
-    totalDebts,
+    totalLiabilities,
     household,
     categoryRows,
     lastMonthCategoryRows,
@@ -226,18 +221,6 @@ export async function loadDashboardData(
     }),
     db
       .select({
-        total: sql<number>`COALESCE(SUM(${sqlAssetBalanceHomeCents()}), 0)`,
-      })
-      .from(assets)
-      .where(
-        and(
-          scopeToHousehold(assets.householdId, session.householdId),
-          or(eq(assets.userId, session.userId), isNull(assets.userId)),
-          isNull(assets.deletedAt)
-        )
-      ),
-    db
-      .select({
         total: sql<number>`COALESCE(SUM(${sqlFinancialAccountBalanceHomeCents()}), 0)`,
       })
       .from(financialAccounts)
@@ -252,14 +235,16 @@ export async function loadDashboardData(
       ),
     db
       .select({
-        total: sql<number>`COALESCE(SUM(${sqlDebtLiabilityHomeCents()}), 0)`,
+        total: sql<number>`COALESCE(SUM(${sqlFinancialAccountBalanceHomeCents()}), 0)`,
       })
-      .from(debts)
+      .from(financialAccounts)
       .where(
         and(
-          scopeToHousehold(debts.householdId, session.householdId),
-          or(eq(debts.userId, session.userId), isNull(debts.userId)),
-          isNull(debts.deletedAt)
+          scopeToHousehold(financialAccounts.householdId, session.householdId),
+          or(eq(financialAccounts.userId, session.userId), isNull(financialAccounts.userId)),
+          isNull(financialAccounts.deletedAt),
+          eq(financialAccounts.archived, false),
+          inArray(financialAccounts.type, [...LIABILITY_ACCOUNT_TYPES])
         )
       ),
     db.query.households.findFirst({
@@ -403,9 +388,9 @@ export async function loadDashboardData(
   const monthName = new Intl.DateTimeFormat(undefined, { month: "long" }).format(
     new Date(Date.UTC(dashboardYear, dashboardMonthIndex, 15))
   );
-  const assetsCents =
-    (totalAssets[0]?.total ?? 0) + (totalAccounts[0]?.total ?? 0);
-  const debtsCents = totalDebts[0]?.total ?? 0;
+  const assetsCents = totalAssets[0]?.total ?? 0;
+  // Liabilities are stored negative (money owed); debtsCents is the positive amount owed.
+  const debtsCents = 0 - (totalLiabilities[0]?.total ?? 0);
   const netWorthCents = assetsCents - debtsCents;
 
   const categoryData = categoryRows

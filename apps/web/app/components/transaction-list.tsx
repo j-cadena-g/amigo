@@ -17,6 +17,7 @@ import {
 import { cn } from "@/app/lib/utils";
 import {
   AddTransactionForm,
+  chargePayload,
   type TransactionFormState,
 } from "@/app/components/transaction-form";
 import { TransactionImportDialog } from "@/app/components/transaction-import-dialog";
@@ -129,6 +130,8 @@ export function TransactionList({
     date: todayStr,
     budgetId: null,
     currency: homeCurrency,
+    chargedAmount: "",
+    chargedCurrency: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -140,6 +143,8 @@ export function TransactionList({
     date: "",
     budgetId: null,
     currency: homeCurrency,
+    chargedAmount: "",
+    chargedCurrency: null,
   });
 
   useEffect(() => {
@@ -226,6 +231,7 @@ export function TransactionList({
           date: newTransaction.date,
           budgetId: newTransaction.budgetId,
           currency: newTransaction.currency,
+          ...chargePayload(newTransaction, homeCurrency),
         }),
       });
       if (res.ok) {
@@ -238,6 +244,8 @@ export function TransactionList({
           date: todayStr,
           budgetId: null,
           currency: homeCurrency,
+          chargedAmount: "",
+          chargedCurrency: null,
         });
         setShowAddForm(false);
         setFormError(null);
@@ -288,6 +296,12 @@ export function TransactionList({
       date: transaction.date.split("T")[0] ?? transaction.date,
       budgetId: transaction.budgetId,
       currency: transaction.currency,
+      chargedAmount:
+        transaction.chargedAmount != null && transaction.chargedCurrency
+          ? centsToInputString(transaction.chargedAmount, transaction.chargedCurrency, locale)
+          : "",
+      chargedCurrency:
+        transaction.chargedAmount != null ? transaction.chargedCurrency : null,
     });
   };
 
@@ -333,6 +347,7 @@ export function TransactionList({
           date: editForm.date,
           budgetId: editForm.budgetId,
           currency: editForm.currency,
+          ...chargePayload(editForm, homeCurrency),
         }),
       });
       if (res.ok) {
@@ -394,6 +409,7 @@ export function TransactionList({
       {showAddForm && (
         <AddTransactionForm
           form={newTransaction}
+          homeCurrency={homeCurrency}
           isSubmitting={isSubmitting}
           formError={formError}
           allowBudgetSuggest={allowBudgetSuggest}

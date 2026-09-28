@@ -6,6 +6,9 @@ export interface MonthGroupTransaction {
   currency: string;
   type: "income" | "expense";
   date: string;
+  /** What the card actually charged, in cents of `chargedCurrency`. */
+  chargedAmount?: number | null;
+  chargedCurrency?: string | null;
 }
 
 export interface MonthTotals {
@@ -13,7 +16,10 @@ export interface MonthTotals {
   outCents: number;
   /** Home-currency income, in cents. */
   inCents: number;
-  /** The month has rows in other currencies; they are left out of the totals. */
+  /**
+   * The month has rows with no exact home-currency figure (another currency
+   * and no charge recorded in home currency); they are left out of the totals.
+   */
   hasOtherCurrencies: boolean;
 }
 
@@ -42,6 +48,21 @@ export function formatMonthHeading(month: string, locale: string): string {
   );
 }
 
+/**
+ * A row's exact home-currency cents: the recorded charge when it was in home
+ * currency, else the amount of a home-currency row with no charge in another
+ * currency. Null when only an FX estimate would do.
+ */
+export function exactHomeCents(
+  t: MonthGroupTransaction,
+  homeCurrency: CurrencyCode
+): number | null {
+  if (t.chargedAmount != null) {
+    return t.chargedCurrency === homeCurrency ? t.chargedAmount : null;
+  }
+  return t.currency === homeCurrency ? t.amount : null;
+}
+
 export function monthTotals(
   transactions: readonly MonthGroupTransaction[],
   homeCurrency: CurrencyCode
@@ -51,12 +72,13 @@ export function monthTotals(
   let hasOtherCurrencies = false;
 
   for (const t of transactions) {
-    if (t.currency !== homeCurrency) {
+    const cents = exactHomeCents(t, homeCurrency);
+    if (cents === null) {
       hasOtherCurrencies = true;
       continue;
     }
-    if (t.type === "income") inCents += t.amount;
-    else outCents += t.amount;
+    if (t.type === "income") inCents += cents;
+    else outCents += cents;
   }
 
   return { outCents, inCents, hasOtherCurrencies };

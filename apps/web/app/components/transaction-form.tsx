@@ -18,7 +18,7 @@ import { CurrencySelect } from "@/app/components/currency-select";
 import { SectionLink } from "@/app/components/ledger";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
-import { isPositiveAmount } from "@/app/lib/decimal-input";
+import { isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import { useT } from "@/app/i18n";
 
 export interface TransactionFormState {
@@ -29,10 +29,53 @@ export interface TransactionFormState {
   date: string;
   budgetId: string | null;
   currency: CurrencyCode;
+  /** What the card actually charged, as typed; blank uses the market rate. */
+  chargedAmount: string;
+  /** Currency of a recorded charge; null until one is recorded (then home). */
+  chargedCurrency: CurrencyCode | null;
+}
+
+const AMOUNT_ROW_GRID =
+  "grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3 sm:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,11rem)]";
+
+function chargeCurrency(form: TransactionFormState, homeCurrency: CurrencyCode) {
+  return form.chargedCurrency ?? homeCurrency;
+}
+
+/**
+ * The charge row shows for foreign-currency amounts, and on a home-currency
+ * row that already records a charge in another currency. Plain home-currency
+ * rows (almost all of them) don't get it.
+ */
+function showsCharge(form: TransactionFormState, homeCurrency: CurrencyCode) {
+  return (
+    form.currency !== homeCurrency ||
+    (form.chargedCurrency !== null && form.chargedCurrency !== form.currency)
+  );
+}
+
+/**
+ * API fields for the charge: integer cents, or null to use the market rate.
+ * The form sends the charge exactly as shown, so editing the amount keeps it:
+ * the statement figure doesn't change when a receipt typo is fixed, and the
+ * field sits right under the amount to change or clear alongside it.
+ */
+export function chargePayload(
+  form: TransactionFormState,
+  homeCurrency: CurrencyCode
+): { chargedAmount: number | null; chargedCurrency?: CurrencyCode } {
+  const currency = chargeCurrency(form, homeCurrency);
+  const amount =
+    showsCharge(form, homeCurrency) && currency !== form.currency
+      ? parseAmount(form.chargedAmount)
+      : null;
+  if (amount === null || amount <= 0) return { chargedAmount: null };
+  return { chargedAmount: Math.round(amount * 100), chargedCurrency: currency };
 }
 
 interface TransactionFieldsProps {
   form: TransactionFormState;
+  homeCurrency: CurrencyCode;
   lastExpenseBudgetIdRef: MutableRefObject<string | null>;
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
   onCategoryChange: (categoryId: string) => void;
@@ -42,6 +85,7 @@ interface TransactionFieldsProps {
 
 function TransactionFields({
   form,
+  homeCurrency,
   lastExpenseBudgetIdRef,
   onChange,
   onCategoryChange,
@@ -52,6 +96,8 @@ function TransactionFields({
   const amountId = useId();
   const currencyId = useId();
   const dateId = useId();
+  const chargedId = useId();
+  const chargedHintId = useId();
   const descriptionId = useId();
   const categoryFieldId = useId();
   const budgetFieldId = useId();
@@ -85,7 +131,7 @@ function TransactionFields({
         onChange={selectType}
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3 sm:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,11rem)]">
+      <div className={AMOUNT_ROW_GRID}>
         <div className="space-y-1.5">
           <label htmlFor={amountId} className="text-sm font-semibold">
             {t.common.amount}
@@ -110,7 +156,12 @@ function TransactionFields({
             compact
             value={form.currency}
             onChange={(v) =>
-              onChange((prev) => ({ ...prev, currency: v as CurrencyCode }))
+              onChange((prev) =>
+                prev.chargedCurrency === v
+                  ? // A charge can't be in the amount's own currency: start it over in home.
+                    { ...prev, currency: v, chargedCurrency: null, chargedAmount: "" }
+                  : { ...prev, currency: v as CurrencyCode }
+              )
             }
           />
         </div>
@@ -132,6 +183,39 @@ function TransactionFields({
           />
         </div>
       </div>
+
+      {showsCharge(form, homeCurrency) && (
+        <div className="space-y-1.5">
+          <label htmlFor={chargedId} className="text-sm font-semibold">
+            {t.transactions.chargedLabel(form.type)}
+          </label>
+          {/* Same columns as the row above: amount under Amount, currency under Currency. */}
+          <div className={AMOUNT_ROW_GRID}>
+            <AmountInput
+              id={chargedId}
+              currency={chargeCurrency(form, homeCurrency)}
+              positive
+              value={form.chargedAmount}
+              onValueChange={(chargedAmount) =>
+                onChange((prev) => ({ ...prev, chargedAmount }))
+              }
+              aria-describedby={chargedHintId}
+            />
+            <CurrencySelect
+              compact
+              aria-label={t.transactions.chargedCurrencyLabel(form.type)}
+              value={chargeCurrency(form, homeCurrency)}
+              exclude={[form.currency]}
+              onChange={(v) =>
+                onChange((prev) => ({ ...prev, chargedCurrency: v as CurrencyCode }))
+              }
+            />
+          </div>
+          <p id={chargedHintId} className="text-xs text-muted-foreground">
+            {t.transactions.chargedHint(form.type, form.currency !== homeCurrency)}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <label htmlFor={descriptionId} className="text-sm font-semibold">
@@ -205,6 +289,7 @@ function FormActions({
 
 interface AddTransactionFormProps {
   form: TransactionFormState;
+  homeCurrency: CurrencyCode;
   isSubmitting: boolean;
   formError: string | null;
   allowBudgetSuggest: boolean;
@@ -218,6 +303,7 @@ interface AddTransactionFormProps {
 
 export function AddTransactionForm({
   form,
+  homeCurrency,
   isSubmitting,
   formError,
   allowBudgetSuggest,
@@ -259,6 +345,7 @@ export function AddTransactionForm({
     <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border p-4">
       <TransactionFields
         form={form}
+        homeCurrency={homeCurrency}
         lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
         onChange={onChange}
         onCategoryChange={(categoryId) => {
@@ -297,6 +384,7 @@ export function AddTransactionForm({
 
 interface EditTransactionFormProps {
   form: TransactionFormState;
+  homeCurrency: CurrencyCode;
   isSubmitting: boolean;
   lastExpenseBudgetIdRef: MutableRefObject<string | null>;
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
@@ -307,6 +395,7 @@ interface EditTransactionFormProps {
 
 export function EditTransactionForm({
   form,
+  homeCurrency,
   isSubmitting,
   lastExpenseBudgetIdRef,
   onChange,
@@ -319,6 +408,7 @@ export function EditTransactionForm({
     <form onSubmit={onSubmit} className="my-3 space-y-4 rounded-xl border border-border p-4">
       <TransactionFields
         form={form}
+        homeCurrency={homeCurrency}
         lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
         onChange={onChange}
         onCategoryChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}

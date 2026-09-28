@@ -1,12 +1,14 @@
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import type { Messages } from "@/app/i18n";
 import { formatCents } from "@/app/lib/currency";
+import { decimalSeparator } from "@/app/lib/decimal-input";
 import { DEFAULT_LOCALE } from "@/app/lib/locale";
 
 const HIDDEN_AUDIT_FIELDS = new Set([
   "id",
   "householdId",
   "exchangeRateToHome",
+  "chargedExchangeRateToHome",
   "createdAt",
   "updatedAt",
   "deletedAt",
@@ -29,6 +31,12 @@ const RECORD_MONEY_AUDIT_FIELDS = new Set([
 
 /** Integer-cents money fields denominated in household home currency. */
 const HOME_MONEY_AUDIT_FIELDS = new Set(["limitAmountHome"]);
+
+/**
+ * Integer-cents money in a currency of their own (shown as its own field
+ * change), so they are formatted without a currency symbol.
+ */
+const OWN_CURRENCY_MONEY_AUDIT_FIELDS = new Set(["chargedAmount"]);
 
 export type AuditChange = { from: unknown; to: unknown };
 
@@ -107,8 +115,9 @@ export function currencyFromAuditChanges(
   return sides.to ?? sides.from;
 }
 
-function formatBareCents(cents: number): string {
-  return (cents / 100).toFixed(2);
+function formatBareCents(cents: number, locale?: string): string {
+  const fixed = (cents / 100).toFixed(2);
+  return locale ? fixed.replace(".", decimalSeparator(locale)) : fixed;
 }
 
 export function formatAuditValue(
@@ -127,6 +136,9 @@ export function formatAuditValue(
     return value ? (options?.labels?.yes ?? "Yes") : (options?.labels?.no ?? "No");
   }
   if (typeof value === "number") {
+    if (options?.field && OWN_CURRENCY_MONEY_AUDIT_FIELDS.has(options.field)) {
+      return formatBareCents(value, options.locale ?? DEFAULT_LOCALE);
+    }
     if (options?.field && HOME_MONEY_AUDIT_FIELDS.has(options.field)) {
       if (options.homeCurrency) {
         return formatCents(value, options.homeCurrency, options.locale ?? DEFAULT_LOCALE);

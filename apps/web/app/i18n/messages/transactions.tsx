@@ -36,6 +36,19 @@ export const transactions = defineMessages({
     noBudget: "No budget",
     sharedBudgets: "Shared",
     personalBudgets: "Personal",
+    chargedLabel: (kind: "income" | "expense") =>
+      kind === "income" ? "Amount received (optional)" : "Amount charged (optional)",
+    chargedCurrencyLabel: (kind: "income" | "expense") =>
+      kind === "income" ? "Currency received" : "Currency charged",
+    /** `foreign`: the amount isn't in home currency, so a blank charge has no exact home figure. */
+    chargedHint: (kind: "income" | "expense", foreign: boolean) =>
+      (kind === "income"
+        ? "What actually reached your account, after fees."
+        : "What your card or bank actually took, fees included.") +
+      (foreign ? " Without it, budgets use the market rate and list totals leave this out." : ""),
+    charged: (kind: "income" | "expense") => (kind === "income" ? "Received" : "Charged"),
+    overMarket: (difference: ReactNode) => <>{difference} over the market rate</>,
+    underMarket: (difference: ReactNode) => <>{difference} under the market rate</>,
   },
   es: {
     add: "Agregar movimiento",
@@ -70,5 +83,19 @@ export const transactions = defineMessages({
     noBudget: "Sin presupuesto",
     sharedBudgets: "Compartidos",
     personalBudgets: "Personales",
+    chargedLabel: (kind: "income" | "expense") =>
+      kind === "income" ? "Monto recibido (opcional)" : "Monto cobrado (opcional)",
+    chargedCurrencyLabel: (kind: "income" | "expense") =>
+      kind === "income" ? "Moneda recibida" : "Moneda del cobro",
+    chargedHint: (kind: "income" | "expense", foreign: boolean) =>
+      (kind === "income"
+        ? "Lo que realmente llegó a tu cuenta, después de comisiones."
+        : "Lo que realmente cobró tu tarjeta o banco, con comisiones.") +
+      (foreign
+        ? " Sin esto, los presupuestos usan la tasa del mercado y los totales de la lista no lo incluyen."
+        : ""),
+    charged: (kind: "income" | "expense") => (kind === "income" ? "Recibido" : "Cobrado"),
+    overMarket: (difference: ReactNode) => <>{difference} más que la tasa del mercado</>,
+    underMarket: (difference: ReactNode) => <>{difference} menos que la tasa del mercado</>,
   },
 });

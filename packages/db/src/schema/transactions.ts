@@ -40,6 +40,15 @@ export const transactions = sqliteTable(
     currency: text("currency", { enum: CURRENCY_CODES }).notNull().default("CAD"),
     // Exchange rate to home currency at time of creation (null if same as home currency)
     exchangeRateToHome: real("exchange_rate_to_home"),
+    /**
+     * What the card or bank actually charged for this row, fees and its own
+     * rate included, in integer cents of `chargedCurrency` (the household
+     * home currency when entered). Null means use `amount * exchangeRateToHome`.
+     */
+    chargedAmount: integer("charged_amount"),
+    chargedCurrency: text("charged_currency", { enum: CURRENCY_CODES }),
+    // Exchange rate from chargedCurrency to home (null if same as home currency)
+    chargedExchangeRateToHome: real("charged_exchange_rate_to_home"),
     categoryId: text("category_id").references(() => financialCategories.id, {
       onDelete: "set null",
     }),

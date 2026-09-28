@@ -42,6 +42,15 @@ describe("audit history helpers", () => {
     expect(formatAuditValue(fn)).toBe(String(fn));
   });
 
+  it("formats a charged amount without guessing its currency", () => {
+    expect(
+      formatAuditValue(5535, { field: "chargedAmount", currency: "USD", homeCurrency: "CAD" })
+    ).toBe("55.35");
+    expect(formatAuditValue(17200000, { field: "chargedAmount", locale: "es-CO" })).toBe(
+      "172000,00"
+    );
+  });
+
   it("formats monetary cents fields with denomination-aware currency", () => {
     expect(
       formatAuditValue(100, { field: "balance", currency: "CAD" })

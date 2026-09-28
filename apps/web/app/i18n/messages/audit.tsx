@@ -40,6 +40,8 @@ export const audit = defineMessages({
       nextRunDate: "Next run date",
       isActive: "Active",
       reviewed: "Reviewed",
+      chargedAmount: "Amount charged",
+      chargedCurrency: "Charged currency",
     } as Record<string, string>,
   },
   es: {
@@ -79,6 +81,8 @@ export const audit = defineMessages({
       nextRunDate: "Próxima fecha",
       isActive: "Activo",
       reviewed: "Revisado",
+      chargedAmount: "Monto cobrado",
+      chargedCurrency: "Moneda del cobro",
     },
   },
 });

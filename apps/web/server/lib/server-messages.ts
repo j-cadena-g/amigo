@@ -123,6 +123,8 @@ const ES: Record<string, string> = {
   "Tag not found": "No se encontró la etiqueta",
   "Too many requests": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo",
   "Transaction not found": "No se encontró el movimiento",
+  "Transaction was modified concurrently; try again":
+    "El movimiento cambió al mismo tiempo; vuelve a intentarlo",
   Unauthorized: "No autorizado",
   "Unknown category in mappings": "Hay una categoría desconocida en los vínculos",
   "Unknown or archived category": "La categoría no existe o está archivada",
@@ -141,6 +143,8 @@ const ES: Record<string, string> = {
     "Elige una categoría al cambiar el tipo del movimiento recurrente",
   "categoryId is required when changing transaction type":
     "Elige una categoría al cambiar el tipo del movimiento",
+  "chargedCurrency must differ from the transaction currency":
+    "La moneda del cobro debe ser distinta de la del movimiento",
   "recordId must be a single path segment": "recordId debe ser un solo segmento de la ruta",
   "recordId path param required": "Falta el parámetro recordId",
   "table query param required": "Falta el parámetro table",

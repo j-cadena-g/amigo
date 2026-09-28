@@ -1,6 +1,7 @@
 import {
   useId,
   type Dispatch,
+  type ReactNode,
   type FormEvent,
   type MutableRefObject,
   type SetStateAction,
@@ -9,7 +10,7 @@ import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { DeleteButton } from "@/app/components/financial/form-controls";
-import { formatSignedCents } from "@/app/lib/currency";
+import { formatCents, formatSignedCents } from "@/app/lib/currency";
 import {
   formatLedgerDate,
   formatTransactionDate,
@@ -18,7 +19,7 @@ import {
 import { cn } from "@/app/lib/utils";
 import { EditTransactionForm, type TransactionFormState } from "./transaction-form";
 import { useLocale } from "@/app/lib/use-locale";
-import { useT } from "@/app/i18n";
+import { useT, type Messages } from "@/app/i18n";
 
 export interface TransactionDTO {
   id: string;
@@ -32,6 +33,39 @@ export interface TransactionDTO {
   date: string;
   budgetId: string | null;
   createdAt: number;
+  exchangeRateToHome: number | null;
+  chargedAmount: number | null;
+  chargedCurrency: CurrencyCode | null;
+}
+
+/**
+ * The recorded charge, and when it is in home currency, how far it landed
+ * from the market-rate snapshot taken when the row was saved (fees and the
+ * card's own rate).
+ */
+function chargeDetail(
+  transaction: TransactionDTO,
+  homeCurrency: CurrencyCode,
+  locale: string,
+  t: Messages["transactions"]
+): { charged: string; versusMarket: ReactNode } | null {
+  const { chargedAmount, chargedCurrency, exchangeRateToHome } = transaction;
+  if (chargedAmount == null || !chargedCurrency) return null;
+  const charged = formatCents(chargedAmount, chargedCurrency, locale);
+  if (chargedCurrency !== homeCurrency || exchangeRateToHome == null) {
+    return { charged, versusMarket: null };
+  }
+  const difference = chargedAmount - Math.round(transaction.amount * exchangeRateToHome);
+  if (difference === 0) return { charged, versusMarket: null };
+  const formatted = (
+    <span className="font-mono font-medium">
+      {formatCents(Math.abs(difference), homeCurrency, locale)}
+    </span>
+  );
+  return {
+    charged,
+    versusMarket: difference > 0 ? t.overMarket(formatted) : t.underMarket(formatted),
+  };
 }
 
 interface TransactionRowProps {
@@ -74,6 +108,7 @@ export function TransactionRow({
       <li>
         <EditTransactionForm
           form={editForm}
+          homeCurrency={homeCurrency}
           isSubmitting={isSubmitting}
           lastExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
           onChange={onEditFormChange}
@@ -86,6 +121,7 @@ export function TransactionRow({
   }
 
   const isIncome = transaction.type === "income";
+  const charge = chargeDetail(transaction, homeCurrency, locale, t.transactions);
   const meta = [
     transaction.description ? transaction.category : null,
     transaction.currency !== homeCurrency ? transaction.currency : null,
@@ -142,6 +178,19 @@ export function TransactionRow({
             <dd>{formatTransactionDate(transaction.date, locale)}</dd>
             <dt className="text-muted-foreground">{t.common.category}</dt>
             <dd>{transaction.category}</dd>
+            {charge && (
+              <>
+                <dt className="text-muted-foreground">
+                  {t.transactions.charged(transaction.type)}
+                </dt>
+                <dd>
+                  <span className="font-mono font-medium">{charge.charged}</span>
+                  {charge.versusMarket && (
+                    <span className="text-muted-foreground"> · {charge.versusMarket}</span>
+                  )}
+                </dd>
+              </>
+            )}
             {transaction.description && (
               <>
                 <dt className="text-muted-foreground">{t.common.description}</dt>

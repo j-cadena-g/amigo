@@ -13,7 +13,7 @@ import type { CurrencyCode, DrizzleD1, Transaction } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
-import type { AppSession } from "../env";
+import type { AppSession, Env } from "../env";
 import { toCents } from "../lib/conversions";
 import { isValidIsoDateString } from "../lib/dates";
 import { getExchangeRateForRecord } from "../lib/exchange-rates";
@@ -63,6 +63,61 @@ const calendarDateString = z
   .string()
   .refine(isValidIsoDateString, { message: "date must be YYYY-MM-DD" });
 
+/**
+ * What the card or bank actually charged, fees included, as integer cents of
+ * `chargedCurrency` (defaults to the household home currency): the same unit
+ * the API returns for `chargedAmount`.
+ */
+const chargedAmountCents = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
+function chargedCurrencyHasAmount(value: {
+  chargedAmount?: number | null;
+  chargedCurrency?: CurrencyCode;
+}): boolean {
+  return value.chargedCurrency === undefined || value.chargedAmount != null;
+}
+
+const CHARGED_CURRENCY_NEEDS_AMOUNT = {
+  message: "chargedCurrency requires chargedAmount",
+  path: ["chargedCurrency"],
+};
+
+const CLEARED_CHARGE = {
+  chargedAmount: null,
+  chargedCurrency: null,
+  chargedExchangeRateToHome: null,
+} as const;
+
+function assertChargeCurrencyDiffers(
+  chargedCurrency: CurrencyCode,
+  transactionCurrency: CurrencyCode
+) {
+  if (chargedCurrency === transactionCurrency) {
+    throw new ActionError(
+      "chargedCurrency must differ from the transaction currency",
+      "VALIDATION_ERROR"
+    );
+  }
+}
+
+/** Charge columns for a recorded card charge, with its FX snapshot to home. */
+async function resolveCharge(
+  env: Env,
+  homeCurrency: CurrencyCode,
+  transactionCurrency: CurrencyCode,
+  chargedAmount: number,
+  chargedCurrency: CurrencyCode
+) {
+  assertChargeCurrencyDiffers(chargedCurrency, transactionCurrency);
+  const rate = await getExchangeRateForRecord(env, chargedCurrency, homeCurrency);
+  if (rate === null && chargedCurrency !== homeCurrency) {
+    throw new Error(
+      `Missing exchange rate from ${chargedCurrency} to ${homeCurrency} for charged amount`
+    );
+  }
+  return { chargedAmount, chargedCurrency, chargedExchangeRateToHome: rate };
+}
+
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
@@ -72,7 +127,9 @@ const addTransactionSchema = z.object({
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
-});
+  chargedAmount: chargedAmountCents.nullable().optional(),
+  chargedCurrency: currencyEnum.optional(),
+}).refine(chargedCurrencyHasAmount, CHARGED_CURRENCY_NEEDS_AMOUNT);
 
 const updateTransactionSchema = z.object({
   amount: z.number().positive().optional(),
@@ -83,8 +140,10 @@ const updateTransactionSchema = z.object({
   budgetId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   currency: currencyEnum.optional(),
+  chargedAmount: chargedAmountCents.nullable().optional(),
+  chargedCurrency: currencyEnum.optional(),
   reviewed: z.boolean().optional(),
-});
+}).refine(chargedCurrencyHasAmount, CHARGED_CURRENCY_NEEDS_AMOUNT);
 
 const importRowSchema = z.object({
   date: importDateString,
@@ -193,6 +252,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
       "category",
       "amount_cents",
       "currency",
+      "charged_amount_cents",
+      "charged_currency",
       "description",
       "budget_id",
       "account_id",
@@ -209,6 +270,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
           csvEscape(t.category),
           csvEscape(t.amount),
           csvEscape(t.currency),
+          csvEscape(t.chargedAmount),
+          csvEscape(t.chargedCurrency),
           csvEscape(t.description),
           csvEscape(t.budgetId),
           csvEscape(t.accountId),
@@ -410,6 +473,16 @@ export const handleTransactionsRequest: ApiHandler = async ({
     });
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = validated.currency ?? homeCurrency;
+    const charge =
+      validated.chargedAmount != null
+        ? await resolveCharge(
+            env,
+            homeCurrency,
+            currency,
+            validated.chargedAmount,
+            validated.chargedCurrency ?? homeCurrency
+          )
+        : CLEARED_CHARGE;
     const exchangeRateToHome = await getExchangeRateForRecord(
       env,
       currency,
@@ -437,6 +510,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             amount: toCents(validated.amount),
             currency,
             exchangeRateToHome,
+            ...charge,
             description: validated.description?.trim() || null,
             categoryId: category.id,
             category: category.name,
@@ -538,20 +612,70 @@ export const handleTransactionsRequest: ApiHandler = async ({
     if (validated.accountId !== undefined) {
       updateData.accountId = validated.accountId || null;
     }
-    if (validated.currency !== undefined) {
-      updateData.currency = validated.currency;
+    // The edit form resends the currency; only a real change takes a new FX
+    // snapshot, so the row's market rate (and a charge's fee) stays put.
+    const currencyChanged =
+      validated.currency !== undefined && validated.currency !== existing.currency;
+    if (currencyChanged || validated.chargedAmount != null) {
       const homeCurrency = await getHomeCurrency(db, session!.householdId);
-      updateData.exchangeRateToHome = await getExchangeRateForRecord(
-        env,
-        validated.currency,
-        homeCurrency
-      );
+      if (validated.currency !== undefined && currencyChanged) {
+        updateData.currency = validated.currency;
+        updateData.exchangeRateToHome = await getExchangeRateForRecord(
+          env,
+          validated.currency,
+          homeCurrency
+        );
+      }
+      if (validated.chargedAmount != null) {
+        const nextCurrency = validated.currency ?? existing.currency;
+        const chargedCurrency =
+          validated.chargedCurrency ?? existing.chargedCurrency ?? homeCurrency;
+        if (
+          validated.chargedAmount === existing.chargedAmount &&
+          chargedCurrency === existing.chargedCurrency
+        ) {
+          // Same charge resent (the edit form always sends it): keep its FX snapshot.
+          assertChargeCurrencyDiffers(chargedCurrency, nextCurrency);
+        } else {
+          Object.assign(
+            updateData,
+            await resolveCharge(
+              env,
+              homeCurrency,
+              nextCurrency,
+              validated.chargedAmount,
+              chargedCurrency
+            )
+          );
+        }
+      }
+    }
+    if (
+      validated.chargedAmount === null ||
+      (validated.chargedAmount === undefined &&
+        (currencyChanged ||
+          (validated.amount !== undefined &&
+            toCents(validated.amount) !== existing.amount)))
+    ) {
+      // A recorded charge belongs to the amount and currency it was entered
+      // for; editing either without a new one falls back to the market rate.
+      Object.assign(updateData, CLEARED_CHARGE);
     }
     if (validated.reviewed !== undefined) {
       updateData.reviewed = validated.reviewed;
     }
 
     await assertCanWriteTransaction(db, session!, existing, "modify");
+
+    // A charge was checked against the amount and currency read above; only
+    // write it if a concurrent edit hasn't changed them since.
+    const chargeGuards =
+      validated.chargedAmount != null
+        ? [
+            eq(transactions.currency, existing.currency),
+            eq(transactions.amount, existing.amount),
+          ]
+        : [];
 
     const updated = await withAudit(
       db,
@@ -572,7 +696,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
             and(
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
-              isNull(transactions.deletedAt)
+              isNull(transactions.deletedAt),
+              ...chargeGuards
             )
           )
           .returning()
@@ -580,6 +705,21 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     if (!updated) {
+      if (chargeGuards.length > 0) {
+        const current = await db.query.transactions.findFirst({
+          where: and(
+            eq(transactions.id, id),
+            scopeToHousehold(transactions.householdId, session!.householdId),
+            isNull(transactions.deletedAt)
+          ),
+        });
+        if (current) {
+          throw new ActionError(
+            "Transaction was modified concurrently; try again",
+            "CONFLICT"
+          );
+        }
+      }
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
 

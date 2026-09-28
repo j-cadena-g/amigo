@@ -111,6 +111,30 @@ describe("monthTotals", () => {
       monthTotals([txn("u1", "2026-09-06", 9900, "expense", "USD"), txn("c1", "2026-09-05", 2500)], "USD")
     ).toEqual({ outCents: 9900, inCents: 0, hasOtherCurrencies: true });
   });
+
+  it("counts a foreign row by what the card charged in home currency", () => {
+    expect(
+      monthTotals(
+        [
+          { ...txn("u1", "2026-09-06", 4000, "expense", "USD"), chargedAmount: 5535, chargedCurrency: "CAD" },
+          txn("c1", "2026-09-05", 2500),
+        ],
+        "CAD"
+      )
+    ).toEqual({ outCents: 8035, inCents: 0, hasOtherCurrencies: false });
+  });
+
+  it("leaves out a row charged in a currency other than home", () => {
+    expect(
+      monthTotals(
+        [
+          { ...txn("e1", "2026-09-06", 4000, "expense", "EUR"), chargedAmount: 4300, chargedCurrency: "USD" },
+          { ...txn("c1", "2026-09-05", 2500), chargedAmount: 1900, chargedCurrency: "USD" },
+        ],
+        "CAD"
+      )
+    ).toEqual({ outCents: 0, inCents: 0, hasOtherCurrencies: true });
+  });
 });
 
 describe("month labels", () => {

@@ -13,6 +13,8 @@ interface CurrencySelectProps {
   "aria-label"?: string;
   /** Show 3-letter codes only — for narrow columns beside amount fields. */
   compact?: boolean;
+  /** Codes to leave out, e.g. the amount's own currency for a card charge. */
+  exclude?: readonly string[];
 }
 
 export function CurrencySelect({
@@ -22,6 +24,7 @@ export function CurrencySelect({
   id,
   "aria-label": ariaLabel,
   compact = false,
+  exclude,
 }: CurrencySelectProps) {
   const t = useT();
   const language = useLanguage();
@@ -34,7 +37,7 @@ export function CurrencySelect({
       compact={compact}
       className={className}
     >
-      {CURRENCY_CODES.map((code) => (
+      {CURRENCY_CODES.filter((code) => !exclude?.includes(code)).map((code) => (
         <option key={code} value={code}>
           {compact ? code : `${code} – ${currencyName(code, language)}`}
         </option>

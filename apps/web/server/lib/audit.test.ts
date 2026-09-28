@@ -75,6 +75,7 @@ describe("insertManyAuditLogs", () => {
       insert: vi.fn(() => ({
         values: mocks.insertValues,
       })),
+      batch: vi.fn((statements: unknown[]) => Promise.all(statements)),
     };
 
     await insertManyAuditLogs(db as never, [
@@ -126,6 +127,7 @@ describe("insertManyAuditLogs", () => {
       insert: vi.fn(() => ({
         values: mocks.insertValues,
       })),
+      batch: vi.fn((statements: unknown[]) => Promise.all(statements)),
     };
 
     await insertManyAuditLogs(db as never, [

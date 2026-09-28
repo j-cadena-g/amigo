@@ -46,6 +46,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Purchased grocery items are cleared 90 days after purchase: the weekly Sunday cron now runs the purge, which only existed as an endpoint nothing called. Bulk audit writes are chunked to stay under D1's bound-parameter limit instead of silently dropping their audit rows
 - Amount fields accept both `1,234.56` and `1.234,56`: `45.000` is read as forty-five thousand instead of 45, and the add-transaction field no longer trims a third digit after a separator while typing
 - `pnpm run agent:signin-url`'s sign-in ticket fallback puts `__clerk_ticket` in the query string; after a `#`, Clerk's sign-in form ignored it
 - Transaction history shows field-level diffs instead of JSON character indexes ([#138](https://github.com/j-cadena-g/amigo/pull/138))

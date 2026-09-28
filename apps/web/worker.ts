@@ -7,6 +7,7 @@ import { getDb, auditLogs, lt } from "@amigo/db";
 import { processDueRecurringRules } from "./server/lib/recurring-processor";
 import { cleanupStalePushSubscriptions } from "./server/api/push";
 import { cleanupStaleGrocerySyncMutations } from "./server/api/sync";
+import { purgeOldPurchasedGroceryItems } from "./server/api/groceries";
 import type { Env } from "./server/env";
 import { getClerkIdentity } from "./server/lib/clerk";
 import { clerkTokenAuthOptions } from "./server/lib/clerk-auth-options";
@@ -60,12 +61,25 @@ export default {
     // Each wrangler.jsonc cron fires separately; Sundays get both triggers at different
     // times for different work (audit prune vs recurring), not duplicate recurring runs.
     if (event.cron === "0 3 * * SUN") {
-      // Weekly audit log pruning (Sunday 3 AM UTC) — retain 90 days
+      // Weekly pruning (Sunday 3 AM UTC) — audit logs and purchased groceries retain 90 days
       const db = getDb(env.DB);
       const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-      await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
-      await cleanupStalePushSubscriptions(env);
-      await cleanupStaleGrocerySyncMutations(env);
+      try {
+        await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
+        await cleanupStalePushSubscriptions(env);
+        await cleanupStaleGrocerySyncMutations(env);
+      } finally {
+        // Groceries still clear if an earlier cleanup fails; that error is rethrown after.
+        const result = await purgeOldPurchasedGroceryItems(env);
+        console.log(
+          JSON.stringify({
+            message: "purgeOldPurchasedGroceryItems completed",
+            cron: event.cron,
+            deleted: result.deletedCount,
+            failed: result.failed,
+          })
+        );
+      }
     } else if (event.cron === "23 4 * * *") {
       // Daily recurring postings (4:23 AM UTC), idempotent by deterministic txn ids.
       // Await directly so failures propagate to the scheduled handler (waitUntil would not).

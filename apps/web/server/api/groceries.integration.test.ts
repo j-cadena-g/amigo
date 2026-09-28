@@ -1,10 +1,13 @@
-import { eq, groceryItems, type DrizzleD1 } from "@amigo/db";
+import { and, auditLogs, eq, groceryItems, type DrizzleD1 } from "@amigo/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRouterLoadContext } from "../../router-context";
 import type { AppSession, Env } from "../env";
 import { createTestDb, seedHouseholdWithOwner } from "../test/fixtures";
 import { getIntegrationEnv } from "../test/integration-env";
-import { handleGroceriesRequest } from "./groceries";
+import {
+  handleGroceriesRequest,
+  purgeOldPurchasedGroceryItems,
+} from "./groceries";
 import { handleSyncRequest } from "./sync";
 
 // What the Workers AI binding returns for typesafe/jev.
@@ -259,5 +262,286 @@ describe("grocery categorization integration", () => {
         },
       ],
     });
+  });
+});
+
+describe("purgeOldPurchasedGroceryItems integration", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date("2026-09-27T03:00:00Z");
+  let db: DrizzleD1;
+
+  beforeEach(() => {
+    db = createTestDb(getIntegrationEnv().DB);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function seedHousehold() {
+    const suffix = crypto.randomUUID();
+    const householdId = `hh-grocery-purge-${suffix}`;
+    const ownerId = `user-grocery-purge-${suffix}`;
+    await seedHouseholdWithOwner(db, {
+      householdId,
+      ownerId,
+      ownerAuthId: `clerk_grocery_purge_${suffix}`,
+    });
+    return { householdId, ownerId };
+  }
+
+  async function seedItem(
+    household: { householdId: string; ownerId: string },
+    purchasedDaysAgo: number | null
+  ) {
+    const id = crypto.randomUUID();
+    await db.insert(groceryItems).values({
+      id,
+      householdId: household.householdId,
+      createdByUserId: household.ownerId,
+      itemName: `item ${id}`,
+      isPurchased: purchasedDaysAgo !== null,
+      purchasedAt:
+        purchasedDaysAgo === null
+          ? null
+          : new Date(now.getTime() - purchasedDaysAgo * DAY_MS),
+    });
+    return id;
+  }
+
+  async function remainingIds(householdId: string) {
+    const rows = await db
+      .select({ id: groceryItems.id })
+      .from(groceryItems)
+      .where(eq(groceryItems.householdId, householdId));
+    return rows.map((row) => row.id).sort();
+  }
+
+  it("deletes items purchased over 90 days ago in every household and audits them", async () => {
+    const first = await seedHousehold();
+    const second = await seedHousehold();
+
+    await seedItem(first, 91);
+    const firstRecent = await seedItem(first, 89);
+    const firstUnpurchased = await seedItem(first, null);
+    // More than one delete batch and audit insert chunk, so every batch must land.
+    const secondOld = await Promise.all(
+      Array.from({ length: 60 }, () => seedItem(second, 200))
+    );
+    const secondRecent = await seedItem(second, 1);
+
+    const result = await purgeOldPurchasedGroceryItems(getIntegrationEnv(), now);
+
+    expect(result).toEqual({ deletedCount: 61, failed: 0 });
+    expect(await remainingIds(first.householdId)).toEqual(
+      [firstRecent, firstUnpurchased].sort()
+    );
+    expect(await remainingIds(second.householdId)).toEqual([secondRecent]);
+
+    const audits = await db
+      .select({ recordId: auditLogs.recordId, changedBy: auditLogs.changedBy })
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.tableName, "grocery_items"),
+          eq(auditLogs.operation, "DELETE"),
+          eq(auditLogs.householdId, second.householdId)
+        )
+      );
+    expect(audits.map((row) => row.recordId).sort()).toEqual(
+      [...secondOld].sort()
+    );
+    expect(audits.every((row) => row.changedBy === null)).toBe(true);
+  });
+
+  it("counts and broadcasts committed batches when a household fails partway", async () => {
+    const broken = await seedHousehold();
+    const healthy = await seedHousehold();
+    // 51 items: the first batch of 50 commits, then the second delete fails.
+    await Promise.all(Array.from({ length: 51 }, () => seedItem(broken, 91)));
+    await seedItem(healthy, 91);
+
+    // Fail the broken household's second item delete only.
+    const realDb = getIntegrationEnv().DB;
+    let brokenDeletes = 0;
+    const failingDb = {
+      ...realDb,
+      batch: realDb.batch.bind(realDb),
+      exec: realDb.exec.bind(realDb),
+      prepare(sql: string) {
+        const statement = realDb.prepare(sql);
+        const bind = statement.bind.bind(statement);
+        statement.bind = (...values: unknown[]) => {
+          if (
+            /^delete from "grocery_items"/i.test(sql) &&
+            values.includes(broken.householdId) &&
+            ++brokenDeletes === 2
+          ) {
+            throw new Error("D1 unavailable");
+          }
+          return bind(...values);
+        };
+        return statement;
+      },
+    } as D1Database;
+    const broadcasts: Array<{ householdId: string; count: unknown }> = [];
+    const household = {
+      idFromName: (name: string) => name,
+      get: (householdId: string) => ({
+        fetch: async (request: Request) => {
+          const payload = (await request.json()) as { count?: unknown };
+          broadcasts.push({ householdId, count: payload.count });
+          return new Response(null);
+        },
+      }),
+    } as unknown as DurableObjectNamespace;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await purgeOldPurchasedGroceryItems(
+      { ...getIntegrationEnv(), DB: failingDb, HOUSEHOLD: household },
+      now
+    );
+
+    expect(result).toEqual({ deletedCount: 51, failed: 1 });
+    expect(await remainingIds(broken.householdId)).toHaveLength(1);
+    expect(await remainingIds(healthy.householdId)).toEqual([]);
+    expect(broadcasts).toEqual(
+      expect.arrayContaining([
+        { householdId: broken.householdId, count: 50 },
+        { householdId: healthy.householdId, count: 1 },
+      ])
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(`"deletedBeforeFailure":50`)
+    );
+  });
+});
+
+describe("POST /api/groceries/clear-old integration", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let db: DrizzleD1;
+
+  beforeEach(() => {
+    db = createTestDb(getIntegrationEnv().DB);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function seedHousehold(label: string) {
+    const suffix = crypto.randomUUID();
+    const householdId = `hh-grocery-clear-${label}-${suffix}`;
+    const ownerId = `user-grocery-clear-${label}-${suffix}`;
+    await seedHouseholdWithOwner(db, {
+      householdId,
+      ownerId,
+      ownerAuthId: `clerk_grocery_clear_${label}_${suffix}`,
+    });
+    return { householdId, ownerId };
+  }
+
+  async function seedItem(
+    household: { householdId: string; ownerId: string },
+    purchasedAt: Date | null
+  ) {
+    const id = crypto.randomUUID();
+    await db.insert(groceryItems).values({
+      id,
+      householdId: household.householdId,
+      createdByUserId: household.ownerId,
+      itemName: `item ${id}`,
+      isPurchased: purchasedAt !== null,
+      purchasedAt,
+    });
+    return id;
+  }
+
+  async function remainingIds(householdId: string) {
+    const rows = await db
+      .select({ id: groceryItems.id })
+      .from(groceryItems)
+      .where(eq(groceryItems.householdId, householdId));
+    return rows.map((row) => row.id).sort();
+  }
+
+  async function callClearOld(household: {
+    householdId: string;
+    ownerId: string;
+  }) {
+    const env = getIntegrationEnv();
+    const session: AppSession = {
+      userId: household.ownerId,
+      householdId: household.householdId,
+      role: "owner",
+      email: "owner@example.com",
+      name: "Owner",
+    };
+    const deferred: Promise<unknown>[] = [];
+    const response = await handleGroceriesRequest({
+      env,
+      params: { "*": "clear-old" },
+      request: new Request("http://localhost/api/groceries/clear-old", {
+        method: "POST",
+      }),
+      sessionStatus: "authenticated",
+      session,
+      loadContext: createRouterLoadContext({
+        cloudflare: {
+          env,
+          ctx: {
+            waitUntil: (task: Promise<unknown>) => deferred.push(task),
+          } as unknown as ExecutionContext,
+          caches: {} as CacheStorage,
+        },
+        app: {
+          cspNonce: "test-nonce",
+          sessionStatus: "authenticated",
+          session,
+        },
+      }),
+    });
+    await Promise.all(deferred);
+    return response;
+  }
+
+  it("deletes this household's items purchased over 90 days ago and audits each one", async () => {
+    const caller = await seedHousehold("caller");
+    const other = await seedHousehold("other");
+    // The route cuts off at 90 days before the request, so these sit a day to either side.
+    const now = Date.now();
+    const daysAgo = (days: number) => new Date(now - days * DAY_MS);
+
+    const oldItems = await Promise.all([
+      seedItem(caller, daysAgo(91)),
+      seedItem(caller, daysAgo(91)),
+    ]);
+    const recent = await seedItem(caller, daysAgo(89));
+    const unpurchased = await seedItem(caller, null);
+    const otherOld = await seedItem(other, daysAgo(91));
+
+    const response = await callClearOld(caller);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ deleted: oldItems.length });
+    expect(await remainingIds(caller.householdId)).toEqual(
+      [recent, unpurchased].sort()
+    );
+    expect(await remainingIds(other.householdId)).toEqual([otherOld]);
+
+    const audits = await db
+      .select({ recordId: auditLogs.recordId, changedBy: auditLogs.changedBy })
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.tableName, "grocery_items"),
+          eq(auditLogs.operation, "DELETE"),
+          eq(auditLogs.householdId, caller.householdId)
+        )
+      );
+    expect(audits.map((row) => row.recordId).sort()).toEqual([...oldItems].sort());
+    expect(audits.every((row) => row.changedBy === caller.ownerId)).toBe(true);
   });
 });

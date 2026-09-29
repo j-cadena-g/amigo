@@ -8,7 +8,7 @@ interface AccountAmountFieldsProps {
   type: string;
   currency: CurrencyCode;
   onCurrencyChange: (currency: CurrencyCode) => void;
-  /** Balance, or the amount owed for a credit card or loan. */
+  /** Balance; available credit for a credit card; amount owed for a loan. */
   amount: string;
   onAmountChange: (amount: string) => void;
   creditLimit: string;
@@ -18,8 +18,9 @@ interface AccountAmountFieldsProps {
 }
 
 /**
- * Amount and currency for an account form. A credit card or loan takes the
- * amount owed plus an optional limit or original amount; other types a balance.
+ * Amount and currency for an account form. A credit card takes its available
+ * credit and limit, a loan the amount owed and optional original amount, and
+ * other types a balance.
  */
 export function AccountAmountFields({
   type,
@@ -43,7 +44,7 @@ export function AccountAmountFields({
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
         <label className="text-sm font-semibold" htmlFor={amountId}>
-          {isCard || isLoan ? t.accounts.amountOwed : t.common.balance}
+          {isCard ? t.accounts.availableCredit : isLoan ? t.accounts.amountOwed : t.common.balance}
         </label>
         <AmountInput
           id={amountId}

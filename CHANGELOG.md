@@ -52,7 +52,7 @@ All notable changes to this project will be documented in this file.
 - README: **How it works** (request flow, tenancy, realtime, auth, security, offline)
 - `CHANGELOG.md` moved to repository root
 - Dependency and GitHub Actions updates (Clerk, react-router 8.3.1, zod, wrangler, ESLint 10.10, lucide-react, `pnpm/action-setup` 6.1.0)
-- pnpm overrides pin patched `browserslist` 4.28.9, `sharp` ≥0.35.4, and `baseline-browser-mapping` ≥2.11.0; Dependabot ignores Vitest majors until `@cloudflare/vitest-pool-workers` supports Vitest 5 ([#139](https://github.com/j-cadena-g/amigo/pull/139))
+- pnpm overrides pin patched `browserslist` 4.28.9, `sharp` ≥0.35.4, and `baseline-browser-mapping` ≥2.11.0, and `undici` 7.29.1 (WebSocket deflate DoS, via miniflare); Dependabot ignores Vitest majors until `@cloudflare/vitest-pool-workers` supports Vitest 5 ([#139](https://github.com/j-cadena-g/amigo/pull/139), [#172](https://github.com/j-cadena-g/amigo/pull/172))
 
 ### Fixed
 

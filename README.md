@@ -17,16 +17,17 @@
 
 ![amigo](apps/web/public/icon-192.png)
 
-Cloudflare-native household management app for shared budgeting, groceries, assets, debts, and calendar planning. The app runs as a single Worker-backed application with **React Router v8 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
+Cloudflare-native household management app for shared budgeting, groceries, accounts, and calendar planning. The app runs as a single Worker-backed application with **React Router v8 framework mode** (SSR, loaders, actions, and `/api/*` resource routes), real-time household updates over WebSockets, and offline-first grocery syncing.
 
 ## What It Does
 
 - Shared household dashboard and setup flow
-- Budget tracking with transactions, budgets, and recurring entries
+- Budget tracking with transactions, categories, budgets, and recurring entries
 - Grocery list management with tags, optimistic updates, and offline sync
-- Asset and debt tracking
-- Calendar aggregation for household activity
-- Household settings, member roles, and account restore flows
+- One accounts view for everything the household owns and owes (bank accounts, credit cards, loans, investments, property)
+- Household calendar on the dashboard
+- Household settings, member roles, invites, and account restore flows
+- Web push notifications
 - Real-time updates through a household-scoped Durable Object WebSocket hub
 
 ## Stack
@@ -212,31 +213,44 @@ CHANGELOG.md         Release history
 
 Notable route groups:
 
-- `/dashboard`
+- `/dashboard` — household overview and calendar
 - `/groceries`
-- `/financial` — transactions, recurring rules, budgets, accounts, and debts (legacy `/budget` → `/financial`, `/accounts` → `/financial/accounts`, `/assets` → `/financial/accounts`)
-- `/financial/debts` — debts (legacy `/debts` → `/financial/debts`)
+- `/financial` — transactions
+  - `/financial/recurring` — recurring rules
+  - `/financial/budgets` — budgets
+  - `/financial/accounts` — everything the household owns and owes, including credit cards and loans
+  - Legacy redirects:
+    - `/budget` → `/financial` (`/budget/budgets` and `/budget/recurring` map to their `/financial` pages)
+    - `/accounts`, `/assets`, `/debts` → `/financial/accounts`
+    - `/financial/assets`, `/financial/debts` → `/financial/accounts`
 - `/calendar` — redirects to `/dashboard`
 - `/settings`
 - `/setup`
+- `/join/:code` — accept a household invite
 - `/restore-account`
+- `/dev/agent-signin` — local development only (see [AGENTS.md](./AGENTS.md))
 
 Notable API groups:
 
 - `/api/health`
+- `/api/me`
 - `/api/setup`
+- `/api/dashboard`
 - `/api/groceries`
 - `/api/tags`
+- `/api/categories`
 - `/api/transactions`
 - `/api/budgets`
 - `/api/recurring`
 - `/api/accounts`
 - `/api/members`
+- `/api/invites`
 - `/api/settings`
 - `/api/sync`
 - `/api/calendar`
 - `/api/restore`
 - `/api/audit`
+- `/api/push`
 
 ## Deployment
 

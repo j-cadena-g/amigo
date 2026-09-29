@@ -29,7 +29,7 @@ Prefer `pnpm run test:unit` (and `test:integration` when touching Workers/D1/DO)
 
 ## Layout
 
-- Pages: `apps/web/app/routes/*.tsx`
+- Pages: `apps/web/app/routes/*.tsx`, registered in `apps/web/app/routes.ts` (routes are not file-based)
 - JSON APIs: `apps/web/app/routes/api.*.ts` → handlers in `apps/web/server/api/`
 - Schema / seed: `packages/db/`
 - Worker-only (`/ws`, cron): `apps/web/worker.ts`

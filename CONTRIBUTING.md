@@ -19,7 +19,7 @@ If you run a modified version as a network service, AGPL obligations may apply t
 
 Follow [README Quick Start](./README.md#quick-start). You do **not** need a Cloudflare account, Workers Builds, Cursor Cloud Agent secrets, or a production Environment to contribute. Local Vite uses simulated D1/KV.
 
-If `pnpm run dev:verify` fails, set the **required** keys (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Missing `AGENT_LOGIN_EMAIL` means first login will not claim the seeded Demo Household. Missing `AGENT_LOGIN_PASSWORD` is fine; prefer `pnpm run agent:signin-url` for agent UI login.
+If `pnpm run dev:verify` fails, set the **required** keys (Clerk + `APP_ENV` + `APP_ORIGIN`). Optional Cloudflare / VAPID keys only produce a note. Missing `AGENT_LOGIN_EMAIL` means first login will not claim the seeded Demo Household. Missing `AGENT_LOGIN_PASSWORD` is fine; for agent UI login, open `http://localhost:5190/dev/agent-signin` (see [AGENTS.md](./AGENTS.md#auth)).
 
 Invite **codes** and `/join/:code` work locally. Outbound invite email uses operator Email Routing and will not send without that domain — share the code manually instead.
 
@@ -54,12 +54,12 @@ To reset local D1 state: `pnpm run dev:reset`.
 1. Handler in `apps/web/server/api/<name>.ts`: Zod body/query, `handleApiRoute` auth mode (`strict` unless public), `enforceRateLimit` with a `ROUTE_RATE_LIMITS` preset (`READ` / `MUTATION` / `BULK` / `SENSITIVE`).
 2. Scope every D1 query with `scopeToHousehold(…, session.householdId)`. Money fields are integer cents.
 3. Permissions: `canManageHousehold` / `canManageMembers` / `canTransferOwnership` from `apps/web/server/lib/permissions.ts` when the action is not member-safe.
-4. Thin route module `apps/web/app/routes/api.<name>.ts` that calls `handleApiRoute` (see `api.tags.ts`).
+4. Thin route module `apps/web/app/routes/api.<name>.ts` that calls `handleApiRoute` (see `api.tags.ts`), registered in `apps/web/app/routes.ts` (plus an `api/<name>/*` entry if it has sub-paths).
 5. Test with mocked `getAuth` / session (unit or `*.integration.test.ts`). Do not drive the Clerk UI.
 
 #### Add a page
 
-1. Route module under `apps/web/app/routes/` (loader/action + UI). Use `requireSession(context)` for authenticated pages.
+1. Route module under `apps/web/app/routes/` (loader/action + UI), registered in `apps/web/app/routes.ts` (inside the `_app.tsx` layout for app-shell pages). Use `requireSession(context)` for authenticated pages.
 2. Load data in the loader with `scopeToHousehold()`. Keep mutations in `/api/*` handlers when the client already uses fetch + Clerk `getToken()`.
 3. Run `pnpm run typegen` so `./+types/…` stays in sync (included in `pnpm run typecheck`).
 

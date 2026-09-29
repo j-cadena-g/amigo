@@ -4,8 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-28
+
 ### Added
 
+- **One Accounts page** for everything the household owns and owes: net worth split into assets and liabilities, then Cash & bank, Investments & property, Credit cards (with credit usage), Loans, and Archived. Credit cards and loans are now account types with an optional credit limit or original amount, and migration 0025 copies existing debts and legacy assets into accounts ([#166](https://github.com/j-cadena-g/amigo/pull/166), [#167](https://github.com/j-cadena-g/amigo/pull/167), [#168](https://github.com/j-cadena-g/amigo/pull/168))
+- Transactions can be linked to an account, including a credit card; the list filters by account (`?account=`) ([#169](https://github.com/j-cadena-g/amigo/pull/169))
+- **Jev** (Workers AI) files grocery items into supermarket aisles from English, Spanish, or mixed names, and the to-buy list is grouped by aisle in the order a store is walked ([#154](https://github.com/j-cadena-g/amigo/pull/154), [#155](https://github.com/j-cadena-g/amigo/pull/155))
+- Month calendar on the dashboard with spending, bills due, and money in per day ([#156](https://github.com/j-cadena-g/amigo/pull/156))
+- Grocery tag management in Settings (add, rename, recolor, delete) with 15 colors ([#156](https://github.com/j-cadena-g/amigo/pull/156))
+- `GET /api/me` and `GET /api/dashboard` for non-browser clients; transactions can be marked reviewed and filtered by review state ([#151](https://github.com/j-cadena-g/amigo/pull/151))
 - **What the card actually charged** on foreign-currency transactions: an optional amount (in home currency by default, or the card's own currency) that budgets and the dashboard use instead of the market-rate estimate. A charge in home currency also counts toward the list's month totals and shows its difference from the market rate on the row. Changing the household currency only re-converts it, so switching back restores the exact charge
 - Jev picks grocery aisles for the household's own country (a Colombian household's items are filed as at Éxito or Carulla), with Colombian everyday words added to each aisle; new households get starter categories named in their language
 - **Spanish interface.** Every screen, dialog, and client-side message is translated, including Clerk's sign-in. The language follows the number and date format (so a Colombian household or a Spanish browser gets Spanish automatically), or pick it under Settings › Language and region. Copy lives in typed English/Spanish catalogs under `app/i18n/`, so a missing translation is a type error. API error messages, invite emails, and grocery push notifications follow the reader's language too
@@ -19,15 +27,17 @@ All notable changes to this project will be documented in this file.
 - **Leave household** — non-owners can leave with soft-delete + 14-day restore window; ownership transfer hardened against concurrent leave/remove races ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Editable household settings for name, home currency (atomic FX refresh), and timezone ([#115](https://github.com/j-cadena-g/amigo/pull/115))
 - Shared household WebSocket at the app shell with reconnect/resume and session-invalidation cleanup ([#115](https://github.com/j-cadena-g/amigo/pull/115))
-- Audit history UI on key financial edit surfaces; account archive/restore; legacy asset → account convert; push controls in Settings ([#116](https://github.com/j-cadena-g/amigo/pull/116))
+- Audit history UI on key financial edit surfaces; account archive/restore; push controls in Settings ([#116](https://github.com/j-cadena-g/amigo/pull/116))
 - First-class **financial categories** with budget linking and seeded defaults ([#64](https://github.com/j-cadena-g/amigo/pull/64))
-- **Available credit** summary on the Financial debts tab ([#91](https://github.com/j-cadena-g/amigo/pull/91))
+- **Available credit** summary for credit cards, now shown as credit usage on the Accounts page ([#91](https://github.com/j-cadena-g/amigo/pull/91))
 - Offline grocery mutation persistence across reload, discarded-sync toasts, and shared API mutation error feedback ([#110](https://github.com/j-cadena-g/amigo/pull/110))
 - `CONTRIBUTING.md` and `SECURITY.md`
 - README badges (CI, CodeRabbit, CodeQL, license, pnpm, TypeScript, React, React Router, Clerk, Drizzle, Vitest, Cloudflare Workers/D1, Wrangler)
 
 ### Changed
 
+- Shelf-tag redesign: ink on paper with one price-tag yellow, self-hosted fonts (no Google Fonts), and the month's spending set as a price tag on the dashboard ([#152](https://github.com/j-cadena-g/amigo/pull/152))
+- The Debts tab is gone: `/debts`, `/assets`, `/financial/debts`, and `/financial/assets` redirect to `/financial/accounts`, and dashboard net worth reads Assets and Liabilities ([#168](https://github.com/j-cadena-g/amigo/pull/168))
 - Amounts in a currency other than the viewer's show its prefix (`US$`, `CA$`) instead of a bare `$`
 - Cursor Cloud Agent secrets use `AMIGO_OP_SERVICE_ACCOUNT_TOKEN` and `AMIGO_OP_ENVIRONMENT_ID` so names stay unique in Cursor's shared secret store; `op` still receives the unprefixed names
 - Unified Budget and Financial navigation/sections ([#63](https://github.com/j-cadena-g/amigo/pull/63))
@@ -46,6 +56,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Phones no longer cut off amounts on the dashboard, in dialogs, or in transaction and category forms ([#153](https://github.com/j-cadena-g/amigo/pull/153))
 - Purchased grocery items are cleared 90 days after purchase: the weekly Sunday cron now runs the purge, which only existed as an endpoint nothing called. Bulk audit writes are chunked to stay under D1's bound-parameter limit instead of silently dropping their audit rows
 - Amount fields accept both `1,234.56` and `1.234,56`: `45.000` is read as forty-five thousand instead of 45, and the add-transaction field no longer trims a third digit after a separator while typing
 - `pnpm run agent:signin-url`'s sign-in ticket fallback puts `__clerk_ticket` in the query string; after a `#`, Clerk's sign-in form ignored it
@@ -63,6 +74,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
+- `/api/debts`, `/api/assets`, and the legacy asset → account convert endpoint; accounts replace both ([#167](https://github.com/j-cadena-g/amigo/pull/167))
 - Clerk Organizations integration (household tenancy stays D1-native) ([#60](https://github.com/j-cadena-g/amigo/pull/60))
 - `docs/` directory (unused images and index)
 - `ARCHITECTURE.md` (content folded into README)

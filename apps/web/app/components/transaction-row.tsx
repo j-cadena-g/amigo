@@ -6,6 +6,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
+import { SectionLink } from "@/app/components/ledger";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
@@ -32,10 +33,25 @@ export interface TransactionDTO {
   type: "income" | "expense";
   date: string;
   budgetId: string | null;
+  accountId: string | null;
   createdAt: number;
   exchangeRateToHome: number | null;
   chargedAmount: number | null;
   chargedCurrency: CurrencyCode | null;
+}
+
+/** What a row needs to name the account it is tagged to. */
+export interface TransactionAccount {
+  id: string;
+  name: string;
+  type: string;
+}
+
+/** The transactions list narrowed to one account, keeping an active type filter. */
+function accountHref(accountId: string, typeFilter?: "income" | "expense" | null) {
+  const params = new URLSearchParams({ account: accountId });
+  if (typeFilter) params.set("type", typeFilter);
+  return `/financial?${params}`;
 }
 
 /**
@@ -70,6 +86,10 @@ function chargeDetail(
 
 interface TransactionRowProps {
   transaction: TransactionDTO;
+  /** The account it is tagged to, when known; deleted or unknown ones show nothing. */
+  account?: TransactionAccount;
+  /** Active type filter, kept when linking to the account's transactions. */
+  typeFilter?: "income" | "expense" | null;
   homeCurrency: CurrencyCode;
   expanded: boolean;
   isEditing: boolean;
@@ -86,6 +106,8 @@ interface TransactionRowProps {
 
 export function TransactionRow({
   transaction,
+  account,
+  typeFilter,
   homeCurrency,
   expanded,
   isEditing,
@@ -115,6 +137,7 @@ export function TransactionRow({
           onCancel={onCancelEdit}
           onSubmit={onSaveEdit}
           recordId={transaction.id}
+          accountLabel={account?.name}
         />
       </li>
     );
@@ -124,6 +147,7 @@ export function TransactionRow({
   const charge = chargeDetail(transaction, homeCurrency, locale, t.transactions);
   const meta = [
     transaction.description ? transaction.category : null,
+    account?.name,
     transaction.currency !== homeCurrency ? transaction.currency : null,
   ]
     .filter(Boolean)
@@ -178,6 +202,15 @@ export function TransactionRow({
             <dd>{formatTransactionDate(transaction.date, locale)}</dd>
             <dt className="text-muted-foreground">{t.common.category}</dt>
             <dd>{transaction.category}</dd>
+            {account && (
+              <>
+                <dt className="text-muted-foreground">{t.transactions.account}</dt>
+                <dd>
+                  {/* Linked here rather than in the row's meta line: that sits inside a button. */}
+                  <SectionLink to={accountHref(account.id, typeFilter)}>{account.name}</SectionLink>
+                </dd>
+              </>
+            )}
             {charge && (
               <>
                 <dt className="text-muted-foreground">

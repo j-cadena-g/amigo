@@ -21,6 +21,12 @@ export const transactions = defineMessages({
     clearFilter: "Clear filter",
     emptyFiltered: (kind: "income" | "expense") =>
       kind === "income" ? "No income transactions yet." : "No expense transactions yet.",
+    showingAccount: (name: string, clear: ReactNode) => (
+      <>
+        Showing {name} only · {clear}
+      </>
+    ),
+    emptyAccount: (name: string) => `No transactions for ${name} yet.`,
     empty: "No transactions yet. Add one, or import a JSON file.",
     loadingMore: "Loading more transactions…",
     end: "That's everything.",
@@ -33,6 +39,9 @@ export const transactions = defineMessages({
     budgetOptional: "Budget (optional)",
     needSchedule: (link: ReactNode) => <>Need this on a schedule? {link}</>,
     setUpRecurring: "Set up a recurring transaction",
+    account: "Account",
+    noAccount: "No account",
+    archivedAccount: "Archived account",
     noBudget: "No budget",
     sharedBudgets: "Shared",
     personalBudgets: "Personal",
@@ -68,6 +77,12 @@ export const transactions = defineMessages({
     clearFilter: "Quitar filtro",
     emptyFiltered: (kind: "income" | "expense") =>
       kind === "income" ? "Todavía no hay ingresos." : "Todavía no hay gastos.",
+    showingAccount: (name: string, clear: ReactNode) => (
+      <>
+        Mostrando solo {name} · {clear}
+      </>
+    ),
+    emptyAccount: (name: string) => `Todavía no hay movimientos de ${name}.`,
     empty: "Todavía no hay movimientos. Agrega uno o importa un archivo JSON.",
     loadingMore: "Cargando más movimientos…",
     end: "Eso es todo.",
@@ -80,6 +95,9 @@ export const transactions = defineMessages({
     budgetOptional: "Presupuesto (opcional)",
     needSchedule: (link: ReactNode) => <>¿Lo necesitas programado? {link}</>,
     setUpRecurring: "Configura un movimiento recurrente",
+    account: "Cuenta",
+    noAccount: "Sin cuenta",
+    archivedAccount: "Cuenta archivada",
     noBudget: "Sin presupuesto",
     sharedBudgets: "Compartidos",
     personalBudgets: "Personales",

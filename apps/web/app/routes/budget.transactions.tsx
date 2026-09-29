@@ -4,6 +4,7 @@ import { requireSession, getEnv } from "@/app/lib/session.server";
 import {
   getDb,
   transactions,
+  financialAccounts,
   households,
   scopeToHousehold,
   eq,
@@ -11,6 +12,7 @@ import {
   isNull,
   desc,
   parseHomeCurrency,
+  visibleFinancialAccountsCondition,
 } from "@amigo/db";
 import { visibleFinancialTransactionsCondition } from "@/server/lib/financial-visibility";
 import { todayInTz } from "@/server/lib/dates";
@@ -23,7 +25,9 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   const env = getEnv(context);
   const db = getDb(env.DB);
 
-  const typeFilter = new URL(request.url).searchParams.get("type") as "income" | "expense" | null;
+  const searchParams = new URL(request.url).searchParams;
+  const typeFilter = searchParams.get("type") as "income" | "expense" | null;
+  const accountFilter = searchParams.get("account") || null;
 
   const conditions = [
     scopeToHousehold(transactions.householdId, session.householdId),
@@ -35,6 +39,10 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     conditions.push(eq(transactions.type, typeFilter));
   }
 
+  if (accountFilter) {
+    conditions.push(eq(transactions.accountId, accountFilter));
+  }
+
   const [household, timeZone] = await Promise.all([
     db.query.households.findFirst({
       where: eq(households.id, session.householdId),
@@ -43,11 +51,28 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
   ]);
   const todayStr = todayInTz(timeZone);
 
-  const items = await db.query.transactions.findMany({
-    where: and(...conditions),
-    orderBy: [desc(transactions.date), desc(transactions.createdAt)],
-    limit: 20,
-  });
+  const [items, accounts] = await Promise.all([
+    db.query.transactions.findMany({
+      where: and(...conditions),
+      orderBy: [desc(transactions.date), desc(transactions.createdAt)],
+      limit: 20,
+    }),
+    // Archived included: a row keeps naming the account it was tagged to.
+    db
+      .select({
+        id: financialAccounts.id,
+        name: financialAccounts.name,
+        type: financialAccounts.type,
+      })
+      .from(financialAccounts)
+      .where(
+        and(
+          scopeToHousehold(financialAccounts.householdId, session.householdId),
+          isNull(financialAccounts.deletedAt),
+          visibleFinancialAccountsCondition(session.userId)
+        )
+      ),
+  ]);
 
   const mapped = items.map((t) => ({
     ...t,
@@ -58,6 +83,8 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     transactions: mapped,
     userId: session.userId,
     typeFilter: typeFilter === "income" || typeFilter === "expense" ? typeFilter : null,
+    accountFilter,
+    accounts,
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
     todayStr,
   };
@@ -72,6 +99,8 @@ export default function Transactions() {
     transactions: initialTransactions,
     userId,
     typeFilter,
+    accountFilter,
+    accounts,
     homeCurrency,
     todayStr,
   } = useLoaderData<typeof loader>();
@@ -81,6 +110,8 @@ export default function Transactions() {
       initialTransactions={initialTransactions}
       currentUserId={userId}
       typeFilter={typeFilter}
+      accountFilter={accountFilter}
+      accounts={accounts}
       homeCurrency={homeCurrency}
       todayStr={todayStr}
     />

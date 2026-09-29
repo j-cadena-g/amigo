@@ -9,6 +9,7 @@ function form(overrides: Partial<TransactionFormState>): TransactionFormState {
     type: "expense",
     date: "2026-09-27",
     budgetId: null,
+    accountId: null,
     currency: "USD",
     chargedAmount: "",
     chargedCurrency: null,

@@ -87,7 +87,7 @@ Sync-enabled tables use `deletedAt` for soft deletes. Schema lives under `packag
 
 ### Security
 
-KV-backed rate limits (`apps/web/server/middleware/rate-limit.ts`):
+Rate limits use Cloudflare's native rate limiting bindings (`ratelimits` in `apps/web/wrangler.jsonc`, enforced in `apps/web/server/middleware/rate-limit.ts`):
 
 | Preset | Limit | Use case |
 | --- | --- | --- |
@@ -171,6 +171,9 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 - KV namespace: `CACHE`
 - Durable Object: `HOUSEHOLD`
 - Static asset binding: `ASSETS`
+- Rate limiting: `RATE_LIMIT_MUTATION`, `RATE_LIMIT_BULK`, `RATE_LIMIT_SENSITIVE`, `RATE_LIMIT_READ`
+- Email sending: `EMAIL` (household invites)
+- Workers AI: `AI` (Jev grocery categorization)
 - Weekly cron: Sunday at `03:00 UTC` for audit log pruning
 - Daily cron: `04:23 UTC` for recurring transaction processing
 

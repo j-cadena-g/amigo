@@ -67,7 +67,13 @@ export function AddAccountDialog({
     setError(null);
     const amounts = parseAccountAmounts(type, { amount, creditLimit, originalAmount });
     if ("error" in amounts) {
-      setError(amounts.error === "amount" ? t.accounts.balanceInvalid : t.accounts.amountInvalid);
+      setError(
+        amounts.error === "amount"
+          ? t.accounts.balanceInvalid
+          : amounts.error === "available"
+            ? t.accounts.availableInvalid
+            : t.accounts.amountInvalid
+      );
       return;
     }
     setLoading(true);

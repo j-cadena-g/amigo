@@ -46,14 +46,19 @@ export function EditAccountDialog({
   const typeId = useId();
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
-  // Cards and loans are edited as the amount owed, the negative of their balance.
-  const [amount, setAmount] = useState(
-    centsToInputString(
+  // Cards are edited as available credit (limit + balance), loans as the amount owed.
+  const [amount, setAmount] = useState(() => {
+    if (account.type === "CREDIT") {
+      return account.creditLimit == null
+        ? ""
+        : centsToInputString(account.creditLimit + account.balance, account.currency, locale);
+    }
+    return centsToInputString(
       isLiabilityAccountType(account.type) ? -account.balance : account.balance,
       account.currency,
       locale
-    )
-  );
+    );
+  });
   const [creditLimit, setCreditLimit] = useState(
     account.creditLimit == null ? "" : centsToInputString(account.creditLimit, account.currency, locale)
   );
@@ -77,7 +82,13 @@ export function EditAccountDialog({
     setError(null);
     const amounts = parseAccountAmounts(type, { amount, creditLimit, originalAmount });
     if ("error" in amounts) {
-      setError(amounts.error === "amount" ? t.accounts.balanceInvalid : t.accounts.amountInvalid);
+      setError(
+        amounts.error === "amount"
+          ? t.accounts.balanceInvalid
+          : amounts.error === "available"
+            ? t.accounts.availableInvalid
+            : t.accounts.amountInvalid
+      );
       return;
     }
     setLoading(true);

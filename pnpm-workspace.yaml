@@ -15,8 +15,8 @@ overrides:
   baseline-browser-mapping: ">=2.11.0"
   # Dependabot: valibot flatten() inherited property names
   valibot: 1.4.2
-  # Dependabot: undici cache/cookie/CRLF issues (via miniflare)
-  undici: 7.29.0
+  # Dependabot: undici cache/cookie/CRLF issues and WebSocket deflate DoS (via miniflare)
+  undici: 7.29.1
 
 allowBuilds:
   esbuild: true

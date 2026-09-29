@@ -11,6 +11,7 @@ import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { AmountInput } from "@/app/components/amount-input";
+import { AccountSelect } from "@/app/components/account-select";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
@@ -28,6 +29,8 @@ export interface TransactionFormState {
   type: "income" | "expense";
   date: string;
   budgetId: string | null;
+  /** Tags the transaction to an account; never changes the account's balance. */
+  accountId: string | null;
   currency: CurrencyCode;
   /** What the card actually charged, as typed; blank uses the market rate. */
   chargedAmount: string;
@@ -80,6 +83,8 @@ interface TransactionFieldsProps {
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
   onCategoryChange: (categoryId: string) => void;
   onBudgetChange: (budgetId: string | null) => void;
+  /** Name for a linked account that is no longer in the live list (archived). */
+  accountLabel?: string;
   amountRef?: Ref<HTMLInputElement>;
 }
 
@@ -90,6 +95,7 @@ function TransactionFields({
   onChange,
   onCategoryChange,
   onBudgetChange,
+  accountLabel,
   amountRef,
 }: TransactionFieldsProps) {
   const t = useT();
@@ -101,6 +107,7 @@ function TransactionFields({
   const descriptionId = useId();
   const categoryFieldId = useId();
   const budgetFieldId = useId();
+  const accountFieldId = useId();
   const { categories } = useFinancialCategories();
 
   const selectType = (type: "income" | "expense") =>
@@ -260,6 +267,19 @@ function TransactionFields({
             />
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <label htmlFor={accountFieldId} className="text-sm font-semibold">
+            {t.transactions.account}
+          </label>
+          <AccountSelect
+            id={accountFieldId}
+            value={form.accountId}
+            onChange={(accountId) => onChange((prev) => ({ ...prev, accountId }))}
+            homeCurrency={homeCurrency}
+            fallbackLabel={accountLabel}
+          />
+        </div>
       </div>
     </>
   );
@@ -299,6 +319,8 @@ interface AddTransactionFormProps {
   onCancel: () => void;
   onSubmit: (e: FormEvent) => void;
   amountRef?: Ref<HTMLInputElement>;
+  /** Name of the selected account, shown until the account list loads. */
+  accountLabel?: string;
 }
 
 export function AddTransactionForm({
@@ -313,6 +335,7 @@ export function AddTransactionForm({
   onCancel,
   onSubmit,
   amountRef,
+  accountLabel,
 }: AddTransactionFormProps) {
   const t = useT();
   useEffect(() => {
@@ -357,6 +380,7 @@ export function AddTransactionForm({
           onChange((prev) => ({ ...prev, budgetId }));
         }}
         amountRef={amountRef}
+        accountLabel={accountLabel}
       />
 
       {formError && (
@@ -391,6 +415,7 @@ interface EditTransactionFormProps {
   onCancel: () => void;
   onSubmit: (e: FormEvent) => void;
   recordId?: string;
+  accountLabel?: string;
 }
 
 export function EditTransactionForm({
@@ -402,6 +427,7 @@ export function EditTransactionForm({
   onCancel,
   onSubmit,
   recordId,
+  accountLabel,
 }: EditTransactionFormProps) {
   const t = useT();
   return (
@@ -413,6 +439,7 @@ export function EditTransactionForm({
         onChange={onChange}
         onCategoryChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
         onBudgetChange={(budgetId) => onChange((prev) => ({ ...prev, budgetId }))}
+        accountLabel={accountLabel}
       />
 
       {recordId ? (

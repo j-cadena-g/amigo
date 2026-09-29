@@ -118,6 +118,12 @@ async function resolveCharge(
   return { chargedAmount, chargedCurrency, chargedExchangeRateToHome: rate };
 }
 
+/**
+ * Not a uuid: accounts made by the asset-convert endpoint have ids like
+ * `from-asset-<uuid>`. Existence and visibility are checked in financial-refs.
+ */
+const accountIdField = z.string().min(1).max(100).nullable().optional();
+
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
@@ -125,7 +131,7 @@ const addTransactionSchema = z.object({
   type: z.enum(["income", "expense"]),
   date: calendarDateString,
   budgetId: z.string().uuid().nullable().optional(),
-  accountId: z.string().uuid().nullable().optional(),
+  accountId: accountIdField,
   currency: currencyEnum.optional(),
   chargedAmount: chargedAmountCents.nullable().optional(),
   chargedCurrency: currencyEnum.optional(),
@@ -138,7 +144,7 @@ const updateTransactionSchema = z.object({
   type: z.enum(["income", "expense"]).optional(),
   date: calendarDateString.optional(),
   budgetId: z.string().uuid().nullable().optional(),
-  accountId: z.string().uuid().nullable().optional(),
+  accountId: accountIdField,
   currency: currencyEnum.optional(),
   chargedAmount: chargedAmountCents.nullable().optional(),
   chargedCurrency: currencyEnum.optional(),
@@ -153,7 +159,7 @@ const importRowSchema = z.object({
   description: z.string().max(500).optional(),
   currency: currencyEnum.optional(),
   budgetId: z.string().uuid().nullable().optional(),
-  accountId: z.string().uuid().nullable().optional(),
+  accountId: accountIdField,
   externalId: z.string().max(200).optional(),
 });
 
@@ -298,11 +304,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     const url = new URL(request.url);
-    const { page, limit, type, reviewed } = parseTransactionsListQuery({
+    const { page, limit, type, reviewed, account } = parseTransactionsListQuery({
       page: url.searchParams.get("page") ?? undefined,
       limit: url.searchParams.get("limit") ?? undefined,
       type: url.searchParams.get("type") ?? undefined,
       reviewed: url.searchParams.get("reviewed") ?? undefined,
+      account: url.searchParams.get("account") ?? undefined,
     });
     const offset = (page - 1) * limit;
 
@@ -318,6 +325,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
 
     if (reviewed !== undefined) {
       conditions.push(eq(transactions.reviewed, reviewed));
+    }
+
+    if (account) {
+      conditions.push(eq(transactions.accountId, account));
     }
 
     const items = await db.query.transactions.findMany({

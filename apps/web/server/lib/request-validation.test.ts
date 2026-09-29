@@ -9,6 +9,14 @@ import {
 } from "./request-validation";
 
 describe("parseTransactionsListQuery", () => {
+  it("passes an account filter through and rejects an oversized one", () => {
+    expect(parseTransactionsListQuery({ account: "acct-1" }).account).toBe("acct-1");
+    expect(parseTransactionsListQuery({ account: "" }).account).toBeUndefined();
+    expect(() => parseTransactionsListQuery({ account: "x".repeat(101) })).toThrow(
+      "Invalid account filter"
+    );
+  });
+
   it("rejects invalid type filters", () => {
     try {
       parseTransactionsListQuery({

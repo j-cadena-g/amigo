@@ -54,11 +54,13 @@ export function parseTransactionsListQuery(query: {
   limit?: string;
   type?: string;
   reviewed?: string;
+  account?: string;
 }): {
   page: number;
   limit: number;
   type?: TransactionsListType;
   reviewed?: boolean;
+  account?: string;
 } {
   let type: TransactionsListType | undefined;
   if (query.type !== undefined && query.type !== "") {
@@ -73,6 +75,12 @@ export function parseTransactionsListQuery(query: {
   }
 
   const reviewed = parseBooleanFilter(query.reviewed, "reviewed");
+
+  // Same bound as a transaction's accountId; any id is fine since results stay household-scoped.
+  const account = query.account === undefined || query.account === "" ? undefined : query.account;
+  if (account !== undefined && account.length > 100) {
+    throw new ActionError("Invalid account filter", "VALIDATION_ERROR");
+  }
 
   return {
     page: clampInt(
@@ -89,6 +97,7 @@ export function parseTransactionsListQuery(query: {
     ),
     type,
     reviewed,
+    account,
   };
 }
 

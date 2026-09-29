@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRevalidator, useSearchParams } from "react-router";
 import { Download, Loader2, Plus, Upload } from "lucide-react";
 import type { CurrencyCode } from "@amigo/db";
@@ -27,6 +27,7 @@ import { CategoryManagementPanel } from "@/app/components/financial/category-man
 import { LedgerGroup } from "@/app/components/financial/ledger-group";
 import {
   TransactionRow,
+  type TransactionAccount,
   type TransactionDTO,
 } from "@/app/components/transaction-row";
 import { useLocale } from "@/app/lib/use-locale";
@@ -38,8 +39,21 @@ interface TransactionListProps {
   initialTransactions: TransactionDTO[];
   currentUserId: string;
   typeFilter?: "income" | "expense" | null;
+  /** Id of the account the list is narrowed to, if any. */
+  accountFilter?: string | null;
+  /** The household's visible accounts, archived included, to name each row's account. */
+  accounts: TransactionAccount[];
   homeCurrency: CurrencyCode;
   todayStr: string;
+}
+
+/** The transactions list URL with whichever filters are given. */
+function financialHref(filters: { type?: string | null; account?: string | null }) {
+  const params = new URLSearchParams();
+  if (filters.type) params.set("type", filters.type);
+  if (filters.account) params.set("account", filters.account);
+  const query = params.toString();
+  return query ? `/financial?${query}` : "/financial";
 }
 
 function MonthTotalsLine({
@@ -93,6 +107,8 @@ export function TransactionList({
   initialTransactions,
   currentUserId: _currentUserId,
   typeFilter,
+  accountFilter,
+  accounts,
   homeCurrency,
   todayStr,
 }: TransactionListProps) {
@@ -119,6 +135,10 @@ export function TransactionList({
   const lastExpenseBudgetIdRef = useRef<string | null>(null);
   const lastEditExpenseBudgetIdRef = useRef<string | null>(null);
 
+  // Adding while filtered to an account starts on that account, so the new row stays in view.
+  const filterAccountId =
+    accountFilter && accounts.some((a) => a.id === accountFilter) ? accountFilter : null;
+
   const [importOpen, setImportOpen] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -129,6 +149,7 @@ export function TransactionList({
     type: "expense",
     date: todayStr,
     budgetId: null,
+    accountId: filterAccountId,
     currency: homeCurrency,
     chargedAmount: "",
     chargedCurrency: null,
@@ -142,6 +163,7 @@ export function TransactionList({
     type: "expense",
     date: "",
     budgetId: null,
+    accountId: null,
     currency: homeCurrency,
     chargedAmount: "",
     chargedCurrency: null,
@@ -153,18 +175,38 @@ export function TransactionList({
     setHasMore(initialTransactions.length >= 20);
   }, [initialTransactions]);
 
+  // A page requested under one filter must not land in the list after the filter changes.
+  const filterKey = `${typeFilter ?? ""}|${accountFilter ?? ""}`;
+  const filterKeyRef = useRef(filterKey);
+  filterKeyRef.current = filterKey;
+
+  // The draft follows the account filter unless someone picked a different account.
+  const draftFilterAccountRef = useRef(filterAccountId);
+  useEffect(() => {
+    const previous = draftFilterAccountRef.current;
+    draftFilterAccountRef.current = filterAccountId;
+    if (previous === filterAccountId) return;
+    setNewTransaction((prev) =>
+      prev.accountId === previous ? { ...prev, accountId: filterAccountId } : prev
+    );
+  }, [filterAccountId]);
+
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const filterParam = typeFilter ? `&type=${typeFilter}` : "";
+      const requestedFilterKey = filterKey;
+      const filterParam =
+        (typeFilter ? `&type=${typeFilter}` : "") +
+        (accountFilter ? `&account=${encodeURIComponent(accountFilter)}` : "");
       const res = await fetch(`/api/transactions?page=${nextPage}&limit=20${filterParam}`);
       if (res.ok) {
         const data = (await res.json()) as {
           data: TransactionDTO[];
           pagination: { hasMore: boolean };
         };
+        if (filterKeyRef.current !== requestedFilterKey) return;
         setAllTransactions((prev) => [...prev, ...data.data]);
         setPage(nextPage);
         setHasMore(data.pagination.hasMore);
@@ -172,7 +214,7 @@ export function TransactionList({
     } finally {
       setIsLoadingMore(false);
     }
-  }, [page, hasMore, isLoadingMore, typeFilter]);
+  }, [page, hasMore, isLoadingMore, typeFilter, accountFilter, filterKey]);
 
   useEffect(() => {
     if (newTransaction.type === "expense") {
@@ -197,6 +239,7 @@ export function TransactionList({
       ...prev,
       currency: homeCurrency,
       date: todayStr,
+      accountId: prev.accountId ?? filterAccountId,
     }));
     setShowAddForm(true);
   };
@@ -230,6 +273,7 @@ export function TransactionList({
           type: newTransaction.type,
           date: newTransaction.date,
           budgetId: newTransaction.budgetId,
+          accountId: newTransaction.accountId,
           currency: newTransaction.currency,
           ...chargePayload(newTransaction, homeCurrency),
         }),
@@ -243,6 +287,7 @@ export function TransactionList({
           type: "expense",
           date: todayStr,
           budgetId: null,
+          accountId: filterAccountId,
           currency: homeCurrency,
           chargedAmount: "",
           chargedCurrency: null,
@@ -295,6 +340,7 @@ export function TransactionList({
       type: transaction.type,
       date: transaction.date.split("T")[0] ?? transaction.date,
       budgetId: transaction.budgetId,
+      accountId: transaction.accountId,
       currency: transaction.currency,
       chargedAmount:
         transaction.chargedAmount != null && transaction.chargedCurrency
@@ -346,6 +392,7 @@ export function TransactionList({
           type: editForm.type,
           date: editForm.date,
           budgetId: editForm.budgetId,
+          accountId: editForm.accountId,
           currency: editForm.currency,
           ...chargePayload(editForm, homeCurrency),
         }),
@@ -362,6 +409,12 @@ export function TransactionList({
       setIsSubmitting(false);
     }
   };
+
+  const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  // A filter on an account that is gone (deleted) still applies, so the empty list is explained.
+  const filterAccountName = accountFilter
+    ? (accountsById.get(accountFilter)?.name ?? t.transactions.archivedAccount)
+    : null;
 
   const groups = groupTransactionsByMonth(allTransactions, {
     homeCurrency,
@@ -422,6 +475,9 @@ export function TransactionList({
           }}
           onSubmit={handleAddTransaction}
           amountRef={addAmountRef}
+          accountLabel={
+            newTransaction.accountId ? accountsById.get(newTransaction.accountId)?.name : undefined
+          }
         />
       )}
 
@@ -433,7 +489,20 @@ export function TransactionList({
         <p className="text-sm text-muted-foreground">
           {t.transactions.showingOnly(
             typeFilter,
-            <SectionLink to="/financial">{t.transactions.clearFilter}</SectionLink>
+            <SectionLink to={financialHref({ account: accountFilter })}>
+              {t.transactions.clearFilter}
+            </SectionLink>
+          )}
+        </p>
+      )}
+
+      {filterAccountName && (
+        <p className="text-sm text-muted-foreground">
+          {t.transactions.showingAccount(
+            filterAccountName,
+            <SectionLink to={financialHref({ type: typeFilter })}>
+              {t.transactions.clearFilter}
+            </SectionLink>
           )}
         </p>
       )}
@@ -441,7 +510,11 @@ export function TransactionList({
       {allTransactions.length === 0 ? (
         <EmptyState
           message={
-            typeFilter ? t.transactions.emptyFiltered(typeFilter) : t.transactions.empty
+            filterAccountName
+              ? t.transactions.emptyAccount(filterAccountName)
+              : typeFilter
+                ? t.transactions.emptyFiltered(typeFilter)
+                : t.transactions.empty
           }
           action={
             <Button type="button" onClick={handleOpenAddForm}>
@@ -471,6 +544,12 @@ export function TransactionList({
                   <TransactionRow
                     key={transaction.id}
                     transaction={transaction}
+                    account={
+                      transaction.accountId
+                        ? accountsById.get(transaction.accountId)
+                        : undefined
+                    }
+                    typeFilter={typeFilter}
                     homeCurrency={homeCurrency}
                     expanded={expandedId === transaction.id}
                     isEditing={editingId === transaction.id}

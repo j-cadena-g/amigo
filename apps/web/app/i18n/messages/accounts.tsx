@@ -33,7 +33,7 @@ export const accounts = defineMessages({
     hide: "Hide",
     show: (count: number) => `Show (${count})`,
     addHint:
-      "Transactions and imports link to checking, savings, and cash accounts. Credit cards and loans track what you owe.",
+      "Link transactions to any account, including credit cards, to see where money came from or went.",
     namePlaceholder: "e.g. Main checking",
     balanceInvalid: "Enter the balance as a number, like 1250.50 or 1.250,50.",
     amountInvalid: "Enter the amount as a number above zero, like 5000 or 5.000,50.",
@@ -102,7 +102,7 @@ export const accounts = defineMessages({
     hide: "Ocultar",
     show: (count: number) => `Mostrar (${count})`,
     addHint:
-      "Los movimientos y las importaciones se vinculan a cuentas corrientes, de ahorros y de efectivo. Las tarjetas de crédito y los préstamos siguen lo que debes.",
+      "Vincula los movimientos a cualquier cuenta, incluidas las tarjetas de crédito, para ver de dónde salió o a dónde fue el dinero.",
     namePlaceholder: "p. ej. Cuenta principal",
     balanceInvalid: "Escribe el saldo como un número, por ejemplo 1250.50 o 1.250,50.",
     amountInvalid: "Escribe el monto como un número mayor que cero, por ejemplo 5000 o 5.000,50.",

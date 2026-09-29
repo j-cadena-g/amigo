@@ -54,6 +54,7 @@ const ES: Record<string, string> = {
   "Internal server error": "Error interno del servidor",
   "Invalid JSON": "JSON no válido",
   "Invalid or expired invite code": "El código de invitación no es válido o ya venció",
+  "Invalid account filter": "Filtro de cuenta no válido",
   "Invalid request origin": "Origen de la solicitud no válido",
   "Invalid timezone": "Zona horaria no válida",
   'Invalid type filter; expected "income" or "expense".':

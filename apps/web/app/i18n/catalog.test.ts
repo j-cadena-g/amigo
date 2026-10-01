@@ -48,6 +48,19 @@ describe("interface copy", () => {
     expect(untranslated).toEqual([]);
   });
 
+  it("uses singular nouns for a count of one in import summaries", () => {
+    const en = messagesFor("en").imports;
+    const es = messagesFor("es").imports;
+    expect(en.finished(1, 1)).toBe("Imported 1 transaction. Skipped 1 duplicate.");
+    expect(en.finished(2, 0)).toBe("Imported 2 transactions. Skipped 0 duplicates.");
+    expect(en.previewSummary(1, 1)).toBe("1 selected · 1 duplicate will be skipped.");
+    expect(en.corrected(1)).toContain("1 transaction.");
+    expect(es.finished(1, 1)).toBe("Se importó 1 movimiento. Se omitió 1 duplicado.");
+    expect(es.finished(2, 3)).toBe("Se importaron 2 movimientos. Se omitieron 3 duplicados.");
+    expect(es.previewSummary(1, 1)).toBe("1 seleccionado · Se omitirá 1 duplicado.");
+    expect(es.corrected(1)).toContain("1 movimiento sin");
+  });
+
   it("never leaves a string empty", () => {
     const empty = [...en, ...es].filter(([, text]) => text.trim() === "");
     expect(empty).toEqual([]);

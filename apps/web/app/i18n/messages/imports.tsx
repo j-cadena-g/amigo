@@ -14,7 +14,7 @@ export const imports = defineMessages({
     noCorrection: "No matching correction",
     originalCurrency: "Original file currency",
     corrected: (count: number) =>
-      `Corrected the currency of ${count} transactions. Amounts were unchanged.`,
+      `Corrected the currency of ${count} ${count === 1 ? "transaction" : "transactions"}. Amounts were unchanged.`,
     currencyMismatch: (currency: string) =>
       `The imported amounts use a different currency from this account (${currency}). Check the posted amounts and select the correct currency before continuing.`,
     acceptCurrencyMismatch:
@@ -44,9 +44,9 @@ export const imports = defineMessages({
     creditsWarning:
       "Credits are unchecked by default. Including a credit records it as income. Leave card payments and transfers unchecked; review refunds separately.",
     previewSummary: (selected: number, duplicates: number) =>
-      `${selected} selected · ${duplicates} duplicates will be skipped.`,
+      `${selected} selected · ${duplicates} ${duplicates === 1 ? "duplicate" : "duplicates"} will be skipped.`,
     finished: (inserted: number, skipped: number) =>
-      `Imported ${inserted} transactions. Skipped ${skipped} duplicates.`,
+      `Imported ${inserted} ${inserted === 1 ? "transaction" : "transactions"}. Skipped ${skipped} ${skipped === 1 ? "duplicate" : "duplicates"}.`,
     checking: "Checking…",
     importing: "Importing…",
     action: "import the transactions",
@@ -64,7 +64,7 @@ export const imports = defineMessages({
     noCorrection: "Sin corrección aplicable",
     originalCurrency: "Moneda original del archivo",
     corrected: (count: number) =>
-      `Se corrigió la moneda de ${count} movimientos sin cambiar sus importes.`,
+      `Se corrigió la moneda de ${count} ${count === 1 ? "movimiento" : "movimientos"} sin cambiar sus importes.`,
     currencyMismatch: (currency: string) =>
       `Los importes usan una moneda distinta de la cuenta (${currency}). Comprueba los importes contabilizados y elige la moneda correcta.`,
     acceptCurrencyMismatch:
@@ -94,9 +94,9 @@ export const imports = defineMessages({
     creditsWarning:
       "Los abonos no se seleccionan por defecto. Incluir un abono lo registra como ingreso. Excluye pagos de tarjeta y transferencias; revisa los reembolsos por separado.",
     previewSummary: (selected: number, duplicates: number) =>
-      `${selected} seleccionados · Se omitirán ${duplicates} duplicados.`,
+      `${selected} ${selected === 1 ? "seleccionado" : "seleccionados"} · ${duplicates === 1 ? "Se omitirá 1 duplicado" : `Se omitirán ${duplicates} duplicados`}.`,
     finished: (inserted: number, skipped: number) =>
-      `Se importaron ${inserted} movimientos. Se omitieron ${skipped} duplicados.`,
+      `${inserted === 1 ? "Se importó 1 movimiento" : `Se importaron ${inserted} movimientos`}. ${skipped === 1 ? "Se omitió 1 duplicado" : `Se omitieron ${skipped} duplicados`}.`,
     checking: "Revisando…",
     importing: "Importando…",
     action: "importar los movimientos",

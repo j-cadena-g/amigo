@@ -30,6 +30,34 @@ Cloudflare-native household management app for shared budgeting, groceries, acco
 - Web push notifications
 - Real-time updates through a household-scoped Durable Object WebSocket hub
 
+## Transaction imports
+
+In **Financial**, choose **Import transactions**, upload an `.ofx`, `.qfx`, or Wealthsimple Chequing `.csv` file, and select
+the destination account. For National Bank (NBC), download **OFX v1.0.2**. Preview
+the rows and file currency, exclude anything you do not want, then confirm the import.
+
+- Supports one bank or credit-card account per file, up to 2 MB and 2,000 rows.
+- OFX/QFX imports use bank transaction IDs to skip duplicates across overlapping downloads.
+- For Scotiabank, RBC, and PC Financial QFX downloads without a bank identifier,
+  select the source bank. Always use the same source bank for that account.
+- Wealthsimple Chequing activity CSVs use content matches to flag possible duplicates.
+  They start unchecked; explicitly include a match only if it is a separate transaction.
+  Identical rows within one CSV remain separate entries. Transfers start unchecked,
+  and zero-value activities are not imported.
+- If a file has an incorrect currency label, select the currency of the posted
+  statement amounts. This changes the label without converting the numbers.
+  To repair an earlier import, re-upload the same OFX/QFX file, choose the same bank
+  and account, set the correct currency, and enable **Correct matching transactions
+  already imported**. Preview and confirm; no new entries are added in this mode.
+  Imports whose currency differs from the account require explicit acknowledgement.
+- New entries are marked unreviewed and categorized as **Uncategorized**.
+- Credits start unchecked. Including one records it as income; exclude card
+  payments and transfers, and review refunds separately.
+- UTF-8 and legacy Windows-1252 downloads are supported. Investment statements,
+  correction records, and transaction-level currency overrides are not supported.
+- CSV export remains available. Other banks' CSV layouts, investment activity CSVs,
+  and PDF uploads are not supported.
+
 ## Stack
 
 - Runtime: Cloudflare Workers

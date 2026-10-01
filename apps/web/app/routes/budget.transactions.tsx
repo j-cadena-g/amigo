@@ -63,6 +63,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
         id: financialAccounts.id,
         name: financialAccounts.name,
         type: financialAccounts.type,
+        archived: financialAccounts.archived,
       })
       .from(financialAccounts)
       .where(

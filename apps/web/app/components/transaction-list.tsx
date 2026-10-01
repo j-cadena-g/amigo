@@ -448,7 +448,7 @@ export function TransactionList({
               onClick={() => setImportOpen(true)}
             >
               <Upload />
-              {t.transactions.importJson}
+              {t.imports.title}
             </Button>
           </>
         }
@@ -586,6 +586,7 @@ export function TransactionList({
 
       <TransactionImportDialog
         open={importOpen}
+        accounts={accounts.filter((account) => !account.archived)}
         onOpenChange={setImportOpen}
         onImported={() => revalidator.revalidate()}
       />

@@ -19,9 +19,9 @@ const ES: Record<string, string> = {
   "CSV files must be under 2 MB.":
     "Los archivos CSV deben pesar menos de 2 MB.",
   "CSV files must contain 1–2,000 transactions.":
-    "Los archivos CSV deben tener entre 1 y 2000 movimientos.",
+    "Los archivos CSV deben tener entre 1 y 2.000 movimientos.",
   "CSV files support at most 2,000 transactions.":
-    "Los archivos CSV admiten como máximo 2000 movimientos.",
+    "Los archivos CSV admiten como máximo 2.000 movimientos.",
   "CSV row has an unexpected number of columns.":
     "Una fila del archivo CSV tiene un número de columnas inesperado.",
   "Choose a CSV containing one Wealthsimple account.":
@@ -57,7 +57,7 @@ const ES: Record<string, string> = {
   "The OFX file contains a bank error.":
     "El archivo OFX contiene un error del banco.",
   "The OFX file must contain 1–2,000 complete transactions.":
-    "El archivo OFX debe tener entre 1 y 2000 movimientos completos.",
+    "El archivo OFX debe tener entre 1 y 2.000 movimientos completos.",
   "Unclosed CSV quote.":
     "Hay comillas sin cerrar en el archivo CSV.",
   "Unsupported CSV currency.":

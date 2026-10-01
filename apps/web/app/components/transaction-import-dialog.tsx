@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
 import { NativeSelect } from "@/app/components/financial/form-controls";
+import { SectionLink } from "@/app/components/ledger";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -303,10 +304,13 @@ export function TransactionImportDialog({
             </>
           )}
           {!accounts.length && (
-            <p className="text-sm">{t.imports.noAccounts}</p>
+            <p className="space-x-2 text-sm">
+              <span>{t.imports.noAccounts}</span>
+              <SectionLink to="/financial/accounts">{t.accounts.add}</SectionLink>
+            </p>
           )}
           {rows && currencyMismatch && (
-            <div className="space-y-2 rounded-xl border border-warning p-3 text-sm">
+            <div className="space-y-2 rounded-xl border border-border p-3 text-sm">
               <p>{t.imports.currencyMismatch(accountCurrency)}</p>
               <label className="flex items-start gap-2">
                 <input

@@ -166,7 +166,9 @@ export function TransactionImportDialog({
             data.rows
               .filter(
                 (row) =>
-                  row.defaultExcluded || row.duplicate || row.amountCents === 0
+                  row.defaultExcluded ||
+                  row.possibleDuplicate ||
+                  row.amountCents === 0
               )
               .map((row) => row.externalId)
           )

@@ -410,6 +410,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
           .parse(body)
       : null;
     let parsedFile: Awaited<ReturnType<typeof parseOfx>> | null = null;
+    const excludedIds = new Set(fileInput?.excludedIds);
     if (fileInput) {
       try {
         parsedFile = fileInput.csv
@@ -456,7 +457,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       }
       if (fileInput.repairCurrency) {
         const candidates = parsedFile.rows.filter(
-          (row) => !fileInput.excludedIds.includes(row.externalId)
+          (row) => !excludedIds.has(row.externalId)
         );
         const matches = await currencyCorrectionMatches(
           db,
@@ -506,7 +507,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
         ? {
             dryRun: fileInput.dryRun,
             rows: parsedFile.rows
-              .filter((row) => !fileInput.excludedIds.includes(row.externalId))
+              .filter((row) => !excludedIds.has(row.externalId))
               .filter((row) => fileInput.dryRun || row.amountCents > 0)
               .map((row) => ({
                 ...row,

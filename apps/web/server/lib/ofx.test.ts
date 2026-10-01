@@ -46,6 +46,15 @@ describe("OFX statement import", () => {
       a.externalId
     );
   });
+  it("reads account identity from the statement, not transfer destinations", async () => {
+    const transfer = transaction().replace(
+      "</STMTTRN>",
+      "<BANKACCTTO><BANKID>123<ACCTID>destination<ACCTTYPE>SAVINGS</BANKACCTTO></STMTTRN>"
+    );
+    const plain = (await parseOfx(statement())).rows[0]!;
+    const withTransfer = (await parseOfx(statement(transfer))).rows[0]!;
+    expect(withTransfer.externalId).toBe(plain.externalId);
+  });
   it("handles credits and single decimal amounts", async () => {
     expect(
       (await parseOfx(statement(transaction("credit", "+0.1")))).rows[0]

@@ -8,6 +8,62 @@ import type { UiLanguage } from "@amigo/db";
  */
 const ES: Record<string, string> = {
   "The import currency differs from the account. Confirm the currency before continuing.": "La moneda de la importación difiere de la cuenta. Confirma la moneda antes de continuar.",
+  "An OFX description exceeds 500 characters.":
+    "Una descripción del archivo OFX supera los 500 caracteres.",
+  "CSV account identity is missing.":
+    "Falta la cuenta en el archivo CSV.",
+  "CSV amount exceeds the supported range.":
+    "Un monto del archivo CSV supera el rango admitido.",
+  "CSV description exceeds 500 characters.":
+    "Una descripción del archivo CSV supera los 500 caracteres.",
+  "CSV files must be under 2 MB.":
+    "Los archivos CSV deben pesar menos de 2 MB.",
+  "CSV files must contain 1–2,000 transactions.":
+    "Los archivos CSV deben tener entre 1 y 2000 movimientos.",
+  "CSV files support at most 2,000 transactions.":
+    "Los archivos CSV admiten como máximo 2000 movimientos.",
+  "CSV row has an unexpected number of columns.":
+    "Una fila del archivo CSV tiene un número de columnas inesperado.",
+  "Choose a CSV containing one Wealthsimple account.":
+    "Elige un archivo CSV con una sola cuenta de Wealthsimple.",
+  "Choose a Wealthsimple activity CSV with the original column headers.":
+    "Elige un CSV de actividad de Wealthsimple con los encabezados de columna originales.",
+  "Choose an OFX file containing one bank or credit-card account.":
+    "Elige un archivo OFX con una sola cuenta bancaria o de tarjeta de crédito.",
+  "Conflicting transactions share an OFX transaction ID.":
+    "Hay movimientos distintos con el mismo ID de transacción OFX.",
+  "Invalid CSV cash amount.":
+    "Monto no válido en el archivo CSV.",
+  "Invalid CSV effective date.":
+    "Fecha no válida en el archivo CSV.",
+  "Invalid OFX amount: expected at most two decimal places.":
+    "Monto OFX no válido: se esperaban como máximo dos decimales.",
+  "Invalid OFX posting date.":
+    "Fecha de registro OFX no válida.",
+  "Invalid or incomplete OFX file.":
+    "El archivo OFX no es válido o está incompleto.",
+  "Malformed CSV quoting.":
+    "Las comillas del archivo CSV no son válidas.",
+  "OFX amounts must be nonzero and within the supported range.":
+    "Los montos OFX deben ser distintos de cero y estar dentro del rango admitido.",
+  "OFX corrections or transaction-level currencies are not supported yet.":
+    "Aún no se admiten correcciones OFX ni monedas por movimiento.",
+  "OFX files must be under 2 MB.":
+    "Los archivos OFX deben pesar menos de 2 MB.",
+  "Only Wealthsimple Chequing cash activities are supported; investment trades are not transaction imports.":
+    "Solo se admiten movimientos de efectivo de Wealthsimple Chequing; las operaciones de inversión no se importan como movimientos.",
+  "Select the source bank: this file has no bank identifier.":
+    "Selecciona el banco de origen: este archivo no identifica al banco.",
+  "The OFX file contains a bank error.":
+    "El archivo OFX contiene un error del banco.",
+  "The OFX file must contain 1–2,000 complete transactions.":
+    "El archivo OFX debe tener entre 1 y 2000 movimientos completos.",
+  "Unclosed CSV quote.":
+    "Hay comillas sin cerrar en el archivo CSV.",
+  "Unsupported CSV currency.":
+    "La moneda del archivo CSV no es compatible.",
+  "Unsupported OFX currency.":
+    "La moneda del archivo OFX no es compatible.",
   "A category with this name already exists": "Ya existe una categoría con este nombre",
   "A primary email address is required to join a household":
     "Se necesita un correo principal para unirse a un hogar",
@@ -180,6 +236,10 @@ const PATTERNS_ES: [RegExp, (...slots: string[]) => string][] = [
   [
     /^Unknown or inaccessible account\(s\): (.+)$/,
     (ids) => `Cuentas que no existen o sin acceso: ${ids}`,
+  ],
+  [
+    /^Missing or repeated OFX field: (\w+)\.$/,
+    (name) => `Falta o se repite el campo OFX ${name}.`,
   ],
   [
     /^Invalid (\w+) filter; expected "true" or "false"\.$/,

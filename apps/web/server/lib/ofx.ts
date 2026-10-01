@@ -74,9 +74,18 @@ export async function parseOfx(
   const currency = field(statement, "CURDEF");
   if (!(CURRENCY_CODES as readonly string[]).includes(currency))
     throw new Error("Unsupported OFX currency.");
-  const account = field(statement, "ACCTID");
+  // Read identity from the statement's own account; STMTTRN may carry BANKACCTTO/CCACCTTO.
+  const accountFrom = [
+    ...statement.matchAll(/<(BANKACCTFROM|CCACCTFROM)>([\s\S]*?)<\/\1>/gi),
+  ];
+  if (accountFrom.length !== 1)
+    throw new Error(
+      "Choose an OFX file containing one bank or credit-card account."
+    );
+  const accountInfo = accountFrom[0]![2]!;
+  const account = field(accountInfo, "ACCTID");
   const bank =
-    field(statement, "BANKID", false) ||
+    field(accountInfo, "BANKID", false) ||
     field(source, "FID", false) ||
     field(source, "ORG", false) ||
     (sourceBank ? `selected:${sourceBank}` : "");
@@ -84,7 +93,7 @@ export async function parseOfx(
     throw new Error(
       "Select the source bank: this file has no bank identifier."
     );
-  const accountType = creditCard ? "creditcard" : field(statement, "ACCTTYPE", false);
+  const accountType = creditCard ? "creditcard" : field(accountInfo, "ACCTTYPE", false);
   const blocks = [...statement.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
   if (
     !blocks.length ||

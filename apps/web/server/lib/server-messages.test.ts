@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { hasServerTranslation, translateServerMessage } from "./server-messages";
 
 const SERVER_DIR = path.resolve(import.meta.dirname, "..");
+/** Import parsers whose plain `Error` messages the import handler sends as `{ error }`. */
+const FILE_PARSERS = new Set(["ofx.ts", "wealthsimple-csv.ts"]);
 
 interface FoundMessage {
   where: string;
@@ -12,7 +14,7 @@ interface FoundMessage {
   template?: string;
 }
 
-/** Messages the API can send as `{ error }`: ActionError, jsonError, assertPermission, `error:`. */
+/** Messages the API can send as `{ error }`: ActionError, jsonError, assertPermission, `error:`, file parser errors. */
 function collectMessages(): FoundMessage[] {
   const found: FoundMessage[] = [];
   const files: string[] = [];
@@ -42,6 +44,12 @@ function collectMessages(): FoundMessage[] {
     };
     const visit = (node: ts.Node) => {
       if (ts.isNewExpression(node) && node.expression.getText() === "ActionError") {
+        add(node, node.arguments?.[0]);
+      } else if (
+        ts.isNewExpression(node) &&
+        node.expression.getText() === "Error" &&
+        FILE_PARSERS.has(path.basename(file))
+      ) {
         add(node, node.arguments?.[0]);
       } else if (ts.isCallExpression(node)) {
         const callee = node.expression.getText();
@@ -78,6 +86,7 @@ const TEMPLATE_SAMPLES: Record<string, string[]> = {
   '`Unknown or inaccessible account(s): ${missing.join(", ")}`': [
     "Unknown or inaccessible account(s): a1",
   ],
+  "`Missing or repeated OFX field: ${name}.`": ["Missing or repeated OFX field: ACCTID."],
   '`Invalid ${label} filter; expected "true" or "false".`': [
     'Invalid reviewed filter; expected "true" or "false".',
   ],

@@ -304,7 +304,7 @@ export function TransactionImportDialog({
             <p className="text-sm">{t.imports.noAccounts}</p>
           )}
           {rows && currencyMismatch && (
-            <div className="space-y-2 rounded-md border border-warning p-3 text-sm">
+            <div className="space-y-2 rounded-xl border border-warning p-3 text-sm">
               <p>{t.imports.currencyMismatch(accountCurrency)}</p>
               <label className="flex items-start gap-2">
                 <input

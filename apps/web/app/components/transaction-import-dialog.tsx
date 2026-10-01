@@ -208,7 +208,7 @@ export function TransactionImportDialog({
           <label className="flex flex-col gap-2 text-sm">
             <span>{t.imports.file}</span>
             <input
-              className="block w-full rounded-md text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-tag file:px-4 file:py-2.5 file:font-semibold file:text-tag-foreground hover:file:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="block w-full rounded-md text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-background file:px-4 file:py-2 file:font-semibold file:transition-colors hover:file:bg-secondary hover:file:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               type="file"
               accept=".ofx,.qfx,.csv"
               disabled={busy}
@@ -391,7 +391,7 @@ export function TransactionImportDialog({
                             />
                           )}
                         </td>
-                        <td className="p-2 whitespace-nowrap">{row.date}</td>
+                        <td className="p-2 font-mono whitespace-nowrap">{row.date}</td>
                         <td className="p-2">
                           {row.description}
                           {row.possibleDuplicate && (
@@ -400,7 +400,7 @@ export function TransactionImportDialog({
                             </span>
                           )}
                         </td>
-                        <td className="p-2 whitespace-nowrap">
+                        <td className="p-2 font-mono font-medium whitespace-nowrap">
                           {row.type === "expense" ? "−" : "+"}
                           {formatCents(row.amountCents, row.currency, locale)}
                         </td>

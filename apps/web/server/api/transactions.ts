@@ -991,7 +991,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
       async () =>
         db
           .update(transactions)
-          .set({ deletedAt: new Date(), externalId: null })
+          // Keep externalId so a deleted import is not re-imported by an overlapping download.
+          .set({ deletedAt: new Date() })
           .where(
             and(
               eq(transactions.id, id),

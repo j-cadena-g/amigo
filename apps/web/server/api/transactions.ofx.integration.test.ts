@@ -124,6 +124,28 @@ describe("OFX imports", () => {
       rows: [expect.objectContaining({ duplicate: true })],
     });
   });
+  it("does not re-import a transaction deleted through the API", async () => {
+    await call({ dryRun: false });
+    const [row] = await stored();
+    const response = await handleTransactionsRequest({
+      env: getIntegrationEnv(),
+      params: { "*": row!.id },
+      request: new Request(`http://localhost/api/transactions/${row!.id}`, {
+        method: "DELETE",
+      }),
+      session: testSession({ userId: ownerId, householdId }),
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+    expect(response.ok).toBe(true);
+    expect(await (await call({ dryRun: false })).json()).toMatchObject({
+      inserted: 0,
+      skipped: 1,
+    });
+    expect(await stored()).toEqual([
+      expect.objectContaining({ id: row!.id, deletedAt: expect.any(Date) }),
+    ]);
+  });
   it("rejects inaccessible and deleted destination accounts", async () => {
     await expect(call({ accountId: crypto.randomUUID() })).rejects.toThrow(
       "inaccessible"
@@ -281,6 +303,30 @@ describe("OFX imports", () => {
     expect(
       await (await call({ ...input, dryRun: false })).json()
     ).toMatchObject({ corrected: 0 });
+  });
+
+  it("corrects every row at the 2,000-row limit", async () => {
+    const ofx = statement(
+      Array.from({ length: 2000 }, (_, i) => transaction(`large-${i}`)).join("")
+    ).replace("<CURDEF>CAD", "<CURDEF>USD");
+    await call({ ofx, currencyOverride: "CAD", dryRun: false });
+    await createTestDb(getIntegrationEnv().DB)
+      .update(transactions)
+      .set({ currency: "USD" })
+      .where(scopeToHousehold(transactions.householdId, householdId));
+    expect(
+      await (
+        await call({
+          ofx,
+          currencyOverride: "CAD",
+          repairCurrency: true,
+          dryRun: false,
+        })
+      ).json()
+    ).toMatchObject({ corrected: 2000 });
+    const after = await stored();
+    expect(after).toHaveLength(2000);
+    expect(after.every((row) => row.currency === "CAD")).toBe(true);
   });
 
   it("does not correct edited amounts, deleted rows, or imports in another account", async () => {

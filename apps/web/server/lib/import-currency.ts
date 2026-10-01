@@ -4,6 +4,7 @@ import {
   inArray,
   isNull,
   isNotNull,
+  or,
   scopeToHousehold,
   transactions,
   type Transaction,
@@ -70,41 +71,62 @@ export async function correctImportCurrency(
     currency,
     homeCurrency
   );
-  const statements = matches.map((record) =>
-    db
-      .update(transactions)
-      .set({ currency, exchangeRateToHome, updatedAt: new Date() })
-      .where(
-        and(
-          scopeToHousehold(transactions.householdId, session.householdId),
-          eq(transactions.userId, session.userId),
-          eq(transactions.id, record.id),
-          eq(transactions.accountId, record.accountId!),
-          eq(transactions.externalId, record.externalId!),
-          eq(transactions.currency, record.currency),
-          eq(transactions.amount, record.amount),
-          eq(transactions.date, record.date),
-          eq(transactions.type, record.type),
-          isNull(transactions.chargedAmount),
-          isNull(transactions.deletedAt)
-        )
-      )
-      .returning()
-  );
+  // Shared guards and SET values take 7 of D1's 100 bound parameters; each row's guard takes 5.
+  const ROWS_PER_UPDATE = 18;
+  const groups = new Map<string, typeof matches>();
+  for (const record of matches) {
+    const key = `${record.accountId}\u0000${record.currency}`;
+    const group = groups.get(key);
+    if (group) group.push(record);
+    else groups.set(key, [record]);
+  }
+  const statements = [...groups.values()].flatMap((group) => {
+    const chunks = [];
+    for (let i = 0; i < group.length; i += ROWS_PER_UPDATE) {
+      const chunk = group.slice(i, i + ROWS_PER_UPDATE);
+      chunks.push(
+        db
+          .update(transactions)
+          .set({ currency, exchangeRateToHome, updatedAt: new Date() })
+          .where(
+            and(
+              scopeToHousehold(transactions.householdId, session.householdId),
+              eq(transactions.userId, session.userId),
+              eq(transactions.accountId, chunk[0]!.accountId!),
+              eq(transactions.currency, chunk[0]!.currency),
+              isNull(transactions.chargedAmount),
+              isNull(transactions.deletedAt),
+              or(
+                ...chunk.map((record) =>
+                  and(
+                    eq(transactions.id, record.id),
+                    eq(transactions.externalId, record.externalId!),
+                    eq(transactions.amount, record.amount),
+                    eq(transactions.date, record.date),
+                    eq(transactions.type, record.type)
+                  )
+                )
+              )
+            )
+          )
+          .returning()
+      );
+    }
+    return chunks;
+  });
   const results = await db.batch(
     statements as unknown as Parameters<typeof db.batch>[0]
   );
-  const auditRows = results.flatMap((result, index) =>
-    (result as Transaction[]).map((record) => ({
-      householdId: session.householdId,
-      tableName: "transactions",
-      recordId: record.id,
-      operation: "UPDATE" as const,
-      oldValues: matches[index],
-      newValues: record,
-      changedBy: session.userId,
-    }))
-  );
+  const before = new Map(matches.map((record) => [record.id, record]));
+  const auditRows = (results as unknown as Transaction[][]).flat().map((record) => ({
+    householdId: session.householdId,
+    tableName: "transactions",
+    recordId: record.id,
+    operation: "UPDATE" as const,
+    oldValues: before.get(record.id),
+    newValues: record,
+    changedBy: session.userId,
+  }));
   await insertManyAuditLogs(db, auditRows);
   return auditRows.length;
 }

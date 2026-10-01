@@ -146,19 +146,21 @@ describe("OFX imports", () => {
       expect.objectContaining({ id: row!.id, deletedAt: expect.any(Date) }),
     ]);
   });
-  it("rejects inaccessible and deleted destination accounts", async () => {
+  it("rejects inaccessible, archived, and deleted destination accounts", async () => {
     await expect(call({ accountId: crypto.randomUUID() })).rejects.toThrow(
       "inaccessible"
     );
-    await createTestDb(getIntegrationEnv().DB)
+    const db = createTestDb(getIntegrationEnv().DB);
+    const where = and(
+      scopeToHousehold(financialAccounts.householdId, householdId),
+      eq(financialAccounts.id, accountId)
+    );
+    await db.update(financialAccounts).set({ archived: true }).where(where);
+    await expect(call()).rejects.toThrow("inaccessible");
+    await db
       .update(financialAccounts)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          scopeToHousehold(financialAccounts.householdId, householdId),
-          eq(financialAccounts.id, accountId)
-        )
-      );
+      .set({ archived: false, deletedAt: new Date() })
+      .where(where);
     await expect(call()).rejects.toThrow("inaccessible");
   });
   it("imports the 2,000-row limit in D1-safe batches", async () => {

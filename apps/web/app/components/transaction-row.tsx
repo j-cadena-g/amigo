@@ -45,6 +45,7 @@ export interface TransactionAccount {
   id: string;
   name: string;
   type: string;
+  archived?: boolean;
 }
 
 /** The transactions list narrowed to one account, keeping an active type filter. */

@@ -429,6 +429,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
         where: and(
           scopeToHousehold(financialAccounts.householdId, session!.householdId),
           eq(financialAccounts.id, fileInput.accountId),
+          eq(financialAccounts.archived, false),
           isNull(financialAccounts.deletedAt),
           visibleFinancialAccountsCondition(session!.userId)
         ),

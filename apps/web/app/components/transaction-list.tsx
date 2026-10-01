@@ -586,7 +586,7 @@ export function TransactionList({
 
       <TransactionImportDialog
         open={importOpen}
-        accounts={accounts}
+        accounts={accounts.filter((account) => !account.archived)}
         onOpenChange={setImportOpen}
         onImported={() => revalidator.revalidate()}
       />

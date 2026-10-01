@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-01
+
+### Added
+
+- **Import bank files** in Financial: upload an OFX/QFX download or a Wealthsimple Chequing activity CSV, pick the destination account, preview the rows and the file's currency, uncheck what you don't want, then confirm. One account per file, up to 2 MB and 2,000 rows. OFX/QFX skips transactions already imported using the bank's transaction IDs; Wealthsimple CSV matches are flagged as possible duplicates and start unchecked. New rows are unreviewed and Uncategorized, and credits and transfers start unchecked ([#173](https://github.com/j-cadena-g/amigo/pull/173))
+- Currency label override for OFX/QFX files with a wrong currency, and **Correct matching transactions already imported** to relabel an earlier import without changing amounts or adding entries; importing in a currency that differs from the account needs explicit confirmation ([#173](https://github.com/j-cadena-g/amigo/pull/173))
+
+### Changed
+
+- The import dialog takes a bank file instead of pasted JSON; `POST /api/transactions/import` still accepts the JSON `rows` body ([#173](https://github.com/j-cadena-g/amigo/pull/173))
+- Deleting a transaction keeps its bank transaction ID, so a deleted import isn't brought back by an overlapping download. Rows deleted before 0.5.1 can still be re-imported ([#173](https://github.com/j-cadena-g/amigo/pull/173))
+- Archived accounts can't be chosen as an import destination ([#173](https://github.com/j-cadena-g/amigo/pull/173))
+
 ## [0.5.0] - 2026-09-28
 
 ### Added

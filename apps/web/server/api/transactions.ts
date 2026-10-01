@@ -1,6 +1,8 @@
 import {
   and,
   budgets,
+  financialAccounts,
+  visibleFinancialAccountsCondition,
   eq,
   getDb,
   isNull,
@@ -8,7 +10,10 @@ import {
   transactions,
   visibleFinancialTransactionsCondition,
 } from "@amigo/db";
-import { count } from "drizzle-orm";
+import { count, inArray } from "drizzle-orm";
+import { currencyCorrectionMatches, correctImportCurrency } from "../lib/import-currency";
+import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
+import { parseOfx, MAX_OFX_BYTES } from "../lib/ofx";
 import type { CurrencyCode, DrizzleD1, Transaction } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
@@ -357,7 +362,165 @@ export const handleTransactionsRequest: ApiHandler = async ({
       ROUTE_RATE_LIMITS.transactions.import
     );
 
-    const parsed = importBodySchema.parse(await request.json());
+    const body = await request.json();
+    const isFileImport =
+      typeof body === "object" &&
+      body !== null &&
+      ("ofx" in body || "csv" in body);
+    const fileInput = isFileImport
+      ? z
+          .object({
+            ofx: z.string().min(1).max(MAX_OFX_BYTES).optional(),
+            csv: z.string().min(1).max(MAX_OFX_BYTES).optional(),
+            sourceBank: z
+              .enum(["nbc", "scotiabank", "rbc", "pcfinancial"])
+              .optional(),
+            currencyOverride: currencyEnum.optional(),
+            repairCurrency: z.boolean().default(false),
+            acceptCurrencyMismatch: z.boolean().default(false),
+            duplicateConfirmationId: z.string().uuid().optional(),
+            confirmedDuplicateIds: z
+              .array(z.string().max(200))
+              .max(2000)
+              .default([]),
+            accountId: z.string().min(1).max(200),
+            dryRun: z.boolean().default(true),
+            excludedIds: z.array(z.string().max(200)).max(2000).default([]),
+          })
+          .refine(
+            (value) => Boolean(value.ofx) !== Boolean(value.csv),
+            "Provide one import file."
+          )
+          .refine(
+            (value) =>
+              !value.confirmedDuplicateIds.length ||
+              Boolean(value.csv && value.duplicateConfirmationId),
+            "CSV duplicate confirmation requires an ID."
+          )
+          .refine(
+            (value) => !value.currencyOverride || Boolean(value.ofx),
+            "Currency overrides require an OFX/QFX file."
+          )
+          .refine(
+            (value) =>
+              !value.repairCurrency ||
+              Boolean(value.ofx && value.currencyOverride),
+            "Choose a currency to correct an OFX/QFX import."
+          )
+          .parse(body)
+      : null;
+    let parsedFile: Awaited<ReturnType<typeof parseOfx>> | null = null;
+    if (fileInput) {
+      try {
+        parsedFile = fileInput.csv
+          ? await parseWealthsimpleCsv(fileInput.csv)
+          : await parseOfx(fileInput.ofx!, fileInput.sourceBank);
+      } catch (error) {
+        throw new ActionError(
+          error instanceof Error ? error.message : "Invalid transaction file.",
+          "VALIDATION_ERROR"
+        );
+      }
+    }
+    let accountCurrency: CurrencyCode | undefined;
+    let currencyMismatch = false;
+    if (fileInput && parsedFile) {
+      const account = await db.query.financialAccounts.findFirst({
+        where: and(
+          scopeToHousehold(financialAccounts.householdId, session!.householdId),
+          eq(financialAccounts.id, fileInput.accountId),
+          isNull(financialAccounts.deletedAt),
+          visibleFinancialAccountsCondition(session!.userId)
+        ),
+      });
+      if (!account)
+        throw new ActionError(
+          "Unknown or inaccessible account",
+          "VALIDATION_ERROR"
+        );
+      accountCurrency = account.currency;
+      currencyMismatch = parsedFile.rows.some(
+        (row) =>
+          (fileInput.currencyOverride ?? row.currency) !== account.currency
+      );
+      if (
+        !fileInput.dryRun &&
+        currencyMismatch &&
+        !fileInput.acceptCurrencyMismatch
+      ) {
+        throw new ActionError(
+          "The import currency differs from the account. Confirm the currency before continuing.",
+          "VALIDATION_ERROR"
+        );
+      }
+      if (fileInput.repairCurrency) {
+        const candidates = parsedFile.rows.filter(
+          (row) => !fileInput.excludedIds.includes(row.externalId)
+        );
+        const matches = await currencyCorrectionMatches(
+          db,
+          session!,
+          fileInput.accountId,
+          candidates,
+          fileInput.currencyOverride!
+        );
+        if (fileInput.dryRun) {
+          const eligible = new Set(matches.map((row) => row.externalId));
+          return Response.json({
+            ok: true,
+            accountCurrency,
+            currencyMismatch,
+            sourceCurrencies: [
+              ...new Set(parsedFile.rows.map((row) => row.currency)),
+            ],
+            rows: candidates.map((row) => ({
+              ...row,
+              currency: fileInput.currencyOverride,
+              canCorrect: eligible.has(row.externalId),
+              duplicate: false,
+              possibleDuplicate: false,
+              defaultExcluded: !eligible.has(row.externalId),
+            })),
+          });
+        }
+        const corrected = await correctImportCurrency(
+          db,
+          env,
+          session!,
+          matches,
+          fileInput.currencyOverride!,
+          await getHomeCurrency(db, session!.householdId)
+        );
+        await broadcastToHousehold(env, session!.householdId, {
+          type: "TRANSACTION_UPDATE",
+          action: "batch_update",
+          count: corrected,
+        });
+        return Response.json({ ok: true, corrected });
+      }
+    }
+    const legacy = fileInput ? null : importBodySchema.parse(body);
+    const parsed =
+      parsedFile && fileInput
+        ? {
+            dryRun: fileInput.dryRun,
+            rows: parsedFile.rows
+              .filter((row) => !fileInput.excludedIds.includes(row.externalId))
+              .filter((row) => fileInput.dryRun || row.amountCents > 0)
+              .map((row) => ({
+                ...row,
+                currency: fileInput.currencyOverride ?? row.currency,
+                accountId: fileInput.accountId,
+                budgetId: null,
+              })),
+          }
+        : {
+            dryRun: legacy!.dryRun,
+            rows: legacy!.rows.map((row) => ({
+              ...row,
+              amountCents: toCents(row.amount),
+            })),
+          };
     await validateImportBudgetAndAccountIds(
       db,
       session!.householdId,
@@ -366,6 +529,54 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
     const batchId = crypto.randomUUID();
 
+    if (parsed.dryRun && parsedFile) {
+      const existing = new Set<string>();
+      // Deliberately include tombstones: the unique import identity survives deletion.
+      for (let i = 0; i < parsed.rows.length; i += 80) {
+        const matches = await db
+          .select({ externalId: transactions.externalId })
+          .from(transactions)
+          .where(
+            and(
+              scopeToHousehold(transactions.householdId, session!.householdId),
+              inArray(
+                transactions.externalId,
+                parsed.rows.slice(i, i + 80).map((row) => row.externalId!)
+              )
+            )
+          );
+        for (const match of matches)
+          if (match.externalId) existing.add(match.externalId);
+      }
+      const rows = parsed.rows.map((row) => {
+        const duplicate = existing.has(row.externalId!);
+        existing.add(row.externalId!);
+        return {
+          date: row.date,
+          type: row.type,
+          description: row.description,
+          currency: row.currency,
+          amountCents: row.amountCents,
+          externalId: row.externalId,
+          duplicate,
+          possibleDuplicate: Boolean(fileInput?.csv) && duplicate,
+          defaultExcluded:
+            "defaultExcluded" in row
+              ? row.defaultExcluded
+              : row.type === "income",
+        };
+      });
+      return Response.json({
+        ok: true,
+        rows,
+        creditCard: parsedFile.creditCard,
+        accountCurrency,
+        currencyMismatch,
+        sourceCurrencies: [
+          ...new Set(parsedFile.rows.map((row) => row.currency)),
+        ],
+      });
+    }
     if (parsed.dryRun) {
       return Response.json({
         ok: true,
@@ -389,7 +600,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
     const categoryCache = new Map<string, Awaited<ReturnType<typeof resolveOrCreateImportCategory>>>();
     const values = [];
     for (const row of parsed.rows) {
-      const externalId = row.externalId?.trim() || null;
+      let externalId = row.externalId?.trim() || null;
+      if (externalId && fileInput?.csv && fileInput.confirmedDuplicateIds.includes(externalId)) {
+        externalId = `${externalId}:repeat:${fileInput.duplicateConfirmationId}`;
+      }
       if (externalId) {
         if (seenInBatch.has(externalId)) {
           continue;
@@ -412,7 +626,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
         id: crypto.randomUUID(),
         householdId: session!.householdId,
         userId: session!.userId,
-        amount: toCents(row.amount),
+        amount: row.amountCents,
         currency,
         exchangeRateToHome: rateByCurrency.get(currency) ?? null,
         description: row.description?.trim() || null,
@@ -427,7 +641,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
       });
     }
 
-    const IMPORT_CHUNK_SIZE = 7;
+    // Leave room for generated timestamp/default bindings under D1's 100-variable limit.
+    const IMPORT_CHUNK_SIZE = 4;
     if (values.length > 0) {
       const statements = [];
       for (let i = 0; i < values.length; i += IMPORT_CHUNK_SIZE) {

@@ -7,6 +7,7 @@ import type { UiLanguage } from "@amigo/db";
  * scans the server source and fails when a message has no translation here.
  */
 const ES: Record<string, string> = {
+  "The import currency differs from the account. Confirm the currency before continuing.": "La moneda de la importación difiere de la cuenta. Confirma la moneda antes de continuar.",
   "A category with this name already exists": "Ya existe una categoría con este nombre",
   "A primary email address is required to join a household":
     "Se necesita un correo principal para unirse a un hogar",

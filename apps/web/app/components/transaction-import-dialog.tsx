@@ -1,4 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
+import { NativeSelect } from "@/app/components/financial/form-controls";
+import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import {
   Dialog,
@@ -8,195 +11,443 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import { cn } from "@/app/lib/utils";
+import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
+import { decodeOfxFile } from "@/app/lib/ofx-file";
+import { formatCents } from "@/app/lib/currency";
+import type { TransactionAccount } from "./transaction-row";
 
-interface TransactionImportDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onImported: () => void;
+interface PreviewRow {
+  date: string;
+  type: "income" | "expense";
+  description: string;
+  amountCents: number;
+  currency: CurrencyCode;
+  externalId: string;
+  duplicate: boolean;
+  possibleDuplicate: boolean;
+  defaultExcluded: boolean;
+  canCorrect?: boolean;
 }
-
-type ImportFeedback = { tone: "success" | "error"; message: string };
 
 export function TransactionImportDialog({
   open,
   onOpenChange,
   onImported,
-}: TransactionImportDialogProps) {
+  accounts,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImported: () => void;
+  accounts: TransactionAccount[];
+}) {
   const t = useT();
-  const dryRunId = useId();
-  const [importText, setImportText] = useState("");
-  const [importDryRun, setImportDryRun] = useState(true);
-  const [importBusy, setImportBusy] = useState(false);
-  const [importFeedback, setImportFeedback] = useState<ImportFeedback | null>(null);
-  const importCloseTimeoutRef = useRef<number | null>(null);
-  const importAbortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      importAbortRef.current?.abort();
-      importAbortRef.current = null;
-      if (importCloseTimeoutRef.current != null) {
-        clearTimeout(importCloseTimeoutRef.current);
-        importCloseTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!open) {
-      setImportText("");
-      setImportFeedback(null);
+  const locale = useLocale();
+  const toast = useToast();
+  const [currencyOverride, setCurrencyOverride] = useState("");
+  const [repairCurrency, setRepairCurrency] = useState(false);
+  const [currencyMismatch, setCurrencyMismatch] = useState(false);
+  const [acceptCurrencyMismatch, setAcceptCurrencyMismatch] = useState(false);
+  const [accountCurrency, setAccountCurrency] = useState("");
+  const [sourceCurrencies, setSourceCurrencies] = useState<string[]>([]);
+  const [format, setFormat] = useState<"ofx" | "csv">("ofx");
+  const [sourceBank, setSourceBank] = useState("");
+  const confirmationId = useRef("");
+  const [ofx, setOfx] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [rows, setRows] = useState<PreviewRow[] | null>(null);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const close = (next: boolean) => {
+    if (!next) {
+      generation.current++;
+      setOfx("");
+      setRows(null);
+      setError(null);
+      setBusy(false);
+      setAccountId("");
+      setSourceBank("");
+      setFormat("ofx");
+      setCurrencyOverride("");
+      setRepairCurrency(false);
+      setAcceptCurrencyMismatch(false);
+      setCurrencyMismatch(false);
+      setExcluded(new Set());
     }
-  }, [open]);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      importAbortRef.current?.abort();
-      importAbortRef.current = null;
-      if (importCloseTimeoutRef.current != null) {
-        clearTimeout(importCloseTimeoutRef.current);
-        importCloseTimeoutRef.current = null;
-      }
-      setImportFeedback(null);
-    }
-    onOpenChange(nextOpen);
+    onOpenChange(next);
   };
-
-  const fail = (message: string) => setImportFeedback({ tone: "error", message });
-
-  const handleImportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setImportBusy(true);
-    setImportFeedback(null);
-    importAbortRef.current?.abort();
-    const controller = new AbortController();
-    importAbortRef.current = controller;
+  const readFile = async (file: File | undefined) => {
+    const current = ++generation.current;
+    setRows(null);
+    setSourceBank("");
+    setCurrencyOverride("");
+    setRepairCurrency(false);
+    setAcceptCurrencyMismatch(false);
+    setCurrencyMismatch(false);
+    setOfx("");
+    setError(null);
+    setExcluded(new Set());
+    if (!file) return;
+    if (!/\.(ofx|qfx|csv)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
+      setError(t.imports.fileError);
+      return;
+    }
+    setBusy(true);
     try {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(importText) as unknown;
-      } catch {
-        fail(t.imports.invalidJson);
-        return;
-      }
-      if (typeof parsed !== "object" || parsed === null || !("rows" in parsed)) {
-        fail(t.imports.needsRows);
-        return;
-      }
-      const rows = (parsed as { rows: unknown }).rows;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        fail(t.imports.emptyRows);
-        return;
-      }
-      const res = await fetch("/api/transactions/import", {
+      const bytes = await file.arrayBuffer();
+      const csv = /\.csv$/i.test(file.name);
+      const text = csv
+        ? new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+        : decodeOfxFile(bytes);
+      if (current === generation.current) setFormat(csv ? "csv" : "ofx");
+      if (current === generation.current) setOfx(text);
+    } catch {
+      if (current === generation.current) setError(t.imports.fileError);
+    } finally {
+      if (current === generation.current) setBusy(false);
+    }
+  };
+  const submit = async (dryRun: boolean) => {
+    const current = generation.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/transactions/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, dryRun: importDryRun }),
-        signal: controller.signal,
+        body: JSON.stringify({
+          [format]: ofx,
+          currencyOverride: currencyOverride || undefined,
+          repairCurrency,
+          acceptCurrencyMismatch,
+          sourceBank: sourceBank || undefined,
+          duplicateConfirmationId: confirmationId.current || undefined,
+          confirmedDuplicateIds: dryRun
+            ? []
+            : (rows ?? [])
+                .filter(
+                  (row) =>
+                    row.possibleDuplicate && !excluded.has(row.externalId)
+                )
+                .map((row) => row.externalId),
+          accountId,
+          dryRun,
+          excludedIds: dryRun ? [] : [...excluded],
+        }),
       });
-      const data = (await res.json().catch(() => null)) as {
-        ok?: boolean;
-        count?: number;
-        inserted?: number;
+      const data = (await response.json()) as {
         error?: string;
-        message?: string;
-      } | null;
-      if (!res.ok) {
-        fail(data?.error ?? data?.message ?? t.common.couldNot(t.imports.action));
+        rows?: PreviewRow[];
+        inserted?: number;
+        skipped?: number;
+        corrected?: number;
+        currencyMismatch?: boolean;
+        accountCurrency?: string;
+        sourceCurrencies?: string[];
+      };
+      if (response.ok && !dryRun) onImported();
+      if (current !== generation.current) return;
+      if (!response.ok) {
+        setError(data.error ?? t.imports.fileError);
         return;
       }
-      if (importDryRun) {
-        const count = data?.count ?? rows.length;
-        setImportFeedback({
-          tone: "success",
-          message: t.imports.ready(count),
-        });
-        return;
+      if (dryRun && data.rows) {
+        setRows(data.rows);
+        setCurrencyMismatch(data.currencyMismatch ?? false);
+        setAcceptCurrencyMismatch(false);
+        setAccountCurrency(data.accountCurrency ?? "");
+        setSourceCurrencies(data.sourceCurrencies ?? []);
+        confirmationId.current = crypto.randomUUID();
+        // Credits may be payments/transfers. Require explicit inclusion as income.
+        setExcluded(
+          new Set(
+            data.rows
+              .filter(
+                (row) =>
+                  row.defaultExcluded || row.duplicate || row.amountCents === 0
+              )
+              .map((row) => row.externalId)
+          )
+        );
+      } else {
+        toast(
+          repairCurrency
+            ? t.imports.corrected(data.corrected ?? 0)
+            : t.imports.finished(data.inserted ?? 0, data.skipped ?? 0),
+          {
+            variant: "success",
+          }
+        );
+        close(false);
       }
-      setImportFeedback({
-        tone: "success",
-        message: t.imports.imported(data?.inserted ?? 0),
-      });
-      onImported();
-      if (importCloseTimeoutRef.current != null) {
-        clearTimeout(importCloseTimeoutRef.current);
-      }
-      importCloseTimeoutRef.current = window.setTimeout(() => {
-        importCloseTimeoutRef.current = null;
-        handleOpenChange(false);
-      }, 1800);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        return;
-      }
-      fail(t.common.couldNotConnection(t.imports.action));
+    } catch {
+      if (current === generation.current)
+        setError(t.common.couldNotConnection(t.imports.action));
     } finally {
-      if (importAbortRef.current === controller) {
-        importAbortRef.current = null;
-      }
-      setImportBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   };
-
-  const busyLabel = importDryRun ? t.imports.checking : t.imports.importing;
-
+  const selected =
+    rows?.filter(
+      (row) =>
+        (!repairCurrency || row.canCorrect) &&
+        (!row.duplicate || row.possibleDuplicate) &&
+        row.amountCents > 0 &&
+        !excluded.has(row.externalId)
+    ).length ?? 0;
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg sm:max-w-xl">
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t.imports.title}</DialogTitle>
-          <DialogDescription>
-            {t.imports.help((name) => (
-              <code className="text-xs">{name}</code>
-            ))}
-          </DialogDescription>
+          <DialogDescription>{t.imports.ofxHelp}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleImportSubmit} className="space-y-4">
-          <textarea
-            aria-label={t.imports.textareaLabel}
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            rows={10}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            placeholder={`{\n  "rows": [\n    {\n      "date": "2026-01-15",\n      "type": "expense",\n      "category": "Groceries",\n      "amount": 12.34\n    }\n  ]\n}`}
-            required
-          />
-          <div className="flex items-center gap-2">
+        <div className="space-y-4">
+          <label className="flex flex-col gap-2 text-sm">
+            <span>{t.imports.file}</span>
             <input
-              id={dryRunId}
-              type="checkbox"
-              checked={importDryRun}
-              onChange={(e) => setImportDryRun(e.target.checked)}
-              className="h-4 w-4 shrink-0 accent-primary"
+              className="block w-full rounded-md text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-tag file:px-4 file:py-2.5 file:font-semibold file:text-tag-foreground hover:file:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              type="file"
+              accept=".ofx,.qfx,.csv"
+              disabled={busy}
+              onChange={(e) => void readFile(e.target.files?.[0])}
             />
-            <label htmlFor={dryRunId} className="text-sm font-semibold">
-              {t.imports.dryRun}
+          </label>
+          {format === "ofx" && (
+            <label className="flex flex-col gap-2 text-sm">
+              <span>{t.imports.bank}</span>
+              <NativeSelect
+                className="w-full"
+                value={sourceBank}
+                disabled={busy}
+                onChange={(e) => {
+                  setSourceBank(e.target.value);
+                  setRows(null);
+                  setError(null);
+                }}
+              >
+                <option value="">{t.imports.bankFromFile}</option>
+                <option value="nbc">National Bank</option>
+                <option value="scotiabank">Scotiabank</option>
+                <option value="rbc">RBC</option>
+                <option value="pcfinancial">PC Financial</option>
+              </NativeSelect>
             </label>
-          </div>
-          {importFeedback && (
-            <p
-              role={importFeedback.tone === "error" ? "alert" : "status"}
-              className={cn(
-                "text-sm",
-                importFeedback.tone === "success"
-                  ? "text-muted-foreground"
-                  : "text-destructive"
-              )}
+          )}
+          <label className="flex flex-col gap-2 text-sm">
+            <span>{t.imports.account}</span>
+            <NativeSelect
+              className="w-full"
+              value={accountId}
+              disabled={busy}
+              onChange={(e) => {
+                setAccountId(e.target.value);
+                setRows(null);
+                setError(null);
+              }}
             >
-              {importFeedback.message}
+              <option value="">{t.imports.chooseAccount}</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          {format === "ofx" && (
+            <>
+              <label className="flex flex-col gap-2 text-sm">
+                <span>{t.imports.amountCurrency}</span>
+                <NativeSelect
+                  value={currencyOverride}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setCurrencyOverride(e.target.value);
+                    setRepairCurrency(false);
+                    setRows(null);
+                    setAcceptCurrencyMismatch(false);
+                  }}
+                >
+                  <option value="">{t.imports.useFileCurrency}</option>
+                  {CURRENCY_CODES.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              {currencyOverride && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {t.imports.overrideHelp}
+                  </p>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={repairCurrency}
+                      disabled={busy}
+                      onChange={(e) => {
+                        setRepairCurrency(e.target.checked);
+                        setRows(null);
+                      }}
+                    />
+                    <span>{t.imports.repairCurrency}</span>
+                  </label>
+                </>
+              )}
+            </>
+          )}
+          {!accounts.length && (
+            <p className="text-sm">{t.imports.noAccounts}</p>
+          )}
+          {rows && currencyMismatch && (
+            <div className="space-y-2 rounded-md border border-warning p-3 text-sm">
+              <p>{t.imports.currencyMismatch(accountCurrency)}</p>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  disabled={busy}
+                  checked={acceptCurrencyMismatch}
+                  onChange={(e) => setAcceptCurrencyMismatch(e.target.checked)}
+                />
+                <span>{t.imports.acceptCurrencyMismatch}</span>
+              </label>
+            </div>
+          )}
+          {rows && (
+            <>
+              <p className="text-sm">
+                {t.imports.previewSummary(
+                  selected,
+                  rows.filter(
+                    (row) =>
+                      row.duplicate &&
+                      (!row.possibleDuplicate || excluded.has(row.externalId))
+                  ).length
+                )}
+              </p>
+              {rows.some((row) => row.type === "income") && (
+                <p className="text-sm text-muted-foreground">
+                  {t.imports.creditsWarning}
+                </p>
+              )}
+              {format === "csv" && (
+                <p className="text-sm text-muted-foreground">
+                  {t.imports.csvWarning}
+                </p>
+              )}
+              <p className="text-sm">
+                {t.imports.currency}:{" "}
+                {[...new Set(rows.map((row) => row.currency))].join(", ")}
+              </p>
+              <p className="text-sm">
+                {t.imports.originalCurrency}: {sourceCurrencies.join(", ")}
+              </p>
+              {repairCurrency && (
+                <p className="text-sm">{t.imports.repairHelp}</p>
+              )}
+              <div className="max-h-72 overflow-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr>
+                      <th>{t.imports.include}</th>
+                      <th>{t.imports.date}</th>
+                      <th>{t.imports.description}</th>
+                      <th>{t.imports.amount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, index) => (
+                      <tr
+                        key={`${row.externalId}-${index}`}
+                        className="border-t"
+                      >
+                        <td className="p-2">
+                          {repairCurrency && !row.canCorrect ? (
+                            <span>{t.imports.noCorrection}</span>
+                          ) : row.amountCents === 0 ? (
+                            <span>{t.imports.zeroAmount}</span>
+                          ) : row.duplicate && !row.possibleDuplicate ? (
+                            <span>{t.imports.duplicate}</span>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              disabled={busy}
+                              aria-label={`${t.imports.include} ${row.date} ${row.description}`}
+                              checked={!excluded.has(row.externalId)}
+                              onChange={(e) =>
+                                setExcluded((previous) => {
+                                  const next = new Set(previous);
+                                  if (e.target.checked)
+                                    next.delete(row.externalId);
+                                  else next.add(row.externalId);
+                                  return next;
+                                })
+                              }
+                            />
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">{row.date}</td>
+                        <td className="p-2">
+                          {row.description}
+                          {row.possibleDuplicate && (
+                            <span className="block text-xs">
+                              {t.imports.possibleDuplicate}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          {row.type === "expense" ? "−" : "+"}
+                          {formatCents(row.amountCents, row.currency, locale)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
             </p>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => close(false)}
+            >
               {t.common.cancel}
             </Button>
-            <Button type="submit" disabled={importBusy || !importText.trim()}>
-              {importBusy ? busyLabel : importDryRun ? t.imports.check : t.imports.title}
+            <Button
+              type="button"
+              disabled={
+                busy ||
+                !ofx ||
+                !accountId ||
+                (!!rows &&
+                  (!selected || (currencyMismatch && !acceptCurrencyMismatch)))
+              }
+              onClick={() => void submit(!rows)}
+            >
+              {busy
+                ? rows
+                  ? t.imports.importing
+                  : t.imports.checking
+                : rows
+                  ? repairCurrency
+                    ? t.imports.correctCurrency
+                    : t.imports.title
+                  : t.imports.preview}
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

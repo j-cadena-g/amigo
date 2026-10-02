@@ -56,4 +56,66 @@ describe("transactions export integration", () => {
     expect(csv).toContain("\"'=HYPERLINK(\"\"https://example.com\"\")\"");
     expect(csv).toContain("\"'+SUM(1,2)\"");
   });
+
+  it("appends bank_description, escaped, and empty when null", async () => {
+    const env = getIntegrationEnv();
+    const db = getDb(env.DB);
+    await db.insert(transactions).values([
+      {
+        id: crypto.randomUUID(),
+        householdId,
+        userId: ownerId,
+        amount: 1000,
+        currency: "CAD",
+        category: "Groceries",
+        description: "Wal-Mart",
+        bankDescription: 'WAL-MART, "#3050"',
+        type: "expense",
+        date: "2026-06-18",
+      },
+      {
+        id: crypto.randomUUID(),
+        householdId,
+        userId: ownerId,
+        amount: 200,
+        currency: "CAD",
+        category: "Fees",
+        description: "Manual",
+        bankDescription: "=1+1",
+        type: "expense",
+        date: "2026-06-17",
+      },
+      {
+        id: crypto.randomUUID(),
+        householdId,
+        userId: ownerId,
+        amount: 300,
+        currency: "CAD",
+        category: "Other",
+        description: "No bank text",
+        type: "expense",
+        date: "2026-06-16",
+      },
+    ]);
+
+    const response = await handleTransactionsRequest({
+      env,
+      params: { "*": "export" },
+      request: new Request("http://localhost/api/transactions/export", {
+        method: "GET",
+      }),
+      sessionStatus: "authenticated",
+      session: testSession({ userId: ownerId, householdId }),
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    const csv = await response.text();
+    const [header, ...lines] = csv.split("\n");
+    expect(header!.split(",").at(-1)).toBe("bank_description");
+    expect(csv).toContain('"WAL-MART, ""#3050"""');
+    expect(csv).toContain("'=1+1");
+    const manual = lines.find((line) => line.includes("No bank text"));
+    expect(manual?.endsWith(",")).toBe(true);
+  });
 });

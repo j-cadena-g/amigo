@@ -11,10 +11,12 @@ import {
   visibleFinancialTransactionsCondition,
 } from "@amigo/db";
 import { count, inArray } from "drizzle-orm";
+import { loadViewerRegion } from "@/app/lib/locale.server";
 import { currencyCorrectionMatches, correctImportCurrency } from "../lib/import-currency";
 import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
-import { parseOfx, MAX_OFX_BYTES } from "../lib/ofx";
-import type { CurrencyCode, DrizzleD1, Transaction } from "@amigo/db";
+import { parseOfx, MAX_OFX_BYTES, type OfxRow } from "../lib/ofx";
+import { cleanBankDescription } from "../lib/bank-description";
+import type { CurrencyCode, DrizzleD1, Transaction, UiLanguage } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
@@ -173,6 +175,24 @@ const importBodySchema = z.object({
   rows: z.array(importRowSchema).min(1).max(200),
 });
 
+type CleanImportRow = Omit<OfxRow, "description"> & {
+  description: string | null;
+  bankDescription: string | null;
+};
+
+function cleanImportRows(rows: OfxRow[], language: UiLanguage): CleanImportRow[] {
+  return rows.map((row) => {
+    const bankDescription = row.description.trim() ? row.description : null;
+    return {
+      ...row,
+      bankDescription,
+      description: bankDescription
+        ? cleanBankDescription(bankDescription, language).name
+        : null,
+    };
+  });
+}
+
 function csvEscape(value: string | number | boolean | null | undefined): string {
   const raw = value === null || value === undefined ? "" : String(value);
   const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
@@ -230,6 +250,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
   params,
   request,
   session,
+  loadContext,
 }) => {
   const segments = getSplatSegments(params);
   const id = segments[0];
@@ -271,6 +292,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       "external_id",
       "import_batch_id",
       "reviewed",
+      "bank_description",
     ];
     const lines = [
       header.join(","),
@@ -289,6 +311,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
           csvEscape(t.externalId),
           csvEscape(t.importBatchId),
           csvEscape(t.reviewed),
+          csvEscape(t.bankDescription),
         ].join(",")
       ),
     ];
@@ -386,6 +409,22 @@ export const handleTransactionsRequest: ApiHandler = async ({
             accountId: z.string().min(1).max(200),
             dryRun: z.boolean().default(true),
             excludedIds: z.array(z.string().max(200)).max(2000).default([]),
+            descriptions: z
+              .record(
+                z.string().max(200),
+                z
+                  .string()
+                  .max(200)
+                  .refine(
+                    (value) => value.trim().length > 0,
+                    "Description override is empty."
+                  )
+              )
+              .default({})
+              .refine(
+                (overrides) => Object.keys(overrides).length <= 2000,
+                "At most 2,000 description overrides."
+              ),
           })
           .refine(
             (value) => Boolean(value.ofx) !== Boolean(value.csv),
@@ -409,11 +448,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
           )
           .parse(body)
       : null;
-    let parsedFile: Awaited<ReturnType<typeof parseOfx>> | null = null;
+    let parsedFile: { rows: CleanImportRow[]; creditCard: boolean } | null = null;
     const excludedIds = new Set(fileInput?.excludedIds);
     if (fileInput) {
+      let parsed: Awaited<ReturnType<typeof parseOfx>>;
       try {
-        parsedFile = fileInput.csv
+        parsed = fileInput.csv
           ? await parseWealthsimpleCsv(fileInput.csv)
           : await parseOfx(fileInput.ofx!, fileInput.sourceBank);
       } catch (error) {
@@ -422,6 +462,11 @@ export const handleTransactionsRequest: ApiHandler = async ({
           "VALIDATION_ERROR"
         );
       }
+      const language = (await loadViewerRegion(loadContext, request)).language;
+      parsedFile = {
+        creditCard: parsed.creditCard,
+        rows: cleanImportRows(parsed.rows, language),
+      };
     }
     let accountCurrency: CurrencyCode | undefined;
     let currencyMismatch = false;
@@ -459,11 +504,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
         const candidates = parsedFile.rows.filter(
           (row) => !excludedIds.has(row.externalId)
         );
+        // Identity is externalId plus amount, date, type, and currency — not the description.
         const matches = await currencyCorrectionMatches(
           db,
           session!,
           fileInput.accountId,
-          candidates,
+          candidates.map((row) => ({ ...row, description: row.description ?? "" })),
           fileInput.currencyOverride!
         );
         if (fileInput.dryRun) {
@@ -521,6 +567,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
             rows: legacy!.rows.map((row) => ({
               ...row,
               amountCents: toCents(row.amount),
+              bankDescription: null,
             })),
           };
     await validateImportBudgetAndAccountIds(
@@ -557,6 +604,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
           date: row.date,
           type: row.type,
           description: row.description,
+          bankDescription: row.bankDescription,
           currency: row.currency,
           amountCents: row.amountCents,
           externalId: row.externalId,
@@ -598,11 +646,16 @@ export const handleTransactionsRequest: ApiHandler = async ({
       rateByCurrency.set(c, await getExchangeRateForRecord(env, c, homeCurrency));
     }
 
+    const descriptionOverrides = fileInput?.descriptions ?? {};
     const seenInBatch = new Set<string>();
     const categoryCache = new Map<string, Awaited<ReturnType<typeof resolveOrCreateImportCategory>>>();
     const values = [];
     for (const row of parsed.rows) {
       let externalId = row.externalId?.trim() || null;
+      const description =
+        (externalId ? descriptionOverrides[externalId] : undefined)?.trim() ||
+        row.description?.trim() ||
+        null;
       if (externalId && fileInput?.csv && fileInput.confirmedDuplicateIds.includes(externalId)) {
         externalId = `${externalId}:repeat:${fileInput.duplicateConfirmationId}`;
       }
@@ -631,7 +684,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
         amount: row.amountCents,
         currency,
         exchangeRateToHome: rateByCurrency.get(currency) ?? null,
-        description: row.description?.trim() || null,
+        description,
+        bankDescription: row.bankDescription,
         categoryId: category.id,
         category: category.name,
         type: row.type,

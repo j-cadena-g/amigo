@@ -30,6 +30,7 @@ export interface TransactionDTO {
   categoryId: string | null;
   category: string;
   description: string | null;
+  bankDescription?: string | null;
   type: "income" | "expense";
   date: string;
   budgetId: string | null;
@@ -231,6 +232,15 @@ export function TransactionRow({
                 <dd className="wrap-break-word">{transaction.description}</dd>
               </>
             )}
+            {transaction.bankDescription &&
+              transaction.bankDescription !== transaction.description && (
+                <>
+                  <dt className="text-muted-foreground">
+                    {t.transactions.bankDescription}
+                  </dt>
+                  <dd className="wrap-break-word">{transaction.bankDescription}</dd>
+                </>
+              )}
           </dl>
           <div className="mt-3 flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onStartEdit}>

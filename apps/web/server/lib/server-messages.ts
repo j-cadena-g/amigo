@@ -247,6 +247,15 @@ const PATTERNS_ES: [RegExp, (...slots: string[]) => string][] = [
   ],
 ];
 
+/** Readable names for bank charges found in an imported description. */
+export const BANK_CHARGE_LABELS: Record<
+  UiLanguage,
+  { interestCharge: string; cardFee: string }
+> = {
+  en: { interestCharge: "Interest charge", cardFee: "Card fee" },
+  es: { interestCharge: "Cargo por intereses", cardFee: "Cargo de la tarjeta" },
+};
+
 /** The message in `language`, or unchanged when there's no translation. */
 export function translateServerMessage(message: string, language: UiLanguage): string {
   if (language === "en") return message;

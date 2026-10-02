@@ -13,15 +13,34 @@ export function utcDay(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-export async function neuronsUsedToday(db: DrizzleD1, now = new Date()): Promise<number> {
+/** Marker row for "Cloudflare refused today's calls (3036)". It holds no neurons. */
+const EXHAUSTED = "exhausted";
+
+/** Neurons recorded today, and whether Cloudflare has already refused today's calls. */
+export async function usageToday(
+  db: DrizzleD1,
+  now = new Date()
+): Promise<{ neurons: number; blocked: boolean }> {
   const [row] = await db
     .select({
-      total: sql<number>`coalesce(sum(${aiUsageDaily.neurons}), 0)`,
+      neurons: sql<number>`coalesce(sum(case when ${aiUsageDaily.feature} = ${EXHAUSTED} then 0 else ${aiUsageDaily.neurons} end), 0)`,
+      blocked: sql<number>`coalesce(max(${aiUsageDaily.feature} = ${EXHAUSTED}), 0)`,
     })
     .from(aiUsageDaily)
     .where(eq(aiUsageDaily.day, utcDay(now)));
-  const total = row?.total ?? 0;
-  return typeof total === "number" ? total : Number(total);
+  return { neurons: Number(row?.neurons ?? 0), blocked: Number(row?.blocked ?? 0) === 1 };
+}
+
+export async function neuronsUsedToday(db: DrizzleD1, now = new Date()): Promise<number> {
+  return (await usageToday(db, now)).neurons;
+}
+
+/** Idempotent: repeated or concurrent 3036 errors leave one marker and no neurons. */
+async function markExhausted(db: DrizzleD1, now: Date): Promise<void> {
+  await db
+    .insert(aiUsageDaily)
+    .values({ day: utcDay(now), feature: EXHAUSTED, neurons: 0, updatedAt: now })
+    .onConflictDoNothing();
 }
 
 export async function recordNeurons(
@@ -68,8 +87,8 @@ export async function runWithinBudget<T>(
 ): Promise<BudgetOutcome<T>> {
   const now = options?.now ?? new Date();
   const budget = dailyNeuronBudget(env);
-  const used = await neuronsUsedToday(db, now);
-  if (used + estimate > budget) {
+  const used = await usageToday(db, now);
+  if (used.blocked || used.neurons + estimate > budget) {
     logBudget("budget_exhausted", feature);
     return { ok: false, reason: "budget_exhausted" };
   }
@@ -87,7 +106,7 @@ export async function runWithinBudget<T>(
   } catch (error) {
     if (isAllocationExhausted(error)) {
       // Cloudflare 3036 means today's free allocation is gone for the whole account.
-      await recordNeurons(db, "exhausted", budget, now);
+      await markExhausted(db, now);
       logBudget("budget_exhausted", feature);
       return { ok: false, reason: "budget_exhausted" };
     }

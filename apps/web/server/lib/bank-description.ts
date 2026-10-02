@@ -11,6 +11,9 @@ const INTEREST =
 const CARD_FEE = /^(ANNUAL FEE|OVERLIMIT FEE|OVER LIMIT FEE)\b/i;
 /** A refunded or reversed charge is a credit, so it keeps its own words. */
 const CHARGE_REVERSAL = /\b(REFUND|REFUNDED|REVERSAL|REVERSED|REBATE|ADJUSTMENT|ADJ)\b/i;
+/** Money sent between people. The text often holds a person's name, not a merchant. */
+const PERSON_TO_PERSON =
+  /\b(e-?transfers?|interac|send money|money request|request money|transfer (from|to)|zelle|venmo|cash ?app|transferencias?|nequi|daviplata|bre-?b)\b/i;
 const NAME_MEMO = " — ";
 
 /**
@@ -226,4 +229,9 @@ function stylePart(part: string): string {
   if (!part) return part;
   if (isConsonantAcronym(part)) return part;
   return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+}
+
+/** True for person-to-person transfers, which should never be sent to an AI model. */
+export function isPersonToPerson(raw: string): boolean {
+  return PERSON_TO_PERSON.test(raw);
 }

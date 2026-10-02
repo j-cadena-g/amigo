@@ -160,8 +160,8 @@ describe("ai neuron budget", () => {
     expect(first).toEqual({ ok: false, reason: "budget_exhausted" });
     expect(second).toEqual({ ok: false, reason: "budget_exhausted" });
     expect(run).toHaveBeenCalledTimes(1);
-    expect(await featureNeurons(db, "exhausted", now)).toBe(100);
-    expect(await neuronsUsedToday(db, now)).toBe(100);
+    expect(await featureNeurons(db, "exhausted", now)).toBe(0);
+    expect(await neuronsUsedToday(db, now)).toBe(0);
 
     const messageDay = isolatedNow();
     const messageOnly = await runWithinBudget(
@@ -176,7 +176,31 @@ describe("ai neuron budget", () => {
       { now: messageDay }
     );
     expect(messageOnly).toEqual({ ok: false, reason: "budget_exhausted" });
-    expect(await featureNeurons(db, "exhausted", messageDay)).toBe(80);
+    expect(await featureNeurons(db, "exhausted", messageDay)).toBe(0);
+  });
+
+  it("keeps recorded usage when repeated 3036 errors arrive after it", async () => {
+    const now = isolatedNow();
+    await recordNeurons(db, "merchant-names", 30, now);
+    const refuse = async () => {
+      throw Object.assign(new Error("allocation"), { code: 3036 });
+    };
+    const results = await Promise.all(
+      [1, 2, 3].map(() =>
+        runWithinBudget({ AI_DAILY_NEURON_BUDGET: "100" }, db, "merchant-names", 10, refuse, () => 1, {
+          now,
+        })
+      )
+    );
+    for (const result of results) expect(result).toEqual({ ok: false, reason: "budget_exhausted" });
+    expect(await neuronsUsedToday(db, now)).toBe(30);
+    const later = vi.fn();
+    expect(
+      await runWithinBudget({ AI_DAILY_NEURON_BUDGET: "100" }, db, "merchant-names", 1, later, () => 1, {
+        now,
+      })
+    ).toEqual({ ok: false, reason: "budget_exhausted" });
+    expect(later).not.toHaveBeenCalled();
   });
 
   it("logs other errors without the merchant text and does not record them", async () => {

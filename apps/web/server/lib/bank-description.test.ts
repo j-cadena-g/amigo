@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanBankDescription } from "./bank-description";
+import { cleanBankDescription, isPersonToPerson } from "./bank-description";
 
 describe("cleanBankDescription", () => {
   it.each([
@@ -110,5 +110,25 @@ describe("cleanBankDescription", () => {
       merchantKey: "STARBUCKS — REWARDS BONUS",
       charge: false,
     });
+  });
+
+  it.each([
+    "Interac e-Transfer from John",
+    "INTERAC E-TRANSFER TO MARIA L",
+    "E-TRANSFER SENT JANE DOE",
+    "Money request from Ana",
+    "ZELLE TO CARLOS",
+    "Transferencia a Juan Pérez",
+    "NEQUI ENVIO A PEDRO",
+  ])("flags a person-to-person transfer (%s)", (raw) => {
+    expect(isPersonToPerson(raw)).toBe(true);
+  });
+
+  it.each([
+    "RCSS OXFORD #2812      LONDON        ON",
+    "PAYPAL *TIKTOK INC 4029357733",
+    "TRANSFERWISE FEE",
+  ])("does not flag a merchant (%s)", (raw) => {
+    expect(isPersonToPerson(raw)).toBe(false);
   });
 });

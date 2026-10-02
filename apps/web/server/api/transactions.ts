@@ -15,7 +15,7 @@ import { loadViewerRegion } from "@/app/lib/locale.server";
 import { currencyCorrectionMatches, correctImportCurrency } from "../lib/import-currency";
 import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
 import { parseOfx, MAX_OFX_BYTES, type OfxRow } from "../lib/ofx";
-import { cleanBankDescription } from "../lib/bank-description";
+import { cleanBankDescription, isPersonToPerson } from "../lib/bank-description";
 import { suggestMerchantNames } from "../lib/merchant-names";
 import {
   isUncategorizedCategoryName,
@@ -193,12 +193,15 @@ type CleanImportRow = Omit<OfxRow, "description"> & {
   bankDescription: string | null;
 };
 
-function rowIsBankCharge(
+/** Bank charges keep their label, and transfers between people never reach the model. */
+function rowSkipsAiName(
   row: { bankDescription: string | null },
   language: UiLanguage
 ): boolean {
-  return Boolean(
-    row.bankDescription && cleanBankDescription(row.bankDescription, language).charge
+  if (!row.bankDescription) return true;
+  return (
+    isPersonToPerson(row.bankDescription) ||
+    cleanBankDescription(row.bankDescription, language).charge
   );
 }
 
@@ -216,7 +219,7 @@ async function previewMerchantNames(
     const suggestion = suggestions[index]!;
     const row = rows[index];
     if (!suggestion.merchantKey || suggestion.nameSource !== "none" || !row) continue;
-    if (rowIsBankCharge(row, language)) continue;
+    if (rowSkipsAiName(row, language)) continue;
     if (seen.has(suggestion.merchantKey)) continue;
     seen.add(suggestion.merchantKey);
     keys.push(suggestion.merchantKey);
@@ -232,14 +235,19 @@ async function previewMerchantNames(
   });
   // A name the cleaner already produced isn't a suggestion worth saving or labeling.
   const names = new Map([...named].filter(([key, name]) => name !== cleaned.get(key)));
-  await Promise.all(
+  // Show only names that were saved: confirm reads them back from memory.
+  const saved = await Promise.all(
     [...names].map(([key, name]) =>
-      upsertAiAlias(db, householdId, key, { displayName: name }).catch(() =>
-        logMerchantAliasFailure()
+      upsertAiAlias(db, householdId, key, { displayName: name }).then(
+        () => [key, name] as const,
+        () => {
+          logMerchantAliasFailure();
+          return null;
+        }
       )
     )
   );
-  return names;
+  return new Map(saved.filter((entry) => entry !== null));
 }
 
 function cleanImportRows(rows: OfxRow[], language: UiLanguage): CleanImportRow[] {
@@ -744,7 +752,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
         const duplicate = existing.has(row.externalId!);
         existing.add(row.externalId!);
         const aiName =
-          !rowIsBankCharge(row, importLanguage) &&
+          !rowSkipsAiName(row, importLanguage) &&
           suggestion.nameSource === "none" &&
           suggestion.merchantKey
             ? aiNames.get(suggestion.merchantKey)

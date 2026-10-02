@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **Categories in the import preview, remembered per merchant.** Each imported row gets a category picker, and choosing one offers to apply it to that merchant's other rows. Names and categories you set, in the preview or later on an imported transaction, are remembered, so the next import from that merchant arrives named and categorized. Migration 0027 adds the merchant memory ([#176](https://github.com/j-cadena-g/amigo/pull/176))
-- **AI names for unfamiliar merchants** in the import preview: store codes like `RCSS` or `UBERONE CA/UBERONEMEMB` become `Real Canadian Superstore` and `Uber One`, marked **Suggested** until you edit them. Merchants the model doesn't recognize keep their cleaned name. Each answer is remembered, and Workers AI use stays under a daily neuron budget (`AI_DAILY_NEURON_BUDGET`, default 10,000; migration 0028) ([#177](https://github.com/j-cadena-g/amigo/pull/177))
+- **AI names for unfamiliar merchants** in the import preview: store codes like `RCSS` or `UBERONE CA/UBERONEMEMB` become `Real Canadian Superstore` and `Uber One`, marked **Suggested** until you edit them. Merchants the model doesn't recognize keep their cleaned name. Transfers between people are never sent to the model. Each answer is remembered, and Workers AI use is held to a soft daily neuron budget (`AI_DAILY_NEURON_BUDGET`, default 10,000; calls started together can pass it slightly; migration 0028) ([#177](https://github.com/j-cadena-g/amigo/pull/177))
 
 ### Changed
 

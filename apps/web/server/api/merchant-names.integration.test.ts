@@ -154,6 +154,39 @@ describe("AI merchant names on import preview", () => {
     ]);
   });
 
+  it("never sends a transfer between people to the model", async () => {
+    const transfer = "Interac e-Transfer from John";
+    const run = namingRun({ [cleanBankDescription(RCSS, "en").merchantKey]: "Real Canadian Superstore" });
+    const preview = (await (
+      await call(
+        { ofx: statement(named(transfer, "transfer") + named(RCSS, "store")) },
+        envWithAi(run)
+      )
+    ).json()) as { rows: PreviewRow[] };
+    expect(requestedKeys(run)).toEqual([cleanBankDescription(RCSS, "en").merchantKey]);
+    expect(JSON.stringify(run.mock.calls)).not.toContain("John");
+    expect(preview.rows[0]).toMatchObject({ description: transfer, nameSource: "none" });
+  });
+
+  it("does not show an AI name that could not be saved", async () => {
+    const run = namingRun({ [cleanBankDescription(RCSS, "en").merchantKey]: "Real Canadian Superstore" });
+    const env = envWithAi(run);
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB = Object.assign(Object.create(env.DB), {
+      prepare: (query: string) => {
+        if (/insert into "merchant_aliases"/i.test(query)) throw new Error("write failed");
+        return realPrepare(query);
+      },
+    });
+    const preview = (await (
+      await call({ ofx: statement(named(RCSS, "store")) }, env)
+    ).json()) as { rows: PreviewRow[] };
+    expect(preview.rows[0]).toMatchObject({
+      description: cleanBankDescription(RCSS, "en").name,
+      nameSource: "none",
+    });
+  });
+
   it("leaves a merchant the model does not know on the cleaned name", async () => {
     const raw = "MYSTERY SHOPPE       LONDON        ON";
     const run = namingRun({});

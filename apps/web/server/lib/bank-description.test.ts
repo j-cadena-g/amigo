@@ -116,6 +116,8 @@ describe("cleanBankDescription", () => {
     "Interac e-Transfer from John",
     "INTERAC E-TRANSFER TO MARIA L",
     "E-TRANSFER SENT JANE DOE",
+    "E TRANSFER SENT JANE DOE",
+    "ETRANSFER RECEIVED SAM",
     "Money request from Ana",
     "ZELLE TO CARLOS",
     "Transferencia a Juan Pérez",

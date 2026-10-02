@@ -13,7 +13,7 @@ const CARD_FEE = /^(ANNUAL FEE|OVERLIMIT FEE|OVER LIMIT FEE)\b/i;
 const CHARGE_REVERSAL = /\b(REFUND|REFUNDED|REVERSAL|REVERSED|REBATE|ADJUSTMENT|ADJ)\b/i;
 /** Money sent between people. The text often holds a person's name, not a merchant. */
 const PERSON_TO_PERSON =
-  /\b(e-?transfers?|interac|send money|money request|request money|transfer (from|to)|zelle|venmo|cash ?app|transferencias?|nequi|daviplata|bre-?b)\b/i;
+  /\b(e[- ]?transfers?|interac|send money|money request|request money|transfer (from|to)|zelle|venmo|cash ?app|transferencias?|nequi|daviplata|bre-?b)\b/i;
 const NAME_MEMO = " — ";
 
 /**

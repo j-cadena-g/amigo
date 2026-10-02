@@ -239,7 +239,7 @@ async function previewMerchantNames(
   const saved = await Promise.all(
     [...names].map(([key, name]) =>
       upsertAiAlias(db, householdId, key, { displayName: name }).then(
-        () => [key, name] as const,
+        (written) => (written ? ([key, name] as const) : null),
         () => {
           logMerchantAliasFailure();
           return null;

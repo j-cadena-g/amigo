@@ -187,6 +187,24 @@ describe("AI merchant names on import preview", () => {
     });
   });
 
+  it("does not show an AI name for a merchant whose household alias has only a category", async () => {
+    const key = cleanBankDescription(RCSS, "en").merchantKey;
+    await createTestDb(getIntegrationEnv().DB)
+      .insert(merchantAliases)
+      .values({ householdId, merchantKey: key, displayName: null, source: "user" });
+    const run = namingRun({ [key]: "Real Canadian Superstore" });
+    const preview = (await (
+      await call({ ofx: statement(named(RCSS, "store")) }, envWithAi(run))
+    ).json()) as { rows: PreviewRow[] };
+    expect(preview.rows[0]).toMatchObject({
+      description: cleanBankDescription(RCSS, "en").name,
+      nameSource: "none",
+    });
+    expect(await aliases()).toEqual([
+      expect.objectContaining({ merchantKey: key, displayName: null, source: "user" }),
+    ]);
+  });
+
   it("leaves a merchant the model does not know on the cleaned name", async () => {
     const raw = "MYSTERY SHOPPE       LONDON        ON";
     const run = namingRun({});

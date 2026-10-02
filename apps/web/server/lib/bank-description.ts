@@ -16,11 +16,12 @@ const NAME_MEMO = " — ";
 /**
  * Turn a bank's raw transaction text into a short display name.
  * `merchantKey` is the uppercase core before title case and charge renaming.
+ * `charge` is true when the interest or card-fee rule produced the name.
  */
 export function cleanBankDescription(
   raw: string,
   language: BankDescriptionLanguage
-): { name: string; merchantKey: string } {
+): { name: string; merchantKey: string; charge: boolean } {
   const collapsed = raw.replace(/\s+/g, " ").trim();
   // Split the bank's NAME — MEMO join on the first em dash.
   const trimmed = raw.trim();
@@ -38,7 +39,7 @@ export function cleanBankDescription(
   const core = text.replace(/\s+/g, " ").trim();
 
   if (!core) {
-    return { name: collapsed, merchantKey: collapsed.toUpperCase() };
+    return { name: collapsed, merchantKey: collapsed.toUpperCase(), charge: false };
   }
 
   const reversed = CHARGE_REVERSAL.test(core);
@@ -47,6 +48,7 @@ export function cleanBankDescription(
     return {
       name: BANK_CHARGE_LABELS[language].interestCharge,
       merchantKey: interest[1]!.toUpperCase(),
+      charge: true,
     };
   }
   const fee = reversed ? null : CARD_FEE.exec(core);
@@ -54,12 +56,13 @@ export function cleanBankDescription(
     return {
       name: BANK_CHARGE_LABELS[language].cardFee,
       merchantKey: fee[1]!.toUpperCase(),
+      charge: true,
     };
   }
 
   const merchantKey = core.toUpperCase();
   const name = /[A-Z]/.test(core) && !/[a-z]/.test(core) ? titleCase(core) : core;
-  return { name, merchantKey };
+  return { name, merchantKey, charge: false };
 }
 
 /** Fixed-width card line, otherwise a padded trailing region code. */

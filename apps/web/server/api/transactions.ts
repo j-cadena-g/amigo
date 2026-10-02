@@ -16,12 +16,14 @@ import { currencyCorrectionMatches, correctImportCurrency } from "../lib/import-
 import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
 import { parseOfx, MAX_OFX_BYTES, type OfxRow } from "../lib/ofx";
 import { cleanBankDescription } from "../lib/bank-description";
+import { suggestMerchantNames } from "../lib/merchant-names";
 import {
   isUncategorizedCategoryName,
   learnMerchantAliasFromEdit,
   lessonForMerchant,
   logMerchantAliasFailure,
   suggestMerchantImportRows,
+  upsertAiAlias,
   upsertUserAlias,
   usableAliasCategoryIds,
   type MerchantImportSuggestion,
@@ -190,6 +192,55 @@ type CleanImportRow = Omit<OfxRow, "description"> & {
   description: string | null;
   bankDescription: string | null;
 };
+
+function rowIsBankCharge(
+  row: { bankDescription: string | null },
+  language: UiLanguage
+): boolean {
+  return Boolean(
+    row.bankDescription && cleanBankDescription(row.bankDescription, language).charge
+  );
+}
+
+async function previewMerchantNames(
+  env: Env,
+  db: DrizzleD1,
+  householdId: string,
+  rows: readonly { bankDescription: string | null }[],
+  suggestions: readonly MerchantImportSuggestion[],
+  language: UiLanguage
+): Promise<Map<string, string>> {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < suggestions.length; index++) {
+    const suggestion = suggestions[index]!;
+    const row = rows[index];
+    if (!suggestion.merchantKey || suggestion.nameSource !== "none" || !row) continue;
+    if (rowIsBankCharge(row, language)) continue;
+    if (seen.has(suggestion.merchantKey)) continue;
+    seen.add(suggestion.merchantKey);
+    keys.push(suggestion.merchantKey);
+  }
+  if (keys.length === 0) return new Map();
+  const cleaned = new Map<string, string | null>();
+  suggestions.forEach((suggestion) => {
+    if (suggestion.merchantKey) cleaned.set(suggestion.merchantKey, suggestion.description);
+  });
+  const named = await suggestMerchantNames(env, db, keys, {
+    language,
+    homeCurrency: await getHomeCurrency(db, householdId),
+  });
+  // A name the cleaner already produced isn't a suggestion worth saving or labeling.
+  const names = new Map([...named].filter(([key, name]) => name !== cleaned.get(key)));
+  await Promise.all(
+    [...names].map(([key, name]) =>
+      upsertAiAlias(db, householdId, key, { displayName: name }).catch(() =>
+        logMerchantAliasFailure()
+      )
+    )
+  );
+  return names;
+}
 
 function cleanImportRows(rows: OfxRow[], language: UiLanguage): CleanImportRow[] {
   return rows.map((row) => {
@@ -680,19 +731,33 @@ export const handleTransactionsRequest: ApiHandler = async ({
         fileRows,
         importLanguage
       );
+      const aiNames = await previewMerchantNames(
+        env,
+        db,
+        session!.householdId,
+        fileRows,
+        suggestions,
+        importLanguage
+      );
       const rows = fileRows.map((row, index) => {
         const suggestion = suggestions[index]!;
         const duplicate = existing.has(row.externalId!);
         existing.add(row.externalId!);
+        const aiName =
+          !rowIsBankCharge(row, importLanguage) &&
+          suggestion.nameSource === "none" &&
+          suggestion.merchantKey
+            ? aiNames.get(suggestion.merchantKey)
+            : undefined;
         return {
           date: row.date,
           type: row.type,
-          description: suggestion.description,
+          description: aiName ?? suggestion.description,
           bankDescription: row.bankDescription,
           merchantKey: suggestion.merchantKey,
           categoryId: suggestion.categoryId,
           categorySource: suggestion.categorySource,
-          nameSource: suggestion.nameSource,
+          nameSource: aiName ? "ai" : suggestion.nameSource,
           currency: row.currency,
           amountCents: row.amountCents,
           externalId: row.externalId,

@@ -115,6 +115,7 @@
   "vars": {
     "APP_ENV": "development",
     "APP_ORIGIN": "http://localhost:5190",
-    "CLERK_PUBLISHABLE_KEY": "pk_test_replace_me"
+    "CLERK_PUBLISHABLE_KEY": "pk_test_replace_me",
+    "AI_DAILY_NEURON_BUDGET": "10000"
   }
 }

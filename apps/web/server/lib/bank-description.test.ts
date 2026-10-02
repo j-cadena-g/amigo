@@ -65,17 +65,19 @@ describe("cleanBankDescription", () => {
     ["ANNUAL FEE REVERSAL", "Annual Fee Reversal"],
     ["INTEREST ADJUSTMENT", "Interest Adjustment"],
   ])("does not name a reversed charge as a charge (%s)", (raw, name) => {
-    expect(cleanBankDescription(raw, "en").name).toBe(name);
+    expect(cleanBankDescription(raw, "en")).toMatchObject({ name, charge: false });
   });
 
   it("names an interest charge in Spanish without changing the merchant key", () => {
     expect(cleanBankDescription("INSTALLMENT INTEREST 7.99%", "es")).toEqual({
       name: "Cargo por intereses",
       merchantKey: "INSTALLMENT INTEREST",
+      charge: true,
     });
     expect(cleanBankDescription("ANNUAL FEE", "es")).toEqual({
       name: "Cargo de la tarjeta",
       merchantKey: "ANNUAL FEE",
+      charge: true,
     });
   });
 
@@ -83,6 +85,7 @@ describe("cleanBankDescription", () => {
     expect(cleanBankDescription("   650-2530000  ", "en")).toEqual({
       name: "650-2530000",
       merchantKey: "650-2530000",
+      charge: false,
     });
   });
 
@@ -90,13 +93,22 @@ describe("cleanBankDescription", () => {
     expect(cleanBankDescription("Interac e-Transfer from John", "en")).toEqual({
       name: "Interac e-Transfer from John",
       merchantKey: "INTERAC E-TRANSFER FROM JOHN",
+      charge: false,
     });
+  });
+
+  it("marks interest and card fees as charges", () => {
+    expect(cleanBankDescription("PURCHASE INTEREST 12.99%", "en").charge).toBe(true);
+    expect(cleanBankDescription("OVERLIMIT FEE", "en").charge).toBe(true);
+    expect(cleanBankDescription("OVER LIMIT FEE", "en").charge).toBe(true);
+    expect(cleanBankDescription("RCSS OXFORD", "en").charge).toBe(false);
   });
 
   it("keeps a memo that adds information", () => {
     expect(cleanBankDescription("STARBUCKS — REWARDS BONUS", "en")).toEqual({
       name: "Starbucks — Rewards Bonus",
       merchantKey: "STARBUCKS — REWARDS BONUS",
+      charge: false,
     });
   });
 });

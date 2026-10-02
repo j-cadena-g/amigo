@@ -506,6 +506,8 @@ export function TransactionImportDialog({
                         choice !== undefined ? (choice ?? "") : (row.categoryId ?? "");
                       const showSuggested =
                         row.categorySource === "ai" && choice === undefined;
+                      const nameSuggested =
+                        editable && row.nameSource === "ai" && edited === undefined;
                       return (
                         <tr
                           key={`${row.externalId}-${index}`}
@@ -539,35 +541,42 @@ export function TransactionImportDialog({
                           <td className="p-2 font-mono whitespace-nowrap">{row.date}</td>
                           <td className="min-w-0 p-2">
                             {editable ? (
-                              <Input
-                                size={1}
-                                maxLength={200}
-                                disabled={busy}
-                                aria-label={t.imports.nameFor(
-                                  row.date,
-                                  formatCents(row.amountCents, row.currency, locale)
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Input
+                                  size={1}
+                                  maxLength={200}
+                                  disabled={busy}
+                                  aria-label={t.imports.nameFor(
+                                    row.date,
+                                    formatCents(row.amountCents, row.currency, locale)
+                                  )}
+                                  value={name}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setDescriptionEdits((previous) => {
+                                      const next = new Map(previous);
+                                      next.set(row.externalId, value);
+                                      return next;
+                                    });
+                                  }}
+                                  onBlur={() => {
+                                    setDescriptionEdits((previous) => {
+                                      const value = previous.get(row.externalId);
+                                      if (value == null || value.trim() !== "")
+                                        return previous;
+                                      const next = new Map(previous);
+                                      next.delete(row.externalId);
+                                      return next;
+                                    });
+                                  }}
+                                  className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-sm focus-visible:border-input"
+                                />
+                                {nameSuggested && (
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {t.imports.suggested}
+                                  </span>
                                 )}
-                                value={name}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setDescriptionEdits((previous) => {
-                                    const next = new Map(previous);
-                                    next.set(row.externalId, value);
-                                    return next;
-                                  });
-                                }}
-                                onBlur={() => {
-                                  setDescriptionEdits((previous) => {
-                                    const value = previous.get(row.externalId);
-                                    if (value == null || value.trim() !== "")
-                                      return previous;
-                                    const next = new Map(previous);
-                                    next.delete(row.externalId);
-                                    return next;
-                                  });
-                                }}
-                                className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-sm focus-visible:border-input"
-                              />
+                              </div>
                             ) : (
                               <span className="wrap-break-word">{name}</span>
                             )}

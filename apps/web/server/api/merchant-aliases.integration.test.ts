@@ -189,14 +189,21 @@ describe("merchant aliases", () => {
       },
     ]);
 
-    await upsertAiAlias(db(), householdId, "USER MART", {
-      displayName: "AI name",
-      categoryId: dining,
-    });
-    await upsertAiAlias(db(), householdId, "AI MART", {
-      displayName: "New AI",
-      categoryId: dining,
-    });
+    expect(
+      await upsertAiAlias(db(), householdId, "USER MART", {
+        displayName: "AI name",
+        categoryId: dining,
+      })
+    ).toBe(false);
+    expect(
+      await upsertAiAlias(db(), householdId, "AI MART", {
+        displayName: "New AI",
+        categoryId: dining,
+      })
+    ).toBe(true);
+    expect(
+      await upsertAiAlias(db(), householdId, "NEW MART", { displayName: "Brand new" })
+    ).toBe(true);
 
     const stored = await aliases();
     expect(stored).toEqual(
@@ -213,9 +220,10 @@ describe("merchant aliases", () => {
           categoryId: dining,
           source: "ai",
         }),
+        expect.objectContaining({ merchantKey: "NEW MART", displayName: "Brand new", source: "ai" }),
       ])
     );
-    expect(stored).toHaveLength(2);
+    expect(stored).toHaveLength(3);
   });
 
   it("ignores another household's alias for the same merchant key", async () => {

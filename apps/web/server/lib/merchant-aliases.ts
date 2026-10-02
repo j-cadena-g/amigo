@@ -123,13 +123,14 @@ export async function upsertUserAlias(
   await upsertAlias(db, householdId, merchantKey, patch, "user");
 }
 
+/** True when the AI value was written; false when a household alias kept it out. */
 export async function upsertAiAlias(
   db: DrizzleD1,
   householdId: string,
   merchantKey: string,
   patch: MerchantAliasUpdate
-): Promise<void> {
-  await upsertAlias(db, householdId, merchantKey, patch, "ai");
+): Promise<boolean> {
+  return upsertAlias(db, householdId, merchantKey, patch, "ai");
 }
 
 async function upsertAlias(
@@ -138,8 +139,8 @@ async function upsertAlias(
   merchantKey: string,
   patch: MerchantAliasUpdate,
   source: MerchantAliasSource
-): Promise<void> {
-  if (patch.displayName === undefined && patch.categoryId === undefined) return;
+): Promise<boolean> {
+  if (patch.displayName === undefined && patch.categoryId === undefined) return false;
   const set: {
     source: MerchantAliasSource;
     updatedAt: Date;
@@ -148,7 +149,8 @@ async function upsertAlias(
   } = { source, updatedAt: new Date() };
   if (patch.displayName !== undefined) set.displayName = patch.displayName;
   if (patch.categoryId !== undefined) set.categoryId = patch.categoryId;
-  await db
+  // RETURNING yields no row when setWhere skipped the update.
+  const written = await db
     .insert(merchantAliases)
     .values({
       householdId,
@@ -162,7 +164,9 @@ async function upsertAlias(
       set,
       // A user correction sticks. AI may refresh its own row only.
       ...(source === "ai" ? { setWhere: eq(merchantAliases.source, "ai") } : {}),
-    });
+    })
+    .returning({ id: merchantAliases.id });
+  return written.length > 0;
 }
 
 export function applyMerchantAlias(input: {

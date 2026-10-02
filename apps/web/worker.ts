@@ -8,6 +8,7 @@ import { processDueRecurringRules } from "./server/lib/recurring-processor";
 import { cleanupStalePushSubscriptions } from "./server/api/push";
 import { cleanupStaleGrocerySyncMutations } from "./server/api/sync";
 import { purgeOldPurchasedGroceryItems } from "./server/api/groceries";
+import { pruneAiUsage } from "./server/lib/ai-budget";
 import type { Env } from "./server/env";
 import { getClerkIdentity } from "./server/lib/clerk";
 import { clerkTokenAuthOptions } from "./server/lib/clerk-auth-options";
@@ -68,6 +69,7 @@ export default {
         await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
         await cleanupStalePushSubscriptions(env);
         await cleanupStaleGrocerySyncMutations(env);
+        await pruneAiUsage(db);
       } finally {
         // Groceries still clear if an earlier cleanup fails; that error is rethrown after.
         const result = await purgeOldPurchasedGroceryItems(env);

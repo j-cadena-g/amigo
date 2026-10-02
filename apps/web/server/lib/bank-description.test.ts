@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanBankDescription } from "./bank-description";
+import { cleanBankDescription, isPersonToPerson } from "./bank-description";
 
 describe("cleanBankDescription", () => {
   it.each([
@@ -65,17 +65,19 @@ describe("cleanBankDescription", () => {
     ["ANNUAL FEE REVERSAL", "Annual Fee Reversal"],
     ["INTEREST ADJUSTMENT", "Interest Adjustment"],
   ])("does not name a reversed charge as a charge (%s)", (raw, name) => {
-    expect(cleanBankDescription(raw, "en").name).toBe(name);
+    expect(cleanBankDescription(raw, "en")).toMatchObject({ name, charge: false });
   });
 
   it("names an interest charge in Spanish without changing the merchant key", () => {
     expect(cleanBankDescription("INSTALLMENT INTEREST 7.99%", "es")).toEqual({
       name: "Cargo por intereses",
       merchantKey: "INSTALLMENT INTEREST",
+      charge: true,
     });
     expect(cleanBankDescription("ANNUAL FEE", "es")).toEqual({
       name: "Cargo de la tarjeta",
       merchantKey: "ANNUAL FEE",
+      charge: true,
     });
   });
 
@@ -83,6 +85,7 @@ describe("cleanBankDescription", () => {
     expect(cleanBankDescription("   650-2530000  ", "en")).toEqual({
       name: "650-2530000",
       merchantKey: "650-2530000",
+      charge: false,
     });
   });
 
@@ -90,13 +93,55 @@ describe("cleanBankDescription", () => {
     expect(cleanBankDescription("Interac e-Transfer from John", "en")).toEqual({
       name: "Interac e-Transfer from John",
       merchantKey: "INTERAC E-TRANSFER FROM JOHN",
+      charge: false,
     });
+  });
+
+  it("marks interest and card fees as charges", () => {
+    expect(cleanBankDescription("PURCHASE INTEREST 12.99%", "en").charge).toBe(true);
+    expect(cleanBankDescription("OVERLIMIT FEE", "en").charge).toBe(true);
+    expect(cleanBankDescription("OVER LIMIT FEE", "en").charge).toBe(true);
+    expect(cleanBankDescription("RCSS OXFORD", "en").charge).toBe(false);
   });
 
   it("keeps a memo that adds information", () => {
     expect(cleanBankDescription("STARBUCKS — REWARDS BONUS", "en")).toEqual({
       name: "Starbucks — Rewards Bonus",
       merchantKey: "STARBUCKS — REWARDS BONUS",
+      charge: false,
     });
+  });
+
+  it.each([
+    ["LATE PAYMENT FEE", "LATE PAYMENT FEE"],
+    ["LATE FEE", "LATE FEE"],
+    ["CASH ADVANCE FEE 3.50", "CASH ADVANCE FEE"],
+    ["FOREIGN TRANSACTION FEE", "FOREIGN TRANSACTION FEE"],
+    ["RETURNED PAYMENT FEE", "RETURNED PAYMENT FEE"],
+    ["NSF FEE", "NSF FEE"],
+  ])("names %s as a card fee", (raw, merchantKey) => {
+    expect(cleanBankDescription(raw, "en")).toEqual({ name: "Card fee", merchantKey, charge: true });
+  });
+
+  it.each([
+    "Interac e-Transfer from John",
+    "INTERAC E-TRANSFER TO MARIA L",
+    "E-TRANSFER SENT JANE DOE",
+    "E TRANSFER SENT JANE DOE",
+    "ETRANSFER RECEIVED SAM",
+    "Money request from Ana",
+    "ZELLE TO CARLOS",
+    "Transferencia a Juan Pérez",
+    "NEQUI ENVIO A PEDRO",
+  ])("flags a person-to-person transfer (%s)", (raw) => {
+    expect(isPersonToPerson(raw)).toBe(true);
+  });
+
+  it.each([
+    "RCSS OXFORD #2812      LONDON        ON",
+    "PAYPAL *TIKTOK INC 4029357733",
+    "TRANSFERWISE FEE",
+  ])("does not flag a merchant (%s)", (raw) => {
+    expect(isPersonToPerson(raw)).toBe(false);
   });
 });

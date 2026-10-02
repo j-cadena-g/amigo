@@ -17,6 +17,8 @@ export interface Env {
   ASSETS: Fetcher;
   EMAIL: SendEmailBinding;
   AI: Ai;
+  /** Account-wide daily Workers AI neuron cap. Missing or invalid uses 10000. */
+  AI_DAILY_NEURON_BUDGET?: string;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   APP_ORIGIN: string;

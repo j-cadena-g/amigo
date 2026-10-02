@@ -7,8 +7,11 @@ import {
   seedStarterFinancialCategories,
   transactions,
 } from "@amigo/db";
+import type { LoaderFunctionArgs } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
+import { createRouterLoadContext } from "../../router-context";
 import { handleCategoriesRequest } from "./categories";
+import { handleApiRoute } from "./route";
 import { handleTransactionsRequest } from "./transactions";
 import { todayInTz } from "../lib/dates";
 import {
@@ -66,6 +69,8 @@ describe("categories integration", () => {
       "Gastos del hogar",
       "Suscripciones",
     ]);
+    expect(seeded.every((category) => category.description)).toBe(true);
+    expect(seeded[1]?.description).toContain("arriendo");
   });
 
   it("does not seed starters when the household already has custom categories", async () => {
@@ -352,5 +357,206 @@ describe("categories integration", () => {
       .get();
 
     expect(imported?.categoryId).toBe(categoryId);
+  });
+
+  function callCategories(
+    method: "GET" | "POST" | "PATCH",
+    options?: { id?: string; body?: unknown; householdId?: string; userId?: string }
+  ) {
+    const id = options?.id;
+    return handleCategoriesRequest({
+      env: getIntegrationEnv(),
+      params: id ? { "*": id } : {},
+      request: new Request(`http://localhost/api/categories${id ? `/${id}` : ""}`, {
+        method,
+        headers:
+          options?.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+      }),
+      session: testSession({
+        userId: options?.userId ?? ownerId,
+        householdId: options?.householdId ?? householdId,
+      }),
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+  }
+
+  it("stores a trimmed description on create and returns it from the list", async () => {
+    const createdResponse = await callCategories("POST", {
+      body: {
+        name: "Housing",
+        type: "expense",
+        description: "  rent, utilities, phone  ",
+      },
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      id: string;
+      description: string | null;
+    };
+    expect(created.description).toBe("rent, utilities, phone");
+
+    const listResponse = await callCategories("GET");
+    expect(listResponse.status).toBe(200);
+    const listed = (await listResponse.json()) as {
+      id: string;
+      description: string | null;
+    }[];
+    expect(listed.find((category) => category.id === created.id)?.description).toBe(
+      "rent, utilities, phone"
+    );
+  });
+
+  it("stores a blank description as null", async () => {
+    const response = await callCategories("POST", {
+      body: { name: "Misc", type: "expense", description: "   " },
+    });
+    expect(response.status).toBe(201);
+    const created = (await response.json()) as { description: string | null };
+    expect(created.description).toBeNull();
+
+    const padded = await callCategories("POST", {
+      body: { name: "Padded", type: "expense", description: " ".repeat(301) },
+    });
+    expect(padded.status).toBe(201);
+    expect(((await padded.json()) as { description: string | null }).description).toBeNull();
+  });
+
+  it("sets and clears a description on update", async () => {
+    const createdResponse = await callCategories("POST", {
+      body: { name: "Transport", type: "expense" },
+    });
+    const created = (await createdResponse.json()) as {
+      id: string;
+      description: string | null;
+    };
+    expect(created.description).toBeNull();
+
+    const setResponse = await callCategories("PATCH", {
+      id: created.id,
+      body: { description: "  bus and fuel  " },
+    });
+    expect(setResponse.status).toBe(200);
+    expect(((await setResponse.json()) as { description: string | null }).description).toBe(
+      "bus and fuel"
+    );
+
+    const clearResponse = await callCategories("PATCH", {
+      id: created.id,
+      body: { description: "  " },
+    });
+    expect(clearResponse.status).toBe(200);
+    expect(((await clearResponse.json()) as { description: string | null }).description).toBeNull();
+  });
+
+  it("leaves the description unchanged when a patch omits it", async () => {
+    const createdResponse = await callCategories("POST", {
+      body: { name: "Phone", type: "expense", description: "mobile plan" },
+    });
+    const created = (await createdResponse.json()) as { id: string };
+
+    const response = await callCategories("PATCH", {
+      id: created.id,
+      body: { name: "Mobile" },
+    });
+    expect(response.status).toBe(200);
+    const updated = (await response.json()) as { name: string; description: string | null };
+    expect(updated.name).toBe("Mobile");
+    expect(updated.description).toBe("mobile plan");
+  });
+
+  it("returns a 400 validation error when a description is longer than 300 characters", async () => {
+    const tooLong = "x".repeat(301);
+    const createdResponse = await callCategories("POST", {
+      body: { name: "Bounded", type: "expense", description: "ok" },
+    });
+    const created = (await createdResponse.json()) as { id: string };
+
+    async function expectValidationError(request: Request, params: Record<string, string> = {}) {
+      const response = await handleApiRoute(
+        {
+          request,
+          params,
+          context: createRouterLoadContext({
+            cloudflare: {
+              env: getIntegrationEnv(),
+              ctx: {} as ExecutionContext,
+              caches: {} as CacheStorage,
+            },
+            app: {
+              cspNonce: "test-nonce",
+              sessionStatus: "authenticated",
+              session: testSession({ userId: ownerId, householdId }),
+            },
+          }),
+        } as unknown as LoaderFunctionArgs,
+        { auth: "none", handler: handleCategoriesRequest }
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "Validation error",
+        code: "VALIDATION_ERROR",
+      });
+    }
+
+    await expectValidationError(
+      new Request("http://localhost/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Too long", type: "expense", description: tooLong }),
+      })
+    );
+    await expectValidationError(
+      new Request(`http://localhost/api/categories/${created.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: tooLong }),
+      }),
+      { "*": created.id }
+    );
+
+    const row = await getDb(getIntegrationEnv().DB).query.financialCategories.findFirst({
+      where: eq(financialCategories.id, created.id),
+    });
+    expect(row?.description).toBe("ok");
+  });
+
+  it("does not update another household's category description", async () => {
+    const suffix = crypto.randomUUID();
+    const otherHouseholdId = `hh-categories-other-${suffix}`;
+    const otherOwnerId = `user-categories-other-${suffix}`;
+    await seedHouseholdWithOwner(getDb(getIntegrationEnv().DB), {
+      householdId: otherHouseholdId,
+      ownerId: otherOwnerId,
+      ownerAuthId: `clerk_categories_other_${suffix}`,
+    });
+
+    const createdResponse = await callCategories("POST", {
+      householdId: otherHouseholdId,
+      userId: otherOwnerId,
+      body: { name: "Rent", type: "expense", description: "rent and utilities" },
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as { id: string };
+
+    await expect(
+      callCategories("PATCH", {
+        id: created.id,
+        body: { description: "taken" },
+      })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Category not found",
+    });
+
+    const row = await getDb(getIntegrationEnv().DB).query.financialCategories.findFirst({
+      where: and(
+        eq(financialCategories.id, created.id),
+        eq(financialCategories.householdId, otherHouseholdId),
+        isNull(financialCategories.deletedAt)
+      ),
+    });
+    expect(row?.description).toBe("rent and utilities");
   });
 });

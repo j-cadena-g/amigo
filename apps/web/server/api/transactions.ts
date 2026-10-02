@@ -17,6 +17,7 @@ import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
 import { parseOfx, MAX_OFX_BYTES, type OfxRow } from "../lib/ofx";
 import { cleanBankDescription, isPersonToPerson } from "../lib/bank-description";
 import { suggestMerchantNames } from "../lib/merchant-names";
+import { suggestTransactionCategories, type TransactionCategoryRequest } from "../lib/transaction-category";
 import {
   isUncategorizedCategoryName,
   learnMerchantAliasFromEdit,
@@ -193,6 +194,9 @@ type CleanImportRow = Omit<OfxRow, "description"> & {
   bankDescription: string | null;
 };
 
+/** Shared by the rename and category steps on a file preview. */
+const IMPORT_PREVIEW_AI_DEADLINE_MS = 12_000;
+
 /** Bank charges keep their label, and transfers between people never reach the model. */
 function rowSkipsAiName(
   row: { bankDescription: string | null },
@@ -211,7 +215,9 @@ async function previewMerchantNames(
   householdId: string,
   rows: readonly { bankDescription: string | null }[],
   suggestions: readonly MerchantImportSuggestion[],
-  language: UiLanguage
+  language: UiLanguage,
+  homeCurrency: CurrencyCode,
+  deadlineMs: number
 ): Promise<Map<string, string>> {
   const keys: string[] = [];
   const seen = new Set<string>();
@@ -231,7 +237,8 @@ async function previewMerchantNames(
   });
   const named = await suggestMerchantNames(env, db, keys, {
     language,
-    homeCurrency: await getHomeCurrency(db, householdId),
+    homeCurrency,
+    deadlineMs,
   });
   // A name the cleaner already produced isn't a suggestion worth saving or labeling.
   const names = new Map([...named].filter(([key, name]) => name !== cleaned.get(key)));
@@ -248,6 +255,44 @@ async function previewMerchantNames(
     )
   );
   return new Map(saved.filter((entry) => entry !== null));
+}
+
+/**
+ * Category suggestions for merchants with nothing remembered. Transfers between
+ * people never reach Jev; bank charges do. Jev bills gateway credits, not neurons.
+ */
+async function previewTransactionCategories(
+  env: Env,
+  db: DrizzleD1,
+  householdId: string,
+  rows: readonly { bankDescription: string | null; type: "income" | "expense" }[],
+  suggestions: readonly MerchantImportSuggestion[],
+  aiNames: ReadonlyMap<string, string>,
+  homeCurrency: CurrencyCode,
+  deadlineMs: number
+) {
+  const requests: TransactionCategoryRequest[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < suggestions.length; index++) {
+    const suggestion = suggestions[index]!;
+    const row = rows[index];
+    if (!suggestion.merchantKey || suggestion.categorySource !== "none" || !row) continue;
+    if (!row.bankDescription || isPersonToPerson(row.bankDescription)) continue;
+    if (seen.has(suggestion.merchantKey)) continue;
+    const displayName = (aiNames.get(suggestion.merchantKey) ?? suggestion.description)?.trim();
+    if (!displayName) continue;
+    seen.add(suggestion.merchantKey);
+    requests.push({
+      merchantKey: suggestion.merchantKey,
+      type: row.type,
+      displayName,
+      bankText: suggestion.merchantKey,
+    });
+  }
+  return suggestTransactionCategories(env, db, householdId, requests, {
+    homeCurrency,
+    deadlineMs,
+  });
 }
 
 function cleanImportRows(rows: OfxRow[], language: UiLanguage): CleanImportRow[] {
@@ -739,13 +784,28 @@ export const handleTransactionsRequest: ApiHandler = async ({
         fileRows,
         importLanguage
       );
+      const homeCurrency = await getHomeCurrency(db, session!.householdId);
+      const aiStartedAt = Date.now();
+      const aiRemaining = () => IMPORT_PREVIEW_AI_DEADLINE_MS - (Date.now() - aiStartedAt);
       const aiNames = await previewMerchantNames(
         env,
         db,
         session!.householdId,
         fileRows,
         suggestions,
-        importLanguage
+        importLanguage,
+        homeCurrency,
+        Math.min(10_000, aiRemaining())
+      );
+      const aiCategories = await previewTransactionCategories(
+        env,
+        db,
+        session!.householdId,
+        fileRows,
+        suggestions,
+        aiNames,
+        homeCurrency,
+        aiRemaining()
       );
       const rows = fileRows.map((row, index) => {
         const suggestion = suggestions[index]!;
@@ -757,14 +817,25 @@ export const handleTransactionsRequest: ApiHandler = async ({
           suggestion.merchantKey
             ? aiNames.get(suggestion.merchantKey)
             : undefined;
+        const aiCategory = suggestion.merchantKey
+          ? aiCategories.get(suggestion.merchantKey)
+          : undefined;
+        const suggestedCategory =
+          suggestion.categorySource === "none" &&
+          aiCategory &&
+          aiCategory.type === row.type &&
+          row.bankDescription != null &&
+          !isPersonToPerson(row.bankDescription)
+            ? aiCategory
+            : null;
         return {
           date: row.date,
           type: row.type,
           description: aiName ?? suggestion.description,
           bankDescription: row.bankDescription,
           merchantKey: suggestion.merchantKey,
-          categoryId: suggestion.categoryId,
-          categorySource: suggestion.categorySource,
+          categoryId: suggestedCategory?.categoryId ?? suggestion.categoryId,
+          categorySource: suggestedCategory ? "ai" : suggestion.categorySource,
           nameSource: aiName ? "ai" : suggestion.nameSource,
           currency: row.currency,
           amountCents: row.amountCents,

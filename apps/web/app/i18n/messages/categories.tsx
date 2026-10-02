@@ -6,6 +6,10 @@ export const categories = defineMessages({
     select: "Select category",
     typeLabel: "Category type",
     namePlaceholder: "e.g. Streaming",
+    descriptionHint:
+      "Optional. What goes here, e.g. “rent, utilities, phone”. Helps suggest categories for imported transactions.",
+    editDescription: "Edit description",
+    editDescriptionNamed: (name: string) => `Edit description for ${name}`,
     parentOptional: "Parent category (optional)",
     topLevel: "None (top level)",
     add: "Add category",
@@ -25,6 +29,7 @@ export const categories = defineMessages({
     addAction: "add the category",
     archiveAction: "archive the category",
     removeAction: "remove the category",
+    saveDescriptionAction: "save the description",
     links: {
       loading: "Loading budget links…",
       loadFailed: "Couldn't load budget links. Reload the page to try again.",
@@ -41,6 +46,10 @@ export const categories = defineMessages({
     select: "Elige una categoría",
     typeLabel: "Tipo de categoría",
     namePlaceholder: "p. ej. Streaming",
+    descriptionHint:
+      "Opcional. Qué va aquí, p. ej. “arriendo, servicios, celular”. Ayuda a sugerir categorías para los movimientos importados.",
+    editDescription: "Editar descripción",
+    editDescriptionNamed: (name: string) => `Editar descripción de ${name}`,
     parentOptional: "Categoría principal (opcional)",
     topLevel: "Ninguna (nivel superior)",
     add: "Agregar categoría",
@@ -60,6 +69,7 @@ export const categories = defineMessages({
     addAction: "agregar la categoría",
     archiveAction: "archivar la categoría",
     removeAction: "quitar la categoría",
+    saveDescriptionAction: "guardar la descripción",
     links: {
       loading: "Cargando vínculos con presupuestos…",
       loadFailed:

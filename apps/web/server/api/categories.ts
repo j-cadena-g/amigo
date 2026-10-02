@@ -27,17 +27,29 @@ const trimmedNameSchema = z.preprocess(
   z.string().min(1).max(100)
 );
 
+/** Blank after trim is stored as null. Omitted on update leaves the column alone. */
+const descriptionSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z.string().max(300).nullable()
+);
+
 const createCategorySchema = z.object({
   name: trimmedNameSchema,
   type: z.enum(["income", "expense"]),
   parentId: z.string().uuid().nullable().optional(),
   icon: z.string().max(16).nullable().optional(),
+  description: descriptionSchema.optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });
 
 const updateCategorySchema = z.object({
   name: trimmedNameSchema.optional(),
   icon: z.string().max(16).nullable().optional(),
+  description: descriptionSchema.optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
   archived: z.boolean().optional(),
 });
@@ -158,6 +170,7 @@ export const handleCategoriesRequest: ApiHandler = async ({
         name: validated.name.trim(),
         type: validated.type,
         icon: validated.icon ?? null,
+        description: validated.description ?? null,
         sortOrder: validated.sortOrder ?? 0,
       })
       .onConflictDoNothing()
@@ -231,6 +244,9 @@ export const handleCategoriesRequest: ApiHandler = async ({
         .set({
           ...(validated.name !== undefined ? { name: validated.name.trim() } : {}),
           ...(validated.icon !== undefined ? { icon: validated.icon } : {}),
+          ...(validated.description !== undefined
+            ? { description: validated.description }
+            : {}),
           ...(validated.sortOrder !== undefined
             ? { sortOrder: validated.sortOrder }
             : {}),

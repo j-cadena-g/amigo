@@ -9,6 +9,7 @@ function category(
     householdId: "hh-1",
     parentId: null,
     type: "expense",
+    description: null,
     sortOrder: 0,
     archived: false,
     icon: null,

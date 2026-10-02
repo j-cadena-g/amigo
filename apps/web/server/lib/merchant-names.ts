@@ -23,7 +23,7 @@ const NAME_ITEM = {
   additionalProperties: false,
 } as const;
 
-const COUNTRY_BY_CURRENCY: Record<CurrencyCode, string> = {
+export const COUNTRY_BY_CURRENCY: Record<CurrencyCode, string> = {
   CAD: "Canada",
   USD: "United States",
   MXN: "Mexico",

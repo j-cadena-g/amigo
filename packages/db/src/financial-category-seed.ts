@@ -22,6 +22,24 @@ const STARTER_NAMES: Record<UiLanguage, readonly [string, string, string]> = {
 };
 
 /**
+ * Starter descriptions, in the same order. AI category suggestions read them;
+ * a bare name like "Living expenses" says little about what goes in it.
+ * Migration 0029 copies them onto existing starter categories, so keep both in step.
+ */
+const STARTER_DESCRIPTIONS: Record<UiLanguage, readonly [string, string, string]> = {
+  en: [
+    "Supermarkets and grocery stores: food and household supplies for home.",
+    "Running the home: rent or mortgage, utilities, phone and internet, insurance, transportation, and other everyday necessities.",
+    "Recurring digital services and memberships: streaming, software, apps, cloud storage, and news.",
+  ],
+  es: [
+    "Supermercados y tiendas de barrio: comida y artículos para la casa.",
+    "Lo que cuesta mantener la casa: arriendo o renta, servicios públicos, teléfono e internet, seguros, transporte y otros gastos del día a día.",
+    "Servicios digitales y membresías que se cobran periódicamente: streaming, software, apps, almacenamiento en la nube y noticias.",
+  ],
+};
+
+/**
  * Give a household its first categories, named in `language`. They're the
  * household's own data from then on, so later language changes leave them be.
  * `language` may be a lookup, run only when there is something to seed.
@@ -42,7 +60,9 @@ export async function seedStarterFinancialCategories(
     return [];
   }
 
-  const names = STARTER_NAMES[typeof language === "function" ? await language() : language];
+  const resolvedLanguage = typeof language === "function" ? await language() : language;
+  const names = STARTER_NAMES[resolvedLanguage];
+  const descriptions = STARTER_DESCRIPTIONS[resolvedLanguage];
 
   const now = new Date();
   const rows = STARTER_FINANCIAL_CATEGORIES.map((starter, index) => ({
@@ -50,6 +70,7 @@ export async function seedStarterFinancialCategories(
     householdId,
     parentId: null,
     name: names[index] ?? starter.name,
+    description: descriptions[index] ?? null,
     type: starter.type,
     sortOrder: starter.sortOrder,
     archived: false,

@@ -204,6 +204,13 @@
       "when": 1790958287141,
       "tag": "0028_ai_usage_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1790977629296,
+      "tag": "0029_financial_categories_description",
+      "breakpoints": true
     }
   ]
 }

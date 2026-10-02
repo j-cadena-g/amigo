@@ -23,6 +23,8 @@ export const financialCategories = sqliteTable(
       .references(() => households.id, { onDelete: "cascade" }),
     parentId: text("parent_id"),
     name: text("name").notNull(),
+    /** What belongs here, in the household's words. AI category suggestions read it. */
+    description: text("description"),
     type: text("type", { enum: FINANCIAL_CATEGORY_TYPES }).notNull(),
     icon: text("icon"),
     sortOrder: integer("sort_order").notNull().default(0),

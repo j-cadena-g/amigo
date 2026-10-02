@@ -5,6 +5,7 @@ import { todayInTz } from "../lib/dates";
 import { handleTransactionsRequest } from "./transactions";
 import {
   createTestDb,
+  seedFinancialCategory,
   seedHouseholdWithOwner,
   testSession,
 } from "../test/fixtures";
@@ -90,7 +91,10 @@ describe("transactions import integration", () => {
 
     const db = getDb(env.DB);
     const stored = await db
-      .select({ externalId: transactions.externalId })
+      .select({
+        externalId: transactions.externalId,
+        bankDescription: transactions.bankDescription,
+      })
       .from(transactions)
       .where(
         and(
@@ -102,6 +106,7 @@ describe("transactions import integration", () => {
       "ext-001",
       "ext-002",
     ]);
+    expect(stored.every((row) => row.bankDescription === null)).toBe(true);
 
     expect(batchSpies.length).toBeGreaterThan(0);
     expect(batchSpies.some((spy) => spy.mock.calls.length > 0)).toBe(true);
@@ -212,5 +217,64 @@ describe("transactions import integration", () => {
         )
       );
     expect(stored).toHaveLength(1);
+  });
+
+  it("ignores a client-supplied bank description on create and update", async () => {
+    const env = getIntegrationEnv();
+    const db = createTestDb(env.DB);
+    const categoryId = crypto.randomUUID();
+    await seedFinancialCategory(db, {
+      id: categoryId,
+      householdId,
+      name: "Groceries",
+    });
+    const session = testSession({ userId: ownerId, householdId });
+    const created = await handleTransactionsRequest({
+      env,
+      params: { "*": "" },
+      request: new Request("http://localhost/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: 12.5,
+          categoryId,
+          type: "expense",
+          date: "2026-09-01",
+          description: "Market",
+          bankDescription: "SHOULD NOT STICK",
+        }),
+      }),
+      session,
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+    expect(created.status).toBe(201);
+    const body = (await created.json()) as {
+      id: string;
+      description: string | null;
+      bankDescription: string | null;
+    };
+    expect(body).toMatchObject({ description: "Market", bankDescription: null });
+
+    const updated = await handleTransactionsRequest({
+      env,
+      params: { "*": body.id },
+      request: new Request(`http://localhost/api/transactions/${body.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: "Corner market",
+          bankDescription: "ALSO NO",
+        }),
+      }),
+      session,
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toMatchObject({
+      description: "Corner market",
+      bankDescription: null,
+    });
   });
 });

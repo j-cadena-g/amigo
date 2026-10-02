@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Imported transactions get readable names.** The import turns bank text like `RCSS OXFORD #2812      LONDON        ON` into `RCSS Oxford`, and the preview lets you edit each name before confirming. The bank's original text is kept and shown as **Bank description** in a transaction's details and in the CSV export. Migration 0026 adds the column and copies the text over for rows already imported from bank files; their names are left as they are ([#175](https://github.com/j-cadena-g/amigo/pull/175))
+
 ## [0.5.1] - 2026-10-01
 
 ### Added

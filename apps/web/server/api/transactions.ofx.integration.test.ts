@@ -40,13 +40,16 @@ describe("OFX imports", () => {
       currency: "CAD",
     });
   });
-  const call = (extra: Record<string, unknown> = {}) =>
+  const call = (
+    extra: Record<string, unknown> = {},
+    headers?: Record<string, string>
+  ) =>
     handleTransactionsRequest({
       env: getIntegrationEnv(),
       params: { "*": "import" },
       request: new Request("http://localhost/api/transactions/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           ofx: statement(),
           accountId,
@@ -287,7 +290,13 @@ describe("OFX imports", () => {
       );
     const input = { ofx, currencyOverride: "CAD", repairCurrency: true };
     expect(await (await call(input)).json()).toMatchObject({
-      rows: [expect.objectContaining({ canCorrect: true })],
+      rows: [
+        expect.objectContaining({
+          canCorrect: true,
+          description: "Café & market",
+          bankDescription: "Café & market",
+        }),
+      ],
     });
     expect(
       await (await call({ ...input, dryRun: false })).json()
@@ -371,6 +380,166 @@ describe("OFX imports", () => {
     expect((await stored())[0]!.currency).toBe("USD");
   });
 
+  it("stores a cleaned OFX name, keeps the raw text, and applies one description override", async () => {
+    const walmart = "WAL-MART # 3050        LONDON        ON";
+    const burger = "BURGER BURGER          LONDON        ON";
+    const ofx = statement(
+      named(walmart, "walmart", "-10.00") + named(burger, "burger", "-8.50")
+    );
+    const preview = (await (await call({ ofx })).json()) as {
+      rows: { externalId: string; description: string; bankDescription: string }[];
+    };
+    expect(preview.rows).toEqual([
+      expect.objectContaining({
+        description: "Wal-Mart",
+        bankDescription: walmart,
+      }),
+      expect.objectContaining({
+        description: "Burger Burger",
+        bankDescription: burger,
+      }),
+    ]);
+    expect(
+      await (
+        await call({
+          ofx,
+          dryRun: false,
+          descriptions: {
+            [preview.rows[0]!.externalId]: "  My Walmart  ",
+            "not-in-the-file": "Ignored",
+          },
+        })
+      ).json()
+    ).toMatchObject({ inserted: 2, skipped: 0 });
+    expect(await stored()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: "My Walmart",
+          bankDescription: walmart,
+          amount: 1000,
+        }),
+        expect.objectContaining({
+          description: "Burger Burger",
+          bankDescription: burger,
+          amount: 850,
+        }),
+      ])
+    );
+    const list = await handleTransactionsRequest({
+      env: getIntegrationEnv(),
+      params: { "*": "" },
+      request: new Request("http://localhost/api/transactions"),
+      session: testSession({ userId: ownerId, householdId }),
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+    expect(await list.json()).toMatchObject({
+      data: expect.arrayContaining([
+        expect.objectContaining({ bankDescription: walmart }),
+        expect.objectContaining({ bankDescription: burger }),
+      ]),
+    });
+  });
+
+  it("rejects an empty description override", async () => {
+    const ofx = statement(named("WAL-MART # 3050        LONDON        ON", "walmart"));
+    const preview = (await (await call({ ofx })).json()) as {
+      rows: { externalId: string }[];
+    };
+    await expect(
+      call({
+        ofx,
+        dryRun: false,
+        descriptions: { [preview.rows[0]!.externalId]: "   " },
+      })
+    ).rejects.toThrow();
+    expect(await stored()).toHaveLength(0);
+  });
+
+  it("cleans a CSV import the same way", async () => {
+    const walmart = "WAL-MART # 3050        LONDON        ON";
+    const transfer = "Interac e-Transfer from John";
+    const input = {
+      ofx: undefined,
+      csv: csvStatement(
+        csvRow({ description: walmart, net_cash_amount: "-10.00" }),
+        csvRow({
+          description: transfer,
+          net_cash_amount: "-4.00",
+          effective_time: "12:31:00",
+        })
+      ),
+    };
+    const preview = (await (await call(input)).json()) as {
+      rows: { externalId: string; description: string; bankDescription: string }[];
+    };
+    expect(preview.rows[0]).toMatchObject({
+      description: "Wal-Mart",
+      bankDescription: walmart,
+    });
+    expect(preview.rows[1]).toMatchObject({
+      description: transfer,
+      bankDescription: transfer,
+    });
+    expect(
+      await (
+        await call({
+          ...input,
+          dryRun: false,
+          descriptions: {
+            [preview.rows[0]!.externalId]: "Neighbourhood Walmart",
+            "not-in-the-file": "Ignored",
+          },
+        })
+      ).json()
+    ).toMatchObject({ inserted: 2 });
+    expect(await stored()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: "Neighbourhood Walmart",
+          bankDescription: walmart,
+        }),
+        expect.objectContaining({
+          description: transfer,
+          bankDescription: transfer,
+        }),
+      ])
+    );
+  });
+
+  it("rejects an empty CSV description override", async () => {
+    const input = {
+      ofx: undefined,
+      csv: csvStatement(csvRow({ description: "WAL-MART # 3050        LONDON        ON" })),
+    };
+    const preview = (await (await call(input)).json()) as {
+      rows: { externalId: string }[];
+    };
+    await expect(
+      call({
+        ...input,
+        dryRun: false,
+        descriptions: { [preview.rows[0]!.externalId]: " " },
+      })
+    ).rejects.toThrow();
+    expect(await stored()).toHaveLength(0);
+  });
+
+  it("names an interest charge in the viewer's language", async () => {
+    const raw = "PURCHASE INTEREST 12.99%";
+    const ofx = statement(named(raw, "interest"));
+    expect(
+      await (await call({ ofx }, { "Accept-Language": "es" })).json()
+    ).toMatchObject({
+      rows: [
+        expect.objectContaining({
+          description: "Cargo por intereses",
+          bankDescription: raw,
+        }),
+      ],
+    });
+  });
+
   it("rejects malformed files before writing", async () => {
     await expect(call({ ofx: "not OFX", dryRun: false })).rejects.toThrow(
       "Invalid"
@@ -378,3 +547,10 @@ describe("OFX imports", () => {
     expect(await stored()).toHaveLength(0);
   });
 });
+
+function named(name: string, id: string, amount = "-12.34") {
+  return transaction(id, amount).replace(
+    "<NAME>Café &amp; market",
+    `<NAME>${name}`
+  );
+}

@@ -39,6 +39,7 @@ export const imports = defineMessages({
     include: "Include",
     date: "Date",
     description: "Description",
+    nameFor: (date: string, amount: string) => `Name for ${date}, ${amount}`,
     amount: "Amount",
     duplicate: "Duplicate — skipped",
     creditsWarning:
@@ -89,6 +90,7 @@ export const imports = defineMessages({
     include: "Incluir",
     date: "Fecha",
     description: "Descripción",
+    nameFor: (date: string, amount: string) => `Nombre para ${date}, ${amount}`,
     amount: "Importe",
     duplicate: "Duplicado — se omite",
     creditsWarning:

@@ -4,6 +4,7 @@ import { NativeSelect } from "@/app/components/financial/form-controls";
 import { SectionLink } from "@/app/components/ledger";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
+import { editedDescriptions } from "@/app/lib/import-descriptions";
 import { decodeOfxFile } from "@/app/lib/ofx-file";
 import { formatCents } from "@/app/lib/currency";
 import type { TransactionAccount } from "./transaction-row";
@@ -21,7 +23,8 @@ import type { TransactionAccount } from "./transaction-row";
 interface PreviewRow {
   date: string;
   type: "income" | "expense";
-  description: string;
+  description: string | null;
+  bankDescription: string | null;
   amountCents: number;
   currency: CurrencyCode;
   externalId: string;
@@ -29,6 +32,20 @@ interface PreviewRow {
   possibleDuplicate: boolean;
   defaultExcluded: boolean;
   canCorrect?: boolean;
+}
+
+/** Cleaned name, or the bank text when the cleaner left it blank. */
+function previewName(row: PreviewRow): string {
+  return row.description ?? row.bankDescription ?? "";
+}
+
+/** Same rows that show an include checkbox. Repair mode is view-only. */
+function canEditName(row: PreviewRow, repairCurrency: boolean): boolean {
+  return (
+    !repairCurrency &&
+    row.amountCents !== 0 &&
+    !(row.duplicate && !row.possibleDuplicate)
+  );
 }
 
 export function TransactionImportDialog({
@@ -58,6 +75,9 @@ export function TransactionImportDialog({
   const [accountId, setAccountId] = useState("");
   const [rows, setRows] = useState<PreviewRow[] | null>(null);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [descriptionEdits, setDescriptionEdits] = useState<Map<string, string>>(
+    () => new Map()
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -76,6 +96,7 @@ export function TransactionImportDialog({
       setAcceptCurrencyMismatch(false);
       setCurrencyMismatch(false);
       setExcluded(new Set());
+      setDescriptionEdits(new Map());
     }
     onOpenChange(next);
   };
@@ -90,6 +111,7 @@ export function TransactionImportDialog({
     setOfx("");
     setError(null);
     setExcluded(new Set());
+    setDescriptionEdits(new Map());
     if (!file) return;
     if (!/\.(ofx|qfx|csv)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
       setError(t.imports.fileError);
@@ -136,6 +158,10 @@ export function TransactionImportDialog({
           accountId,
           dryRun,
           excludedIds: dryRun ? [] : [...excluded],
+          descriptions:
+            dryRun || repairCurrency
+              ? undefined
+              : editedDescriptions(rows ?? [], descriptionEdits, excluded),
         }),
       });
       const data = (await response.json()) as {
@@ -174,6 +200,7 @@ export function TransactionImportDialog({
               .map((row) => row.externalId)
           )
         );
+        setDescriptionEdits(new Map());
       } else {
         toast(
           repairCurrency
@@ -367,51 +394,94 @@ export function TransactionImportDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, index) => (
-                      <tr
-                        key={`${row.externalId}-${index}`}
-                        className="border-t"
-                      >
-                        <td className="p-2">
-                          {repairCurrency && !row.canCorrect ? (
-                            <span>{t.imports.noCorrection}</span>
-                          ) : row.amountCents === 0 ? (
-                            <span>{t.imports.zeroAmount}</span>
-                          ) : row.duplicate && !row.possibleDuplicate ? (
-                            <span>{t.imports.duplicate}</span>
-                          ) : (
-                            <input
-                              type="checkbox"
-                              disabled={busy}
-                              aria-label={`${t.imports.include} ${row.date} ${row.description}`}
-                              checked={!excluded.has(row.externalId)}
-                              onChange={(e) =>
-                                setExcluded((previous) => {
-                                  const next = new Set(previous);
-                                  if (e.target.checked)
+                    {rows.map((row, index) => {
+                      const editable = canEditName(row, repairCurrency);
+                      const edited = descriptionEdits.get(row.externalId);
+                      const name =
+                        editable && edited !== undefined ? edited : previewName(row);
+                      return (
+                        <tr
+                          key={`${row.externalId}-${index}`}
+                          className="border-t"
+                        >
+                          <td className="p-2">
+                            {repairCurrency && !row.canCorrect ? (
+                              <span>{t.imports.noCorrection}</span>
+                            ) : row.amountCents === 0 ? (
+                              <span>{t.imports.zeroAmount}</span>
+                            ) : row.duplicate && !row.possibleDuplicate ? (
+                              <span>{t.imports.duplicate}</span>
+                            ) : (
+                              <input
+                                type="checkbox"
+                                disabled={busy}
+                                aria-label={`${t.imports.include} ${row.date} ${name}`}
+                                checked={!excluded.has(row.externalId)}
+                                onChange={(e) =>
+                                  setExcluded((previous) => {
+                                    const next = new Set(previous);
+                                    if (e.target.checked)
+                                      next.delete(row.externalId);
+                                    else next.add(row.externalId);
+                                    return next;
+                                  })
+                                }
+                              />
+                            )}
+                          </td>
+                          <td className="p-2 font-mono whitespace-nowrap">{row.date}</td>
+                          <td className="min-w-0 p-2">
+                            {editable ? (
+                              <Input
+                                size={1}
+                                maxLength={200}
+                                disabled={busy}
+                                aria-label={t.imports.nameFor(
+                                  row.date,
+                                  formatCents(row.amountCents, row.currency, locale)
+                                )}
+                                value={name}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setDescriptionEdits((previous) => {
+                                    const next = new Map(previous);
+                                    next.set(row.externalId, value);
+                                    return next;
+                                  });
+                                }}
+                                onBlur={() => {
+                                  setDescriptionEdits((previous) => {
+                                    const value = previous.get(row.externalId);
+                                    if (value == null || value.trim() !== "")
+                                      return previous;
+                                    const next = new Map(previous);
                                     next.delete(row.externalId);
-                                  else next.add(row.externalId);
-                                  return next;
-                                })
-                              }
-                            />
-                          )}
-                        </td>
-                        <td className="p-2 font-mono whitespace-nowrap">{row.date}</td>
-                        <td className="p-2">
-                          {row.description}
-                          {row.possibleDuplicate && (
-                            <span className="block text-xs">
-                              {t.imports.possibleDuplicate}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-2 font-mono font-medium whitespace-nowrap">
-                          {row.type === "expense" ? "−" : "+"}
-                          {formatCents(row.amountCents, row.currency, locale)}
-                        </td>
-                      </tr>
-                    ))}
+                                    return next;
+                                  });
+                                }}
+                                className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-sm focus-visible:border-input"
+                              />
+                            ) : (
+                              <span className="wrap-break-word">{name}</span>
+                            )}
+                            {row.bankDescription && row.bankDescription !== name && (
+                              <span className="block wrap-break-word text-xs text-muted-foreground">
+                                {row.bankDescription}
+                              </span>
+                            )}
+                            {row.possibleDuplicate && (
+                              <span className="block text-xs">
+                                {t.imports.possibleDuplicate}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 font-mono font-medium whitespace-nowrap">
+                            {row.type === "expense" ? "−" : "+"}
+                            {formatCents(row.amountCents, row.currency, locale)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

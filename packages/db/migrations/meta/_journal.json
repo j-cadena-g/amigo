@@ -183,6 +183,13 @@
       "when": 1790700000000,
       "tag": "0025_move_debts_and_assets_to_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1790905517115,
+      "tag": "0026_transactions_bank_description",
+      "breakpoints": true
     }
   ]
 }

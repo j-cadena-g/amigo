@@ -55,6 +55,8 @@ export const transactions = sqliteTable(
     /** Denormalized display name; kept in sync when categoryId is set. */
     category: text("category").notNull(),
     description: text("description"),
+    /** The bank's original text for an imported row. Null on manual entries. */
+    bankDescription: text("bank_description"),
     type: text("type", { enum: TRANSACTION_TYPES }).notNull(),
     date: text("date").notNull(), // ISO 8601 YYYY-MM-DD
     createdAt: integer("created_at", { mode: "timestamp_ms" })

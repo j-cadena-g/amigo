@@ -104,13 +104,23 @@ describe("chosenCategories", () => {
 
 describe("sameMerchantTargets", () => {
   const preview = [
-    { externalId: "a", merchantKey: "cafe", categoryId: "groceries" },
-    { externalId: "b", merchantKey: "cafe", categoryId: "rent" },
-    { externalId: "c", merchantKey: "cafe", categoryId: "groceries" },
-    { externalId: "d", merchantKey: null, categoryId: "rent" },
-    { externalId: "e", merchantKey: "market", categoryId: "rent" },
+    { externalId: "a", merchantKey: "cafe", categoryId: "groceries", type: "expense" as const },
+    { externalId: "b", merchantKey: "cafe", categoryId: "rent", type: "expense" as const },
+    { externalId: "c", merchantKey: "cafe", categoryId: "groceries", type: "expense" as const },
+    { externalId: "d", merchantKey: null, categoryId: "rent", type: "expense" as const },
+    { externalId: "e", merchantKey: "market", categoryId: "rent", type: "expense" as const },
+    { externalId: "f", merchantKey: "cafe", categoryId: null, type: "income" as const },
   ];
   const editable = () => true;
+
+  it("skips a same-merchant row of the other type", () => {
+    expect(
+      sameMerchantTargets(preview, "b", "groceries", new Map(), new Set(), editable)
+    ).not.toContain("f");
+    expect(
+      sameMerchantTargets(preview, "f", "salary", new Map(), new Set(), editable)
+    ).toEqual([]);
+  });
 
   it("returns none when the changed row has a null merchant key", () => {
     expect(

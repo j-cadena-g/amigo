@@ -25,11 +25,16 @@ export function chosenCategories(
 }
 
 /**
- * Other included editable rows from the same merchant whose current category
- * differs from the one just chosen.
+ * Other included editable rows from the same merchant and of the same type
+ * whose current category differs from the one just chosen.
  */
 export function sameMerchantTargets(
-  rows: { externalId: string; merchantKey: string | null; categoryId: string | null }[],
+  rows: {
+    externalId: string;
+    merchantKey: string | null;
+    categoryId: string | null;
+    type: "income" | "expense";
+  }[],
   changedId: string,
   categoryId: string | null,
   choices: ReadonlyMap<string, string | null>,
@@ -42,6 +47,8 @@ export function sameMerchantTargets(
   const targets: string[] = [];
   for (const row of rows) {
     if (row.externalId === changedId || row.merchantKey !== changed.merchantKey) continue;
+    // A refund from the same merchant can't take an expense category, or the reverse.
+    if (row.type !== changed.type) continue;
     if (excluded.has(row.externalId) || !editable(row.externalId)) continue;
     const current = chosenCategory(row.categoryId, choices, row.externalId);
     if (current === nextCategory) continue;

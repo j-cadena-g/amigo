@@ -8,7 +8,8 @@ const AS_WRITTEN = ["Amazon.ca", "Amazon.com", "Apple.com", "X", "TikTok", "407 
 
 const INTEREST =
   /^(PURCHASE INTEREST|INSTALLMENT INTEREST|CASH ADVANCE INTEREST)\b/i;
-const CARD_FEE = /^(ANNUAL FEE|OVERLIMIT FEE|OVER LIMIT FEE)\b/i;
+const CARD_FEE =
+  /^(ANNUAL FEE|OVERLIMIT FEE|OVER LIMIT FEE|LATE PAYMENT FEE|LATE FEE|CASH ADVANCE FEE|FOREIGN TRANSACTION FEE|RETURNED PAYMENT FEE|NSF FEE)\b/i;
 /** A refunded or reversed charge is a credit, so it keeps its own words. */
 const CHARGE_REVERSAL = /\b(REFUND|REFUNDED|REVERSAL|REVERSED|REBATE|ADJUSTMENT|ADJ)\b/i;
 /** Money sent between people. The text often holds a person's name, not a merchant. */

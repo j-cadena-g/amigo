@@ -113,6 +113,17 @@ describe("cleanBankDescription", () => {
   });
 
   it.each([
+    ["LATE PAYMENT FEE", "LATE PAYMENT FEE"],
+    ["LATE FEE", "LATE FEE"],
+    ["CASH ADVANCE FEE 3.50", "CASH ADVANCE FEE"],
+    ["FOREIGN TRANSACTION FEE", "FOREIGN TRANSACTION FEE"],
+    ["RETURNED PAYMENT FEE", "RETURNED PAYMENT FEE"],
+    ["NSF FEE", "NSF FEE"],
+  ])("names %s as a card fee", (raw, merchantKey) => {
+    expect(cleanBankDescription(raw, "en")).toEqual({ name: "Card fee", merchantKey, charge: true });
+  });
+
+  it.each([
     "Interac e-Transfer from John",
     "INTERAC E-TRANSFER TO MARIA L",
     "E-TRANSFER SENT JANE DOE",

@@ -154,6 +154,17 @@ describe("AI merchant names on import preview", () => {
     ]);
   });
 
+  it("never sends a card fee to the model or remembers it", async () => {
+    const fee = "LATE PAYMENT FEE";
+    const run = namingRun({ [cleanBankDescription(fee, "en").merchantKey]: "Late Payment Fee" });
+    const preview = (await (
+      await call({ ofx: statement(named(fee, "fee")) }, envWithAi(run))
+    ).json()) as { rows: PreviewRow[] };
+    expect(run).not.toHaveBeenCalled();
+    expect(preview.rows[0]).toMatchObject({ description: "Card fee", nameSource: "none" });
+    expect(await aliases()).toEqual([]);
+  });
+
   it("never sends a transfer between people to the model", async () => {
     const transfer = "Interac e-Transfer from John";
     const run = namingRun({ [cleanBankDescription(RCSS, "en").merchantKey]: "Real Canadian Superstore" });

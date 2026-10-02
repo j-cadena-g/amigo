@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "@amigo/db";
+import { CategorySelect } from "@/app/components/financial/category-select";
 import { NativeSelect } from "@/app/components/financial/form-controls";
+import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
 import { SectionLink } from "@/app/components/ledger";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
@@ -15,7 +17,11 @@ import {
 } from "@/app/components/ui/dialog";
 import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
-import { editedDescriptions } from "@/app/lib/import-descriptions";
+import {
+  chosenCategories,
+  editedDescriptions,
+  sameMerchantTargets,
+} from "@/app/lib/import-descriptions";
 import { decodeOfxFile } from "@/app/lib/ofx-file";
 import { formatCents } from "@/app/lib/currency";
 import type { TransactionAccount } from "./transaction-row";
@@ -32,11 +38,39 @@ interface PreviewRow {
   possibleDuplicate: boolean;
   defaultExcluded: boolean;
   canCorrect?: boolean;
+  merchantKey: string | null;
+  categoryId: string | null;
+  categorySource: "user" | "ai" | "none";
+  nameSource: "user" | "ai" | "none";
+}
+
+interface MerchantPrompt {
+  categoryId: string | null;
+  name: string;
+  targetIds: string[];
 }
 
 /** Cleaned name, or the bank text when the cleaner left it blank. */
 function previewName(row: PreviewRow): string {
   return row.description ?? row.bankDescription ?? "";
+}
+
+function editableRow(
+  rows: PreviewRow[],
+  repairCurrency: boolean,
+  externalId: string
+): boolean {
+  const row = rows.find((candidate) => candidate.externalId === externalId);
+  return row ? canEditName(row, repairCurrency) : false;
+}
+
+function categoryChoiceLabel(
+  categories: { id: string; name: string }[],
+  categoryId: string | null,
+  uncategorized: string
+): string {
+  if (!categoryId) return uncategorized;
+  return categories.find((category) => category.id === categoryId)?.name ?? uncategorized;
 }
 
 /** Same rows that show an include checkbox. Repair mode is view-only. */
@@ -62,6 +96,11 @@ export function TransactionImportDialog({
   const t = useT();
   const locale = useLocale();
   const toast = useToast();
+  const {
+    categories,
+    loading: categoriesLoading,
+    error: categoriesError,
+  } = useFinancialCategories();
   const [currencyOverride, setCurrencyOverride] = useState("");
   const [repairCurrency, setRepairCurrency] = useState(false);
   const [currencyMismatch, setCurrencyMismatch] = useState(false);
@@ -78,6 +117,10 @@ export function TransactionImportDialog({
   const [descriptionEdits, setDescriptionEdits] = useState<Map<string, string>>(
     () => new Map()
   );
+  const [categoryChoices, setCategoryChoices] = useState<Map<string, string | null>>(
+    () => new Map()
+  );
+  const [merchantPrompt, setMerchantPrompt] = useState<MerchantPrompt | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -97,6 +140,8 @@ export function TransactionImportDialog({
       setCurrencyMismatch(false);
       setExcluded(new Set());
       setDescriptionEdits(new Map());
+      setCategoryChoices(new Map());
+      setMerchantPrompt(null);
     }
     onOpenChange(next);
   };
@@ -112,6 +157,8 @@ export function TransactionImportDialog({
     setError(null);
     setExcluded(new Set());
     setDescriptionEdits(new Map());
+    setCategoryChoices(new Map());
+    setMerchantPrompt(null);
     if (!file) return;
     if (!/\.(ofx|qfx|csv)$/i.test(file.name) || file.size > 2 * 1024 * 1024) {
       setError(t.imports.fileError);
@@ -162,6 +209,12 @@ export function TransactionImportDialog({
             dryRun || repairCurrency
               ? undefined
               : editedDescriptions(rows ?? [], descriptionEdits, excluded),
+          categories:
+            dryRun || repairCurrency
+              ? undefined
+              : chosenCategories(rows ?? [], categoryChoices, excluded, (externalId) =>
+                  editableRow(rows ?? [], repairCurrency, externalId)
+                ),
         }),
       });
       const data = (await response.json()) as {
@@ -170,6 +223,7 @@ export function TransactionImportDialog({
         inserted?: number;
         skipped?: number;
         corrected?: number;
+        learned?: number;
         currencyMismatch?: boolean;
         accountCurrency?: string;
         sourceCurrencies?: string[];
@@ -201,14 +255,16 @@ export function TransactionImportDialog({
           )
         );
         setDescriptionEdits(new Map());
+        setCategoryChoices(new Map());
+        setMerchantPrompt(null);
       } else {
+        const summary = repairCurrency
+          ? t.imports.corrected(data.corrected ?? 0)
+          : t.imports.finished(data.inserted ?? 0, data.skipped ?? 0);
+        const learned = data.learned ?? 0;
         toast(
-          repairCurrency
-            ? t.imports.corrected(data.corrected ?? 0)
-            : t.imports.finished(data.inserted ?? 0, data.skipped ?? 0),
-          {
-            variant: "success",
-          }
+          learned > 0 ? `${summary} ${t.imports.remembered(learned)}` : summary,
+          { variant: "success" }
         );
         close(false);
       }
@@ -227,6 +283,10 @@ export function TransactionImportDialog({
         row.amountCents > 0 &&
         !excluded.has(row.externalId)
     ).length ?? 0;
+  // The blank option is Uncategorized, so a category with that name is omitted.
+  const pickerCategories = categories.filter(
+    (category) => category.name.toLowerCase() !== "uncategorized"
+  );
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -383,6 +443,48 @@ export function TransactionImportDialog({
               {repairCurrency && (
                 <p className="text-sm">{t.imports.repairHelp}</p>
               )}
+              {merchantPrompt && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span>
+                    {t.imports.applyToMerchant(
+                      categoryChoiceLabel(
+                        categories,
+                        merchantPrompt.categoryId,
+                        t.imports.uncategorized
+                      ),
+                      merchantPrompt.targetIds.length,
+                      merchantPrompt.name
+                    )}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      const prompt = merchantPrompt;
+                      setCategoryChoices((previous) => {
+                        const next = new Map(previous);
+                        for (const externalId of prompt.targetIds) {
+                          next.set(externalId, prompt.categoryId);
+                        }
+                        return next;
+                      });
+                      setMerchantPrompt(null);
+                    }}
+                  >
+                    {t.imports.apply}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setMerchantPrompt(null)}
+                  >
+                    {t.imports.dismiss}
+                  </Button>
+                </div>
+              )}
               <div className="max-h-72 overflow-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -399,6 +501,11 @@ export function TransactionImportDialog({
                       const edited = descriptionEdits.get(row.externalId);
                       const name =
                         editable && edited !== undefined ? edited : previewName(row);
+                      const choice = categoryChoices.get(row.externalId);
+                      const categoryValue =
+                        choice !== undefined ? (choice ?? "") : (row.categoryId ?? "");
+                      const showSuggested =
+                        row.categorySource === "ai" && choice === undefined;
                       return (
                         <tr
                           key={`${row.externalId}-${index}`}
@@ -463,6 +570,52 @@ export function TransactionImportDialog({
                               />
                             ) : (
                               <span className="wrap-break-word">{name}</span>
+                            )}
+                            {editable && (
+                              <div className="mt-1 flex min-w-0 items-center gap-2">
+                                <div className="min-w-0 flex-1 [&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:py-0.5 [&_select]:pl-1 [&_select]:text-sm [&_select]:focus-visible:border-input">
+                                  <CategorySelect
+                                    type={row.type}
+                                    categories={pickerCategories}
+                                    value={categoryValue}
+                                    disabled={
+                                      busy || categoriesLoading || categoriesError != null
+                                    }
+                                    placeholder={t.imports.uncategorized}
+                                    aria-label={t.imports.categoryFor(
+                                      row.date,
+                                      formatCents(row.amountCents, row.currency, locale)
+                                    )}
+                                    onChange={(value) => {
+                                      const categoryId = value ? value : null;
+                                      setCategoryChoices((previous) => {
+                                        const next = new Map(previous);
+                                        next.set(row.externalId, categoryId);
+                                        return next;
+                                      });
+                                      const targets = sameMerchantTargets(
+                                        rows,
+                                        row.externalId,
+                                        categoryId,
+                                        categoryChoices,
+                                        excluded,
+                                        (externalId) =>
+                                          editableRow(rows, repairCurrency, externalId)
+                                      );
+                                      setMerchantPrompt(
+                                        targets.length
+                                          ? { categoryId, name, targetIds: targets }
+                                          : null
+                                      );
+                                    }}
+                                  />
+                                </div>
+                                {showSuggested && (
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {t.imports.suggested}
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {row.bankDescription && row.bankDescription !== name && (
                               <span className="block wrap-break-word text-xs text-muted-foreground">

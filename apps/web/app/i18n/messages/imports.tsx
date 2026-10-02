@@ -40,6 +40,15 @@ export const imports = defineMessages({
     date: "Date",
     description: "Description",
     nameFor: (date: string, amount: string) => `Name for ${date}, ${amount}`,
+    uncategorized: "Uncategorized",
+    categoryFor: (date: string, amount: string) => `Category for ${date}, ${amount}`,
+    suggested: "Suggested",
+    applyToMerchant: (category: string, count: number, name: string) =>
+      `Apply ${category} to ${count} other ${name} ${count === 1 ? "row" : "rows"}?`,
+    apply: "Apply",
+    dismiss: "Dismiss",
+    remembered: (count: number) =>
+      `Remembered ${count} ${count === 1 ? "merchant" : "merchants"} for next time.`,
     amount: "Amount",
     duplicate: "Duplicate — skipped",
     creditsWarning:
@@ -91,6 +100,17 @@ export const imports = defineMessages({
     date: "Fecha",
     description: "Descripción",
     nameFor: (date: string, amount: string) => `Nombre para ${date}, ${amount}`,
+    uncategorized: "Sin categoría",
+    categoryFor: (date: string, amount: string) => `Categoría para ${date}, ${amount}`,
+    suggested: "Sugerida",
+    applyToMerchant: (category: string, count: number, name: string) =>
+      `¿Aplicar ${category} a ${count} ${count === 1 ? "fila" : "filas"} más de ${name}?`,
+    apply: "Aplicar",
+    dismiss: "Descartar",
+    remembered: (count: number) =>
+      count === 1
+        ? "Se recordó 1 comercio para la próxima vez."
+        : `Se recordaron ${count} comercios para la próxima vez.`,
     amount: "Importe",
     duplicate: "Duplicado — se omite",
     creditsWarning:

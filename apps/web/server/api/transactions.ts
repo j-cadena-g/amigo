@@ -16,6 +16,17 @@ import { currencyCorrectionMatches, correctImportCurrency } from "../lib/import-
 import { parseWealthsimpleCsv } from "../lib/wealthsimple-csv";
 import { parseOfx, MAX_OFX_BYTES, type OfxRow } from "../lib/ofx";
 import { cleanBankDescription } from "../lib/bank-description";
+import {
+  isUncategorizedCategoryName,
+  learnMerchantAliasFromEdit,
+  lessonForMerchant,
+  logMerchantAliasFailure,
+  suggestMerchantImportRows,
+  upsertUserAlias,
+  usableAliasCategoryIds,
+  type MerchantImportSuggestion,
+  type MerchantLessonRow,
+} from "../lib/merchant-aliases";
 import type { CurrencyCode, DrizzleD1, Transaction, UiLanguage } from "@amigo/db";
 import { z } from "zod";
 import { broadcastToHousehold } from "../lib/realtime";
@@ -191,6 +202,60 @@ function cleanImportRows(rows: OfxRow[], language: UiLanguage): CleanImportRow[]
         : null,
     };
   });
+}
+
+async function uncategorizedImportCategory(
+  db: DrizzleD1,
+  householdId: string,
+  type: "income" | "expense",
+  cache: Map<string, { id: string; name: string }>
+): Promise<{ id: string; name: string }> {
+  const cached = cache.get(type);
+  if (cached) return cached;
+  const category = await resolveOrCreateImportCategory(
+    db,
+    householdId,
+    "Uncategorized",
+    type
+  );
+  const resolved = { id: category.id, name: category.name };
+  cache.set(type, resolved);
+  return resolved;
+}
+
+async function resolveFileImportCategory(
+  db: DrizzleD1,
+  householdId: string,
+  rowType: "income" | "expense",
+  overrideKey: string | null,
+  categoryOverrides: Record<string, string | null>,
+  suggestion: MerchantImportSuggestion,
+  usableOverrides: Map<string, { type: "income" | "expense"; name: string }>,
+  uncategorizedCache: Map<string, { id: string; name: string }>
+): Promise<{ stored: { id: string; name: string }; learnCategoryId: string | null }> {
+  const uncategorized = () =>
+    uncategorizedImportCategory(db, householdId, rowType, uncategorizedCache);
+  const hasOverride =
+    overrideKey != null && Object.hasOwn(categoryOverrides, overrideKey);
+  if (!hasOverride) {
+    if (suggestion.categoryId && suggestion.categoryName) {
+      return {
+        stored: { id: suggestion.categoryId, name: suggestion.categoryName },
+        learnCategoryId: suggestion.categoryId,
+      };
+    }
+    return { stored: await uncategorized(), learnCategoryId: null };
+  }
+  const requested = categoryOverrides[overrideKey] ?? null;
+  if (!requested) return { stored: await uncategorized(), learnCategoryId: null };
+  const usable = usableOverrides.get(requested);
+  if (!usable || usable.type !== rowType) {
+    return { stored: await uncategorized(), learnCategoryId: null };
+  }
+  if (isUncategorizedCategoryName(usable.name)) {
+    return { stored: { id: requested, name: usable.name }, learnCategoryId: null };
+  }
+  return { stored: { id: requested, name: usable.name }, learnCategoryId: requested };
 }
 
 function csvEscape(value: string | number | boolean | null | undefined): string {
@@ -425,6 +490,13 @@ export const handleTransactionsRequest: ApiHandler = async ({
                 (overrides) => Object.keys(overrides).length <= 2000,
                 "At most 2,000 description overrides."
               ),
+            categories: z
+              .record(z.string().max(200), z.string().uuid().nullable())
+              .default({})
+              .refine(
+                (categories) => Object.keys(categories).length <= 2000,
+                "At most 2,000 category overrides."
+              ),
           })
           .refine(
             (value) => Boolean(value.ofx) !== Boolean(value.csv),
@@ -450,6 +522,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
       : null;
     let parsedFile: { rows: CleanImportRow[]; creditCard: boolean } | null = null;
     const excludedIds = new Set(fileInput?.excludedIds);
+    let importLanguage: UiLanguage = "en";
     if (fileInput) {
       let parsed: Awaited<ReturnType<typeof parseOfx>>;
       try {
@@ -462,10 +535,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
           "VALIDATION_ERROR"
         );
       }
-      const language = (await loadViewerRegion(loadContext, request)).language;
+      importLanguage = (await loadViewerRegion(loadContext, request)).language;
       parsedFile = {
         creditCard: parsed.creditCard,
-        rows: cleanImportRows(parsed.rows, language),
+        rows: cleanImportRows(parsed.rows, importLanguage),
       };
     }
     let accountCurrency: CurrencyCode | undefined;
@@ -548,19 +621,23 @@ export const handleTransactionsRequest: ApiHandler = async ({
       }
     }
     const legacy = fileInput ? null : importBodySchema.parse(body);
-    const parsed =
+    const fileRows =
       parsedFile && fileInput
+        ? parsedFile.rows
+            .filter((row) => !excludedIds.has(row.externalId))
+            .filter((row) => fileInput.dryRun || row.amountCents > 0)
+            .map((row) => ({
+              ...row,
+              currency: fileInput.currencyOverride ?? row.currency,
+              accountId: fileInput.accountId,
+              budgetId: null,
+            }))
+        : null;
+    const parsed =
+      fileRows && fileInput
         ? {
             dryRun: fileInput.dryRun,
-            rows: parsedFile.rows
-              .filter((row) => !excludedIds.has(row.externalId))
-              .filter((row) => fileInput.dryRun || row.amountCents > 0)
-              .map((row) => ({
-                ...row,
-                currency: fileInput.currencyOverride ?? row.currency,
-                accountId: fileInput.accountId,
-                budgetId: null,
-              })),
+            rows: fileRows,
           }
         : {
             dryRun: legacy!.dryRun,
@@ -578,10 +655,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
     const batchId = crypto.randomUUID();
 
-    if (parsed.dryRun && parsedFile) {
+    if (parsed.dryRun && fileRows && parsedFile) {
       const existing = new Set<string>();
       // Deliberately include tombstones: the unique import identity survives deletion.
-      for (let i = 0; i < parsed.rows.length; i += 80) {
+      for (let i = 0; i < fileRows.length; i += 80) {
         const matches = await db
           .select({ externalId: transactions.externalId })
           .from(transactions)
@@ -590,21 +667,32 @@ export const handleTransactionsRequest: ApiHandler = async ({
               scopeToHousehold(transactions.householdId, session!.householdId),
               inArray(
                 transactions.externalId,
-                parsed.rows.slice(i, i + 80).map((row) => row.externalId!)
+                fileRows.slice(i, i + 80).map((row) => row.externalId)
               )
             )
           );
         for (const match of matches)
           if (match.externalId) existing.add(match.externalId);
       }
-      const rows = parsed.rows.map((row) => {
+      const suggestions = await suggestMerchantImportRows(
+        db,
+        session!.householdId,
+        fileRows,
+        importLanguage
+      );
+      const rows = fileRows.map((row, index) => {
+        const suggestion = suggestions[index]!;
         const duplicate = existing.has(row.externalId!);
         existing.add(row.externalId!);
         return {
           date: row.date,
           type: row.type,
-          description: row.description,
+          description: suggestion.description,
           bankDescription: row.bankDescription,
+          merchantKey: suggestion.merchantKey,
+          categoryId: suggestion.categoryId,
+          categorySource: suggestion.categorySource,
+          nameSource: suggestion.nameSource,
           currency: row.currency,
           amountCents: row.amountCents,
           externalId: row.externalId,
@@ -647,15 +735,42 @@ export const handleTransactionsRequest: ApiHandler = async ({
     }
 
     const descriptionOverrides = fileInput?.descriptions ?? {};
+    const categoryOverrides = fileInput?.categories ?? {};
+    const fileSuggestions = fileRows
+      ? await suggestMerchantImportRows(
+          db,
+          session!.householdId,
+          fileRows,
+          importLanguage
+        )
+      : null;
+    const usableOverrides = fileSuggestions
+      ? await usableAliasCategoryIds(
+          db,
+          session!.householdId,
+          Object.values(categoryOverrides).filter((id): id is string => id != null)
+        )
+      : null;
     const seenInBatch = new Set<string>();
     const categoryCache = new Map<string, Awaited<ReturnType<typeof resolveOrCreateImportCategory>>>();
+    const uncategorizedCache = new Map<string, { id: string; name: string }>();
     const values = [];
-    for (const row of parsed.rows) {
+    const lessons: {
+      id: string;
+      merchantKey: string;
+      row: MerchantLessonRow;
+    }[] = [];
+    for (let index = 0; index < parsed.rows.length; index++) {
+      const row = parsed.rows[index]!;
       let externalId = row.externalId?.trim() || null;
+      const overrideKey = externalId;
+      const suggestion = fileSuggestions?.[index];
+      const nameOverride =
+        overrideKey != null && Object.hasOwn(descriptionOverrides, overrideKey)
+          ? descriptionOverrides[overrideKey]!.trim()
+          : null;
       const description =
-        (externalId ? descriptionOverrides[externalId] : undefined)?.trim() ||
-        row.description?.trim() ||
-        null;
+        nameOverride || suggestion?.description || row.description?.trim() || null;
       if (externalId && fileInput?.csv && fileInput.confirmedDuplicateIds.includes(externalId)) {
         externalId = `${externalId}:repeat:${fileInput.duplicateConfirmationId}`;
       }
@@ -666,19 +781,50 @@ export const handleTransactionsRequest: ApiHandler = async ({
         seenInBatch.add(externalId);
       }
       const currency = (row.currency ?? homeCurrency) as CurrencyCode;
-      const cacheKey = `${row.type}:${row.category.trim().toLowerCase()}`;
-      let category = categoryCache.get(cacheKey);
-      if (!category) {
-        category = await resolveOrCreateImportCategory(
+      let category: { id: string; name: string };
+      let learnCategoryId: string | null = null;
+      if (suggestion) {
+        const resolved = await resolveFileImportCategory(
           db,
           session!.householdId,
-          row.category,
-          row.type
+          row.type,
+          overrideKey,
+          categoryOverrides,
+          suggestion,
+          usableOverrides ?? new Map(),
+          uncategorizedCache
         );
-        categoryCache.set(cacheKey, category);
+        category = resolved.stored;
+        learnCategoryId = resolved.learnCategoryId;
+      } else {
+        const cacheKey = `${row.type}:${row.category.trim().toLowerCase()}`;
+        let resolved = categoryCache.get(cacheKey);
+        if (!resolved) {
+          resolved = await resolveOrCreateImportCategory(
+            db,
+            session!.householdId,
+            row.category,
+            row.type
+          );
+          categoryCache.set(cacheKey, resolved);
+        }
+        category = resolved;
+      }
+      const id = crypto.randomUUID();
+      if (suggestion?.merchantKey) {
+        lessons.push({
+          id,
+          merchantKey: suggestion.merchantKey,
+          row: {
+            suggestedName: suggestion.description,
+            chosenName: nameOverride ?? suggestion.description,
+            suggestedCategoryId: suggestion.categoryId,
+            chosenCategoryId: learnCategoryId,
+          },
+        });
       }
       values.push({
-        id: crypto.randomUUID(),
+        id,
         householdId: session!.householdId,
         userId: session!.userId,
         amount: row.amountCents,
@@ -725,6 +871,37 @@ export const handleTransactionsRequest: ApiHandler = async ({
       );
     const inserted = insertCount[0]?.inserted ?? 0;
     const skipped = parsed.rows.length - inserted;
+    let learned = 0;
+    if (lessons.length > 0) {
+      const storedIds = await db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(
+          and(
+            scopeToHousehold(transactions.householdId, session!.householdId),
+            eq(transactions.importBatchId, batchId)
+          )
+        );
+      const insertedIds = new Set(storedIds.map((row) => row.id));
+      const groups = new Map<string, MerchantLessonRow[]>();
+      for (const lesson of lessons) {
+        if (!insertedIds.has(lesson.id)) continue;
+        const group = groups.get(lesson.merchantKey) ?? [];
+        group.push(lesson.row);
+        groups.set(lesson.merchantKey, group);
+      }
+      for (const [merchantKey, rows] of groups) {
+        const patch = lessonForMerchant(rows);
+        if (!patch) continue;
+        // The rows are already in; a failed lesson must not fail the import.
+        try {
+          await upsertUserAlias(db, session!.householdId, merchantKey, patch);
+          learned += 1;
+        } catch {
+          logMerchantAliasFailure();
+        }
+      }
+    }
 
     await broadcastToHousehold(env, session!.householdId, {
       type: "TRANSACTION_UPDATE",
@@ -732,7 +909,10 @@ export const handleTransactionsRequest: ApiHandler = async ({
       count: inserted,
     });
 
-    return Response.json({ ok: true, inserted, skipped, batchId }, { status: 201 });
+    return Response.json(
+      { ok: true, inserted, skipped, batchId, learned },
+      { status: 201 }
+    );
   }
 
   if (request.method === "POST" && !id) {
@@ -1003,6 +1183,25 @@ export const handleTransactionsRequest: ApiHandler = async ({
         }
       }
       throw new ActionError("Transaction not found", "NOT_FOUND");
+    }
+
+    if (existing.bankDescription) {
+      try {
+        const language = (await loadViewerRegion(loadContext, request)).language;
+        await learnMerchantAliasFromEdit(db, session!.householdId, {
+          bankDescription: existing.bankDescription,
+          language,
+          previousDescription: existing.description,
+          nextDescription: updated.description,
+          descriptionProvided: validated.description !== undefined,
+          previousCategoryId: existing.categoryId,
+          nextCategoryId: updated.categoryId,
+          nextCategoryName: updated.category,
+          categoryProvided: validated.categoryId !== undefined,
+        });
+      } catch {
+        logMerchantAliasFailure();
+      }
     }
 
     await broadcastToHousehold(env, session!.householdId, {

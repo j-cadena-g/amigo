@@ -60,6 +60,14 @@ describe("cleanBankDescription", () => {
     ).toBe("TIKTOK INC");
   });
 
+  it.each([
+    ["PURCHASE INTEREST REFUND", "Purchase Interest Refund"],
+    ["ANNUAL FEE REVERSAL", "Annual Fee Reversal"],
+    ["INTEREST ADJUSTMENT", "Interest Adjustment"],
+  ])("does not name a reversed charge as a charge (%s)", (raw, name) => {
+    expect(cleanBankDescription(raw, "en").name).toBe(name);
+  });
+
   it("names an interest charge in Spanish without changing the merchant key", () => {
     expect(cleanBankDescription("INSTALLMENT INTEREST 7.99%", "es")).toEqual({
       name: "Cargo por intereses",

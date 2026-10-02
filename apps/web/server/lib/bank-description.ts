@@ -9,6 +9,8 @@ const AS_WRITTEN = ["Amazon.ca", "Amazon.com", "Apple.com", "X", "TikTok", "407 
 const INTEREST =
   /^(PURCHASE INTEREST|INSTALLMENT INTEREST|CASH ADVANCE INTEREST)\b/i;
 const CARD_FEE = /^(ANNUAL FEE|OVERLIMIT FEE|OVER LIMIT FEE)\b/i;
+/** A refunded or reversed charge is a credit, so it keeps its own words. */
+const CHARGE_REVERSAL = /\b(REFUND|REFUNDED|REVERSAL|REVERSED|REBATE|ADJUSTMENT|ADJ)\b/i;
 const NAME_MEMO = " — ";
 
 /**
@@ -39,14 +41,15 @@ export function cleanBankDescription(
     return { name: collapsed, merchantKey: collapsed.toUpperCase() };
   }
 
-  const interest = INTEREST.exec(core);
+  const reversed = CHARGE_REVERSAL.test(core);
+  const interest = reversed ? null : INTEREST.exec(core);
   if (interest) {
     return {
       name: BANK_CHARGE_LABELS[language].interestCharge,
       merchantKey: interest[1]!.toUpperCase(),
     };
   }
-  const fee = CARD_FEE.exec(core);
+  const fee = reversed ? null : CARD_FEE.exec(core);
   if (fee) {
     return {
       name: BANK_CHARGE_LABELS[language].cardFee,

@@ -129,6 +129,11 @@ describe("cleanBankDescription", () => {
     "E-TRANSFER SENT JANE DOE",
     "E TRANSFER SENT JANE DOE",
     "ETRANSFER RECEIVED SAM",
+    "SEND E-TFR ***9Kx MARIA GONZALEZ",
+    "E-TFR RECEIVED JOHN SMITH",
+    "E-TRF AUTODEPOSIT SAM",
+    "EMT SENT MARIA",
+    "EMAIL MONEY TRF JANE DOE",
     "Money request from Ana",
     "ZELLE TO CARLOS",
     "Transferencia a Juan Pérez",
@@ -141,6 +146,7 @@ describe("cleanBankDescription", () => {
     "RCSS OXFORD #2812      LONDON        ON",
     "PAYPAL *TIKTOK INC 4029357733",
     "TRANSFERWISE FEE",
+    "TEMTEM BAKERY",
   ])("does not flag a merchant (%s)", (raw) => {
     expect(isPersonToPerson(raw)).toBe(false);
   });

@@ -6,6 +6,7 @@ export interface FinancialCategoryItem {
   parentId: string | null;
   name: string;
   type: FinancialCategoryType;
+  description: string | null;
   icon: string | null;
   sortOrder: number;
   archived: boolean;

@@ -10,23 +10,32 @@ import {
   useFinancialCategories,
 } from "@/app/components/financial/use-financial-categories";
 import { parseApiError } from "@/app/lib/parse-api-error";
-import type { FinancialCategoryType } from "@/app/lib/financial-category-types";
+import type {
+  FinancialCategoryItem,
+  FinancialCategoryType,
+} from "@/app/lib/financial-category-types";
 import { cn } from "@/app/lib/utils";
 import { useT } from "@/app/i18n";
 
 export function CategoryManagementPanel() {
   const t = useT();
   const nameId = useId();
+  const descriptionId = useId();
+  const descriptionHintId = useId();
   const parentId = useId();
   const confirm = useConfirm();
   const { categories, loading, error, reload } = useFinancialCategories({
     includeArchived: true,
   });
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [type, setType] = useState<FinancialCategoryType>("expense");
   const [parentCategoryId, setParentCategoryId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const tree = buildCategoryTree(categories.filter((c) => !c.archived));
   const parentOptions = tree.filter((row) => row.parent.type === type);
@@ -50,6 +59,7 @@ export function CategoryManagementPanel() {
           name: name.trim(),
           type,
           parentId: parentCategoryId || null,
+          description: description.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -61,12 +71,55 @@ export function CategoryManagementPanel() {
         return;
       }
       setName("");
+      setDescription("");
       setParentCategoryId("");
       await reload();
     } catch {
       setFeedback(t.common.couldNotConnection(t.categories.addAction));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function beginDescriptionEdit(category: FinancialCategoryItem) {
+    setEditingId(category.id);
+    setDescriptionDraft(category.description ?? "");
+    setFeedback(null);
+  }
+
+  function cancelDescriptionEdit() {
+    setEditingId(null);
+    setDescriptionDraft("");
+    setFeedback(null);
+  }
+
+  async function saveDescription(categoryId: string) {
+    if (savingDescription) return;
+    setSavingDescription(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: descriptionDraft.trim() || null }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setFeedback(
+          parseApiError(body, t.common.couldNot(t.categories.saveDescriptionAction))
+        );
+        return;
+      }
+      setEditingId(null);
+      setDescriptionDraft("");
+      await reload();
+    } catch {
+      setFeedback(t.common.couldNotConnection(t.categories.saveDescriptionAction));
+    } finally {
+      setSavingDescription(false);
     }
   }
 
@@ -148,6 +201,21 @@ export function CategoryManagementPanel() {
             onChange={selectType}
           />
         </div>
+        <div className="space-y-1.5">
+          <label htmlFor={descriptionId} className="text-sm font-semibold">
+            {t.common.description}
+          </label>
+          <Input
+            id={descriptionId}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={300}
+            aria-describedby={descriptionHintId}
+          />
+          <p id={descriptionHintId} className="text-xs text-muted-foreground">
+            {t.categories.descriptionHint}
+          </p>
+        </div>
         {parentOptions.length > 0 ? (
           <div className="space-y-1.5">
             <label htmlFor={parentId} className="text-sm font-semibold">
@@ -184,19 +252,29 @@ export function CategoryManagementPanel() {
           {tree.flatMap((row) => [
             <CategoryRow
               key={row.parent.id}
-              name={row.parent.name}
-              type={row.parent.type}
-              archived={row.parent.archived}
+              category={row.parent}
+              editing={editingId === row.parent.id}
+              draft={descriptionDraft}
+              saving={savingDescription}
+              onDraftChange={setDescriptionDraft}
+              onStartEdit={() => beginDescriptionEdit(row.parent)}
+              onCancelEdit={cancelDescriptionEdit}
+              onSaveDescription={() => void saveDescription(row.parent.id)}
               onArchive={() => void handleArchive(row.parent.id)}
               onDelete={() => void handleDelete(row.parent.id)}
             />,
             ...row.children.map((child) => (
               <CategoryRow
                 key={child.id}
-                name={child.name}
-                type={child.type}
-                archived={child.archived}
+                category={child}
                 nested
+                editing={editingId === child.id}
+                draft={descriptionDraft}
+                saving={savingDescription}
+                onDraftChange={setDescriptionDraft}
+                onStartEdit={() => beginDescriptionEdit(child)}
+                onCancelEdit={cancelDescriptionEdit}
+                onSaveDescription={() => void saveDescription(child.id)}
                 onArchive={() => void handleArchive(child.id)}
                 onDelete={() => void handleDelete(child.id)}
               />
@@ -211,38 +289,107 @@ export function CategoryManagementPanel() {
 }
 
 function CategoryRow({
-  name,
-  type,
-  archived,
+  category,
   nested,
+  editing,
+  draft,
+  saving,
+  onDraftChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveDescription,
   onArchive,
   onDelete,
 }: {
-  name: string;
-  type: FinancialCategoryType;
-  archived: boolean;
+  category: FinancialCategoryItem;
   nested?: boolean;
+  editing: boolean;
+  draft: string;
+  saving: boolean;
+  onDraftChange: (value: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveDescription: () => void;
   onArchive: () => void;
   onDelete: () => void;
 }) {
   const t = useT();
+  const { name, type, archived, description } = category;
+
+  if (editing) {
+    return (
+      <li className={cn("min-w-0 space-y-2 py-2", nested && "pl-5")}>
+        <p className="truncate text-sm font-semibold">{name}</p>
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSaveDescription();
+          }}
+        >
+          <Input
+            value={draft}
+            onChange={(e) => onDraftChange(e.target.value)}
+            maxLength={300}
+            autoFocus
+            disabled={saving}
+            aria-label={t.categories.editDescriptionNamed(name)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onCancelEdit();
+              }
+            }}
+          />
+          <div className="flex flex-wrap gap-1">
+            <Button type="submit" size="sm" disabled={saving}>
+              {saving ? t.common.saving : t.common.save}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onCancelEdit}
+              disabled={saving}
+            >
+              {t.common.cancel}
+            </Button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
   return (
     <li
       className={cn(
-        "flex items-center justify-between gap-3 py-2",
+        "flex flex-wrap items-start justify-between gap-x-3 gap-y-2 py-2",
         nested && "pl-5",
         archived && "text-muted-foreground"
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 w-full sm:w-auto sm:flex-1">
         <p className="truncate text-sm font-semibold">{name}</p>
+        {description ? (
+          <p className="truncate text-xs text-muted-foreground">{description}</p>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           {type === "income" ? t.common.income : t.common.expense}
           {archived ? ` · ${t.categories.archived}` : ""}
         </p>
       </div>
       {!archived ? (
-        <div className="flex shrink-0 gap-1">
+        <div className="flex max-w-full flex-wrap gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onStartEdit}
+            disabled={saving}
+            aria-label={t.categories.editDescriptionNamed(name)}
+          >
+            {t.categories.editDescription}
+          </Button>
           <Button
             type="button"
             variant="ghost"

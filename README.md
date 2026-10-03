@@ -50,7 +50,13 @@ the rows and file currency, exclude anything you do not want, then confirm the i
   and account, set the correct currency, and enable **Correct matching transactions
   already imported**. Preview and confirm; no new entries are added in this mode.
   Imports whose currency differs from the account require explicit acknowledgement.
-- New entries are marked unreviewed and categorized as **Uncategorized**.
+- The preview shows a readable name for each row, with the bank's text underneath, and a
+  category picker. Names and categories you set are remembered per merchant for the next import.
+- For merchants with nothing remembered, the preview suggests a name (Workers AI) and one of your
+  categories (Jev), marked **Suggested**. Only merchant text is sent: never amounts, dates or
+  accounts, and never transfers between people. Rows without a confident suggestion stay
+  **Uncategorized**. A category's description helps the suggestions.
+- New entries are marked unreviewed.
 - Credits start unchecked. Including one records it as income; exclude card
   payments and transfers, and review refunds separately.
 - UTF-8 and legacy Windows-1252 downloads are supported. Investment statements,
@@ -201,8 +207,8 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 - Static asset binding: `ASSETS`
 - Rate limiting: `RATE_LIMIT_MUTATION`, `RATE_LIMIT_BULK`, `RATE_LIMIT_SENSITIVE`, `RATE_LIMIT_READ`
 - Email sending: `EMAIL` (household invites)
-- Workers AI: `AI` (Jev grocery categorization)
-- Weekly cron: Sunday at `03:00 UTC` for audit log pruning
+- Workers AI: `AI` (Jev grocery aisles and import category suggestions, import merchant names); `AI_DAILY_NEURON_BUDGET` var caps daily Workers AI neurons for merchant names (default 10,000)
+- Weekly cron: Sunday at `03:00 UTC` for audit log and AI usage pruning
 - Daily cron: `04:23 UTC` for recurring transaction processing
 
 ## Scripts

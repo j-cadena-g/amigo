@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
 ### Added
 
 - **Categories in the import preview, remembered per merchant.** Each imported row gets a category picker, and choosing one offers to apply it to that merchant's other rows. Names and categories you set, in the preview or later on an imported transaction, are remembered, so the next import from that merchant arrives named and categorized. Migration 0027 adds the merchant memory ([#176](https://github.com/j-cadena-g/amigo/pull/176))

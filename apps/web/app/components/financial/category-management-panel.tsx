@@ -385,6 +385,7 @@ function CategoryRow({
             variant="ghost"
             size="sm"
             onClick={onStartEdit}
+            disabled={saving}
             aria-label={t.categories.editDescriptionNamed(name)}
           >
             {t.categories.editDescription}

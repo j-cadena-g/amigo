@@ -53,8 +53,9 @@ the rows and file currency, exclude anything you do not want, then confirm the i
 - The preview shows a readable name for each row, with the bank's text underneath, and a
   category picker. Names and categories you set are remembered per merchant for the next import.
 - For merchants with nothing remembered, the preview suggests a name (Workers AI) and one of your
-  categories (Jev), marked **Suggested**. Only merchant text is sent: never amounts, dates or
-  accounts, and never transfers between people. Rows without a confident suggestion stay
+  categories (Jev, a third-party model reached through the AI binding), marked **Suggested**.
+  The models get the merchant text, and Jev also gets your category names and descriptions:
+  never amounts, dates or accounts, and never transfers between people. Rows without a confident suggestion stay
   **Uncategorized**. A category's description helps the suggestions.
 - New entries are marked unreviewed.
 - Credits start unchecked. Including one records it as income; exclude card

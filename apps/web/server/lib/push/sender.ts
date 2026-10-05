@@ -1,10 +1,20 @@
 import webpush from "web-push";
-import { eq, getDb, households, pushSubscriptions, users, type UiLanguage } from "@amigo/db";
+import {
+  and,
+  eq,
+  getDb,
+  households,
+  isNull,
+  pushSubscriptions,
+  scopeToHousehold,
+  users,
+  type UiLanguage,
+} from "@amigo/db";
 import { resolveLanguage, resolveLocale } from "@/app/lib/locale";
 import type { Env } from "../../env";
 import type { GroceryPushEvent } from "./batching";
 
-interface NotificationPayload {
+export interface NotificationPayload {
   title: string;
   body: string;
   icon?: string;
@@ -16,24 +26,25 @@ interface NotificationPayload {
   };
 }
 
-let vapidConfigured = false;
+let configuredVapid: string | undefined;
 
-function ensureVapidConfigured(env: Env): boolean {
-  if (vapidConfigured) return true;
-
+export function ensureVapidConfigured(env: Env): boolean {
   const { VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = env;
   if (!VAPID_SUBJECT || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn("processPushBatch skipped: VAPID is not configured");
+    console.warn("Push notifications skipped: VAPID is not configured");
     return false;
   }
 
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  vapidConfigured = true;
+  const configuration = JSON.stringify([VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY]);
+  if (configuredVapid !== configuration) {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    configuredVapid = configuration;
+  }
   return true;
 }
 
 /** A member's interface language from their saved choices; no browser to ask here. */
-function recipientLanguage(user: {
+export function recipientLanguage(user: {
   locale: string | null;
   language: string | null;
   homeCurrency: string | null;
@@ -72,7 +83,13 @@ export async function processPushBatch(
     .from(users)
     .innerJoin(households, eq(households.id, users.householdId))
     .leftJoin(pushSubscriptions, eq(users.id, pushSubscriptions.userId))
-    .where(eq(users.householdId, householdId));
+    .where(
+      and(
+        scopeToHousehold(users.householdId, householdId),
+        eq(users.groceryNotifications, true),
+        isNull(users.deletedAt)
+      )
+    );
 
   const subscriptionsByUser = new Map<
     string,
@@ -126,7 +143,8 @@ const COPY: Record<
   es: {
     title: "Cambios en la lista de compras",
     someone: "Alguien",
-    addedOne: (actors, many, item) => `${actors} ${many ? "agregaron" : "agregó"} ${item} a la lista`,
+    addedOne: (actors, many, item) =>
+      `${actors} ${many ? "agregaron" : "agregó"} ${item} a la lista`,
     addedMany: (actors, many, count) =>
       `${actors} ${many ? "agregaron" : "agregó"} ${count} artículos a la lista`,
     // "compró", not "marcó … como comprado", so the item's gender never has to agree.
@@ -151,7 +169,10 @@ export function buildNotificationPayload(
   const actors =
     actorNames.length === 0
       ? copy.someone
-      : new Intl.ListFormat(language, { style: "long", type: "conjunction" }).format(actorNames);
+      : new Intl.ListFormat(language, {
+          style: "long",
+          type: "conjunction",
+        }).format(actorNames);
   const many = actorNames.length > 1;
 
   let body: string;
@@ -190,32 +211,43 @@ async function sendToSubscriptions(
   subscriptions: Array<typeof pushSubscriptions.$inferSelect>,
   payload: NotificationPayload
 ): Promise<void> {
-  const payloadString = JSON.stringify(payload);
-
   for (const subscription of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: subscription.keys,
-        },
-        payloadString
-      );
-
-      await db
-        .update(pushSubscriptions)
-        .set({ lastPushAt: new Date() })
-        .where(eq(pushSubscriptions.id, subscription.id));
-    } catch (error) {
-      if (isPushSubscriptionGone(error)) {
-        await db
-          .delete(pushSubscriptions)
-          .where(eq(pushSubscriptions.id, subscription.id));
-      } else {
-        console.error("Push notification failed:", error);
-      }
-    }
+    await sendPushNotification(db, subscription, payload);
   }
+}
+
+/** Transport result lets scheduled notifications retry only unsuccessful deliveries. */
+export async function sendPushNotification(
+  db: ReturnType<typeof getDb>,
+  subscription: typeof pushSubscriptions.$inferSelect,
+  payload: NotificationPayload,
+  options: { TTL?: number } = {}
+): Promise<"sent" | "gone" | "failed"> {
+  try {
+    await webpush.sendNotification(
+      { endpoint: subscription.endpoint, keys: subscription.keys },
+      JSON.stringify(payload),
+      { timeout: 30_000, ...options }
+    );
+  } catch (error) {
+    if (isPushSubscriptionGone(error)) {
+      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, subscription.id));
+      return "gone";
+    }
+    console.error("Push notification failed:", error);
+    return "failed";
+  }
+
+  // Delivery already succeeded: a bookkeeping failure must not turn it into a retry.
+  try {
+    await db
+      .update(pushSubscriptions)
+      .set({ lastPushAt: new Date() })
+      .where(eq(pushSubscriptions.id, subscription.id));
+  } catch (error) {
+    console.error("Push delivery timestamp update failed:", error);
+  }
+  return "sent";
 }
 
 function isPushSubscriptionGone(error: unknown): boolean {

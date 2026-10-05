@@ -1,7 +1,7 @@
 import type { PushErrorCode } from "@/app/lib/push/client";
 import { defineMessages } from "../define";
 
-/** Grocery-list push notifications: settings, the first-run prompt, and the list button. */
+/** Push notification preferences, device setup, and grocery alerts. */
 export const notifications = defineMessages({
   en: {
     /** Why a change failed, or null when there's nothing more specific than "try again". */
@@ -27,6 +27,15 @@ export const notifications = defineMessages({
       "Your browser blocked notifications for amigo. Allow them in your browser's site settings to turn them back on.",
     groceryChanges: "Grocery list changes",
     groceryChangesHint: "Get a notification when someone else adds an item or marks one as bought.",
+    scheduledTransactions: "Scheduled transaction reminders",
+    scheduledTransactionsHint: "Choose up to four dates and times when adding or editing a transaction. Reminders usually arrive within a minute of the chosen time.",
+    recurringExpenses: "Recurring transaction reminders",
+    recurringExpensesHint: "Choose up to four reminder times when adding or editing a recurring transaction. They repeat for each occurrence, for income and expenses.",
+    accountPreferencesHint: "These choices apply to all your devices. Each device needs notification permission to receive alerts.",
+    deviceEnabled: "This device is ready to receive your selected notifications.",
+    deviceDisabled: "Notifications are not enabled on this device.",
+    enableDevice: "Enable on this device",
+    retry: "Try again",
     iosHint:
       "On iPhone and iPad, notifications only work after you add amigo to your Home Screen and open it from there.",
     showInstallSteps: "Show install steps",
@@ -80,6 +89,15 @@ export const notifications = defineMessages({
     groceryChanges: "Cambios en la lista de compras",
     groceryChangesHint:
       "Recibe una notificación cuando alguien más agregue un artículo o lo marque como comprado.",
+    scheduledTransactions: "Recordatorios programados de movimientos",
+    scheduledTransactionsHint: "Elige hasta cuatro fechas y horas al agregar o editar un movimiento. Los recordatorios suelen llegar en un minuto después de la hora elegida.",
+    recurringExpenses: "Recordatorios de movimientos recurrentes",
+    recurringExpensesHint: "Elige hasta cuatro horarios al agregar o editar un movimiento recurrente. Se repiten en cada ocasión, tanto para ingresos como para gastos.",
+    accountPreferencesHint: "Estas opciones se aplican a todos tus dispositivos. Cada dispositivo necesita permiso para recibir notificaciones.",
+    deviceEnabled: "Este dispositivo está listo para recibir las notificaciones que elegiste.",
+    deviceDisabled: "Las notificaciones no están activadas en este dispositivo.",
+    enableDevice: "Activar en este dispositivo",
+    retry: "Intentar de nuevo",
     iosHint:
       "En iPhone y iPad, las notificaciones solo funcionan después de agregar amigo a tu pantalla de inicio y abrirlo desde ahí.",
     showInstallSteps: "Ver cómo instalar",

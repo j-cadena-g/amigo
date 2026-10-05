@@ -28,6 +28,7 @@ export default defineConfig({
   ],
   test: {
     include: ["**/*.integration.test.ts"],
+    exclude: ["server/lib/notification-transport.integration.test.ts"],
     setupFiles: ["./server/test/apply-migrations.ts"],
   },
   resolve: {

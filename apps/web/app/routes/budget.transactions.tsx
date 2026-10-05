@@ -88,6 +88,7 @@ export async function loader({ context, request }: LoaderFunctionArgs) {
     accounts,
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
     todayStr,
+    timeZone,
   };
 }
 
@@ -104,6 +105,7 @@ export default function Transactions() {
     accounts,
     homeCurrency,
     todayStr,
+    timeZone,
   } = useLoaderData<typeof loader>();
 
   return (
@@ -115,6 +117,7 @@ export default function Transactions() {
       accounts={accounts}
       homeCurrency={homeCurrency}
       todayStr={todayStr}
+      timeZone={timeZone}
     />
   );
 }

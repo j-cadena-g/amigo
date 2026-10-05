@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { AmountInput } from "@/app/components/amount-input";
@@ -18,11 +18,25 @@ import { useFinancialCategories } from "@/app/components/financial/use-financial
 import { DeleteButton, NativeSelect } from "@/app/components/financial/form-controls";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { readApiErrorMessage } from "@/app/lib/api-error";
+import { formatLedgerDate } from "@/app/lib/format-dates";
 import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
+import { PushError, pushErrorCode, setNotificationCategory } from "@/app/lib/push/client";
+import {
+  hasNewRecurringReminderSchedules,
+  MAX_RECURRING_REMINDERS,
+  RecurringReminderError,
+  recurringReminderDrafts,
+  recurringReminderPayload,
+  recurringReminderOccurrenceDate,
+  rebaseRecurringReminderDrafts,
+  shiftReminderDate,
+  type RecurringReminderDraft,
+  type RecurringReminderSchedule,
+} from "@/app/lib/recurring-reminder-schedules";
 
 type SchedulePreset =
   | "daily"
@@ -35,7 +49,7 @@ type SchedulePreset =
   | "yearly"
   | "custom";
 
-interface RecurringFormData {
+export interface RecurringFormData {
   type: "income" | "expense";
   amount: string;
   currency: string;
@@ -48,6 +62,9 @@ interface RecurringFormData {
   startDate: string;
   endDate: string;
   budgetId: string | null;
+  reminderSchedules: RecurringReminderDraft[];
+  /** Reference date used to preserve reminder timing when the recurrence changes. */
+  reminderOccurrenceDate?: string;
 }
 
 interface RecurringRule {
@@ -65,14 +82,18 @@ interface RecurringRule {
   startDate: string;
   endDate: string | null;
   budgetId: string | null;
+  reminderSchedules?: RecurringReminderSchedule[];
 }
 
-function localDateString(date = new Date()): string {
-  return date.toLocaleDateString("en-CA");
+export function localDateString(timeZone: string): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function emptyForm(currency: CurrencyCode): RecurringFormData {
-  return {
+function emptyForm(currency: CurrencyCode, timeZone: string): RecurringFormData {
+  const form: RecurringFormData = {
     type: "expense",
     amount: "",
     currency,
@@ -82,10 +103,12 @@ function emptyForm(currency: CurrencyCode): RecurringFormData {
     customFrequency: "MONTHLY",
     customInterval: "1",
     customDayOfMonth: "1",
-    startDate: localDateString(),
+    startDate: localDateString(timeZone),
     endDate: "",
     budgetId: null,
+    reminderSchedules: [],
   };
+  return { ...form, reminderOccurrenceDate: recurringFormOccurrenceDate(form, localDateString(timeZone)) };
 }
 
 function canSubmit(form: RecurringFormData): boolean {
@@ -125,20 +148,49 @@ function presetToSchedule(preset: SchedulePreset, form: RecurringFormData) {
   }
 }
 
+export function recurringFormOccurrenceDate(
+  form: RecurringFormData,
+  today: string
+): string {
+  return recurringReminderOccurrenceDate({
+    ...presetToSchedule(form.schedulePreset, form),
+    startDate: form.startDate,
+    endDate: form.endDate || null,
+  }, today);
+}
+
+export function rebaseRecurringFormReminders(
+  form: RecurringFormData,
+  occurrenceDate: string
+): RecurringFormData {
+  // Native date inputs become blank while editing. Keep the last valid anchor.
+  if (!occurrenceDate || form.reminderOccurrenceDate === occurrenceDate) return form;
+  return {
+    ...form,
+    reminderOccurrenceDate: occurrenceDate,
+    reminderSchedules: form.reminderOccurrenceDate
+      ? rebaseRecurringReminderDrafts(form.reminderSchedules, form.reminderOccurrenceDate, occurrenceDate)
+      : form.reminderSchedules,
+  };
+}
+
 function RecurringFields({
   form,
   setForm,
+  timeZone,
   initialBudgetSuggest = true,
   budgetSuggestScopeRef,
 }: {
   form: RecurringFormData;
   setForm: React.Dispatch<React.SetStateAction<RecurringFormData>>;
+  timeZone: string;
   /** When false, category changes won't overwrite an existing budget until the user picks a category. */
   initialBudgetSuggest?: boolean;
   /** When set, budget suggestions are ignored after this ref's value changes (e.g. edit dialog rule switch). */
   budgetSuggestScopeRef?: React.RefObject<string | null | undefined>;
 }) {
   const t = useT();
+  const locale = useLocale();
   const { categories } = useFinancialCategories();
   const [allowBudgetSuggest, setAllowBudgetSuggest] = useState(initialBudgetSuggest);
   const budgetSuggestRequestSeq = useRef(0);
@@ -154,6 +206,11 @@ function RecurringFields({
   const startDateId = useId();
   const endDateId = useId();
   const budgetFieldId = useId();
+  const occurrenceDate = recurringFormOccurrenceDate(form, localDateString(timeZone));
+
+  useEffect(() => {
+    setForm((previous) => rebaseRecurringFormReminders(previous, occurrenceDate));
+  }, [occurrenceDate, setForm]);
 
   const selectType = (type: "income" | "expense") =>
     setForm((f) => {
@@ -409,11 +466,80 @@ function RecurringFields({
           />
         </div>
       )}
+
+      <fieldset className="space-y-3 rounded-lg border border-border p-3">
+        <legend className="px-1 text-sm font-semibold">{t.recurring.reminders}</legend>
+        <p className="text-xs text-muted-foreground">{t.recurring.remindersHint(timeZone)}</p>
+        {occurrenceDate && (
+          <p className="text-xs text-muted-foreground">
+            {t.recurring.reminderReference} <span className="font-mono">{formatLedgerDate(occurrenceDate, locale)}</span>
+          </p>
+        )}
+        {form.reminderSchedules.map((reminder, index) => (
+          <div key={index} className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,1fr)_2.5rem]">
+            <div className="col-span-2 min-w-0 space-y-1 sm:col-span-1">
+              <label className="block text-xs text-muted-foreground" htmlFor={`${scheduleId}-reminder-date-${index}`}>
+                {t.common.date}
+              </label>
+              <Input id={`${scheduleId}-reminder-date-${index}`} type="date" required
+                value={reminder.date} className="min-w-0"
+                aria-label={t.recurring.reminderDateNumber(index + 1)}
+                onChange={(event) => {
+                  const date = event.target.value;
+                  setForm((previous) => ({ ...previous,
+                    reminderSchedules: previous.reminderSchedules.map((saved, i) => i === index ? { ...saved, date } : saved),
+                  }));
+                }} />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <label className="block text-xs text-muted-foreground" htmlFor={`${scheduleId}-reminder-time-${index}`}>
+                {t.recurring.reminderTime}
+              </label>
+              <Input id={`${scheduleId}-reminder-time-${index}`} type="time" step="60" required value={reminder.time}
+                className="min-w-0"
+                aria-label={t.recurring.reminderTimeNumber(index + 1)}
+                onChange={(event) => {
+                  const time = event.target.value;
+                  setForm((previous) => ({ ...previous,
+                    reminderSchedules: previous.reminderSchedules.map((saved, i) => i === index ? { ...saved, time } : saved),
+                  }));
+                }} />
+            </div>
+            <Button type="button" variant="outline" size="icon"
+              aria-label={t.recurring.removeReminder(index + 1)}
+              onClick={() => setForm((previous) => ({ ...previous,
+                reminderSchedules: previous.reminderSchedules.filter((_, i) => i !== index),
+              }))}>
+              <X aria-hidden />
+            </Button>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm"
+            disabled={!occurrenceDate || form.reminderSchedules.length >= MAX_RECURRING_REMINDERS}
+            onClick={() => setForm((previous) => ({ ...previous,
+              reminderSchedules: [...previous.reminderSchedules, { date: occurrenceDate, time: "09:00" }],
+            }))}>
+            {t.recurring.addReminder}
+          </Button>
+          <Button type="button" variant="outline" size="sm"
+            disabled={!occurrenceDate || form.reminderSchedules.length >= MAX_RECURRING_REMINDERS}
+            onClick={() => setForm((previous) => ({ ...previous,
+              reminderSchedules: [...previous.reminderSchedules, { date: shiftReminderDate(occurrenceDate, -1), time: "09:00" }],
+            }))}>
+            {t.recurring.dayBeforeReminder}
+          </Button>
+        </div>
+      </fieldset>
     </>
   );
 }
 
-function requestBody(form: RecurringFormData) {
+export function recurringRequestBody(form: RecurringFormData, today: string) {
+  const occurrenceDate = recurringFormOccurrenceDate(form, today);
+  const reminders = form.reminderOccurrenceDate && form.reminderOccurrenceDate !== occurrenceDate
+    ? rebaseRecurringReminderDrafts(form.reminderSchedules, form.reminderOccurrenceDate, occurrenceDate)
+    : form.reminderSchedules;
   const schedule = presetToSchedule(form.schedulePreset, form);
   return {
     type: form.type,
@@ -429,6 +555,7 @@ function requestBody(form: RecurringFormData) {
     startDate: form.startDate,
     endDate: form.endDate || null,
     budgetId: form.type === "expense" ? form.budgetId : null,
+    reminderSchedules: recurringReminderPayload(reminders, occurrenceDate),
   };
 }
 
@@ -438,36 +565,42 @@ interface AddRecurringDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCurrency?: CurrencyCode;
+  timeZone: string;
 }
 
 export function AddRecurringDialog({
   open,
   onOpenChange,
   defaultCurrency = "CAD",
+  timeZone,
 }: AddRecurringDialogProps) {
   const t = useT();
   const revalidator = useRevalidator();
-  const [form, setForm] = useState<RecurringFormData>(() => emptyForm(defaultCurrency));
+  const [form, setForm] = useState<RecurringFormData>(() => emptyForm(defaultCurrency, timeZone));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleOpenChange(next: boolean) {
     if (!next) {
-      setForm(emptyForm(defaultCurrency));
+      setForm(emptyForm(defaultCurrency, timeZone));
       setError(null);
     }
     onOpenChange(next);
   }
 
   async function handleSubmit() {
-    if (!canSubmit(form)) return;
+    if (submitting || !canSubmit(form)) return;
     setSubmitting(true);
     setError(null);
     try {
+      const body = recurringRequestBody(form, localDateString(timeZone));
+      if (hasNewRecurringReminderSchedules(body.reminderSchedules)) {
+        await setNotificationCategory("recurringNotifications", true);
+      }
       const res = await fetch("/api/recurring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody(form)),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         setError(
@@ -475,11 +608,15 @@ export function AddRecurringDialog({
         );
         return;
       }
-      setForm(emptyForm(defaultCurrency));
+      setForm(emptyForm(defaultCurrency, timeZone));
       onOpenChange(false);
       revalidator.revalidate();
-    } catch {
-      setError(t.common.couldNotConnection(t.recurring.addAction));
+    } catch (err) {
+      setError(err instanceof RecurringReminderError
+        ? t.recurring.reminderErrors[err.code]
+        : err instanceof PushError
+          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
+          : t.common.couldNotConnection(t.recurring.addAction));
     } finally {
       setSubmitting(false);
     }
@@ -498,7 +635,7 @@ export function AddRecurringDialog({
           }}
           className="space-y-4"
         >
-          <RecurringFields form={form} setForm={setForm} />
+          <RecurringFields form={form} setForm={setForm} timeZone={timeZone} />
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
@@ -531,6 +668,7 @@ interface EditRecurringDialogProps {
   rule: RecurringRule | null;
   onDelete: () => void;
   deleting: boolean;
+  timeZone: string;
 }
 
 function ruleToPreset(rule: RecurringRule): SchedulePreset {
@@ -541,15 +679,15 @@ function ruleToPreset(rule: RecurringRule): SchedulePreset {
     if (rule.dayOfMonth === 1) return "monthly-1";
     if (rule.dayOfMonth === 15) return "monthly-15";
     if (rule.dayOfMonth === 31) return "monthly-last";
-    return "monthly-same";
+    return rule.dayOfMonth === Number(rule.startDate.slice(8, 10)) ? "monthly-same" : "custom";
   }
   if (rule.frequency === "YEARLY" && rule.interval === 1) return "yearly";
   return "custom";
 }
 
-function ruleToForm(rule: RecurringRule, locale: string): RecurringFormData {
+function ruleToForm(rule: RecurringRule, locale: string, timeZone: string): RecurringFormData {
   const preset = ruleToPreset(rule);
-  return {
+  const form: RecurringFormData = {
     type: rule.type,
     amount: centsToInputString(rule.amount, rule.currency, locale),
     currency: rule.currency,
@@ -562,6 +700,13 @@ function ruleToForm(rule: RecurringRule, locale: string): RecurringFormData {
     startDate: rule.startDate,
     endDate: rule.endDate ?? "",
     budgetId: rule.budgetId,
+    reminderSchedules: [],
+  };
+  const occurrenceDate = recurringFormOccurrenceDate(form, localDateString(timeZone));
+  return {
+    ...form,
+    reminderOccurrenceDate: occurrenceDate,
+    reminderSchedules: recurringReminderDrafts(rule.reminderSchedules ?? [], occurrenceDate),
   };
 }
 
@@ -571,12 +716,13 @@ export function EditRecurringDialog({
   rule,
   onDelete,
   deleting,
+  timeZone,
 }: EditRecurringDialogProps) {
   const t = useT();
   const locale = useLocale();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() =>
-    emptyForm(rule?.currency ?? "CAD")
+    emptyForm(rule?.currency ?? "CAD", timeZone)
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -586,7 +732,7 @@ export function EditRecurringDialog({
 
   // Sync form state when the rule changes
   if (rule && initialized !== rule.id) {
-    setForm(ruleToForm(rule, locale));
+    setForm(ruleToForm(rule, locale, timeZone));
     setError(null);
     setInitialized(rule.id);
   }
@@ -597,14 +743,18 @@ export function EditRecurringDialog({
   const busy = submitting || deleting;
 
   async function handleSubmit() {
-    if (!rule || !canSubmit(form)) return;
+    if (!rule || busy || !canSubmit(form)) return;
     setSubmitting(true);
     setError(null);
     try {
+      const body = recurringRequestBody(form, localDateString(timeZone));
+      if (hasNewRecurringReminderSchedules(body.reminderSchedules, rule.reminderSchedules ?? [])) {
+        await setNotificationCategory("recurringNotifications", true);
+      }
       const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody(form)),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         setError(
@@ -614,8 +764,12 @@ export function EditRecurringDialog({
       }
       onOpenChange(false);
       revalidator.revalidate();
-    } catch {
-      setError(t.common.couldNotConnection(t.recurring.saveAction));
+    } catch (err) {
+      setError(err instanceof RecurringReminderError
+        ? t.recurring.reminderErrors[err.code]
+        : err instanceof PushError
+          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
+          : t.common.couldNotConnection(t.recurring.saveAction));
     } finally {
       setSubmitting(false);
     }
@@ -638,6 +792,7 @@ export function EditRecurringDialog({
             key={rule?.id ?? "none"}
             form={form}
             setForm={setForm}
+            timeZone={timeZone}
             initialBudgetSuggest={false}
             budgetSuggestScopeRef={budgetSuggestScopeRef}
           />

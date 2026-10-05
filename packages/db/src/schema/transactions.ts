@@ -1,4 +1,5 @@
 import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { households } from "./households";
 import { users } from "./users";
 import { budgets } from "./budgets";
@@ -59,6 +60,15 @@ export const transactions = sqliteTable(
     bankDescription: text("bank_description"),
     type: text("type", { enum: TRANSACTION_TYPES }).notNull(),
     date: text("date").notNull(), // ISO 8601 YYYY-MM-DD
+    /** Explicit reminder instants, sorted canonical UTC ISO strings. */
+    reminderTimes: text("reminder_times", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    /** The member who explicitly scheduled these reminders. */
+    reminderUserId: text("reminder_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -68,7 +78,12 @@ export const transactions = sqliteTable(
       .$onUpdate(() => new Date()),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   },
-  (table) => [index("transactions_household_id_idx").on(table.householdId)]
+  (table) => [
+    index("transactions_household_id_idx").on(table.householdId),
+    index("transactions_reminder_user_id_idx")
+      .on(table.reminderUserId)
+      .where(sql`${table.reminderUserId} IS NOT NULL AND ${table.deletedAt} IS NULL`),
+  ]
 );
 
 export type Transaction = typeof transactions.$inferSelect;

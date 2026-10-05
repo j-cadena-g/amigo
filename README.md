@@ -27,7 +27,7 @@ Cloudflare-native household management app for shared budgeting, groceries, acco
 - One accounts view for everything the household owns and owes (bank accounts, credit cards, loans, investments, property)
 - Household calendar on the dashboard
 - Household settings, member roles, invites, and account restore flows
-- Web push notifications
+- Web push notifications for grocery changes and scheduled reminders for one-time or recurring income and expenses
 - Real-time updates through a household-scoped Durable Object WebSocket hub
 
 ## Transaction imports
@@ -66,6 +66,70 @@ the rows and file currency, exclude anything you do not want, then confirm the i
   correction records, and transaction-level currency overrides are not supported.
 - CSV export remains available. Other banks' CSV layouts, investment activity CSVs,
   and PDF uploads are not supported.
+
+## Notifications
+
+In **Settings**, choose grocery list alerts, recurring transaction reminders, and scheduled
+transaction reminders separately.
+These choices apply to your account; each browser or installed app needs notification
+permission and notifications enabled on that device. Turning off one category keeps
+the other enabled.
+
+For a recurring income or expense, add up to **four reminders** in its add or edit
+form. Pick a date from the calendar and a time in your household's timezone, or use
+**Day before** for 9 AM on the preceding day. The form shows the occurrence date used
+for these choices. Their timing relative to that date repeats for every occurrence;
+changing the recurrence moves the selected reminder dates too. Saving a new reminder enables the
+recurring notification category and sets up notifications on the current device.
+Paused or deleted entries do not send reminders. Tap the notification to open recurring
+entries. Removing reminders cancels their future delivery.
+
+For a one-time transaction, add up to **four reminders** in its add or edit form. Pick
+any future date and time in the household's timezone, or use **Day before** to fill in
+9 AM on the preceding day and adjust it. Each reminder is a concrete date and time;
+changing the transaction's date does not move existing reminders. Saving a new reminder
+sets up notifications on the current device and enables scheduled transaction reminders
+for your account. Removing reminders cancels their future delivery.
+
+Scheduled reminders are checked every minute. Temporary delivery failures can retry for
+up to three hours after the selected time; older reminders are skipped. Reminders live
+on the existing transaction and do not change the linked account's balance.
+
+On iPhone and iPad, add amigo to your Home Screen and open it there to enable push
+notifications.
+
+### Test notifications locally
+
+Run `pnpm run test:notifications` for the focused notification suite. It uses an
+isolated local D1 database, synthetic transactions and subscriptions, and fixed clocks,
+so DST, recurring schedules, retries, cancellation, and duplicate prevention are
+testable immediately. No Clerk login or real device subscription is needed.
+The suite also runs the actual minute cron and Web Push sender against a local fake
+push service with ephemeral keys, decrypts the received ciphertext independently,
+and checks the notification content and delivery ledger. External traffic is blocked
+in that transport test.
+
+For an actual device notification:
+
+1. Start `pnpm run dev` and sign in at `http://localhost:5190` in your normal browser.
+   Run `pnpm run dev:verify` to check secret names; delivery needs the three `VAPID_*`
+   keys in your existing 1Password environment.
+2. Enable scheduled transaction notifications in Settings. The browser must support
+   a working Web Push service; notification permission alone is insufficient. The
+   embedded preview browser can report "push service not available" during registration.
+3. Add a temporary transaction with a reminder one or two minutes ahead. After that
+   time arrives, run `pnpm run dev:notifications --transactions` in another terminal.
+4. Check the notification and the dev server's `sent` / `failed` counts. Run the command
+   again: a successful reminder should not deliver twice. Remove another future reminder
+   and run the command after its former time to check cancellation.
+5. Delete the temporary transaction when finished.
+
+`pnpm run dev:notifications` runs both reminder handlers across the local database;
+`--transactions`, `--recurring`, and `--all` are aliases for that shared minute cron.
+To test a recurring reminder without posting a transaction, create a temporary rule
+starting tomorrow and select one day before at a time a few minutes ahead. Remove the
+rule afterward. Setting a future cron event timestamp does not advance the scheduler's
+clock; the automated suite covers future occurrences without waiting.
 
 ## Stack
 
@@ -213,6 +277,7 @@ Current Worker bindings in the public `apps/web/wrangler.jsonc` template:
 - Workers AI: `AI` (Jev grocery aisles and import category suggestions, import merchant names); `AI_DAILY_NEURON_BUDGET` var caps daily Workers AI neurons for merchant names (default 10,000)
 - Weekly cron: Sunday at `03:00 UTC` for audit log and AI usage pruning
 - Daily cron: `04:23 UTC` for recurring transaction processing
+- Every minute: one-time and recurring transaction reminders due at their selected dates and times
 
 ## Scripts
 

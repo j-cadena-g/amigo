@@ -13,7 +13,7 @@ import {
   isIOS,
   isPWAInstalled,
   pushErrorCode,
-  subscribeToPush,
+  setNotificationCategory,
 } from "@/app/lib/push/client";
 import { PUSH_PROMPT_STORAGE_KEY } from "@/app/lib/push/constants";
 import { useT } from "@/app/i18n";
@@ -36,7 +36,7 @@ export function PushNotificationModal({ onClose }: PushNotificationModalProps) {
     setError(null);
 
     try {
-      await subscribeToPush();
+      await setNotificationCategory("groceryNotifications", true);
       try {
         localStorage.setItem(PUSH_PROMPT_STORAGE_KEY, "true");
       } catch (storageErr) {

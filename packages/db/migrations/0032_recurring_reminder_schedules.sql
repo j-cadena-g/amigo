@@ -1,0 +1,1 @@
+ALTER TABLE `recurring_transactions` ADD `reminder_schedules` text DEFAULT '[]' NOT NULL;

@@ -5,6 +5,14 @@ import type { Cloudflare } from "./router-context";
 import { HouseholdDO } from "./server/durable-objects/household";
 import { getDb, auditLogs, lt } from "@amigo/db";
 import { processDueRecurringRules } from "./server/lib/recurring-processor";
+import {
+  processRecurringReminders,
+  pruneRecurringReminderDeliveries,
+} from "./server/lib/recurring-reminders";
+import {
+  processTransactionReminders,
+  pruneTransactionReminderDeliveries,
+} from "./server/lib/transaction-reminders";
 import { cleanupStalePushSubscriptions } from "./server/api/push";
 import { cleanupStaleGrocerySyncMutations } from "./server/api/sync";
 import { purgeOldPurchasedGroceryItems } from "./server/api/groceries";
@@ -70,6 +78,8 @@ export default {
         await cleanupStalePushSubscriptions(env);
         await cleanupStaleGrocerySyncMutations(env);
         await pruneAiUsage(db);
+        await pruneRecurringReminderDeliveries(db, cutoff);
+        await pruneTransactionReminderDeliveries(db, cutoff);
       } finally {
         // Groceries still clear if an earlier cleanup fails; that error is rethrown after.
         const result = await purgeOldPurchasedGroceryItems(env);
@@ -111,9 +121,36 @@ export default {
         );
         throw err;
       }
+    } else if (event.cron === "* * * * *") {
+      // Let both independent reminder types finish, even if one scheduler fails.
+      const [transactionResult, recurringResult] = await Promise.allSettled([
+        processTransactionReminders(env),
+        processRecurringReminders(env),
+      ]);
+      if (transactionResult.status === "rejected") throw transactionResult.reason;
+      if (recurringResult.status === "rejected") throw recurringResult.reason;
+      const result = transactionResult.value;
+      const recurring = recurringResult.value;
+      console.log(
+        JSON.stringify({
+          message: "processRecurringReminders completed",
+          cron: event.cron,
+          ...recurring,
+        })
+      );
+      console.log(
+        JSON.stringify({
+          message: "processTransactionReminders completed",
+          cron: event.cron,
+          ...result,
+        })
+      );
     } else {
       console.warn(
-        JSON.stringify({ message: "scheduled: unhandled cron", cron: event.cron })
+        JSON.stringify({
+          message: "scheduled: unhandled cron",
+          cron: event.cron,
+        })
       );
     }
   },
@@ -130,10 +167,7 @@ async function handleWebSocketUpgrade(request: Request, env: Env) {
     secretKey: env.CLERK_SECRET_KEY,
     publishableKey: env.CLERK_PUBLISHABLE_KEY,
   });
-  const authState = await clerk.authenticateRequest(
-    request,
-    clerkTokenAuthOptions(env.APP_ORIGIN)
-  );
+  const authState = await clerk.authenticateRequest(request, clerkTokenAuthOptions(env.APP_ORIGIN));
   const identity = getClerkIdentity(authState.toAuth());
 
   if (!identity) {

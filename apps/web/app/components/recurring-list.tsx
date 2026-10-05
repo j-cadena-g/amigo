@@ -22,6 +22,7 @@ import {
 } from "@/app/components/recurring-dialogs";
 import { useLocale } from "@/app/lib/use-locale";
 import { useLanguage, useT } from "@/app/i18n";
+import type { RecurringReminderSchedule } from "@/app/lib/recurring-reminder-schedules";
 
 interface RecurringRule {
   id: string;
@@ -43,16 +44,19 @@ interface RecurringRule {
   isActive: boolean;
   budgetId: string | null;
   createdAt: number;
+  reminderSchedules?: RecurringReminderSchedule[];
 }
 
 interface RecurringListProps {
   rules: RecurringRule[];
   homeCurrency: CurrencyCode;
+  timeZone: string;
 }
 
-function RecurringRuleRow({
+export function RecurringRuleRow({
   rule,
   homeCurrency,
+  timeZone,
   toggling,
   deleting,
   onToggle,
@@ -61,6 +65,7 @@ function RecurringRuleRow({
 }: {
   rule: RecurringRule;
   homeCurrency: CurrencyCode;
+  timeZone: string;
   toggling: boolean;
   deleting: boolean;
   onToggle: () => void;
@@ -72,6 +77,7 @@ function RecurringRuleRow({
   const locale = useLocale();
   const isIncome = rule.type === "income";
   const title = rule.description || rule.category;
+  const ended = Boolean(rule.endDate && rule.nextRunDate > rule.endDate);
 
   return (
     <li className="flex items-center gap-3 py-3">
@@ -79,7 +85,9 @@ function RecurringRuleRow({
         checked={rule.isActive}
         disabled={toggling}
         onCheckedChange={onToggle}
-        aria-label={rule.isActive ? t.recurring.pause(title) : t.recurring.resume(title)}
+        aria-label={ended
+          ? rule.isActive ? t.recurring.pauseReminders(title) : t.recurring.resumeReminders(title)
+          : rule.isActive ? t.recurring.pause(title) : t.recurring.resume(title)}
       />
 
       <div className={cn("min-w-0 flex-1", !rule.isActive && "text-muted-foreground")}>
@@ -99,7 +107,9 @@ function RecurringRuleRow({
         <p className="text-sm text-muted-foreground">
           {rule.description ? `${rule.category} · ` : ""}
           {getFrequencyLabel(rule, language)} ·{" "}
-          {rule.isActive ? (
+          {rule.isActive && ended ? (
+            <>{t.recurring.ended} · {t.recurring.finalOccurrenceCompleted}</>
+          ) : rule.isActive ? (
             <>
               {t.recurring.next} <span className="font-mono">{formatLedgerDate(rule.nextRunDate, locale)}</span>
             </>
@@ -108,6 +118,12 @@ function RecurringRuleRow({
           )}
           {rule.currency !== homeCurrency ? ` · ${rule.currency}` : ""}
         </p>
+        {!!rule.reminderSchedules?.length && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t.recurring.reminderCount(rule.reminderSchedules.length)} · {rule.reminderSchedules
+              .map(({ dayOffset, time }) => t.recurring.reminderTiming(dayOffset, time)).join("; ")} · {timeZone}
+          </p>
+        )}
       </div>
 
       <div className="-mr-2 flex shrink-0">
@@ -127,7 +143,7 @@ function RecurringRuleRow({
   );
 }
 
-export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
+export function RecurringList({ rules, homeCurrency, timeZone }: RecurringListProps) {
   const t = useT();
   const revalidator = useRevalidator();
   const confirm = useConfirm();
@@ -223,6 +239,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
                 key={rule.id}
                 rule={rule}
                 homeCurrency={homeCurrency}
+                timeZone={timeZone}
                 toggling={toggling === rule.id}
                 deleting={deleting === rule.id}
                 onToggle={() => handleToggle(rule)}
@@ -242,6 +259,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         defaultCurrency={homeCurrency}
+        timeZone={timeZone}
       />
 
       <EditRecurringDialog
@@ -250,6 +268,7 @@ export function RecurringList({ rules, homeCurrency }: RecurringListProps) {
           if (!open) setEditingRule(null);
         }}
         rule={editingRule}
+        timeZone={timeZone}
         onDelete={() => void handleDeleteFromDialog()}
         deleting={editingRule !== null && deleting === editingRule.id}
       />

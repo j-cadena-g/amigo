@@ -40,6 +40,8 @@ const ES: Record<string, string> = {
     "Monto OFX no válido: se esperaban como máximo dos decimales.",
   "Invalid OFX posting date.":
     "Fecha de registro OFX no válida.",
+  "New reminder times must be in the future":
+    "Las nuevas fechas y horas de recordatorio deben estar en el futuro",
   "Invalid or incomplete OFX file.":
     "El archivo OFX no es válido o está incompleto.",
   "Malformed CSV quoting.":

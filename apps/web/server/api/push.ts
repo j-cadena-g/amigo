@@ -1,6 +1,20 @@
-import { and, eq, getDb, lt, pushSubscriptions } from "@amigo/db";
+import {
+  and,
+  eq,
+  getDb,
+  isNull,
+  lt,
+  notInArray,
+  or,
+  pushSubscriptions,
+  scopeToHousehold,
+  sql,
+  transactions,
+  users,
+} from "@amigo/db";
 import { z } from "zod";
 import { ActionError, jsonError } from "../lib/errors";
+import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 
 const PUSH_SUBSCRIPTION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -16,6 +30,21 @@ const subscribeSchema = z.object({
 const unsubscribeSchema = z.object({
   endpoint: z.string().url(),
 });
+
+const preferencesSchema = z
+  .object({
+    groceryNotifications: z.boolean().optional(),
+    recurringNotifications: z.boolean().optional(),
+    transactionNotifications: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (body) =>
+      body.groceryNotifications !== undefined ||
+      body.recurringNotifications !== undefined ||
+      body.transactionNotifications !== undefined,
+    { message: "Nothing to update" }
+  );
 
 function isIPv4(host: string): boolean {
   const parts = host.split(".");
@@ -84,6 +113,57 @@ export const handlePushRequest: ApiHandler = async ({
 }) => {
   const path = params["*"] ?? "";
   const db = getDb(env.DB);
+
+  if (path === "preferences") {
+    if (request.method !== "GET" && request.method !== "PATCH") {
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: "GET, PATCH" },
+      });
+    }
+
+    await enforceRateLimit(
+      env,
+      `${session!.userId}:push:preferences:${request.method.toLowerCase()}`,
+      request.method === "GET"
+        ? ROUTE_RATE_LIMITS.push.preferencesGet
+        : ROUTE_RATE_LIMITS.push.preferencesPatch
+    );
+
+    const currentUser = and(
+      eq(users.id, session!.userId),
+      scopeToHousehold(users.householdId, session!.householdId),
+      isNull(users.deletedAt)
+    );
+    if (request.method === "PATCH") {
+      const parsed = preferencesSchema.parse(await request.json());
+      const [preferences] = await db
+        .update(users)
+        .set(parsed)
+        .where(currentUser)
+        .returning({
+          groceryNotifications: users.groceryNotifications,
+          recurringNotifications: users.recurringNotifications,
+          transactionNotifications: users.transactionNotifications,
+        });
+
+      return preferences
+        ? Response.json(preferences)
+        : jsonError("Account access revoked", "PERMISSION_DENIED");
+    }
+
+    const preferences = await db.query.users.findFirst({
+      columns: {
+        groceryNotifications: true,
+        recurringNotifications: true,
+        transactionNotifications: true,
+      },
+      where: currentUser,
+    });
+    return preferences
+      ? Response.json(preferences)
+      : jsonError("Account access revoked", "PERMISSION_DENIED");
+  }
 
   if (request.method === "GET" && path === "status") {
     const subscription = await db.query.pushSubscriptions.findFirst({
@@ -158,7 +238,7 @@ export const handlePushRequest: ApiHandler = async ({
 
   return new Response(null, {
     status: 405,
-    headers: { Allow: "GET, POST, DELETE" },
+    headers: { Allow: "GET, POST, PATCH, DELETE" },
   });
 };
 
@@ -168,9 +248,39 @@ export async function cleanupStalePushSubscriptions(
   const db = getDb(env.DB);
   const cutoffDate = new Date(Date.now() - PUSH_SUBSCRIPTION_MAX_AGE_MS);
 
+  // Reminders may have no deliveries for longer than a week. Keep devices for
+  // active reminder recipients until they opt out or a push provider expires them.
+  const reminderRecipients = db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(
+      isNull(users.deletedAt),
+      or(
+        eq(users.recurringNotifications, true),
+        and(
+          eq(users.transactionNotifications, true),
+          sql`EXISTS (
+            SELECT 1 FROM ${transactions}
+            WHERE ${transactions.reminderUserId} = ${users.id}
+              AND ${transactions.householdId} = ${users.householdId}
+              AND ${transactions.deletedAt} IS NULL
+              AND EXISTS (
+                SELECT 1 FROM json_each(${transactions.reminderTimes}) AS reminder
+                WHERE reminder.value >= ${new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()}
+              )
+          )`
+        )
+      )
+    ));
+
   const result = await db
     .delete(pushSubscriptions)
-    .where(lt(pushSubscriptions.updatedAt, cutoffDate))
+    .where(
+      and(
+        lt(pushSubscriptions.updatedAt, cutoffDate),
+        notInArray(pushSubscriptions.userId, reminderRecipients)
+      )
+    )
     .returning({ id: pushSubscriptions.id });
 
   return { deletedCount: result.length };

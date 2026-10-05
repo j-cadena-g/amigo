@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   createClerkClient: vi.fn(),
   resolveSession: vi.fn(),
   requestHandler: vi.fn(),
+  processRecurringReminders: vi.fn(),
+  processDueRecurringRules: vi.fn(),
+  processTransactionReminders: vi.fn(),
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -24,6 +27,18 @@ vi.mock("cloudflare:workers", () => ({
 vi.mock("./server/lib/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./server/lib/session")>()),
   resolveSession: mocks.resolveSession,
+}));
+
+vi.mock("./server/lib/recurring-reminders", () => ({
+  processRecurringReminders: mocks.processRecurringReminders,
+  pruneRecurringReminderDeliveries: vi.fn(),
+}));
+vi.mock("./server/lib/recurring-processor", () => ({
+  processDueRecurringRules: mocks.processDueRecurringRules,
+}));
+vi.mock("./server/lib/transaction-reminders", () => ({
+  processTransactionReminders: mocks.processTransactionReminders,
+  pruneTransactionReminderDeliveries: vi.fn(),
 }));
 
 function makeEnv() {
@@ -95,13 +110,66 @@ describe("worker WebSocket security", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.authenticateRequest).toHaveBeenCalledWith(
-      expect.any(Request),
-      {
-        acceptsToken: "any",
-        treatPendingAsSignedOut: false,
-        authorizedParties: ["https://app.example.test"],
-      }
+    expect(mocks.authenticateRequest).toHaveBeenCalledWith(expect.any(Request), {
+      acceptsToken: "any",
+      treatPendingAsSignedOut: false,
+      authorizedParties: ["https://app.example.test"],
+    });
+  });
+});
+
+describe("worker recurring cron routing", () => {
+  beforeEach(() => {
+    mocks.processRecurringReminders.mockReset().mockResolvedValue({ sent: 1, failed: 0 });
+    mocks.processDueRecurringRules.mockReset().mockResolvedValue({ processed: 1, failed: 0 });
+    mocks.processTransactionReminders.mockReset().mockResolvedValue({ sent: 1, failed: 0 });
+  });
+
+  it("does not run the retired quarter-hour digest trigger", async () => {
+    const env = makeEnv();
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await worker.scheduled({ cron: "*/15 * * * *" } as ScheduledEvent, env, {} as ExecutionContext);
+    expect(mocks.processRecurringReminders).not.toHaveBeenCalled();
+    expect(mocks.processTransactionReminders).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("keeps daily postings independent of reminder checks", async () => {
+    await worker.scheduled(
+      { cron: "23 4 * * *" } as ScheduledEvent,
+      makeEnv(),
+      {} as ExecutionContext
     );
+    expect(mocks.processDueRecurringRules).toHaveBeenCalledOnce();
+    expect(mocks.processRecurringReminders).not.toHaveBeenCalled();
+    expect(mocks.processTransactionReminders).not.toHaveBeenCalled();
+  });
+
+  it("propagates reminder scheduler failures", async () => {
+    const error = new Error("D1 unavailable");
+    mocks.processRecurringReminders.mockRejectedValueOnce(error);
+    await expect(
+      worker.scheduled({ cron: "* * * * *" } as ScheduledEvent, makeEnv(), {} as ExecutionContext)
+    ).rejects.toThrow(error);
+  });
+
+  it("routes the minute trigger to both selected transaction and recurring reminders", async () => {
+    const env = makeEnv();
+    await worker.scheduled(
+      { cron: "* * * * *", scheduledTime: 0 } as ScheduledEvent,
+      env,
+      {} as ExecutionContext
+    );
+    expect(mocks.processTransactionReminders).toHaveBeenCalledExactlyOnceWith(env);
+    expect(mocks.processRecurringReminders).toHaveBeenCalledExactlyOnceWith(env);
+    expect(mocks.processDueRecurringRules).not.toHaveBeenCalled();
+  });
+
+  it("propagates transaction scheduler failures", async () => {
+    mocks.processTransactionReminders.mockRejectedValueOnce(new Error("D1 unavailable"));
+    await expect(
+      worker.scheduled({ cron: "* * * * *" } as ScheduledEvent, makeEnv(), {} as ExecutionContext)
+    ).rejects.toThrow("D1 unavailable");
+    expect(mocks.processRecurringReminders).toHaveBeenCalledOnce();
   });
 });

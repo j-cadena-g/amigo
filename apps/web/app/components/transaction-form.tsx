@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { CurrencyCode } from "@amigo/db";
+import { X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { AmountInput } from "@/app/components/amount-input";
@@ -21,6 +22,11 @@ import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import { useT } from "@/app/i18n";
+import {
+  dayBeforeReminder,
+  MAX_TRANSACTION_REMINDERS,
+  reminderTimeToLocal,
+} from "@/app/lib/reminder-times";
 
 export interface TransactionFormState {
   amount: string;
@@ -36,6 +42,8 @@ export interface TransactionFormState {
   chargedAmount: string;
   /** Currency of a recorded charge; null until one is recorded (then home). */
   chargedCurrency: CurrencyCode | null;
+  /** Editable wall times in the household time zone; submit converts them to UTC. */
+  reminderTimes: string[];
 }
 
 const AMOUNT_ROW_GRID =
@@ -79,6 +87,8 @@ export function chargePayload(
 interface TransactionFieldsProps {
   form: TransactionFormState;
   homeCurrency: CurrencyCode;
+  timeZone: string;
+  existingReminderTimes?: string[];
   lastExpenseBudgetIdRef: MutableRefObject<string | null>;
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
   onCategoryChange: (categoryId: string) => void;
@@ -91,6 +101,8 @@ interface TransactionFieldsProps {
 function TransactionFields({
   form,
   homeCurrency,
+  timeZone,
+  existingReminderTimes = [],
   lastExpenseBudgetIdRef,
   onChange,
   onCategoryChange,
@@ -281,6 +293,89 @@ function TransactionFields({
           />
         </div>
       </div>
+
+      <fieldset className="space-y-3 rounded-lg border border-border p-3">
+        <legend className="px-1 text-sm font-semibold">{t.transactions.reminders}</legend>
+        <p className="text-xs text-muted-foreground">{t.transactions.remindersHint(timeZone)}</p>
+        {form.reminderTimes.map((value, index) => {
+          const isPast = existingReminderTimes.some((instant) =>
+            Date.parse(instant) <= Date.now() && reminderTimeToLocal(instant, timeZone) === value
+          );
+          return (
+            <div key={index} className="space-y-1">
+              <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,1fr)_2.5rem]">
+                <div className="col-span-2 min-w-0 space-y-1 sm:col-span-1">
+                  <label className="block text-xs text-muted-foreground" htmlFor={`${dateId}-reminder-date-${index}`}>
+                    {t.common.date}
+                  </label>
+                  <Input
+                    id={`${dateId}-reminder-date-${index}`}
+                    type="date"
+                    className="min-w-0"
+                    aria-label={t.transactions.reminderDateNumber(index + 1)}
+                    value={value.split("T")[0] ?? ""}
+                    readOnly={isPast}
+                    required
+                    onChange={(event) => {
+                      const next = `${event.target.value}T${value.split("T")[1] ?? "09:00"}`;
+                      onChange((previous) => ({
+                        ...previous,
+                        reminderTimes: previous.reminderTimes.map((time, i) => i === index ? next : time),
+                      }));
+                    }}
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <label className="block text-xs text-muted-foreground" htmlFor={`${dateId}-reminder-time-${index}`}>
+                    {t.transactions.reminderTime}
+                  </label>
+                  <Input
+                    id={`${dateId}-reminder-time-${index}`}
+                    type="time"
+                    step="60"
+                    className="min-w-0"
+                    aria-label={t.transactions.reminderTimeNumber(index + 1)}
+                    value={value.split("T")[1] ?? "09:00"}
+                    readOnly={isPast}
+                    required
+                    onChange={(event) => {
+                      const next = `${value.split("T")[0] ?? ""}T${event.target.value}`;
+                      onChange((previous) => ({
+                        ...previous,
+                        reminderTimes: previous.reminderTimes.map((time, i) => i === index ? next : time),
+                      }));
+                    }}
+                  />
+                </div>
+                <Button type="button" variant="outline" size="icon"
+                  aria-label={t.transactions.removeReminder(index + 1)}
+                  onClick={() => onChange((previous) => ({
+                    ...previous, reminderTimes: previous.reminderTimes.filter((_, i) => i !== index),
+                  }))}>
+                  <X aria-hidden />
+                </Button>
+              </div>
+              {isPast && <p className="text-xs text-muted-foreground">{t.transactions.pastReminder}</p>}
+            </div>
+          );
+        })}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm"
+            disabled={form.reminderTimes.length >= MAX_TRANSACTION_REMINDERS}
+            onClick={() => onChange((previous) => ({
+              ...previous, reminderTimes: [...previous.reminderTimes, ""],
+            }))}>
+            {t.transactions.addReminder}
+          </Button>
+          <Button type="button" variant="outline" size="sm"
+            disabled={!form.date || form.reminderTimes.length >= MAX_TRANSACTION_REMINDERS}
+            onClick={() => onChange((previous) => ({
+              ...previous, reminderTimes: [...previous.reminderTimes, dayBeforeReminder(previous.date)],
+            }))}>
+            {t.transactions.dayBeforeReminder}
+          </Button>
+        </div>
+      </fieldset>
     </>
   );
 }
@@ -310,6 +405,8 @@ function FormActions({
 interface AddTransactionFormProps {
   form: TransactionFormState;
   homeCurrency: CurrencyCode;
+  timeZone: string;
+  existingReminderTimes?: string[];
   isSubmitting: boolean;
   formError: string | null;
   allowBudgetSuggest: boolean;
@@ -326,6 +423,8 @@ interface AddTransactionFormProps {
 export function AddTransactionForm({
   form,
   homeCurrency,
+  timeZone,
+  existingReminderTimes = [],
   isSubmitting,
   formError,
   allowBudgetSuggest,
@@ -369,6 +468,8 @@ export function AddTransactionForm({
       <TransactionFields
         form={form}
         homeCurrency={homeCurrency}
+        timeZone={timeZone}
+        existingReminderTimes={existingReminderTimes}
         lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
         onChange={onChange}
         onCategoryChange={(categoryId) => {
@@ -409,6 +510,8 @@ export function AddTransactionForm({
 interface EditTransactionFormProps {
   form: TransactionFormState;
   homeCurrency: CurrencyCode;
+  timeZone: string;
+  existingReminderTimes?: string[];
   isSubmitting: boolean;
   lastExpenseBudgetIdRef: MutableRefObject<string | null>;
   onChange: Dispatch<SetStateAction<TransactionFormState>>;
@@ -421,6 +524,8 @@ interface EditTransactionFormProps {
 export function EditTransactionForm({
   form,
   homeCurrency,
+  timeZone,
+  existingReminderTimes = [],
   isSubmitting,
   lastExpenseBudgetIdRef,
   onChange,
@@ -435,6 +540,8 @@ export function EditTransactionForm({
       <TransactionFields
         form={form}
         homeCurrency={homeCurrency}
+        timeZone={timeZone}
+        existingReminderTimes={existingReminderTimes}
         lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
         onChange={onChange}
         onCategoryChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}

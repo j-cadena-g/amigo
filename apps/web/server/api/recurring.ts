@@ -289,6 +289,13 @@ export const handleRecurringRequest: ApiHandler = async ({
             ? new Date(existing.endDate)
             : null;
 
+      if (endDate && toISODate(endDate) < toISODate(startDate)) {
+        throw new ActionError(
+          "End date must be on or after the first occurrence date",
+          "VALIDATION_ERROR"
+        );
+      }
+
       updateData.startDate = toISODate(startDate);
       const timeZone = await getHouseholdTimezone(db, session!.householdId);
 

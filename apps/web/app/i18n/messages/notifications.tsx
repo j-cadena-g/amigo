@@ -90,7 +90,7 @@ export const notifications = defineMessages({
     groceryChangesHint:
       "Recibe una notificación cuando alguien más agregue un artículo o lo marque como comprado.",
     scheduledTransactions: "Recordatorios programados de movimientos",
-    scheduledTransactionsHint: "Elige hasta cuatro fechas y horas al agregar o editar un movimiento. Los recordatorios suelen llegar en un minuto después de la hora elegida.",
+    scheduledTransactionsHint: "Elige hasta cuatro fechas y horas al agregar o editar un movimiento. Los recordatorios suelen llegar dentro del minuto siguiente a la hora elegida.",
     recurringExpenses: "Recordatorios de movimientos recurrentes",
     recurringExpensesHint: "Elige hasta cuatro horarios al agregar o editar un movimiento recurrente. Se repiten en cada ocasión, tanto para ingresos como para gastos.",
     accountPreferencesHint: "Estas opciones se aplican a todos tus dispositivos. Cada dispositivo necesita permiso para recibir notificaciones.",

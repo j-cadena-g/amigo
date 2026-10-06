@@ -13,6 +13,7 @@ function form(overrides: Partial<TransactionFormState>): TransactionFormState {
     currency: "USD",
     chargedAmount: "",
     chargedCurrency: null,
+    reminderTimes: [],
     ...overrides,
   };
 }

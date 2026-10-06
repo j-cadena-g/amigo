@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getNotificationPreferences,
   hasPushRegistration,
   isSubscribed,
   pushSubscriptionKeysMissing,
+  setNotificationCategory,
   subscribeToPush,
   unsubscribeFromPush,
+  updateNotificationPreferences,
 } from "./client";
 
 const VAPID_PUBLIC_KEY = "dGVzdA";
@@ -113,6 +116,115 @@ describe("push registration availability", () => {
 
     expect(inactiveRegistration.pushManager.subscribe).not.toHaveBeenCalled();
     expect(subscribe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("notification categories", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function existingSubscription() {
+    const subscription = {
+      endpoint: "https://updates.push.services.mozilla.com/wpush/v2/test",
+      getKey: vi.fn(() => new ArrayBuffer(8)),
+      unsubscribe: vi.fn().mockResolvedValue(true),
+    };
+    stubPushEnvironment({
+      registration: {
+        active: {} as ServiceWorker,
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(subscription),
+          subscribe: vi.fn(),
+        } as unknown as PushManager,
+      },
+    });
+    return subscription;
+  }
+
+  it("loads account-wide category choices", async () => {
+    const preferences = { groceryNotifications: false, recurringNotifications: true, transactionNotifications: true };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(preferences));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getNotificationPreferences()).resolves.toEqual(preferences);
+    expect(fetchMock).toHaveBeenCalledWith("/api/push/preferences");
+  });
+
+  it.each(["groceryNotifications", "recurringNotifications", "transactionNotifications"] as const)(
+    "turning %s off does not remove the device subscription or change the other category",
+    async (category) => {
+      const subscription = existingSubscription();
+      const fetchMock = vi.fn().mockResolvedValue(Response.json({
+        groceryNotifications: category !== "groceryNotifications",
+        recurringNotifications: category !== "recurringNotifications",
+        transactionNotifications: category !== "transactionNotifications",
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await setNotificationCategory(category, false);
+
+      expect(subscription.unsubscribe).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/push/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [category]: false }),
+      });
+    }
+  );
+
+  it.each(["recurringNotifications", "transactionNotifications"] as const)(
+    "enabling %s leaves the other categories unchanged", async (category) => {
+      const subscription = existingSubscription();
+      const preferences = {
+        groceryNotifications: false,
+        recurringNotifications: category === "recurringNotifications",
+        transactionNotifications: category === "transactionNotifications",
+      };
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
+        if (url === "/api/push") return Response.json({ success: true });
+        return Response.json(preferences);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(setNotificationCategory(category, true)).resolves.toEqual(preferences);
+
+      expect(fetchMock).toHaveBeenLastCalledWith("/api/push/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [category]: true }),
+      });
+      expect(subscription.unsubscribe).not.toHaveBeenCalled();
+    }
+  );
+
+  it("does not enable a category when device subscription fails", async () => {
+    stubPushEnvironment({ registration: undefined });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setNotificationCategory("recurringNotifications", true)).rejects.toThrow(
+      "Service worker is not available"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a failed preference save without removing an existing subscription", async () => {
+    const subscription = existingSubscription();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+
+    await expect(setNotificationCategory("groceryNotifications", false)).rejects.toMatchObject({ code: "failed" });
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when loading or saving preferences fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(null, { status: 500 }))));
+
+    await expect(getNotificationPreferences()).rejects.toMatchObject({ code: "failed" });
+    await expect(updateNotificationPreferences({ recurringNotifications: true, transactionNotifications: true })).rejects.toMatchObject({ code: "failed" });
   });
 });
 

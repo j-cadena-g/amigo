@@ -26,6 +26,7 @@
     "vite.config.test.ts",
     "vitest.config.ts",
     "vitest.workers.config.ts",
+    "vitest.push-transport.config.ts",
     "react-router.config.ts"
   ],
   "exclude": [

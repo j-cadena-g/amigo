@@ -13,6 +13,12 @@ export const RECURRING_FREQUENCIES = [
   "YEARLY",
 ] as const;
 
+/** Calendar day offset from each occurrence and household-local clock time. */
+export type RecurringReminderSchedule = {
+  dayOffset: number;
+  time: string;
+};
+
 export const recurringTransactions = sqliteTable(
   "recurring_transactions",
   {
@@ -53,6 +59,11 @@ export const recurringTransactions = sqliteTable(
     lastRunDate: text("last_run_date"), // ISO 8601 YYYY-MM-DD
     nextRunDate: text("next_run_date").notNull(), // ISO 8601 YYYY-MM-DD
     active: integer("active", { mode: "boolean" }).notNull().default(true),
+    /** Explicit reminders reused for every occurrence; no automatic reminders. */
+    reminderSchedules: text("reminder_schedules", { mode: "json" })
+      .$type<RecurringReminderSchedule[]>()
+      .notNull()
+      .default([]),
 
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()

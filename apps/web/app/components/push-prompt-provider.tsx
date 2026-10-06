@@ -10,6 +10,7 @@ import { useLocation } from "react-router";
 import { PushNotificationModal } from "./push-notification-modal";
 import {
   getNotificationPermissionStatus,
+  getNotificationPreferences,
   hasPushRegistration,
   isSubscribed,
 } from "@/app/lib/push/client";
@@ -26,6 +27,16 @@ const PushPromptContext = createContext<PushPromptContextValue | null>(null);
 /** Alerts are about the grocery list, so the automatic prompt only appears there. */
 export function isPushPromptPath(pathname: string): boolean {
   return pathname === "/groceries" || pathname.startsWith("/groceries/");
+}
+
+/** A subscription for another category does not override an explicit grocery opt-out. */
+export async function shouldOfferGroceryNotifications(): Promise<boolean> {
+  const permission = getNotificationPermissionStatus();
+  if (permission === "unsupported" || permission === "denied") return false;
+  if (!(await hasPushRegistration())) return false;
+  const preferences = await getNotificationPreferences();
+  if (!preferences.groceryNotifications) return false;
+  return permission !== "granted" || !(await isSubscribed());
 }
 
 function clearPushPromptedFlag(): void {
@@ -70,23 +81,7 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
         // Storage unavailable; continue with prompt eligibility checks.
       }
 
-      const permission = getNotificationPermissionStatus();
-      if (permission === "unsupported" || permission === "denied") {
-        return false;
-      }
-
-      if (!(await hasPushRegistration())) {
-        return false;
-      }
-
-      if (permission === "granted") {
-        const subscribed = await isSubscribed();
-        if (subscribed) {
-          return false;
-        }
-      }
-
-      return true;
+      return shouldOfferGroceryNotifications();
     }
 
     let cancelled = false;
@@ -95,6 +90,8 @@ export function PushPromptProvider({ children }: PushPromptProviderProps) {
         if (cancelled || !shouldPrompt) return;
         autoPromptedRef.current = true;
         setShowModal(true);
+      }).catch(() => {
+        // A failed preference lookup should not trigger an unsolicited permission prompt.
       });
     }, PROMPT_DELAY_MS);
 

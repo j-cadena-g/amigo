@@ -145,6 +145,29 @@ async function resolveCharge(
  */
 const accountIdField = z.string().min(1).max(100).nullable().optional();
 
+const reminderInstant = z.string().refine((value) => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::00(?:\.000)?)?Z$/.test(value)) return false;
+  const instant = new Date(value);
+  return Number.isFinite(instant.getTime()) && instant.toISOString().slice(0, 16) === value.slice(0, 16);
+}, { message: "Reminder times must be valid UTC ISO instants with minute precision" })
+  .transform((value) => new Date(value).toISOString());
+
+const reminderTimesField = z.array(reminderInstant)
+  .max(4)
+  .refine((times) => new Set(times).size === times.length, {
+    message: "Reminder times must be unique",
+  })
+  .transform((times) => times.sort())
+  .optional();
+
+function assertFutureReminders(times: string[], existingTimes: string[] = []) {
+  const existing = new Set(existingTimes);
+  const now = Date.now();
+  if (times.some((time) => !existing.has(time) && new Date(time).getTime() <= now)) {
+    throw new ActionError("New reminder times must be in the future", "VALIDATION_ERROR");
+  }
+}
+
 const addTransactionSchema = z.object({
   amount: z.number().positive(),
   description: z.string().max(500).optional(),
@@ -156,6 +179,8 @@ const addTransactionSchema = z.object({
   currency: currencyEnum.optional(),
   chargedAmount: chargedAmountCents.nullable().optional(),
   chargedCurrency: currencyEnum.optional(),
+  reminderTimes: reminderTimesField,
+  reminderUserId: z.never().optional(),
 }).refine(chargedCurrencyHasAmount, CHARGED_CURRENCY_NEEDS_AMOUNT);
 
 const updateTransactionSchema = z.object({
@@ -170,6 +195,8 @@ const updateTransactionSchema = z.object({
   chargedAmount: chargedAmountCents.nullable().optional(),
   chargedCurrency: currencyEnum.optional(),
   reviewed: z.boolean().optional(),
+  reminderTimes: reminderTimesField,
+  reminderUserId: z.never().optional(),
 }).refine(chargedCurrencyHasAmount, CHARGED_CURRENCY_NEEDS_AMOUNT);
 
 const importRowSchema = z.object({
@@ -1067,6 +1094,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     const validated = addTransactionSchema.parse(await request.json());
+    const reminderTimes = validated.reminderTimes ?? [];
+    assertFutureReminders(reminderTimes);
     const category = await assertSelectableFinancialCategory(
       db,
       session!.householdId,
@@ -1124,6 +1153,8 @@ export const handleTransactionsRequest: ApiHandler = async ({
             date: validated.date,
             budgetId: validated.budgetId || null,
             accountId: validated.accountId || null,
+            reminderTimes,
+            reminderUserId: reminderTimes.length > 0 ? session!.userId : null,
           })
           .returning()
           .get()
@@ -1165,6 +1196,14 @@ export const handleTransactionsRequest: ApiHandler = async ({
       refsChangedFromExisting(validated, existing)
     );
     const updateData: Record<string, unknown> = {};
+
+    if (validated.reminderTimes !== undefined) {
+      assertFutureReminders(validated.reminderTimes, existing.reminderTimes);
+      updateData.reminderTimes = validated.reminderTimes;
+      if (JSON.stringify(validated.reminderTimes) !== JSON.stringify(existing.reminderTimes)) {
+        updateData.reminderUserId = validated.reminderTimes.length > 0 ? session!.userId : null;
+      }
+    }
 
     if (validated.amount !== undefined) {
       updateData.amount = toCents(validated.amount);

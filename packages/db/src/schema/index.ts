@@ -15,4 +15,6 @@ export * from "./ai-usage";
 export * from "./audit-logs";
 export * from "./recurring";
 export * from "./push-subscriptions";
+export * from "./recurring-reminder-deliveries";
+export * from "./transaction-reminder-deliveries";
 export * from "./household-invites";

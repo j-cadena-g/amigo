@@ -16,6 +16,7 @@ import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurrin
 import { refsChangedFromExisting, validateFinancialRefs } from "../lib/financial-refs";
 import { assertSelectableFinancialCategory } from "../lib/financial-categories";
 import { getHomeCurrency } from "../lib/household-currency";
+import { getHouseholdTimezone } from "../lib/household-timezone";
 import { withAudit } from "../lib/audit";
 import { zCurrencyCode } from "../lib/request-validation";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
@@ -34,6 +35,17 @@ const recurringStartDateSchema = z.coerce.date().refine(
   }
 );
 
+const reminderSchedulesSchema = z.array(z.object({
+  dayOffset: z.number().int().min(-36600).max(36600),
+  time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+}).strict())
+  .max(4)
+  .refine((schedules) => new Set(schedules.map(({ dayOffset, time }) => `${dayOffset}:${time}`)).size === schedules.length, {
+    message: "Reminder schedules must be unique",
+  })
+  .transform((schedules) => schedules.sort((a, b) => a.dayOffset - b.dayOffset || a.time.localeCompare(b.time)))
+  .optional();
+
 export const createRuleSchema = z.object({
   amount: z.number().positive(),
   categoryId: z.string().uuid(),
@@ -46,6 +58,7 @@ export const createRuleSchema = z.object({
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
   currency: zCurrencyCode.optional(),
+  reminderSchedules: reminderSchedulesSchema,
 });
 
 export const updateRuleSchema = z.object({
@@ -60,6 +73,7 @@ export const updateRuleSchema = z.object({
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
   currency: zCurrencyCode.optional(),
+  reminderSchedules: reminderSchedulesSchema,
 });
 
 export const handleRecurringRequest: ApiHandler = async ({
@@ -109,12 +123,14 @@ export const handleRecurringRequest: ApiHandler = async ({
       budgetId: validated.budgetId,
     });
     const interval = validated.interval ?? 1;
+    const timeZone = await getHouseholdTimezone(db, session!.householdId);
     const nextRunDate = getInitialNextRunDate(
       validated.startDate,
       validated.frequency,
       interval,
       validated.dayOfMonth,
-      validated.endDate
+      validated.endDate,
+      timeZone
     );
 
     if (!nextRunDate) {
@@ -157,6 +173,7 @@ export const handleRecurringRequest: ApiHandler = async ({
             endDate: validated.endDate ? toISODate(validated.endDate) : null,
             nextRunDate: toISODate(nextRunDate),
             budgetId: validated.budgetId || null,
+            reminderSchedules: validated.reminderSchedules ?? [],
           })
           .returning()
           .get()
@@ -198,6 +215,10 @@ export const handleRecurringRequest: ApiHandler = async ({
     );
 
     const updateData: Record<string, unknown> = {};
+
+    if (validated.reminderSchedules !== undefined) {
+      updateData.reminderSchedules = validated.reminderSchedules;
+    }
 
     if (validated.amount !== undefined) updateData.amount = toCents(validated.amount);
     if (validated.categoryId !== undefined) {
@@ -268,21 +289,33 @@ export const handleRecurringRequest: ApiHandler = async ({
             ? new Date(existing.endDate)
             : null;
 
+      if (endDate && toISODate(endDate) < toISODate(startDate)) {
+        throw new ActionError(
+          "End date must be on or after the first occurrence date",
+          "VALIDATION_ERROR"
+        );
+      }
+
       updateData.startDate = toISODate(startDate);
+      const timeZone = await getHouseholdTimezone(db, session!.householdId);
 
       const newNextRunDate = getInitialNextRunDate(
         startDate,
         frequency,
         interval,
         dayOfMonth,
-        endDate
+        endDate,
+        timeZone
       );
 
       if (newNextRunDate) {
         updateData.nextRunDate = toISODate(newNextRunDate);
       } else {
-        updateData.active = false;
-        updateData.nextRunDate = toISODate(startDate);
+        // Completion keeps the rule enabled for reminders after its final
+        // occurrence. Posting stops at endDate; only an explicit pause disables it.
+        updateData.nextRunDate = toISODate(
+          getInitialNextRunDate(startDate, frequency, interval, dayOfMonth, undefined, timeZone)!
+        );
       }
     }
 

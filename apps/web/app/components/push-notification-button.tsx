@@ -3,14 +3,14 @@ import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/toast-provider";
 import {
   getNotificationPermissionStatus,
+  getNotificationPreferences,
   isSubscribed,
   pushErrorCode,
-  subscribeToPush,
-  unsubscribeFromPush,
+  setNotificationCategory,
 } from "@/app/lib/push/client";
 import { useT } from "@/app/i18n";
 
-type Status = "loading" | "subscribed" | "unsubscribed" | "denied" | "unsupported";
+type Status = "loading" | "subscribed" | "unsubscribed" | "denied" | "unsupported" | "error";
 
 export function PushNotificationButton() {
   const t = useT();
@@ -35,8 +35,14 @@ export function PushNotificationButton() {
       return;
     }
 
-    const subscribed = await isSubscribed();
-    setStatus(subscribed ? "subscribed" : "unsubscribed");
+    try {
+      const [subscribed, preferences] = await Promise.all([
+        isSubscribed(), getNotificationPreferences(),
+      ]);
+      setStatus(subscribed && preferences.groceryNotifications ? "subscribed" : "unsubscribed");
+    } catch {
+      setStatus("error");
+    }
   }
 
   async function handleToggle() {
@@ -44,10 +50,10 @@ export function PushNotificationButton() {
     setIsToggling(true);
     try {
       if (turningOff) {
-        await unsubscribeFromPush();
+        await setNotificationCategory("groceryNotifications", false);
         setStatus("unsubscribed");
       } else {
-        await subscribeToPush();
+        await setNotificationCategory("groceryNotifications", true);
         setStatus("subscribed");
       }
     } catch (error) {
@@ -68,6 +74,14 @@ export function PushNotificationButton() {
   if (status === "denied") {
     return (
       <p className="max-w-56 shrink-0 text-sm text-muted-foreground">{t.notifications.alertsBlocked}</p>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <Button type="button" variant="outline" onClick={() => void checkStatus()}>
+        {t.notifications.retry}
+      </Button>
     );
   }
 

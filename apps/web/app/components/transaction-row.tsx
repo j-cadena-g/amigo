@@ -39,6 +39,8 @@ export interface TransactionDTO {
   exchangeRateToHome: number | null;
   chargedAmount: number | null;
   chargedCurrency: CurrencyCode | null;
+  reminderTimes?: string[];
+  reminderUserId?: string | null;
 }
 
 /** What a row needs to name the account it is tagged to. */
@@ -93,6 +95,7 @@ interface TransactionRowProps {
   /** Active type filter, kept when linking to the account's transactions. */
   typeFilter?: "income" | "expense" | null;
   homeCurrency: CurrencyCode;
+  timeZone: string;
   expanded: boolean;
   isEditing: boolean;
   isSubmitting: boolean;
@@ -111,6 +114,7 @@ export function TransactionRow({
   account,
   typeFilter,
   homeCurrency,
+  timeZone,
   expanded,
   isEditing,
   isSubmitting,
@@ -133,6 +137,8 @@ export function TransactionRow({
         <EditTransactionForm
           form={editForm}
           homeCurrency={homeCurrency}
+          timeZone={timeZone}
+          existingReminderTimes={transaction.reminderTimes ?? []}
           isSubmitting={isSubmitting}
           lastExpenseBudgetIdRef={lastEditExpenseBudgetIdRef}
           onChange={onEditFormChange}
@@ -223,6 +229,20 @@ export function TransactionRow({
                   {charge.versusMarket && (
                     <span className="text-muted-foreground"> · {charge.versusMarket}</span>
                   )}
+                </dd>
+              </>
+            )}
+            {!!transaction.reminderTimes?.length && (
+              <>
+                <dt className="text-muted-foreground">{t.transactions.reminders}</dt>
+                <dd>
+                  <ul className="space-y-1">
+                    {transaction.reminderTimes.map((instant) => (
+                      <li key={instant}>{new Intl.DateTimeFormat(locale, {
+                        timeZone, dateStyle: "medium", timeStyle: "short",
+                      }).format(new Date(instant))} · {timeZone}</li>
+                    ))}
+                  </ul>
                 </dd>
               </>
             )}

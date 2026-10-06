@@ -5,6 +5,7 @@ import {
   inArray,
   isNull,
   lte,
+  or,
   recurringTransactions,
   scopeToHousehold,
   transactions,
@@ -56,10 +57,11 @@ export function getInitialNextRunDate(
   frequency: RecurringFrequency,
   interval: number,
   dayOfMonth?: number | null,
-  endDate?: Date | null
+  endDate?: Date | null,
+  timeZone = "UTC",
+  now = new Date()
 ) {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const today = new Date(`${todayInTz(timeZone, now)}T00:00:00.000Z`);
   const start = new Date(startDate);
   start.setUTCHours(0, 0, 0, 0);
   const end = endDate ? new Date(endDate) : null;
@@ -143,30 +145,29 @@ export async function advanceRecurringRuleIfCurrent(db: DrizzleD1, rule: Recurri
     rule.dayOfMonth
   );
 
-  const endDate = rule.endDate ? new Date(rule.endDate) : null;
-  if (endDate) endDate.setUTCHours(0, 0, 0, 0);
-
-  const update =
-    endDate && nextRunDate > endDate
-      ? { lastRunDate: rule.nextRunDate, active: false }
-      : {
-          lastRunDate: rule.nextRunDate,
-          nextRunDate: toISODate(nextRunDate),
-        };
-
   return await db
     .update(recurringTransactions)
-    .set(update)
+    // Posting completion is separate from an explicit pause: selected reminders
+    // after the final occurrence still need an enabled rule.
+    .set({ lastRunDate: rule.nextRunDate, nextRunDate: toISODate(nextRunDate) })
     .where(
       and(
         eq(recurringTransactions.id, rule.id),
         eq(recurringTransactions.active, true),
         isNull(recurringTransactions.deletedAt),
+        recurringPostingWithinEndDate(),
         eq(recurringTransactions.nextRunDate, rule.nextRunDate)
       )
     )
     .returning({ id: recurringTransactions.id })
     .get();
+}
+
+function recurringPostingWithinEndDate() {
+  return or(
+    isNull(recurringTransactions.endDate),
+    lte(recurringTransactions.nextRunDate, recurringTransactions.endDate)
+  );
 }
 
 export type ProcessDueRecurringMode =
@@ -189,6 +190,7 @@ export async function processDueRecurringRules(
     eq(recurringTransactions.active, true),
     isNull(recurringTransactions.deletedAt),
     lte(recurringTransactions.nextRunDate, farthestToday),
+    recurringPostingWithinEndDate(),
   ];
 
   if (scope.mode === "household_user") {
@@ -240,6 +242,7 @@ export async function processDueRecurringRules(
           eq(recurringTransactions.id, rule.id),
           eq(recurringTransactions.active, true),
           isNull(recurringTransactions.deletedAt),
+          recurringPostingWithinEndDate(),
           eq(recurringTransactions.nextRunDate, rule.nextRunDate)
         ),
         columns: { id: true },
@@ -260,6 +263,7 @@ export async function processDueRecurringRules(
           eq(recurringTransactions.id, rule.id),
           eq(recurringTransactions.active, true),
           isNull(recurringTransactions.deletedAt),
+          recurringPostingWithinEndDate(),
           eq(recurringTransactions.nextRunDate, rule.nextRunDate)
         ),
         columns: { id: true },

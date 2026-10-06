@@ -36,6 +36,18 @@ export const users = sqliteTable("users", {
   locale: text("locale", { enum: FORMAT_LOCALES }),
   /** Interface language. Null follows the resolved number and date format. */
   language: text("language", { enum: UI_LANGUAGES }),
+  /** Existing subscriptions keep receiving grocery updates. */
+  groceryNotifications: integer("grocery_notifications", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  /** Recurring expense reminders require an explicit opt-in. */
+  recurringNotifications: integer("recurring_notifications", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** Explicitly scheduled transaction reminders are enabled by default. */
+  transactionNotifications: integer("transaction_notifications", { mode: "boolean" })
+    .notNull()
+    .default(true),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

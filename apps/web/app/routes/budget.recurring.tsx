@@ -14,6 +14,7 @@ import {
 } from "@amigo/db";
 import { RecurringList } from "@/app/components/recurring-list";
 import { pageTitle } from "@/app/i18n";
+import { getHouseholdTimezone } from "@/server/lib/household-timezone";
 
 function dayOfWeekFromStartDate(startDate: string): number {
   return new Date(startDate + "T00:00:00").getDay();
@@ -24,9 +25,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const env = getEnv(context);
   const db = getDb(env.DB);
 
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, session.householdId),
-  });
+  const [household, timeZone] = await Promise.all([
+    db.query.households.findFirst({ where: eq(households.id, session.householdId) }),
+    getHouseholdTimezone(db, session.householdId),
+  ]);
 
   const rules = await db.query.recurringTransactions.findMany({
     where: and(
@@ -49,6 +51,7 @@ export async function loader({ context }: LoaderFunctionArgs) {
   return {
     rules: mapped,
     homeCurrency: parseHomeCurrency(household?.homeCurrency),
+    timeZone,
   };
 }
 
@@ -57,7 +60,7 @@ export function meta({ matches }: MetaArgs) {
 }
 
 export default function Recurring() {
-  const { rules, homeCurrency } = useLoaderData<typeof loader>();
+  const { rules, homeCurrency, timeZone } = useLoaderData<typeof loader>();
 
-  return <RecurringList rules={rules} homeCurrency={homeCurrency} />;
+  return <RecurringList rules={rules} homeCurrency={homeCurrency} timeZone={timeZone} />;
 }

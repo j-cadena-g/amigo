@@ -17,6 +17,46 @@ export function pushErrorCode(error: unknown): PushErrorCode {
   return error instanceof PushError ? error.code : "failed";
 }
 
+export interface NotificationPreferences {
+  groceryNotifications: boolean;
+  recurringNotifications: boolean;
+  transactionNotifications: boolean;
+}
+
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  const response = await fetch("/api/push/preferences");
+  if (!response.ok) {
+    throw new PushError("failed", "Failed to load notification preferences");
+  }
+  return response.json() as Promise<NotificationPreferences>;
+}
+
+export async function updateNotificationPreferences(
+  preferences: Partial<NotificationPreferences>
+): Promise<NotificationPreferences> {
+  const response = await fetch("/api/push/preferences", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  });
+  if (!response.ok) {
+    throw new PushError("failed", "Failed to update notification preferences");
+  }
+  return response.json() as Promise<NotificationPreferences>;
+}
+
+/** Categories are account preferences; turning one off leaves device delivery intact. */
+export async function setNotificationCategory(
+  category: keyof NotificationPreferences,
+  enabled: boolean
+): Promise<NotificationPreferences> {
+  if (enabled) {
+    // Register even an existing subscription, so it belongs to the signed-in user.
+    await subscribeToPush();
+  }
+  return updateNotificationPreferences({ [category]: enabled });
+}
+
 export type NotificationPermissionStatus =
   | "granted"
   | "denied"

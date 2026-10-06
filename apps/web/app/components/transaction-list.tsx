@@ -32,6 +32,13 @@ import {
 } from "@/app/components/transaction-row";
 import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
+import {
+  hasNewFutureReminders,
+  reminderTimeToLocal,
+  ReminderTimeError,
+  transactionReminderPayload,
+} from "@/app/lib/reminder-times";
+import { PushError, pushErrorCode, setNotificationCategory } from "@/app/lib/push/client";
 
 export type { TransactionDTO };
 
@@ -45,6 +52,7 @@ interface TransactionListProps {
   accounts: TransactionAccount[];
   homeCurrency: CurrencyCode;
   todayStr: string;
+  timeZone: string;
 }
 
 /** The transactions list URL with whichever filters are given. */
@@ -111,6 +119,7 @@ export function TransactionList({
   accounts,
   homeCurrency,
   todayStr,
+  timeZone,
 }: TransactionListProps) {
   const t = useT();
   const locale = useLocale();
@@ -153,7 +162,9 @@ export function TransactionList({
     currency: homeCurrency,
     chargedAmount: "",
     chargedCurrency: null,
+    reminderTimes: [],
   });
+  const editingReminderTimesRef = useRef<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState<TransactionFormState>({
@@ -167,6 +178,7 @@ export function TransactionList({
     currency: homeCurrency,
     chargedAmount: "",
     chargedCurrency: null,
+    reminderTimes: [],
   });
 
   useEffect(() => {
@@ -263,6 +275,11 @@ export function TransactionList({
     setIsSubmitting(true);
     setFormError(null);
     try {
+      const reminderTimes = transactionReminderPayload(newTransaction.reminderTimes, timeZone);
+      // Start permission setup directly from the submit gesture, before any other await.
+      if (hasNewFutureReminders(reminderTimes)) {
+        await setNotificationCategory("transactionNotifications", true);
+      }
       const res = await fetch("/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -276,6 +293,7 @@ export function TransactionList({
           accountId: newTransaction.accountId,
           currency: newTransaction.currency,
           ...chargePayload(newTransaction, homeCurrency),
+          reminderTimes,
         }),
       });
       if (res.ok) {
@@ -291,6 +309,7 @@ export function TransactionList({
           currency: homeCurrency,
           chargedAmount: "",
           chargedCurrency: null,
+          reminderTimes: [],
         });
         setShowAddForm(false);
         setFormError(null);
@@ -302,7 +321,11 @@ export function TransactionList({
       }
     } catch (err) {
       console.error("Transaction request failed:", err);
-      setFormError(t.common.couldNotConnection(t.transactions.addAction));
+      setFormError(err instanceof ReminderTimeError
+        ? t.transactions.reminderErrors[err.code]
+        : err instanceof PushError
+          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
+          : t.common.couldNotConnection(t.transactions.addAction));
     } finally {
       setIsSubmitting(false);
     }
@@ -333,6 +356,7 @@ export function TransactionList({
 
   const handleStartEdit = (transaction: TransactionDTO) => {
     setEditingId(transaction.id);
+    editingReminderTimesRef.current = transaction.reminderTimes ?? [];
     setEditForm({
       amount: centsToInputString(transaction.amount, transaction.currency, locale),
       description: transaction.description || "",
@@ -348,6 +372,7 @@ export function TransactionList({
           : "",
       chargedCurrency:
         transaction.chargedAmount != null ? transaction.chargedCurrency : null,
+      reminderTimes: (transaction.reminderTimes ?? []).map((time) => reminderTimeToLocal(time, timeZone)),
     });
   };
 
@@ -379,9 +404,13 @@ export function TransactionList({
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingId) return;
+    if (!editingId || isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const reminderTimes = transactionReminderPayload(editForm.reminderTimes, timeZone, editingReminderTimesRef.current);
+      if (hasNewFutureReminders(reminderTimes, editingReminderTimesRef.current)) {
+        await setNotificationCategory("transactionNotifications", true);
+      }
       const res = await fetch(`/api/transactions/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -395,6 +424,7 @@ export function TransactionList({
           accountId: editForm.accountId,
           currency: editForm.currency,
           ...chargePayload(editForm, homeCurrency),
+          reminderTimes,
         }),
       });
       if (res.ok) {
@@ -403,8 +433,14 @@ export function TransactionList({
       } else {
         await toastMutationFailure(toast, res, t.transactions.saveAction, t.common);
       }
-    } catch {
-      await toastMutationFailure(toast, null, t.transactions.saveAction, t.common);
+    } catch (error) {
+      if (error instanceof ReminderTimeError) {
+        toast(t.transactions.reminderErrors[error.code], { variant: "error" });
+      } else if (error instanceof PushError) {
+        toast(t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(error)]), { variant: "error" });
+      } else {
+        await toastMutationFailure(toast, null, t.transactions.saveAction, t.common);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -463,6 +499,7 @@ export function TransactionList({
         <AddTransactionForm
           form={newTransaction}
           homeCurrency={homeCurrency}
+          timeZone={timeZone}
           isSubmitting={isSubmitting}
           formError={formError}
           allowBudgetSuggest={allowBudgetSuggest}
@@ -551,6 +588,7 @@ export function TransactionList({
                     }
                     typeFilter={typeFilter}
                     homeCurrency={homeCurrency}
+                    timeZone={timeZone}
                     expanded={expandedId === transaction.id}
                     isEditing={editingId === transaction.id}
                     isSubmitting={isSubmitting}

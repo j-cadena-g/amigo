@@ -219,4 +219,50 @@ describe("recurring and occurrence amount edits", () => {
       message: "Unknown or inaccessible budget",
     });
   });
+
+  it("rejects an edit that ends the rule before its first occurrence", async () => {
+    const env = getIntegrationEnv();
+    const db = getDb(env.DB);
+    const session = testSession({ userId: ownerId, householdId });
+    const ruleId = crypto.randomUUID();
+
+    await db.insert(recurringTransactions).values({
+      id: ruleId,
+      householdId,
+      userId: ownerId,
+      amount: 150000,
+      currency: "CAD",
+      categoryId,
+      category: "Rent",
+      type: "expense",
+      frequency: "MONTHLY",
+      interval: 1,
+      dayOfMonth: 1,
+      startDate: "2026-01-01",
+      nextRunDate: "2026-10-01",
+    });
+
+    await expect(
+      handleRecurringRequest({
+        env,
+        params: { "*": ruleId },
+        request: new Request(`http://localhost/api/recurring/${ruleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endDate: "2025-12-31" }),
+        }),
+        session,
+        sessionStatus: "authenticated",
+        loadContext: {} as never,
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "End date must be on or after the first occurrence date",
+    });
+
+    const stored = await db.query.recurringTransactions.findFirst({
+      where: eq(recurringTransactions.id, ruleId),
+    });
+    expect(stored?.endDate).toBeNull();
+  });
 });

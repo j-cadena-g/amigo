@@ -116,4 +116,31 @@ describe("recurring-processor", () => {
       getInitialNextRunDate(start, "DAILY", Number.NaN)
     ).toThrow(/Invalid recurring interval/);
   });
+
+  it.each([
+    {
+      timeZone: "America/Toronto",
+      now: "2026-10-04T00:30:00.000Z",
+      today: "2026-10-03",
+      utcToday: "2026-10-04",
+    },
+    {
+      timeZone: "Asia/Tokyo",
+      now: "2026-10-03T23:30:00.000Z",
+      today: "2026-10-04",
+      utcToday: "2026-10-03",
+    },
+  ])("uses $timeZone calendar today across UTC midnight while preserving UTC date-only values", ({ timeZone, now, today, utcToday }) => {
+    const start = new Date("2026-10-01T00:00:00.000Z");
+    const instant = new Date(now);
+    const next = getInitialNextRunDate(start, "DAILY", 1, undefined, undefined, timeZone, instant);
+    expect(next?.toISOString()).toBe(`${today}T00:00:00.000Z`);
+    expect(instant.toISOString()).toBe(now);
+    expect(getInitialNextRunDate(start, "DAILY", 1, undefined, undefined, undefined, instant)?.toISOString()).toBe(`${utcToday}T00:00:00.000Z`);
+    const end = new Date(`${today}T00:00:00.000Z`);
+    expect(getInitialNextRunDate(start, "DAILY", 1, undefined, end, timeZone, instant)?.toISOString()).toBe(`${today}T00:00:00.000Z`);
+    const beforeToday = new Date(end);
+    beforeToday.setUTCDate(beforeToday.getUTCDate() - 1);
+    expect(getInitialNextRunDate(start, "DAILY", 1, undefined, beforeToday, timeZone, instant)).toBeNull();
+  });
 });

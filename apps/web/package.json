@@ -23,6 +23,7 @@
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.workers.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:integration": "vitest run --config vitest.workers.config.ts",
+    "test:push-transport": "vitest run --config vitest.push-transport.config.ts",
     "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {

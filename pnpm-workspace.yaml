@@ -5,10 +5,10 @@ packages:
 overrides:
   esbuild: ">=0.25.0 <1.0.0"
   # Dependabot: brace-expansion DoS (GHSA advisories on 1.x and 5.x lines)
-  brace-expansion@1: 1.1.18
-  brace-expansion@5: 5.0.9
-  # Dependabot: sharp/libvips CVEs (libheif RCE in < 0.35.4)
-  sharp: ">=0.35.4"
+  brace-expansion@1: 1.1.21
+  brace-expansion@5: 5.0.12
+  # Dependabot: sharp/libvips CVEs (libheif RCE in < 0.35.4, librsvg in < 0.35.5)
+  sharp: ">=0.35.5"
   # Dependabot: browserslist prototype write / crash via untrusted custom stats
   browserslist: "4.28.9"
   # Dependabot: baseline-browser-mapping process.exit() DoS on invalid input
@@ -17,6 +17,8 @@ overrides:
   valibot: 1.4.2
   # Dependabot: undici cache/cookie/CRLF issues and WebSocket deflate DoS (via miniflare)
   undici: 7.29.1
+  # Dependabot: source-map-js event-loop DoS via indexed source-map section offsets
+  source-map-js: ">=1.2.2"
 
 allowBuilds:
   esbuild: true

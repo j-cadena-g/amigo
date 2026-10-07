@@ -16,10 +16,14 @@ export const notifications = defineMessages({
       reason ? `Couldn't update notifications: ${reason}.` : "Couldn't update notifications. Try again.",
     turnOnFailed: (reason: string | null) =>
       reason ? `Couldn't turn on notifications: ${reason}.` : "Couldn't turn on notifications. Try again.",
-    reminderDeviceFailed: (reason: string | null) =>
-      reason
+    reminderSetupFailed: (step: "preference" | "device", reason: string | null) => {
+      if (step === "preference") {
+        return "Saved, but reminders couldn't be turned on for your account. Turn them on in Settings.";
+      }
+      return reason
         ? `Saved. Notifications couldn't be turned on for this device: ${reason}.`
-        : "Saved. Notifications couldn't be turned on for this device. Try again.",
+        : "Saved. Notifications couldn't be turned on for this device. Try again.";
+    },
     alertsFailed: (turningOff: boolean, reason: string | null) => {
       const action = turningOff ? "turn off" : "turn on";
       return reason ? `Couldn't ${action} alerts: ${reason}.` : `Couldn't ${action} alerts. Try again.`;
@@ -80,10 +84,14 @@ export const notifications = defineMessages({
       reason
         ? `No se pudieron activar las notificaciones: ${reason}.`
         : "No se pudieron activar las notificaciones. Inténtalo de nuevo.",
-    reminderDeviceFailed: (reason: string | null) =>
-      reason
+    reminderSetupFailed: (step: "preference" | "device", reason: string | null) => {
+      if (step === "preference") {
+        return "Guardado, pero no se pudieron activar los recordatorios en tu cuenta. Actívalos en Ajustes.";
+      }
+      return reason
         ? `Guardado. No se pudieron activar las notificaciones en este dispositivo: ${reason}.`
-        : "Guardado. No se pudieron activar las notificaciones en este dispositivo. Inténtalo de nuevo.",
+        : "Guardado. No se pudieron activar las notificaciones en este dispositivo. Inténtalo de nuevo.";
+    },
     alertsFailed: (turningOff: boolean, reason: string | null) => {
       const action = turningOff ? "desactivar" : "activar";
       return reason

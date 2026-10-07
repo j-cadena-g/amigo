@@ -30,7 +30,7 @@ export async function runLocalNotifications(args, request = fetch) {
   if (!worker) throw new Error("The local app Worker was not found.");
   // Transaction and recurring reminders share one minute cron.
   const cron = "* * * * *";
-  if (!worker.triggers?.crons.includes(cron)) throw new Error("The local Worker does not have the reminder cron configured.");
+  if (!worker.triggers?.crons?.includes(cron)) throw new Error("The local Worker does not have the reminder cron configured.");
   const result = await json(`/local/scheduled?${new URLSearchParams({ worker: worker.name })}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cron }),

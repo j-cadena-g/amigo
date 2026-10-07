@@ -127,16 +127,22 @@ export default {
         processTransactionReminders(env),
         processRecurringReminders(env),
       ]);
-      if (transactionResult.status === "rejected") throw transactionResult.reason;
-      if (recurringResult.status === "rejected") throw recurringResult.reason;
-      console.log(
+      const outcome = (result: PromiseSettledResult<unknown>) =>
+        result.status === "fulfilled"
+          ? result.value
+          : { error: result.reason instanceof Error ? result.reason.message : String(result.reason) };
+      const failed = transactionResult.status === "rejected" || recurringResult.status === "rejected";
+      // Log every run, including a failed one, before rethrowing.
+      (failed ? console.error : console.log)(
         JSON.stringify({
-          message: "reminders completed",
+          message: failed ? "reminders failed" : "reminders completed",
           cron: event.cron,
-          transactions: transactionResult.value,
-          recurring: recurringResult.value,
+          transactions: outcome(transactionResult),
+          recurring: outcome(recurringResult),
         })
       );
+      if (transactionResult.status === "rejected") throw transactionResult.reason;
+      if (recurringResult.status === "rejected") throw recurringResult.reason;
     } else {
       console.warn(
         JSON.stringify({

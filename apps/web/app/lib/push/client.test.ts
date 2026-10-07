@@ -272,7 +272,10 @@ describe("enableReminderNotifications", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(savedPreferences("transactionNotifications")));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(enableReminderNotifications("transactionNotifications")).resolves.toBe("denied");
+    await expect(enableReminderNotifications("transactionNotifications")).resolves.toEqual({
+      step: "device",
+      code: "denied",
+    });
     expect(fetchMock).toHaveBeenCalledWith("/api/push/preferences", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -280,7 +283,7 @@ describe("enableReminderNotifications", () => {
     });
   });
 
-  it("returns failed when the preference save fails and device setup succeeds", async () => {
+  it("reports a preference failure when the device subscribes but the preference save fails", async () => {
     existingSubscription();
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
@@ -288,7 +291,10 @@ describe("enableReminderNotifications", () => {
       return Response.json({ success: true });
     }));
 
-    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBe("failed");
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toEqual({
+      step: "preference",
+      code: "failed",
+    });
   });
 
   it("never rejects when device setup and the preference save both fail", async () => {
@@ -299,7 +305,39 @@ describe("enableReminderNotifications", () => {
     });
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
 
-    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBe("failed");
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toEqual({
+      step: "preference",
+      code: "failed",
+    });
+  });
+
+  it("leaves a device turned off in settings alone until it is turned back on", async () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+      removeItem: (key: string) => void stored.delete(key),
+    });
+    const subscription = existingSubscription();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
+      if (url === "/api/push/preferences") return Response.json(savedPreferences("recurringNotifications"));
+      return Response.json({ success: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await unsubscribeFromPush();
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    fetchMock.mockClear();
+
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBeNull();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/push/preferences"]);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+
+    await subscribeToPush();
+    fetchMock.mockClear();
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBeNull();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/push");
   });
 });
 

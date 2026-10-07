@@ -314,8 +314,9 @@ export function TransactionList({
         setShowAddForm(false);
         setFormError(null);
         revalidator.revalidate();
-        void notificationSetup?.then((code) => {
-          if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+        void notificationSetup?.then((failure) => {
+          if (!failure) return;
+          toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
         });
       } else {
         const message = await readApiErrorMessage(res);
@@ -432,8 +433,9 @@ export function TransactionList({
       if (res.ok) {
         handleCancelEdit();
         revalidator.revalidate();
-        void notificationSetup?.then((code) => {
-          if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+        void notificationSetup?.then((failure) => {
+          if (!failure) return;
+          toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
         });
       } else {
         await toastMutationFailure(toast, res, t.transactions.saveAction, t.common);

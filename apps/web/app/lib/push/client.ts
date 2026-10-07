@@ -59,27 +59,56 @@ export async function setNotificationCategory(
 
 export type ReminderNotificationCategory = "transactionNotifications" | "recurringNotifications";
 
+/** Which part of reminder setup failed: the account preference, or this device's subscription. */
+export interface ReminderSetupFailure {
+  step: "preference" | "device";
+  code: PushErrorCode;
+}
+
 /**
  * Call synchronously from the submit handler (before any other await) so the permission prompt
  * stays inside the user's gesture. Never rejects. Turns the account preference on even when this
- * device cannot subscribe, so the member's other devices still get the reminder.
- * Resolves to null on success, otherwise the first failure's code (preference failure wins).
+ * device cannot subscribe, so the member's other devices still get the reminder. Leaves a device
+ * the member turned off alone. Resolves to null on success, otherwise the failure that matters
+ * most (a preference failure, since without it no device gets the reminder).
  */
 export function enableReminderNotifications(
   category: ReminderNotificationCategory
-): Promise<PushErrorCode | null> {
+): Promise<ReminderSetupFailure | null> {
   // Start subscribe first: its synchronous part reaches Notification.requestPermission().
-  const device = subscribeToPush().then(
-    () => null,
-    (error: unknown) => pushErrorCode(error)
-  );
+  const device = deviceTurnedOff()
+    ? Promise.resolve(null)
+    : subscribeToPush().then(
+        () => null,
+        (error: unknown): ReminderSetupFailure => ({ step: "device", code: pushErrorCode(error) })
+      );
   const preference = updateNotificationPreferences({ [category]: true }).then(
     () => null,
-    (error: unknown) => pushErrorCode(error)
+    (error: unknown): ReminderSetupFailure => ({ step: "preference", code: pushErrorCode(error) })
   );
   return Promise.all([preference, device]).then(
-    ([preferenceError, deviceError]) => preferenceError ?? deviceError
+    ([preferenceFailure, deviceFailure]) => preferenceFailure ?? deviceFailure
   );
+}
+
+/** Set when the member turns this device off, so reminder setup does not subscribe it again. */
+const DEVICE_OFF_STORAGE_KEY = "amigo-push-device-off";
+
+function deviceTurnedOff(): boolean {
+  try {
+    return localStorage.getItem(DEVICE_OFF_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function rememberDeviceTurnedOff(off: boolean) {
+  try {
+    if (off) localStorage.setItem(DEVICE_OFF_STORAGE_KEY, "true");
+    else localStorage.removeItem(DEVICE_OFF_STORAGE_KEY);
+  } catch {
+    // Storage unavailable (private mode, blocked site data): nothing to remember.
+  }
 }
 
 export type NotificationPermissionStatus =
@@ -195,6 +224,7 @@ export async function subscribeToPush(): Promise<void> {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new PushError("failed", data.error ?? "Failed to save subscription");
   }
+  rememberDeviceTurnedOff(false);
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
@@ -203,10 +233,11 @@ export async function unsubscribeFromPush(): Promise<void> {
   }
 
   const registration = await getPushRegistration();
-  if (!registration) return;
-  const subscription = await registration.pushManager.getSubscription();
-
-  if (!subscription) return;
+  const subscription = await registration?.pushManager.getSubscription();
+  if (!subscription) {
+    rememberDeviceTurnedOff(true);
+    return;
+  }
 
   const endpoint = subscription.endpoint;
 
@@ -231,6 +262,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   }
 
   await subscription.unsubscribe();
+  rememberDeviceTurnedOff(true);
 }
 
 export async function isSubscribed(): Promise<boolean> {

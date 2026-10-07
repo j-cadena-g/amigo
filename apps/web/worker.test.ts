@@ -148,9 +148,15 @@ describe("worker recurring cron routing", () => {
   it("propagates reminder scheduler failures", async () => {
     const error = new Error("D1 unavailable");
     mocks.processRecurringReminders.mockRejectedValueOnce(error);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
       worker.scheduled({ cron: "* * * * *" } as ScheduledEvent, makeEnv(), {} as ExecutionContext)
     ).rejects.toThrow(error);
+    // The failed run is still logged, with the other scheduler's result.
+    const entry = JSON.parse(log.mock.calls[0]?.[0] as string);
+    expect(entry).toMatchObject({ message: "reminders failed", recurring: { error: "D1 unavailable" } });
+    expect(entry.transactions).not.toHaveProperty("error");
+    log.mockRestore();
   });
 
   it("routes the minute trigger to both selected transaction and recurring reminders", async () => {

@@ -614,8 +614,9 @@ export function AddRecurringDialog({
       setForm(emptyForm(defaultCurrency, timeZone));
       onOpenChange(false);
       revalidator.revalidate();
-      void notificationSetup?.then((code) => {
-        if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+      void notificationSetup?.then((failure) => {
+        if (!failure) return;
+        toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
       });
     } catch (err) {
       setError(err instanceof RecurringReminderError
@@ -770,8 +771,9 @@ export function EditRecurringDialog({
       }
       onOpenChange(false);
       revalidator.revalidate();
-      void notificationSetup?.then((code) => {
-        if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+      void notificationSetup?.then((failure) => {
+        if (!failure) return;
+        toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
       });
     } catch (err) {
       setError(err instanceof RecurringReminderError

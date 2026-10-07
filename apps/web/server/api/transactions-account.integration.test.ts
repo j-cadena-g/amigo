@@ -15,6 +15,8 @@ describe("transactions account link", () => {
   let categoryId: string;
   let incomeCategoryId: string;
   let cardId: string;
+  let bankId: string;
+  let loanId: string;
   let convertedId: string;
 
   beforeEach(async () => {
@@ -24,6 +26,8 @@ describe("transactions account link", () => {
     categoryId = crypto.randomUUID();
     incomeCategoryId = crypto.randomUUID();
     cardId = crypto.randomUUID();
+    bankId = crypto.randomUUID();
+    loanId = crypto.randomUUID();
     // The asset-convert endpoint made ids like this, which are not uuids.
     convertedId = `from-asset-${crypto.randomUUID()}`;
 
@@ -51,6 +55,24 @@ describe("transactions account link", () => {
         currency: "CAD",
       },
       {
+        id: bankId,
+        householdId,
+        userId: null,
+        name: "Chequing",
+        type: "CHECKING",
+        balance: 100000,
+        currency: "CAD",
+      },
+      {
+        id: loanId,
+        householdId,
+        userId: null,
+        name: "Car loan",
+        type: "LOAN",
+        balance: -800000,
+        currency: "CAD",
+      },
+      {
         id: convertedId,
         householdId,
         userId: null,
@@ -62,11 +84,17 @@ describe("transactions account link", () => {
     ]);
   });
 
-  function call(method: "GET" | "POST" | "PATCH", body?: unknown, id?: string, query = "") {
+  function call(
+    method: "GET" | "POST" | "PATCH",
+    body?: unknown,
+    id?: string,
+    query = "",
+    path = id
+  ) {
     return handleTransactionsRequest({
       env: getIntegrationEnv(),
-      params: { "*": id ?? "" },
-      request: new Request(`http://localhost/api/transactions${id ? `/${id}` : ""}${query}`, {
+      params: { "*": path ?? "" },
+      request: new Request(`http://localhost/api/transactions${path ? `/${path}` : ""}${query}`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -103,15 +131,19 @@ describe("transactions account link", () => {
     const { id } = await create({ accountId: cardId });
     expect(await storedAccountId(id)).toBe(cardId);
 
-    await call("PATCH", { accountId: convertedId }, id);
-    expect(await storedAccountId(id)).toBe(convertedId);
+    await call("PATCH", { accountId: bankId }, id);
+    expect(await storedAccountId(id)).toBe(bankId);
 
     await call("PATCH", { accountId: null }, id);
     expect(await storedAccountId(id)).toBeNull();
   });
 
   it("accepts an account id that is not a uuid", async () => {
-    const { id } = await create({ accountId: convertedId });
+    const { id } = await create({
+      accountId: convertedId,
+      type: "income",
+      categoryId: incomeCategoryId,
+    });
     expect(await storedAccountId(id)).toBe(convertedId);
   });
 
@@ -145,7 +177,7 @@ describe("transactions account link", () => {
   it("lists only the transactions of the account in the account filter", async () => {
     const onCard = await create({ accountId: cardId });
     const onCardToo = await create({ accountId: cardId, type: "income", categoryId: incomeCategoryId });
-    await create({ accountId: convertedId });
+    await create({ accountId: bankId });
     await create();
 
     const all = (await (await call("GET")).json()) as { data: { id: string }[] };
@@ -160,5 +192,73 @@ describe("transactions account link", () => {
       await call("GET", undefined, undefined, `?account=${cardId}&type=income`)
     ).json()) as { data: { id: string }[] };
     expect(both.data.map((t) => t.id)).toEqual([onCardToo.id]);
+  });
+
+  const expenseAccountError = {
+    code: "VALIDATION_ERROR",
+    message: expect.stringMatching(/^Expenses can only use/),
+  };
+
+  it("keeps new expenses off loan and asset accounts", async () => {
+    await expect(create({ accountId: loanId })).rejects.toMatchObject(expenseAccountError);
+    await expect(create({ accountId: convertedId })).rejects.toMatchObject(expenseAccountError);
+
+    const { id } = await create({ accountId: bankId });
+    await expect(call("PATCH", { accountId: loanId }, id)).rejects.toMatchObject(
+      expenseAccountError
+    );
+    expect(await storedAccountId(id)).toBe(bankId);
+
+    const onLoan = await create({
+      type: "income",
+      categoryId: incomeCategoryId,
+      accountId: loanId,
+    });
+    expect(await storedAccountId(onLoan.id)).toBe(loanId);
+    await expect(
+      call("PATCH", { type: "expense", categoryId }, onLoan.id)
+    ).rejects.toMatchObject(expenseAccountError);
+    await call("PATCH", { type: "expense", categoryId, accountId: cardId }, onLoan.id);
+    expect(await storedAccountId(onLoan.id)).toBe(cardId);
+  });
+
+  it("lets a saved expense keep a loan account while it is edited", async () => {
+    const id = crypto.randomUUID();
+    await createTestDb(getIntegrationEnv().DB).insert(transactions).values({
+      id,
+      householdId,
+      userId: ownerId,
+      amount: 4000,
+      currency: "CAD",
+      categoryId,
+      category: "Dining",
+      type: "expense",
+      date: "2026-09-01",
+      accountId: loanId,
+    });
+
+    const response = await call(
+      "PATCH",
+      { amount: 45, type: "expense", categoryId, accountId: loanId },
+      id
+    );
+    expect(response.status).toBe(200);
+    expect(await storedAccountId(id)).toBe(loanId);
+  });
+
+  it("rejects imported expense rows on a loan account", async () => {
+    const row = { date: "2026-09-01", category: "Dining", amount: 12, accountId: loanId };
+    await expect(
+      call("POST", { rows: [{ ...row, type: "expense" }] }, undefined, "", "import")
+    ).rejects.toMatchObject(expenseAccountError);
+
+    const response = await call(
+      "POST",
+      { rows: [{ ...row, type: "income", category: "Refunds" }] },
+      undefined,
+      "",
+      "import"
+    );
+    expect(await response.json()).toMatchObject({ inserted: 1 });
   });
 });

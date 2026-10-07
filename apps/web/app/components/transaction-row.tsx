@@ -146,6 +146,7 @@ export function TransactionRow({
           onSubmit={onSaveEdit}
           recordId={transaction.id}
           accountLabel={account?.name}
+          keptExpenseAccountId={transaction.type === "expense" ? transaction.accountId : null}
         />
       </li>
     );

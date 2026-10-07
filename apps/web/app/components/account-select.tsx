@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { CurrencyCode } from "@amigo/db";
 import { Button } from "@/app/components/ui/button";
 import { NativeSelect } from "@/app/components/financial/form-controls";
-import { groupAccountsForSelect } from "@/app/lib/account-select-groups";
+import { groupAccountsForSelect, type AccountSelectGroupKey } from "@/app/lib/account-select-groups";
 import { useT } from "@/app/i18n";
 
 interface Account {
@@ -18,6 +18,10 @@ interface AccountSelectProps {
   homeCurrency: CurrencyCode;
   /** Name for a `value` missing from the live list (archived); generic when absent. */
   fallbackLabel?: string;
+  /** Offer only these groups; another chosen account is cleared once the list loads. */
+  groups?: readonly AccountSelectGroupKey[];
+  /** A saved link that stays listed outside `groups`. */
+  keepId?: string | null;
   id?: string;
   "aria-label"?: string;
 }
@@ -27,6 +31,8 @@ export function AccountSelect({
   onChange,
   homeCurrency,
   fallbackLabel,
+  groups: allowedGroups,
+  keepId,
   id,
   "aria-label": ariaLabel,
 }: AccountSelectProps) {
@@ -54,7 +60,14 @@ export function AccountSelect({
     };
   }, [attempt]);
 
-  const groups = groupAccountsForSelect(accounts ?? []);
+  const groups = groupAccountsForSelect(accounts ?? [], allowedGroups, keepId);
+  const valueLeftOut =
+    value !== null &&
+    Boolean(accounts?.some((a) => a.id === value)) &&
+    !groups.some((group) => group.accounts.some((a) => a.id === value));
+  useEffect(() => {
+    if (valueLeftOut) onChange(null);
+  }, [valueLeftOut, onChange]);
   const optionLabel = (a: Account) =>
     a.currency !== homeCurrency ? `${a.name} · ${a.currency}` : a.name;
   // Until the list arrives, a chosen account is kept selectable rather than shown blank.

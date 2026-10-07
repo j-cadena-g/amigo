@@ -47,6 +47,7 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import {
+  assertKeptAccountHoldsExpenses,
   refsChangedFromExisting,
   validateFinancialRefs,
   validateImportBudgetAndAccountIds,
@@ -1102,10 +1103,13 @@ export const handleTransactionsRequest: ApiHandler = async ({
       validated.categoryId,
       validated.type
     );
-    await validateFinancialRefs(db, session!.householdId, session!.userId, {
-      budgetId: validated.budgetId,
-      accountId: validated.accountId,
-    });
+    await validateFinancialRefs(
+      db,
+      session!.householdId,
+      session!.userId,
+      { budgetId: validated.budgetId, accountId: validated.accountId },
+      validated.type
+    );
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = validated.currency ?? homeCurrency;
     const charge =
@@ -1189,12 +1193,24 @@ export const handleTransactionsRequest: ApiHandler = async ({
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
 
+    const nextType = validated.type ?? existing.type;
+    const changedRefs = refsChangedFromExisting(validated, existing);
     await validateFinancialRefs(
       db,
       session!.householdId,
       session!.userId,
-      refsChangedFromExisting(validated, existing)
+      changedRefs,
+      nextType
     );
+    // An expense left untouched on a loan or asset account keeps it; a new expense cannot.
+    if (
+      nextType === "expense" &&
+      existing.type !== "expense" &&
+      changedRefs.accountId === undefined &&
+      existing.accountId
+    ) {
+      await assertKeptAccountHoldsExpenses(db, session!.householdId, existing.accountId);
+    }
     const updateData: Record<string, unknown> = {};
 
     if (validated.reminderTimes !== undefined) {
@@ -1212,7 +1228,6 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.description = validated.description?.trim() || null;
     }
     if (validated.categoryId !== undefined) {
-      const nextType = validated.type ?? existing.type;
       const categoryUnchanged =
         validated.categoryId === existing.categoryId && nextType === existing.type;
       if (categoryUnchanged) {

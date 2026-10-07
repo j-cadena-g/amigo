@@ -13,6 +13,7 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { AmountInput } from "@/app/components/amount-input";
 import { AccountSelect } from "@/app/components/account-select";
+import { EXPENSE_ACCOUNT_GROUPS } from "@/app/lib/account-select-groups";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
@@ -95,6 +96,8 @@ interface TransactionFieldsProps {
   onBudgetChange: (budgetId: string | null) => void;
   /** Name for a linked account that is no longer in the live list (archived). */
   accountLabel?: string;
+  /** A saved expense's account, kept even when expenses can no longer use its type. */
+  keptExpenseAccountId?: string | null;
   amountRef?: Ref<HTMLInputElement>;
 }
 
@@ -108,6 +111,7 @@ function TransactionFields({
   onCategoryChange,
   onBudgetChange,
   accountLabel,
+  keptExpenseAccountId,
   amountRef,
 }: TransactionFieldsProps) {
   const t = useT();
@@ -290,6 +294,8 @@ function TransactionFields({
             onChange={(accountId) => onChange((prev) => ({ ...prev, accountId }))}
             homeCurrency={homeCurrency}
             fallbackLabel={accountLabel}
+            groups={form.type === "expense" ? EXPENSE_ACCOUNT_GROUPS : undefined}
+            keepId={keptExpenseAccountId}
           />
         </div>
       </div>
@@ -516,6 +522,7 @@ interface EditTransactionFormProps {
   onSubmit: (e: FormEvent) => void;
   recordId?: string;
   accountLabel?: string;
+  keptExpenseAccountId?: string | null;
 }
 
 export function EditTransactionForm({
@@ -530,6 +537,7 @@ export function EditTransactionForm({
   onSubmit,
   recordId,
   accountLabel,
+  keptExpenseAccountId,
 }: EditTransactionFormProps) {
   const t = useT();
   return (
@@ -544,6 +552,7 @@ export function EditTransactionForm({
         onCategoryChange={(categoryId) => onChange((prev) => ({ ...prev, categoryId }))}
         onBudgetChange={(budgetId) => onChange((prev) => ({ ...prev, budgetId }))}
         accountLabel={accountLabel}
+        keptExpenseAccountId={keptExpenseAccountId}
       />
 
       {recordId ? (

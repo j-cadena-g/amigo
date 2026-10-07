@@ -10,7 +10,11 @@ import {
   visibleBudgetsCondition,
   type DrizzleD1,
 } from "@amigo/db";
+import { canHoldExpenses } from "@/app/lib/financial-account-types";
 import { ActionError } from "./errors";
+
+export const EXPENSE_ACCOUNT_ERROR =
+  "Expenses can only use a cash, bank, or credit card account";
 
 /** Only newly chosen refs need validation; keep an existing (possibly deleted) link. */
 export function refsChangedFromExisting(
@@ -51,7 +55,8 @@ export async function validateFinancialRefs(
   refs: {
     budgetId?: string | null;
     accountId?: string | null;
-  }
+  },
+  transactionType?: "income" | "expense"
 ): Promise<void> {
   const budgetId = refs.budgetId || null;
   const accountId = refs.accountId || null;
@@ -88,6 +93,31 @@ export async function validateFinancialRefs(
         "VALIDATION_ERROR"
       );
     }
+    if (transactionType === "expense" && !canHoldExpenses(account.type)) {
+      throw new ActionError(EXPENSE_ACCOUNT_ERROR, "VALIDATION_ERROR");
+    }
+  }
+}
+
+/**
+ * Turning a transaction into an expense must not leave it on a loan or asset account.
+ * A deleted account is a kept link, like in `refsChangedFromExisting`.
+ */
+export async function assertKeptAccountHoldsExpenses(
+  db: DrizzleD1,
+  householdId: string,
+  accountId: string
+): Promise<void> {
+  const account = await db.query.financialAccounts.findFirst({
+    where: and(
+      eq(financialAccounts.id, accountId),
+      scopeToHousehold(financialAccounts.householdId, householdId),
+      isNull(financialAccounts.deletedAt)
+    ),
+    columns: { type: true },
+  });
+  if (account && !canHoldExpenses(account.type)) {
+    throw new ActionError(EXPENSE_ACCOUNT_ERROR, "VALIDATION_ERROR");
   }
 }
 
@@ -95,7 +125,7 @@ export async function validateImportBudgetAndAccountIds(
   db: DrizzleD1,
   householdId: string,
   viewerUserId: string,
-  rows: { budgetId?: string | null; accountId?: string | null }[]
+  rows: { budgetId?: string | null; accountId?: string | null; type?: string }[]
 ): Promise<void> {
   const budgetIds = [
     ...new Set(rows.map((r) => r.budgetId).filter((id): id is string => Boolean(id))),
@@ -128,7 +158,7 @@ export async function validateImportBudgetAndAccountIds(
 
   if (accountIds.length > 0) {
     const found = await db
-      .select({ id: financialAccounts.id })
+      .select({ id: financialAccounts.id, type: financialAccounts.type })
       .from(financialAccounts)
       .where(
         and(
@@ -145,6 +175,16 @@ export async function validateImportBudgetAndAccountIds(
         `Unknown or inaccessible account(s): ${missing.join(", ")}`,
         "VALIDATION_ERROR"
       );
+    }
+    const typeById = new Map(found.map((r) => [r.id, r.type]));
+    const misplacedExpense = rows.some(
+      (r) =>
+        r.type === "expense" &&
+        r.accountId &&
+        !canHoldExpenses(typeById.get(r.accountId)!)
+    );
+    if (misplacedExpense) {
+      throw new ActionError(EXPENSE_ACCOUNT_ERROR, "VALIDATION_ERROR");
     }
   }
 }

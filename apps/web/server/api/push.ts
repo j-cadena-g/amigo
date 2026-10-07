@@ -14,6 +14,7 @@ import {
 } from "@amigo/db";
 import { z } from "zod";
 import { ActionError, jsonError } from "../lib/errors";
+import { ownsRecurringReminderRule } from "../lib/recurring-reminders";
 import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import type { ApiHandler } from "./route";
 
@@ -256,7 +257,7 @@ export async function cleanupStalePushSubscriptions(
     .where(and(
       isNull(users.deletedAt),
       or(
-        eq(users.recurringNotifications, true),
+        and(eq(users.recurringNotifications, true), ownsRecurringReminderRule()),
         and(
           eq(users.transactionNotifications, true),
           sql`EXISTS (

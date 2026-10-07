@@ -57,6 +57,31 @@ export async function setNotificationCategory(
   return updateNotificationPreferences({ [category]: enabled });
 }
 
+export type ReminderNotificationCategory = "transactionNotifications" | "recurringNotifications";
+
+/**
+ * Call synchronously from the submit handler (before any other await) so the permission prompt
+ * stays inside the user's gesture. Never rejects. Turns the account preference on even when this
+ * device cannot subscribe, so the member's other devices still get the reminder.
+ * Resolves to null on success, otherwise the first failure's code (preference failure wins).
+ */
+export function enableReminderNotifications(
+  category: ReminderNotificationCategory
+): Promise<PushErrorCode | null> {
+  // Start subscribe first: its synchronous part reaches Notification.requestPermission().
+  const device = subscribeToPush().then(
+    () => null,
+    (error: unknown) => pushErrorCode(error)
+  );
+  const preference = updateNotificationPreferences({ [category]: true }).then(
+    () => null,
+    (error: unknown) => pushErrorCode(error)
+  );
+  return Promise.all([preference, device]).then(
+    ([preferenceError, deviceError]) => preferenceError ?? deviceError
+  );
+}
+
 export type NotificationPermissionStatus =
   | "granted"
   | "denied"

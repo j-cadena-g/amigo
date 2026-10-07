@@ -406,7 +406,6 @@ interface AddTransactionFormProps {
   form: TransactionFormState;
   homeCurrency: CurrencyCode;
   timeZone: string;
-  existingReminderTimes?: string[];
   isSubmitting: boolean;
   formError: string | null;
   allowBudgetSuggest: boolean;
@@ -424,7 +423,6 @@ export function AddTransactionForm({
   form,
   homeCurrency,
   timeZone,
-  existingReminderTimes = [],
   isSubmitting,
   formError,
   allowBudgetSuggest,
@@ -469,7 +467,6 @@ export function AddTransactionForm({
         form={form}
         homeCurrency={homeCurrency}
         timeZone={timeZone}
-        existingReminderTimes={existingReminderTimes}
         lastExpenseBudgetIdRef={lastExpenseBudgetIdRef}
         onChange={onChange}
         onCategoryChange={(categoryId) => {

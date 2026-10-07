@@ -22,9 +22,10 @@ import { formatLedgerDate } from "@/app/lib/format-dates";
 import { centsToInputString, isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
 import type { CurrencyCode } from "@amigo/db";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
+import { useToast } from "@/app/components/toast-provider";
 import { useLocale } from "@/app/lib/use-locale";
 import { useT } from "@/app/i18n";
-import { PushError, pushErrorCode, setNotificationCategory } from "@/app/lib/push/client";
+import { enableReminderNotifications } from "@/app/lib/push/client";
 import {
   hasNewRecurringReminderSchedules,
   MAX_RECURRING_REMINDERS,
@@ -575,6 +576,7 @@ export function AddRecurringDialog({
   timeZone,
 }: AddRecurringDialogProps) {
   const t = useT();
+  const toast = useToast();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() => emptyForm(defaultCurrency, timeZone));
   const [submitting, setSubmitting] = useState(false);
@@ -594,9 +596,10 @@ export function AddRecurringDialog({
     setError(null);
     try {
       const body = recurringRequestBody(form, localDateString(timeZone));
-      if (hasNewRecurringReminderSchedules(body.reminderSchedules)) {
-        await setNotificationCategory("recurringNotifications", true);
-      }
+      // Start permission setup directly from the submit gesture, before any other await.
+      const notificationSetup = hasNewRecurringReminderSchedules(body.reminderSchedules)
+        ? enableReminderNotifications("recurringNotifications")
+        : null;
       const res = await fetch("/api/recurring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -611,12 +614,13 @@ export function AddRecurringDialog({
       setForm(emptyForm(defaultCurrency, timeZone));
       onOpenChange(false);
       revalidator.revalidate();
+      void notificationSetup?.then((code) => {
+        if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+      });
     } catch (err) {
       setError(err instanceof RecurringReminderError
         ? t.recurring.reminderErrors[err.code]
-        : err instanceof PushError
-          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
-          : t.common.couldNotConnection(t.recurring.addAction));
+        : t.common.couldNotConnection(t.recurring.addAction));
     } finally {
       setSubmitting(false);
     }
@@ -719,6 +723,7 @@ export function EditRecurringDialog({
   timeZone,
 }: EditRecurringDialogProps) {
   const t = useT();
+  const toast = useToast();
   const locale = useLocale();
   const revalidator = useRevalidator();
   const [form, setForm] = useState<RecurringFormData>(() =>
@@ -748,9 +753,10 @@ export function EditRecurringDialog({
     setError(null);
     try {
       const body = recurringRequestBody(form, localDateString(timeZone));
-      if (hasNewRecurringReminderSchedules(body.reminderSchedules, rule.reminderSchedules ?? [])) {
-        await setNotificationCategory("recurringNotifications", true);
-      }
+      // Start permission setup directly from the submit gesture, before any other await.
+      const notificationSetup = hasNewRecurringReminderSchedules(body.reminderSchedules, rule.reminderSchedules ?? [])
+        ? enableReminderNotifications("recurringNotifications")
+        : null;
       const res = await fetch(`/api/recurring/${rule.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -764,12 +770,13 @@ export function EditRecurringDialog({
       }
       onOpenChange(false);
       revalidator.revalidate();
+      void notificationSetup?.then((code) => {
+        if (code) toast(t.notifications.reminderDeviceFailed(t.notifications.reason[code]), { variant: "error" });
+      });
     } catch (err) {
       setError(err instanceof RecurringReminderError
         ? t.recurring.reminderErrors[err.code]
-        : err instanceof PushError
-          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
-          : t.common.couldNotConnection(t.recurring.saveAction));
+        : t.common.couldNotConnection(t.recurring.saveAction));
     } finally {
       setSubmitting(false);
     }

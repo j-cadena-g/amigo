@@ -164,6 +164,18 @@ export async function claimReminderDelivery(
   return claimed ? { id, leaseUntil } : null;
 }
 
+/** Correlated on `users`: the user owns an enabled rule in their household with reminders. */
+export function ownsRecurringReminderRule() {
+  return sql`EXISTS (
+    SELECT 1 FROM ${recurringTransactions}
+    WHERE ${recurringTransactions.userId} = ${users.id}
+      AND ${recurringTransactions.householdId} = ${users.householdId}
+      AND ${recurringTransactions.active} = 1
+      AND ${recurringTransactions.deletedAt} IS NULL
+      AND json_array_length(${recurringTransactions.reminderSchedules}) > 0
+  )`;
+}
+
 /** Explicit per-rule reminders go only to that rule's current owner and their devices. */
 export async function processRecurringReminders(env: Env, clock: () => Date = () => new Date()) {
   const result = { sent: 0, failed: 0 };
@@ -179,7 +191,13 @@ export async function processRecurringReminders(env: Env, clock: () => Date = ()
     .from(users)
     .innerJoin(households, eq(households.id, users.householdId))
     .innerJoin(pushSubscriptions, eq(pushSubscriptions.userId, users.id))
-    .where(and(eq(users.recurringNotifications, true), isNull(users.deletedAt)));
+    .where(
+      and(
+        eq(users.recurringNotifications, true),
+        isNull(users.deletedAt),
+        ownsRecurringReminderRule()
+      )
+    );
 
   for (const recipient of recipients) {
     const rules = await db

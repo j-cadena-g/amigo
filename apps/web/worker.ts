@@ -129,20 +129,12 @@ export default {
       ]);
       if (transactionResult.status === "rejected") throw transactionResult.reason;
       if (recurringResult.status === "rejected") throw recurringResult.reason;
-      const result = transactionResult.value;
-      const recurring = recurringResult.value;
       console.log(
         JSON.stringify({
-          message: "processRecurringReminders completed",
+          message: "reminders completed",
           cron: event.cron,
-          ...recurring,
-        })
-      );
-      console.log(
-        JSON.stringify({
-          message: "processTransactionReminders completed",
-          cron: event.cron,
-          ...result,
+          transactions: transactionResult.value,
+          recurring: recurringResult.value,
         })
       );
     } else {

@@ -10,6 +10,7 @@ import {
   pushErrorCode,
   setNotificationCategory,
   subscribeToPush,
+  unsubscribeFromPush,
   type NotificationPreferences,
 } from "@/app/lib/push/client";
 import { useT } from "@/app/i18n";
@@ -72,6 +73,19 @@ export function NotificationSettings() {
     } catch (err) {
       setError(t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)]));
       if (getNotificationPermissionStatus() === "denied") setStatus("denied");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function disableDevice() {
+    setToggling(true);
+    setError(null);
+    try {
+      await unsubscribeFromPush();
+      setStatus("unsubscribed");
+    } catch (err) {
+      setError(t.notifications.updateFailed(t.notifications.reason[pushErrorCode(err)]));
     } finally {
       setToggling(false);
     }
@@ -144,6 +158,12 @@ export function NotificationSettings() {
           <p className="text-sm text-muted-foreground">
             {status === "subscribed" ? t.notifications.deviceEnabled : t.notifications.deviceDisabled}
           </p>
+          {status === "subscribed" && (
+            <Button type="button" variant="outline" size="sm" className="mt-3"
+              disabled={toggling} onClick={() => void disableDevice()}>
+              {t.notifications.disableDevice}
+            </Button>
+          )}
           {status === "unsubscribed" && anyEnabled && (
             <Button type="button" variant="outline" size="sm" className="mt-3"
               disabled={toggling} onClick={() => void enableDevice()}>

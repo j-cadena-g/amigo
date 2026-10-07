@@ -118,15 +118,14 @@ For an actual device notification:
    a working Web Push service; notification permission alone is insufficient. The
    embedded preview browser can report "push service not available" during registration.
 3. Add a temporary transaction with a reminder one or two minutes ahead. After that
-   time arrives, run `pnpm run dev:notifications --transactions` in another terminal.
+   time arrives, run `pnpm run dev:notifications` in another terminal.
 4. Check the notification and the dev server's `sent` / `failed` counts. Run the command
    again: a successful reminder should not deliver twice. Remove another future reminder
    and run the command after its former time to check cancellation.
 5. Delete the temporary transaction when finished.
 
-`pnpm run dev:notifications` runs both reminder handlers across the local database;
-`--transactions`, `--recurring`, and `--all` are aliases for that shared minute cron.
-To test a recurring reminder without posting a transaction, create a temporary rule
+`pnpm run dev:notifications` runs the shared minute cron, which handles both transaction
+and recurring reminders across the local database. To test a recurring reminder without posting a transaction, create a temporary rule
 starting tomorrow and select one day before at a time a few minutes ahead. Remove the
 rule afterward. Setting a future cron event timestamp does not advance the scheduler's
 clock; the automated suite covers future occurrences without waiting.

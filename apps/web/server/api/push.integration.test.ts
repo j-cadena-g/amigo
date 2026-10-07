@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { eq, inArray, pushSubscriptions, transactions, users } from "@amigo/db";
+import { eq, inArray, pushSubscriptions, recurringTransactions, transactions, users } from "@amigo/db";
 import { createTestDb, seedExpenseTransaction, seedHouseholdWithOwner, testSession } from "../test/fixtures";
 import { getIntegrationEnv } from "../test/integration-env";
 import { cleanupStalePushSubscriptions, handlePushRequest } from "./push";
@@ -176,12 +176,20 @@ describe("push notifications", () => {
   it("retains dormant recurring devices while removing other stale subscriptions", async () => {
     const db = createTestDb(getIntegrationEnv().DB);
     const recurringUserId = crypto.randomUUID();
+    const noRulesUserId = crypto.randomUUID();
     const deletedUserId = crypto.randomUUID();
     await db.insert(users).values([
       {
         id: recurringUserId,
         authId: `clerk_recurring_${recurringUserId}`,
         email: "recurring@example.com",
+        householdId,
+        recurringNotifications: true,
+      },
+      {
+        id: noRulesUserId,
+        authId: `clerk_no_rules_${noRulesUserId}`,
+        email: "no-rules@example.com",
         householdId,
         recurringNotifications: true,
       },
@@ -194,13 +202,32 @@ describe("push notifications", () => {
         deletedAt: new Date(),
       },
     ]);
+    // Only owning an enabled rule with reminders keeps a dormant device.
+    await db.insert(recurringTransactions).values([
+      { userId: recurringUserId, reminderSchedules: [{ dayOffset: 0, time: "09:00" }] },
+      { userId: noRulesUserId, reminderSchedules: [] },
+      { userId: deletedUserId, reminderSchedules: [{ dayOffset: 0, time: "09:00" }] },
+    ].map((rule) => ({
+      ...rule,
+      id: crypto.randomUUID(),
+      householdId,
+      amount: 10000,
+      category: "Utilities",
+      type: "expense" as const,
+      frequency: "MONTHLY" as const,
+      interval: 1,
+      startDate: "2026-01-01",
+      nextRunDate: "2026-11-01",
+    })));
     const old = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000);
     const recurringId = crypto.randomUUID();
+    const noRulesId = crypto.randomUUID();
     const groceryId = crypto.randomUUID();
     const deletedId = crypto.randomUUID();
     const freshId = crypto.randomUUID();
     for (const [id, userId, updatedAt] of [
       [recurringId, recurringUserId, old],
+      [noRulesId, noRulesUserId, old],
       [groceryId, ownerId, old],
       [deletedId, deletedUserId, old],
       [freshId, ownerId, new Date()],
@@ -215,10 +242,10 @@ describe("push notifications", () => {
     }
 
     const result = await cleanupStalePushSubscriptions(getIntegrationEnv());
-    expect(result.deletedCount).toBe(2);
+    expect(result.deletedCount).toBe(3);
     const remaining = await db.query.pushSubscriptions.findMany({
       columns: { id: true },
-      where: inArray(pushSubscriptions.id, [recurringId, groceryId, deletedId, freshId]),
+      where: inArray(pushSubscriptions.id, [recurringId, noRulesId, groceryId, deletedId, freshId]),
     });
     expect(remaining.map((subscription) => subscription.id).sort()).toEqual(
       [recurringId, freshId].sort()

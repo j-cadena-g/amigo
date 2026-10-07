@@ -4,6 +4,7 @@ import {
   hasPushRegistration,
   isSubscribed,
   pushSubscriptionKeysMissing,
+  enableReminderNotifications,
   setNotificationCategory,
   subscribeToPush,
   unsubscribeFromPush,
@@ -37,6 +38,24 @@ function stubPushEnvironment({
       ready,
     },
   });
+}
+
+function existingSubscription() {
+  const subscription = {
+    endpoint: "https://updates.push.services.mozilla.com/wpush/v2/test",
+    getKey: vi.fn(() => new ArrayBuffer(8)),
+    unsubscribe: vi.fn().mockResolvedValue(true),
+  };
+  stubPushEnvironment({
+    registration: {
+      active: {} as ServiceWorker,
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(subscription),
+        subscribe: vi.fn(),
+      } as unknown as PushManager,
+    },
+  });
+  return subscription;
 }
 
 describe("push registration availability", () => {
@@ -125,24 +144,6 @@ describe("notification categories", () => {
     vi.restoreAllMocks();
   });
 
-  function existingSubscription() {
-    const subscription = {
-      endpoint: "https://updates.push.services.mozilla.com/wpush/v2/test",
-      getKey: vi.fn(() => new ArrayBuffer(8)),
-      unsubscribe: vi.fn().mockResolvedValue(true),
-    };
-    stubPushEnvironment({
-      registration: {
-        active: {} as ServiceWorker,
-        pushManager: {
-          getSubscription: vi.fn().mockResolvedValue(subscription),
-          subscribe: vi.fn(),
-        } as unknown as PushManager,
-      },
-    });
-    return subscription;
-  }
-
   it("loads account-wide category choices", async () => {
     const preferences = { groceryNotifications: false, recurringNotifications: true, transactionNotifications: true };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(preferences));
@@ -225,6 +226,80 @@ describe("notification categories", () => {
 
     await expect(getNotificationPreferences()).rejects.toMatchObject({ code: "failed" });
     await expect(updateNotificationPreferences({ recurringNotifications: true, transactionNotifications: true })).rejects.toMatchObject({ code: "failed" });
+  });
+});
+
+describe("enableReminderNotifications", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function savedPreferences(category: "recurringNotifications" | "transactionNotifications") {
+    return {
+      groceryNotifications: false,
+      recurringNotifications: category === "recurringNotifications",
+      transactionNotifications: category === "transactionNotifications",
+    };
+  }
+
+  it.each(["recurringNotifications", "transactionNotifications"] as const)(
+    "returns null when device setup and the %s preference both succeed",
+    async (category) => {
+      existingSubscription();
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
+        if (url === "/api/push") return Response.json({ success: true });
+        return Response.json(savedPreferences(category));
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(enableReminderNotifications(category)).resolves.toBeNull();
+      expect(fetchMock).toHaveBeenCalledWith("/api/push/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [category]: true }),
+      });
+    }
+  );
+
+  it("returns denied when permission is denied and still saves the preference", async () => {
+    stubPushEnvironment({ registration: undefined });
+    vi.stubGlobal("Notification", {
+      permission: "default" as NotificationPermission,
+      requestPermission: vi.fn().mockResolvedValue("denied"),
+    });
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(savedPreferences("transactionNotifications")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(enableReminderNotifications("transactionNotifications")).resolves.toBe("denied");
+    expect(fetchMock).toHaveBeenCalledWith("/api/push/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactionNotifications: true }),
+    });
+  });
+
+  it("returns failed when the preference save fails and device setup succeeds", async () => {
+    existingSubscription();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
+      if (url === "/api/push/preferences") return new Response(null, { status: 500 });
+      return Response.json({ success: true });
+    }));
+
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBe("failed");
+  });
+
+  it("never rejects when device setup and the preference save both fail", async () => {
+    stubPushEnvironment({ registration: undefined });
+    vi.stubGlobal("Notification", {
+      permission: "default" as NotificationPermission,
+      requestPermission: vi.fn().mockResolvedValue("denied"),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(enableReminderNotifications("recurringNotifications")).resolves.toBe("failed");
   });
 });
 

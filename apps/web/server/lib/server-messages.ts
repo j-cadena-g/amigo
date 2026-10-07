@@ -95,6 +95,8 @@ const ES: Record<string, string> = {
   "Duplicate category mappings": "Hay vínculos de categoría repetidos",
   "End date must be on or after the first occurrence date":
     "La fecha de fin debe ser igual o posterior a la primera fecha",
+  "Expenses can only use a cash, bank, or credit card account":
+    "Los gastos solo pueden ir en una cuenta de efectivo, banco o tarjeta de crédito",
   "Explicit admin takeover is required to share another user's personal financial object":
     "Para compartir un registro personal de otra persona, un administrador debe tomarlo explícitamente",
   "Failed to clear household metadata from Clerk user":

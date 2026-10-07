@@ -47,6 +47,7 @@ import { enforceRateLimit, ROUTE_RATE_LIMITS } from "../middleware/rate-limit";
 import { getSplatSegments, type ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import {
+  assertKeptAccountHoldsExpenses,
   refsChangedFromExisting,
   validateFinancialRefs,
   validateImportBudgetAndAccountIds,
@@ -1102,10 +1103,13 @@ export const handleTransactionsRequest: ApiHandler = async ({
       validated.categoryId,
       validated.type
     );
-    await validateFinancialRefs(db, session!.householdId, session!.userId, {
-      budgetId: validated.budgetId,
-      accountId: validated.accountId,
-    });
+    await validateFinancialRefs(
+      db,
+      session!.householdId,
+      session!.userId,
+      { budgetId: validated.budgetId, accountId: validated.accountId },
+      validated.type
+    );
     const homeCurrency = await getHomeCurrency(db, session!.householdId);
     const currency = validated.currency ?? homeCurrency;
     const charge =
@@ -1189,12 +1193,23 @@ export const handleTransactionsRequest: ApiHandler = async ({
       throw new ActionError("Transaction not found", "NOT_FOUND");
     }
 
+    const nextType = validated.type ?? existing.type;
+    const changedRefs = refsChangedFromExisting(validated, existing);
     await validateFinancialRefs(
       db,
       session!.householdId,
       session!.userId,
-      refsChangedFromExisting(validated, existing)
+      changedRefs,
+      nextType
     );
+    // An expense left untouched on a loan or asset account keeps it; a new expense cannot.
+    const keptAccountId =
+      nextType === "expense" && existing.type !== "expense" && changedRefs.accountId === undefined
+        ? existing.accountId
+        : null;
+    if (keptAccountId) {
+      await assertKeptAccountHoldsExpenses(db, session!.householdId, keptAccountId);
+    }
     const updateData: Record<string, unknown> = {};
 
     if (validated.reminderTimes !== undefined) {
@@ -1212,7 +1227,6 @@ export const handleTransactionsRequest: ApiHandler = async ({
       updateData.description = validated.description?.trim() || null;
     }
     if (validated.categoryId !== undefined) {
-      const nextType = validated.type ?? existing.type;
       const categoryUnchanged =
         validated.categoryId === existing.categoryId && nextType === existing.type;
       if (categoryUnchanged) {
@@ -1321,6 +1335,15 @@ export const handleTransactionsRequest: ApiHandler = async ({
             eq(transactions.amount, existing.amount),
           ]
         : [];
+    // The account was checked against the type read above (and the type against
+    // the account); only write if a concurrent edit hasn't changed the other one.
+    const accountGuards = [
+      ...(changedRefs.accountId && validated.type === undefined
+        ? [eq(transactions.type, existing.type)]
+        : []),
+      ...(keptAccountId ? [eq(transactions.accountId, keptAccountId)] : []),
+    ];
+    const writeGuards = [...chargeGuards, ...accountGuards];
 
     const updated = await withAudit(
       db,
@@ -1342,7 +1365,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
               isNull(transactions.deletedAt),
-              ...chargeGuards
+              ...writeGuards
             )
           )
           .returning()
@@ -1350,7 +1373,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     if (!updated) {
-      if (chargeGuards.length > 0) {
+      if (writeGuards.length > 0) {
         const current = await db.query.transactions.findFirst({
           where: and(
             eq(transactions.id, id),

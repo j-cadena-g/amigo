@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupAccountsForSelect } from "./account-select-groups";
+import { EXPENSE_ACCOUNT_GROUPS, groupAccountsForSelect } from "./account-select-groups";
 
 const account = (id: string, type: string) => ({ id, type });
 
@@ -30,5 +30,32 @@ describe("groupAccountsForSelect", () => {
       "creditCards",
     ]);
     expect(groupAccountsForSelect([])).toEqual([]);
+  });
+
+  it("limits expense accounts to cash and bank and credit cards", () => {
+    const accounts = [
+      account("loan", "LOAN"),
+      account("card", "CREDIT"),
+      account("inv", "INVESTMENT"),
+      account("check", "CHECKING"),
+    ];
+    expect(
+      groupAccountsForSelect(accounts, EXPENSE_ACCOUNT_GROUPS).map((g) => [g.key, g.accounts.map((a) => a.id)])
+    ).toEqual([
+      ["cashAndBank", ["check"]],
+      ["creditCards", ["card"]],
+    ]);
+  });
+
+  it("keeps an already linked account outside the allowed groups", () => {
+    const groups = groupAccountsForSelect(
+      [account("loan", "LOAN"), account("other-loan", "LOAN"), account("check", "CHECKING")],
+      EXPENSE_ACCOUNT_GROUPS,
+      "loan"
+    );
+    expect(groups.map((g) => [g.key, g.accounts.map((a) => a.id)])).toEqual([
+      ["cashAndBank", ["check"]],
+      ["loans", ["loan"]],
+    ]);
   });
 });

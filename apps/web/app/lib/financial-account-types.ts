@@ -41,3 +41,8 @@ export const CASH_AND_BANK_ACCOUNT_TYPES = [
 export function isCashAndBankType(type: string): boolean {
   return (CASH_AND_BANK_ACCOUNT_TYPES as readonly string[]).includes(type);
 }
+
+/** Expenses are paid from cash or a bank account, or charged to a credit card. */
+export function canHoldExpenses(type: string): boolean {
+  return isCashAndBankType(type) || type === "CREDIT";
+}

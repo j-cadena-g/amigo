@@ -175,6 +175,25 @@ describe("OFX imports", () => {
       .where(where);
     await expect(call()).rejects.toThrow("inaccessible");
   });
+  it("rejects expenses into a loan account and accepts its payments", async () => {
+    await createTestDb(getIntegrationEnv().DB)
+      .update(financialAccounts)
+      .set({ type: "LOAN" })
+      .where(
+        and(
+          scopeToHousehold(financialAccounts.householdId, householdId),
+          eq(financialAccounts.id, accountId)
+        )
+      );
+    await expect(call()).rejects.toThrow("Expenses can only use");
+    await expect(call({ dryRun: false })).rejects.toThrow("Expenses can only use");
+    expect(await stored()).toHaveLength(0);
+
+    const payment = statement(transaction("payment-1", "250.00"));
+    expect(await (await call({ ofx: payment, dryRun: false })).json()).toMatchObject({
+      inserted: 1,
+    });
+  });
   it("imports the 2,000-row limit in D1-safe batches", async () => {
     const ofx = statement(
       Array.from({ length: 2000 }, (_, i) => transaction(`large-${i}`)).join("")

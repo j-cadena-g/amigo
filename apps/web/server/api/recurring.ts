@@ -76,6 +76,19 @@ export const updateRuleSchema = z.object({
   reminderSchedules: reminderSchedulesSchema,
 });
 
+/**
+ * Monthly rules are anchored to a day so a short month doesn't move later runs
+ * (Jan 31 → Feb 28 → Mar 31, not Mar 28). Without one, use the start date's day.
+ */
+function anchorDayOfMonth(
+  frequency: string,
+  dayOfMonth: number | null | undefined,
+  startDate: Date
+): number | null {
+  if (frequency !== "MONTHLY" || dayOfMonth != null) return dayOfMonth ?? null;
+  return startDate.getUTCDate();
+}
+
 export const handleRecurringRequest: ApiHandler = async ({
   env,
   params,
@@ -123,12 +136,17 @@ export const handleRecurringRequest: ApiHandler = async ({
       budgetId: validated.budgetId,
     });
     const interval = validated.interval ?? 1;
+    const dayOfMonth = anchorDayOfMonth(
+      validated.frequency,
+      validated.dayOfMonth,
+      validated.startDate
+    );
     const timeZone = await getHouseholdTimezone(db, session!.householdId);
     const nextRunDate = getInitialNextRunDate(
       validated.startDate,
       validated.frequency,
       interval,
-      validated.dayOfMonth,
+      dayOfMonth,
       validated.endDate,
       timeZone
     );
@@ -168,7 +186,7 @@ export const handleRecurringRequest: ApiHandler = async ({
             type: validated.type,
             frequency: validated.frequency,
             interval,
-            dayOfMonth: validated.dayOfMonth ?? null,
+            dayOfMonth,
             startDate: toISODate(validated.startDate),
             endDate: validated.endDate ? toISODate(validated.endDate) : null,
             nextRunDate: toISODate(nextRunDate),
@@ -261,7 +279,6 @@ export const handleRecurringRequest: ApiHandler = async ({
     }
     if (validated.frequency !== undefined) updateData.frequency = validated.frequency;
     if (validated.interval !== undefined) updateData.interval = validated.interval;
-    if (validated.dayOfMonth !== undefined) updateData.dayOfMonth = validated.dayOfMonth;
     if (validated.endDate !== undefined) updateData.endDate = validated.endDate ? toISODate(validated.endDate) : null;
     if (validated.budgetId !== undefined) updateData.budgetId = validated.budgetId || null;
     if (validated.currency !== undefined) updateData.currency = validated.currency;
@@ -276,10 +293,12 @@ export const handleRecurringRequest: ApiHandler = async ({
       const startDate = validated.startDate ?? new Date(existing.startDate);
       const frequency = validated.frequency ?? existing.frequency;
       const interval = validated.interval ?? existing.interval;
-      const dayOfMonth =
-        validated.dayOfMonth !== undefined
-          ? validated.dayOfMonth
-          : existing.dayOfMonth;
+      const dayOfMonth = anchorDayOfMonth(
+        frequency,
+        validated.dayOfMonth !== undefined ? validated.dayOfMonth : existing.dayOfMonth,
+        startDate
+      );
+      if (dayOfMonth !== existing.dayOfMonth) updateData.dayOfMonth = dayOfMonth;
       const endDate =
         validated.endDate !== undefined
           ? validated.endDate

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { handleRecurringRequest } from "./recurring";
 import { handleTransactionsRequest } from "./transactions";
 import { buildRecurringOccurrenceTransactionId } from "../lib/recurring-processor";
+import { calculateNextRunDate } from "../../app/lib/recurring-dates";
 import {
   createTestDb,
   seedFinancialCategory,
@@ -264,5 +265,102 @@ describe("recurring and occurrence amount edits", () => {
       where: eq(recurringTransactions.id, ruleId),
     });
     expect(stored?.endDate).toBeNull();
+  });
+
+  describe("monthly day anchoring", () => {
+    function send(method: "POST" | "PATCH", path: string, body: unknown) {
+      return handleRecurringRequest({
+        env: getIntegrationEnv(),
+        params: { "*": path },
+        request: new Request(`http://localhost/api/recurring/${path}`, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        session: testSession({ userId: ownerId, householdId }),
+        sessionStatus: "authenticated",
+        loadContext: {} as never,
+      });
+    }
+
+    async function insertRule(values: { frequency: "WEEKLY" | "MONTHLY"; dayOfMonth: number | null }) {
+      const id = crypto.randomUUID();
+      await getDb(getIntegrationEnv().DB).insert(recurringTransactions).values({
+        id,
+        householdId,
+        userId: ownerId,
+        amount: 150000,
+        currency: "CAD",
+        categoryId,
+        category: "Rent",
+        type: "expense",
+        interval: 1,
+        startDate: "2099-01-31",
+        nextRunDate: "2099-01-31",
+        ...values,
+      });
+      return id;
+    }
+
+    async function storedDay(id: string) {
+      const rule = await getDb(getIntegrationEnv().DB).query.recurringTransactions.findFirst({
+        where: eq(recurringTransactions.id, id),
+      });
+      return rule?.dayOfMonth;
+    }
+
+    it("anchors a new monthly rule without a day to its start date's day", async () => {
+      const response = await send("POST", "", {
+        type: "expense",
+        amount: 1500,
+        categoryId,
+        frequency: "MONTHLY",
+        startDate: "2099-01-31",
+      });
+
+      expect(response.status).toBe(201);
+      const rule = (await response.json()) as { id: string; dayOfMonth: number | null };
+      expect(rule.dayOfMonth).toBe(31);
+      expect(await storedDay(rule.id)).toBe(31);
+
+      // A short month clips the run without moving the ones after it.
+      const feb = calculateNextRunDate("MONTHLY", 1, new Date("2099-01-31"), rule.dayOfMonth);
+      const mar = calculateNextRunDate("MONTHLY", 1, feb, rule.dayOfMonth);
+      expect([feb, mar].map((d) => d.toISOString().slice(0, 10))).toEqual([
+        "2099-02-28",
+        "2099-03-31",
+      ]);
+    });
+
+    it("leaves non-monthly rules without a day", async () => {
+      const response = await send("POST", "", {
+        type: "expense",
+        amount: 1500,
+        categoryId,
+        frequency: "WEEKLY",
+        startDate: "2099-01-31",
+      });
+
+      const rule = (await response.json()) as { id: string };
+      expect(await storedDay(rule.id)).toBeNull();
+    });
+
+    it("anchors a rule switched to monthly without a day", async () => {
+      const id = await insertRule({ frequency: "WEEKLY", dayOfMonth: null });
+
+      const response = await send("PATCH", id, { frequency: "MONTHLY" });
+
+      expect(response.status).toBe(200);
+      expect(await storedDay(id)).toBe(31);
+    });
+
+    it("anchors a monthly rule whose day is cleared", async () => {
+      const id = await insertRule({ frequency: "MONTHLY", dayOfMonth: 31 });
+
+      const response = await send("PATCH", id, { dayOfMonth: null });
+
+      expect(response.status).toBe(200);
+      expect(await storedDay(id)).toBe(31);
+    });
   });
 });

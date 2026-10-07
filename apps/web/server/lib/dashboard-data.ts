@@ -35,6 +35,7 @@ import { getBudgetsWithSpending } from "./budget-spending";
 import { monthBoundsInTz, todayInTz, startOfIsoDayInTz, endOfIsoDayInTz, toISODateInTz } from "./dates";
 import { getHouseholdTimezone } from "./household-timezone";
 import { getRecurringOccurrences } from "../api/calendar";
+import { recurringPostingWithinEndDate } from "./recurring-processor";
 import type { Env } from "../env";
 
 export interface BudgetWithSpending {
@@ -214,6 +215,7 @@ export async function loadDashboardData(
         visibleRecurringRulesCondition(session.userId),
         eq(recurringTransactions.active, true),
         isNull(recurringTransactions.deletedAt),
+        recurringPostingWithinEndDate(),
         gte(recurringTransactions.nextRunDate, todayStr)
       ),
       orderBy: [asc(recurringTransactions.nextRunDate)],
@@ -422,6 +424,7 @@ export async function loadDashboardData(
         isNull(recurringTransactions.deletedAt),
         eq(recurringTransactions.type, "expense"),
         inArray(recurringTransactions.budgetId, budgetIdsForImpact),
+        recurringPostingWithinEndDate(),
         gte(recurringTransactions.nextRunDate, monthStart),
         lte(recurringTransactions.nextRunDate, monthEnd)
       ),

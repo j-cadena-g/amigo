@@ -38,7 +38,7 @@ import {
   ReminderTimeError,
   transactionReminderPayload,
 } from "@/app/lib/reminder-times";
-import { PushError, pushErrorCode, setNotificationCategory } from "@/app/lib/push/client";
+import { enableReminderNotifications } from "@/app/lib/push/client";
 
 export type { TransactionDTO };
 
@@ -277,9 +277,9 @@ export function TransactionList({
     try {
       const reminderTimes = transactionReminderPayload(newTransaction.reminderTimes, timeZone);
       // Start permission setup directly from the submit gesture, before any other await.
-      if (hasNewFutureReminders(reminderTimes)) {
-        await setNotificationCategory("transactionNotifications", true);
-      }
+      const notificationSetup = hasNewFutureReminders(reminderTimes)
+        ? enableReminderNotifications("transactionNotifications")
+        : null;
       const res = await fetch("/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -314,6 +314,10 @@ export function TransactionList({
         setShowAddForm(false);
         setFormError(null);
         revalidator.revalidate();
+        void notificationSetup?.then((failure) => {
+          if (!failure) return;
+          toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
+        });
       } else {
         const message = await readApiErrorMessage(res);
         console.error("Failed to add transaction:", res.status, message);
@@ -323,9 +327,7 @@ export function TransactionList({
       console.error("Transaction request failed:", err);
       setFormError(err instanceof ReminderTimeError
         ? t.transactions.reminderErrors[err.code]
-        : err instanceof PushError
-          ? t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(err)])
-          : t.common.couldNotConnection(t.transactions.addAction));
+        : t.common.couldNotConnection(t.transactions.addAction));
     } finally {
       setIsSubmitting(false);
     }
@@ -408,9 +410,10 @@ export function TransactionList({
     setIsSubmitting(true);
     try {
       const reminderTimes = transactionReminderPayload(editForm.reminderTimes, timeZone, editingReminderTimesRef.current);
-      if (hasNewFutureReminders(reminderTimes, editingReminderTimesRef.current)) {
-        await setNotificationCategory("transactionNotifications", true);
-      }
+      // Start permission setup directly from the submit gesture, before any other await.
+      const notificationSetup = hasNewFutureReminders(reminderTimes, editingReminderTimesRef.current)
+        ? enableReminderNotifications("transactionNotifications")
+        : null;
       const res = await fetch(`/api/transactions/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -430,14 +433,16 @@ export function TransactionList({
       if (res.ok) {
         handleCancelEdit();
         revalidator.revalidate();
+        void notificationSetup?.then((failure) => {
+          if (!failure) return;
+          toast(t.notifications.reminderSetupFailed(failure.step, t.notifications.reason[failure.code]), { variant: "error" });
+        });
       } else {
         await toastMutationFailure(toast, res, t.transactions.saveAction, t.common);
       }
     } catch (error) {
       if (error instanceof ReminderTimeError) {
         toast(t.transactions.reminderErrors[error.code], { variant: "error" });
-      } else if (error instanceof PushError) {
-        toast(t.notifications.turnOnFailed(t.notifications.reason[pushErrorCode(error)]), { variant: "error" });
       } else {
         await toastMutationFailure(toast, null, t.transactions.saveAction, t.common);
       }

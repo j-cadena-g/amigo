@@ -1,3 +1,5 @@
+import { calculateNextRunDate, type RecurringFrequency } from "./recurring-dates";
+
 export const MAX_RECURRING_REMINDERS = 4;
 export const MAX_REMINDER_DAY_OFFSET = 36_600;
 const DAY_MS = 86_400_000;
@@ -76,7 +78,7 @@ export function rebaseRecurringReminderDrafts(
 interface Recurrence {
   startDate: string;
   endDate?: string | null;
-  frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+  frequency: RecurringFrequency;
   interval: number;
   dayOfMonth?: number | null;
 }
@@ -99,17 +101,7 @@ export function recurringReminderOccurrenceDate(rule: Recurrence, today: string)
   }
   let current = new Date(start);
   for (let i = 0; current.getTime() < target && i < 120_000; i++) {
-    const next = new Date(current);
-    if (rule.frequency === "MONTHLY") {
-      const day = rule.dayOfMonth ?? current.getUTCDate();
-      next.setUTCDate(1);
-      next.setUTCMonth(next.getUTCMonth() + rule.interval);
-      const monthEnd = new Date(next);
-      monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1, 0);
-      next.setUTCDate(Math.min(day, monthEnd.getUTCDate()));
-    } else {
-      next.setUTCFullYear(next.getUTCFullYear() + rule.interval);
-    }
+    const next = calculateNextRunDate(rule.frequency, rule.interval, current, rule.dayOfMonth);
     // An exhausted series still has a final occurrence for after-date reminders.
     if (end !== null && next.getTime() > end) break;
     current = next;

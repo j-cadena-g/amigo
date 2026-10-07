@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleDashboardRequest } from "./dashboard";
+import { recurringTransactions } from "@amigo/db";
 import {
   createTestDb,
   seedExpenseTransaction,
@@ -67,6 +68,44 @@ describe("dashboard integration", () => {
     expect(Array.isArray(body.recentTransactions)).toBe(true);
     expect(Array.isArray(body.budgetsWithSpending)).toBe(true);
     expect(Array.isArray(body.calendarEvents)).toBe(true);
+  });
+
+  it("leaves finished recurring series out of upcoming payments", async () => {
+    const env = getIntegrationEnv();
+    const db = createTestDb(env.DB);
+    const session = testSession({ userId: ownerId, householdId });
+    const inDays = (days: number) =>
+      new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+    const rule = {
+      householdId,
+      userId: ownerId,
+      amount: 5000,
+      currency: "CAD" as const,
+      category: "Utilities",
+      type: "expense" as const,
+      frequency: "MONTHLY" as const,
+      interval: 1,
+      startDate: "2026-01-01",
+      nextRunDate: inDays(10),
+    };
+    const ongoingId = crypto.randomUUID();
+    // A finished series stays active with nextRunDate past its end date.
+    await db.insert(recurringTransactions).values([
+      { ...rule, id: ongoingId },
+      { ...rule, id: crypto.randomUUID(), endDate: inDays(5) },
+    ]);
+
+    const response = await handleDashboardRequest({
+      env,
+      params: {},
+      request: new Request("http://localhost/api/dashboard"),
+      session,
+      sessionStatus: "authenticated",
+      loadContext: {} as never,
+    });
+
+    const body = (await response.json()) as { upcomingRecurring: { id: string }[] };
+    expect(body.upcomingRecurring.map((r) => r.id)).toEqual([ongoingId]);
   });
 
   it("rejects non-GET methods with 405", async () => {

@@ -11,6 +11,7 @@ import {
   transactions,
 } from "@amigo/db";
 import type { DrizzleD1 } from "@amigo/db";
+import { calculateNextRunDate, type RecurringFrequency } from "@/app/lib/recurring-dates";
 import { toISODate } from "./conversions";
 import { todayInTz } from "./dates";
 import { getExchangeRateForRecord } from "./exchange-rates";
@@ -18,39 +19,8 @@ import { getHomeCurrency } from "./household-currency";
 import { broadcastToHousehold } from "./realtime";
 import type { Env } from "../env";
 
-export type RecurringFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+export { calculateNextRunDate, type RecurringFrequency };
 export type RecurringRule = typeof recurringTransactions.$inferSelect;
-
-export function calculateNextRunDate(
-  frequency: RecurringFrequency,
-  interval: number,
-  fromDate: Date,
-  dayOfMonth?: number | null
-) {
-  const next = new Date(fromDate);
-  switch (frequency) {
-    case "DAILY":
-      next.setUTCDate(next.getUTCDate() + interval);
-      break;
-    case "WEEKLY":
-      next.setUTCDate(next.getUTCDate() + interval * 7);
-      break;
-    case "MONTHLY": {
-      const desiredDay = dayOfMonth ?? next.getUTCDate();
-      next.setUTCDate(1);
-      next.setUTCMonth(next.getUTCMonth() + interval);
-      const lastDay = new Date(
-        Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)
-      ).getUTCDate();
-      next.setUTCDate(Math.min(desiredDay, lastDay));
-      break;
-    }
-    case "YEARLY":
-      next.setUTCFullYear(next.getUTCFullYear() + interval);
-      break;
-  }
-  return next;
-}
 
 export function getInitialNextRunDate(
   startDate: Date,
@@ -163,7 +133,8 @@ export async function advanceRecurringRuleIfCurrent(db: DrizzleD1, rule: Recurri
     .get();
 }
 
-function recurringPostingWithinEndDate() {
+/** The rule's next occurrence is not past its end date (finished series stay `active`). */
+export function recurringPostingWithinEndDate() {
   return or(
     isNull(recurringTransactions.endDate),
     lte(recurringTransactions.nextRunDate, recurringTransactions.endDate)

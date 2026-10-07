@@ -16,6 +16,14 @@ export const notifications = defineMessages({
       reason ? `Couldn't update notifications: ${reason}.` : "Couldn't update notifications. Try again.",
     turnOnFailed: (reason: string | null) =>
       reason ? `Couldn't turn on notifications: ${reason}.` : "Couldn't turn on notifications. Try again.",
+    reminderSetupFailed: (step: "preference" | "device", reason: string | null) => {
+      if (step === "preference") {
+        return "Saved, but reminders couldn't be turned on for your account. Turn them on in Settings.";
+      }
+      return reason
+        ? `Saved. Notifications couldn't be turned on for this device: ${reason}.`
+        : "Saved. Notifications couldn't be turned on for this device. Try again.";
+    },
     alertsFailed: (turningOff: boolean, reason: string | null) => {
       const action = turningOff ? "turn off" : "turn on";
       return reason ? `Couldn't ${action} alerts: ${reason}.` : `Couldn't ${action} alerts. Try again.`;
@@ -35,6 +43,7 @@ export const notifications = defineMessages({
     deviceEnabled: "This device is ready to receive your selected notifications.",
     deviceDisabled: "Notifications are not enabled on this device.",
     enableDevice: "Enable on this device",
+    disableDevice: "Turn off on this device",
     retry: "Try again",
     iosHint:
       "On iPhone and iPad, notifications only work after you add amigo to your Home Screen and open it from there.",
@@ -75,6 +84,14 @@ export const notifications = defineMessages({
       reason
         ? `No se pudieron activar las notificaciones: ${reason}.`
         : "No se pudieron activar las notificaciones. Inténtalo de nuevo.",
+    reminderSetupFailed: (step: "preference" | "device", reason: string | null) => {
+      if (step === "preference") {
+        return "Guardado, pero no se pudieron activar los recordatorios en tu cuenta. Actívalos en Ajustes.";
+      }
+      return reason
+        ? `Guardado. No se pudieron activar las notificaciones en este dispositivo: ${reason}.`
+        : "Guardado. No se pudieron activar las notificaciones en este dispositivo. Inténtalo de nuevo.";
+    },
     alertsFailed: (turningOff: boolean, reason: string | null) => {
       const action = turningOff ? "desactivar" : "activar";
       return reason
@@ -97,6 +114,7 @@ export const notifications = defineMessages({
     deviceEnabled: "Este dispositivo está listo para recibir las notificaciones que elegiste.",
     deviceDisabled: "Las notificaciones no están activadas en este dispositivo.",
     enableDevice: "Activar en este dispositivo",
+    disableDevice: "Desactivar en este dispositivo",
     retry: "Intentar de nuevo",
     iosHint:
       "En iPhone y iPad, las notificaciones solo funcionan después de agregar amigo a tu pantalla de inicio y abrirlo desde ahí.",

@@ -89,10 +89,11 @@ describe("transactions account link", () => {
     body?: unknown,
     id?: string,
     query = "",
-    path = id
+    path = id,
+    env = getIntegrationEnv()
   ) {
     return handleTransactionsRequest({
-      env: getIntegrationEnv(),
+      env,
       params: { "*": path ?? "" },
       request: new Request(`http://localhost/api/transactions${path ? `/${path}` : ""}${query}`, {
         method,
@@ -244,6 +245,75 @@ describe("transactions account link", () => {
     );
     expect(response.status).toBe(200);
     expect(await storedAccountId(id)).toBe(loanId);
+  });
+
+  /** An env whose first write to `transactions` runs `race` just before it. */
+  function racingEnv(race: () => Promise<unknown>) {
+    const env = getIntegrationEnv();
+    let fired = false;
+    const wrap = (stmt: D1PreparedStatement): D1PreparedStatement =>
+      new Proxy(stmt, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop) as unknown;
+          if (typeof value !== "function") return value;
+          if (prop === "bind") {
+            return (...args: unknown[]) => wrap(target.bind(...args));
+          }
+          return async (...args: unknown[]) => {
+            await race();
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        },
+      });
+    const DB = new Proxy(env.DB, {
+      get(target, prop) {
+        if (prop === "prepare") {
+          return (sql: string) => {
+            const stmt = target.prepare(sql);
+            if (fired || !/^update "transactions"/i.test(sql)) return stmt;
+            fired = true;
+            return wrap(stmt);
+          };
+        }
+        const value = Reflect.get(target, prop) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    return { ...env, DB };
+  }
+
+  it("rejects an account edit when a concurrent edit changed the type it was checked for", async () => {
+    const income = await create({ type: "income", categoryId: incomeCategoryId });
+    const env = racingEnv(() =>
+      getDb(getIntegrationEnv().DB)
+        .update(transactions)
+        .set({ type: "expense", categoryId })
+        .where(eq(transactions.id, income.id))
+    );
+
+    await expect(
+      call("PATCH", { accountId: loanId }, income.id, "", income.id, env)
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await storedAccountId(income.id)).toBeNull();
+  });
+
+  it("rejects a type edit when a concurrent edit changed the account it was checked for", async () => {
+    const income = await create({
+      type: "income",
+      categoryId: incomeCategoryId,
+      accountId: bankId,
+    });
+    const env = racingEnv(() =>
+      getDb(getIntegrationEnv().DB)
+        .update(transactions)
+        .set({ accountId: loanId })
+        .where(eq(transactions.id, income.id))
+    );
+
+    await expect(
+      call("PATCH", { type: "expense", categoryId }, income.id, "", income.id, env)
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await storedAccountId(income.id)).toBe(loanId);
   });
 
   it("rejects imported expense rows on a loan account", async () => {

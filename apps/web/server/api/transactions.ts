@@ -1203,13 +1203,12 @@ export const handleTransactionsRequest: ApiHandler = async ({
       nextType
     );
     // An expense left untouched on a loan or asset account keeps it; a new expense cannot.
-    if (
-      nextType === "expense" &&
-      existing.type !== "expense" &&
-      changedRefs.accountId === undefined &&
-      existing.accountId
-    ) {
-      await assertKeptAccountHoldsExpenses(db, session!.householdId, existing.accountId);
+    const keptAccountId =
+      nextType === "expense" && existing.type !== "expense" && changedRefs.accountId === undefined
+        ? existing.accountId
+        : null;
+    if (keptAccountId) {
+      await assertKeptAccountHoldsExpenses(db, session!.householdId, keptAccountId);
     }
     const updateData: Record<string, unknown> = {};
 
@@ -1336,6 +1335,15 @@ export const handleTransactionsRequest: ApiHandler = async ({
             eq(transactions.amount, existing.amount),
           ]
         : [];
+    // The account was checked against the type read above (and the type against
+    // the account); only write if a concurrent edit hasn't changed the other one.
+    const accountGuards = [
+      ...(changedRefs.accountId && validated.type === undefined
+        ? [eq(transactions.type, existing.type)]
+        : []),
+      ...(keptAccountId ? [eq(transactions.accountId, keptAccountId)] : []),
+    ];
+    const writeGuards = [...chargeGuards, ...accountGuards];
 
     const updated = await withAudit(
       db,
@@ -1357,7 +1365,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
               eq(transactions.id, id),
               scopeToHousehold(transactions.householdId, session!.householdId),
               isNull(transactions.deletedAt),
-              ...chargeGuards
+              ...writeGuards
             )
           )
           .returning()
@@ -1365,7 +1373,7 @@ export const handleTransactionsRequest: ApiHandler = async ({
     );
 
     if (!updated) {
-      if (chargeGuards.length > 0) {
+      if (writeGuards.length > 0) {
         const current = await db.query.transactions.findFirst({
           where: and(
             eq(transactions.id, id),

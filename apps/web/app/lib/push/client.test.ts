@@ -318,7 +318,28 @@ describe("enableReminderNotifications", () => {
       setItem: (key: string, value: string) => void stored.set(key, value),
       removeItem: (key: string) => void stored.delete(key),
     });
-    const subscription = existingSubscription();
+    // Like a browser: unsubscribing ends the subscription, and subscribe() makes a new one.
+    let current: PushSubscription | null = null;
+    const makeSubscription = (endpoint: string) => {
+      const subscription = {
+        endpoint,
+        getKey: vi.fn(() => new ArrayBuffer(8)),
+        unsubscribe: vi.fn(async () => {
+          current = null;
+          return true;
+        }),
+      } as unknown as PushSubscription;
+      current = subscription;
+      return subscription;
+    };
+    const original = makeSubscription("https://updates.push.services.mozilla.com/wpush/v2/old");
+    const pushManager = {
+      getSubscription: vi.fn(async () => current),
+      subscribe: vi.fn(async () => makeSubscription("https://updates.push.services.mozilla.com/wpush/v2/new")),
+    };
+    stubPushEnvironment({
+      registration: { active: {} as ServiceWorker, pushManager: pushManager as unknown as PushManager },
+    });
     const fetchMock = vi.fn(async (url: string) => {
       if (url === "/api/push/status") return Response.json({ vapidPublicKey: VAPID_PUBLIC_KEY });
       if (url === "/api/push/preferences") return Response.json(savedPreferences("recurringNotifications"));
@@ -327,17 +348,20 @@ describe("enableReminderNotifications", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await unsubscribeFromPush();
-    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(original.unsubscribe).toHaveBeenCalledOnce();
     fetchMock.mockClear();
 
     await expect(enableReminderNotifications("recurringNotifications")).resolves.toBeNull();
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/push/preferences"]);
     expect(Notification.requestPermission).not.toHaveBeenCalled();
+    expect(pushManager.subscribe).not.toHaveBeenCalled();
 
+    // Turning the device back on subscribes it again, and reminder setup then keeps it registered.
     await subscribeToPush();
+    expect(pushManager.subscribe).toHaveBeenCalledOnce();
     fetchMock.mockClear();
     await expect(enableReminderNotifications("recurringNotifications")).resolves.toBeNull();
-    expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/push");
+    expect(fetchMock).toHaveBeenCalledWith("/api/push", expect.objectContaining({ method: "POST" }));
   });
 });
 

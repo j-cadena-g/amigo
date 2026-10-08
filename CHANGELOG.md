@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-07
+
+### Added
+
+- **Reminders for one-time and recurring transactions.** Add up to four reminders to any income or expense, picked from a calendar with a time in the household's timezone, or with **Day before** for 9 AM the day before. A recurring rule's reminders repeat for every occurrence. Reminders are checked every minute and retried for up to three hours. Pausing a rule or removing its reminders cancels them. Settings has separate switches for grocery alerts, recurring reminders, and one-time reminders, plus **Turn off on this device**. Migrations 0030–0032 ([#182](https://github.com/j-cadena-g/amigo/pull/182), [#187](https://github.com/j-cadena-g/amigo/pull/187))
+
+### Changed
+
+- Expenses can only be linked to cash and bank accounts or credit cards. The account picker hides other account types for expenses, and the API rejects them. An expense already linked to a loan, investment, or property account keeps that link ([#189](https://github.com/j-cadena-g/amigo/pull/189))
+- pnpm overrides pin patched `sharp` ≥0.35.5, `source-map-js` ≥1.2.2, and `brace-expansion` 1.1.21 and 5.0.12 ([#185](https://github.com/j-cadena-g/amigo/pull/185))
+
+### Fixed
+
+- Monthly recurring entries keep their day after a short month: a rule on the 31st runs Jan 31, Feb 28, then Mar 31 instead of moving to the 28th. Migration 0033 anchors existing monthly rules to their start date's day, and entries that had already moved go back at their next posting ([#188](https://github.com/j-cadena-g/amigo/pull/188))
+- Finished recurring series no longer appear in upcoming payments ([#187](https://github.com/j-cadena-g/amigo/pull/187))
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

@@ -6,6 +6,7 @@ function form(type: "income" | "expense"): RecurringFormData {
     type, amount: "100", currency: "CAD", categoryId: "category", description: "",
     schedulePreset: "monthly-1", customFrequency: "MONTHLY", customInterval: "1",
     customDayOfMonth: "1", startDate: "2026-10-01", endDate: "", budgetId: "budget",
+    accountId: "acct-1",
     reminderOccurrenceDate: "2026-10-01",
     reminderSchedules: [{ date: "2026-09-30", time: "09:00" }],
   };
@@ -40,6 +41,7 @@ describe("recurring calendar reminder payload", () => {
     expect(body.amount).toBe(100);
     expect(body.reminderSchedules).toEqual([{ dayOffset: -1, time: "09:00" }]);
     expect(body.budgetId).toBe(type === "expense" ? "budget" : null);
+    expect(body.accountId).toBe("acct-1");
   });
 
   it("sends an empty array when all reminders are removed", () => {

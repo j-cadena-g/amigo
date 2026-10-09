@@ -13,7 +13,11 @@ import { broadcastToHousehold } from "../lib/realtime";
 import { ActionError } from "../lib/errors";
 import { toCents, toISODate } from "../lib/conversions";
 import { getInitialNextRunDate, processDueRecurringRules } from "../lib/recurring-processor";
-import { refsChangedFromExisting, validateFinancialRefs } from "../lib/financial-refs";
+import {
+  assertKeptAccountHoldsExpenses,
+  refsChangedFromExisting,
+  validateFinancialRefs,
+} from "../lib/financial-refs";
 import { assertSelectableFinancialCategory } from "../lib/financial-categories";
 import { getHomeCurrency } from "../lib/household-currency";
 import { getHouseholdTimezone } from "../lib/household-timezone";
@@ -34,6 +38,9 @@ const recurringStartDateSchema = z.coerce.date().refine(
     message: "startDate must be between 2000-01-01 and 2100-12-31",
   }
 );
+
+/** Not a uuid: converted asset accounts use ids like `from-asset-<uuid>`. */
+const accountIdField = z.string().min(1).max(100).nullable().optional();
 
 const reminderSchedulesSchema = z.array(z.object({
   dayOffset: z.number().int().min(-36600).max(36600),
@@ -57,6 +64,7 @@ export const createRuleSchema = z.object({
   startDate: recurringStartDateSchema,
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
+  accountId: accountIdField,
   currency: zCurrencyCode.optional(),
   reminderSchedules: reminderSchedulesSchema,
 });
@@ -72,6 +80,7 @@ export const updateRuleSchema = z.object({
   startDate: recurringStartDateSchema.optional(),
   endDate: z.coerce.date().nullable().optional(),
   budgetId: z.string().uuid().nullable().optional(),
+  accountId: accountIdField,
   currency: zCurrencyCode.optional(),
   reminderSchedules: reminderSchedulesSchema,
 });
@@ -132,9 +141,13 @@ export const handleRecurringRequest: ApiHandler = async ({
       validated.categoryId,
       validated.type
     );
-    await validateFinancialRefs(db, session!.householdId, session!.userId, {
-      budgetId: validated.budgetId,
-    });
+    await validateFinancialRefs(
+      db,
+      session!.householdId,
+      session!.userId,
+      { budgetId: validated.budgetId, accountId: validated.accountId },
+      validated.type
+    );
     const interval = validated.interval ?? 1;
     const dayOfMonth = anchorDayOfMonth(
       validated.frequency,
@@ -191,6 +204,7 @@ export const handleRecurringRequest: ApiHandler = async ({
             endDate: validated.endDate ? toISODate(validated.endDate) : null,
             nextRunDate: toISODate(nextRunDate),
             budgetId: validated.budgetId || null,
+            accountId: validated.accountId || null,
             reminderSchedules: validated.reminderSchedules ?? [],
           })
           .returning()
@@ -225,12 +239,23 @@ export const handleRecurringRequest: ApiHandler = async ({
     if (!existing) {
       throw new ActionError("Recurring rule not found", "NOT_FOUND");
     }
+    const nextType = validated.type ?? existing.type;
+    const changedRefs = refsChangedFromExisting(validated, existing);
     await validateFinancialRefs(
       db,
       session!.householdId,
       session!.userId,
-      refsChangedFromExisting(validated, existing)
+      changedRefs,
+      nextType
     );
+    // An expense left untouched on a loan or asset account keeps it; a new expense cannot.
+    const keptAccountId =
+      nextType === "expense" && existing.type !== "expense" && changedRefs.accountId === undefined
+        ? existing.accountId
+        : null;
+    if (keptAccountId) {
+      await assertKeptAccountHoldsExpenses(db, session!.householdId, keptAccountId);
+    }
 
     const updateData: Record<string, unknown> = {};
 
@@ -240,7 +265,6 @@ export const handleRecurringRequest: ApiHandler = async ({
 
     if (validated.amount !== undefined) updateData.amount = toCents(validated.amount);
     if (validated.categoryId !== undefined) {
-      const nextType = validated.type ?? existing.type;
       const categoryUnchanged =
         validated.categoryId === existing.categoryId && nextType === existing.type;
       if (categoryUnchanged) {
@@ -281,6 +305,7 @@ export const handleRecurringRequest: ApiHandler = async ({
     if (validated.interval !== undefined) updateData.interval = validated.interval;
     if (validated.endDate !== undefined) updateData.endDate = validated.endDate ? toISODate(validated.endDate) : null;
     if (validated.budgetId !== undefined) updateData.budgetId = validated.budgetId || null;
+    if (validated.accountId !== undefined) updateData.accountId = validated.accountId || null;
     if (validated.currency !== undefined) updateData.currency = validated.currency;
 
     if (

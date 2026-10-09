@@ -3,6 +3,7 @@ import { households } from "./households";
 import { users } from "./users";
 import { TRANSACTION_TYPES } from "./transactions";
 import { budgets } from "./budgets";
+import { financialAccounts } from "./financial-accounts";
 import { financialCategories } from "./financial-categories";
 import { CURRENCY_CODES } from "./currencies";
 
@@ -37,6 +38,9 @@ export const recurringTransactions = sqliteTable(
       { onDelete: "set null" }
     ),
     budgetId: text("budget_id").references(() => budgets.id, {
+      onDelete: "set null",
+    }),
+    accountId: text("account_id").references(() => financialAccounts.id, {
       onDelete: "set null",
     }),
 

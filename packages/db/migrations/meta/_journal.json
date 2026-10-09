@@ -239,6 +239,13 @@
       "when": 1791382804865,
       "tag": "0033_monthly_day_of_month_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1791554600939,
+      "tag": "0034_recurring_transactions_account_id",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { Trash2, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/app/components/ui/dialog";
 import { CurrencySelect } from "@/app/components/currency-select";
+import { AccountSelect } from "@/app/components/account-select";
+import { EXPENSE_ACCOUNT_GROUPS } from "@/app/lib/account-select-groups";
 import { BudgetSelect } from "@/app/components/budget-select";
 import { CategorySelect } from "@/app/components/financial/category-select";
 import { useFinancialCategories } from "@/app/components/financial/use-financial-categories";
@@ -63,6 +65,7 @@ export interface RecurringFormData {
   startDate: string;
   endDate: string;
   budgetId: string | null;
+  accountId: string | null;
   reminderSchedules: RecurringReminderDraft[];
   /** Reference date used to preserve reminder timing when the recurrence changes. */
   reminderOccurrenceDate?: string;
@@ -83,6 +86,7 @@ interface RecurringRule {
   startDate: string;
   endDate: string | null;
   budgetId: string | null;
+  accountId: string | null;
   reminderSchedules?: RecurringReminderSchedule[];
 }
 
@@ -107,6 +111,7 @@ function emptyForm(currency: CurrencyCode, timeZone: string): RecurringFormData 
     startDate: localDateString(timeZone),
     endDate: "",
     budgetId: null,
+    accountId: null,
     reminderSchedules: [],
   };
   return { ...form, reminderOccurrenceDate: recurringFormOccurrenceDate(form, localDateString(timeZone)) };
@@ -181,6 +186,8 @@ function RecurringFields({
   timeZone,
   initialBudgetSuggest = true,
   budgetSuggestScopeRef,
+  homeCurrency,
+  savedExpenseAccountId = null,
 }: {
   form: RecurringFormData;
   setForm: React.Dispatch<React.SetStateAction<RecurringFormData>>;
@@ -189,6 +196,9 @@ function RecurringFields({
   initialBudgetSuggest?: boolean;
   /** When set, budget suggestions are ignored after this ref's value changes (e.g. edit dialog rule switch). */
   budgetSuggestScopeRef?: React.RefObject<string | null | undefined>;
+  homeCurrency: CurrencyCode;
+  /** Saved expense-rule account that stays listed even when it is outside the expense groups. */
+  savedExpenseAccountId?: string | null;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -207,7 +217,11 @@ function RecurringFields({
   const startDateId = useId();
   const endDateId = useId();
   const budgetFieldId = useId();
+  const accountFieldId = useId();
   const occurrenceDate = recurringFormOccurrenceDate(form, localDateString(timeZone));
+  const onAccountChange = useCallback((accountId: string | null) => {
+    setForm((current) => ({ ...current, accountId }));
+  }, [setForm]);
 
   useEffect(() => {
     setForm((previous) => rebaseRecurringFormReminders(previous, occurrenceDate));
@@ -468,6 +482,20 @@ function RecurringFields({
         </div>
       )}
 
+      <div className="space-y-1.5">
+        <label htmlFor={accountFieldId} className="text-sm font-semibold">
+          {t.transactions.account}
+        </label>
+        <AccountSelect
+          id={accountFieldId}
+          value={form.accountId}
+          onChange={onAccountChange}
+          homeCurrency={homeCurrency}
+          groups={form.type === "expense" ? EXPENSE_ACCOUNT_GROUPS : undefined}
+          keepId={savedExpenseAccountId}
+        />
+      </div>
+
       <fieldset className="space-y-3 rounded-lg border border-border p-3">
         <legend className="px-1 text-sm font-semibold">{t.recurring.reminders}</legend>
         <p className="text-xs text-muted-foreground">{t.recurring.remindersHint(timeZone)}</p>
@@ -556,6 +584,7 @@ export function recurringRequestBody(form: RecurringFormData, today: string) {
     startDate: form.startDate,
     endDate: form.endDate || null,
     budgetId: form.type === "expense" ? form.budgetId : null,
+    accountId: form.accountId,
     reminderSchedules: recurringReminderPayload(reminders, occurrenceDate),
   };
 }
@@ -640,7 +669,12 @@ export function AddRecurringDialog({
           }}
           className="space-y-4"
         >
-          <RecurringFields form={form} setForm={setForm} timeZone={timeZone} />
+          <RecurringFields
+            form={form}
+            setForm={setForm}
+            timeZone={timeZone}
+            homeCurrency={defaultCurrency}
+          />
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
@@ -674,6 +708,7 @@ interface EditRecurringDialogProps {
   onDelete: () => void;
   deleting: boolean;
   timeZone: string;
+  homeCurrency: CurrencyCode;
 }
 
 function ruleToPreset(rule: RecurringRule): SchedulePreset {
@@ -705,6 +740,7 @@ function ruleToForm(rule: RecurringRule, locale: string, timeZone: string): Recu
     startDate: rule.startDate,
     endDate: rule.endDate ?? "",
     budgetId: rule.budgetId,
+    accountId: rule.accountId,
     reminderSchedules: [],
   };
   const occurrenceDate = recurringFormOccurrenceDate(form, localDateString(timeZone));
@@ -722,6 +758,7 @@ export function EditRecurringDialog({
   onDelete,
   deleting,
   timeZone,
+  homeCurrency,
 }: EditRecurringDialogProps) {
   const t = useT();
   const toast = useToast();
@@ -804,6 +841,8 @@ export function EditRecurringDialog({
             timeZone={timeZone}
             initialBudgetSuggest={false}
             budgetSuggestScopeRef={budgetSuggestScopeRef}
+            homeCurrency={homeCurrency}
+            savedExpenseAccountId={rule?.type === "expense" ? rule.accountId : null}
           />
           {rule ? (
             <AuditHistoryPanel

@@ -13,7 +13,7 @@ function renderRule(overrides: Partial<RowProps["rule"]> = {}, language: "en" | 
       categoryId: "category", category: "Rent", description: null, type: "expense",
       frequency: "MONTHLY", interval: 1, dayOfMonth: 1, dayOfWeek: null,
       startDate: "2026-01-01", endDate: "2026-10-01", nextRunDate: "2026-11-01",
-      isActive: true, budgetId: null, createdAt: 0,
+      isActive: true, budgetId: null, accountId: null, createdAt: 0,
       reminderSchedules: [{ dayOffset: 2, time: "09:00" }],
       ...overrides,
     },

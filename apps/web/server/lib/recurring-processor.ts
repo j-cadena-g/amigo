@@ -256,6 +256,7 @@ export async function processDueRecurringRules(
         type: rule.type,
         date: rule.nextRunDate,
         budgetId: rule.budgetId,
+        accountId: rule.accountId,
       });
 
       inserted = true;

@@ -43,6 +43,7 @@ interface RecurringRule {
   nextRunDate: string;
   isActive: boolean;
   budgetId: string | null;
+  accountId: string | null;
   createdAt: number;
   reminderSchedules?: RecurringReminderSchedule[];
 }
@@ -269,6 +270,7 @@ export function RecurringList({ rules, homeCurrency, timeZone }: RecurringListPr
         }}
         rule={editingRule}
         timeZone={timeZone}
+        homeCurrency={homeCurrency}
         onDelete={() => void handleDeleteFromDialog()}
         deleting={editingRule !== null && deleting === editingRule.id}
       />

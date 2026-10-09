@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-09
+
+### Fixed
+
+- Recurring rules can be linked to an account. The add and edit dialogs have the same account picker as transactions, and each posted occurrence is linked to the rule's account. Expense rules can only use cash and bank accounts or credit cards. Existing rules have no account until one is set. Migration 0034 ([#191](https://github.com/j-cadena-g/amigo/pull/191))
+
 ## [0.6.1] - 2026-10-07
 
 ### Added

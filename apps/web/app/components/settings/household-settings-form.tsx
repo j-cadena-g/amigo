@@ -6,12 +6,10 @@ import { buildTimezoneOptions } from "@/app/lib/timezones";
 import { currencyName } from "@/app/lib/currency";
 import { useLanguage, useT } from "@/app/i18n";
 import { useConfirm } from "@/app/components/confirm-provider";
+import { NativeSelect } from "@/app/components/financial/form-controls";
 import { useToast } from "@/app/components/toast-provider";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-
-const SELECT_CLASS =
-  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base disabled:cursor-not-allowed disabled:opacity-50";
 
 interface HouseholdSettingsFormProps {
   name: string;
@@ -136,10 +134,10 @@ export function HouseholdSettingsForm({
         >
           {t.settings.household.homeCurrencyHint}
         </p>
-        <select
+        <NativeSelect
           id="household-home-currency"
           aria-describedby="household-home-currency-hint"
-          className={`mt-1.5 ${SELECT_CLASS}`}
+          className="mt-1.5"
           value={currencyValue}
           onChange={(e) => setCurrencyValue(e.target.value as CurrencyCode)}
           disabled={!canEdit || saving}
@@ -149,7 +147,7 @@ export function HouseholdSettingsForm({
               {`${code} – ${currencyName(code, language)}`}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
       <div>
@@ -159,10 +157,10 @@ export function HouseholdSettingsForm({
         <p id="household-timezone-hint" className="text-sm text-muted-foreground">
           {t.settings.household.timezoneHint}
         </p>
-        <select
+        <NativeSelect
           id="household-timezone"
           aria-describedby="household-timezone-hint"
-          className={`mt-1.5 ${SELECT_CLASS}`}
+          className="mt-1.5"
           value={timezoneValue}
           onChange={(e) => setTimezoneValue(e.target.value)}
           disabled={!canEdit || saving}
@@ -172,7 +170,7 @@ export function HouseholdSettingsForm({
               {tz}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
       {canEdit && (

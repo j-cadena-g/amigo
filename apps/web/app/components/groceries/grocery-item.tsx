@@ -171,7 +171,7 @@ function GroceryItemComponent({
         )}
       </div>
 
-      <div className="flex h-6 shrink-0 items-center gap-4">
+      <div className="flex h-6 shrink-0 items-center gap-5">
         <TagSelector
           mode="item"
           itemName={item.itemName}
@@ -187,7 +187,7 @@ function GroceryItemComponent({
           type="button"
           onClick={() => onDelete(item.id)}
           aria-label={t.groceries.deleteNamed(item.itemName)}
-          className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-destructive"
+          className="relative rounded-md p-1 text-muted-foreground before:absolute before:-inset-2.5 before:content-[''] hover:bg-secondary hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>

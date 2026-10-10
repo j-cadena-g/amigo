@@ -64,13 +64,13 @@ const DialogContent = React.forwardRef<
           borderColor: "var(--color-border)",
         }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-[51] grid w-[calc(100%-2rem)] max-w-lg grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg animate-appear",
+          "fixed left-1/2 top-1/2 z-[51] grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg grid-cols-1 -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-xl border p-6 shadow-lg animate-appear",
           className
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none">
+        <DialogPrimitive.Close className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none">
           <XIcon className="h-4 w-4" />
           <span className="sr-only">{t.common.close}</span>
         </DialogPrimitive.Close>

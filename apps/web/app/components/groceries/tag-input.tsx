@@ -133,17 +133,17 @@ export function TagInput({
         {selectedTags.map((tag) => (
           <span
             key={tag.id}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border py-0.5 pl-2 pr-1 text-xs font-semibold"
+            className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md border border-border py-0.5 pl-2 pr-1 text-xs font-semibold"
           >
             <TagDot color={tag.color} />
-            {tag.name}
+            <span className="min-w-0 truncate">{tag.name}</span>
             <button
               type="button"
               onClick={() => removeTag(tag.id)}
-              className="relative rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
+              className="relative shrink-0 rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
               aria-label={t.groceries.tags.removeNamed(tag.name)}
             >
-              <X className="h-3 w-3" aria-hidden="true" />
+              <X className="h-3 w-3 shrink-0" aria-hidden="true" />
             </button>
           </span>
         ))}

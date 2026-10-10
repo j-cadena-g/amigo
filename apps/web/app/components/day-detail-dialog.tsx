@@ -54,7 +54,7 @@ export function DayEntries({ events }: { events: CalendarEvent[] }) {
         </p>
       )}
 
-      <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto border-y border-border">
+      <ul className="max-h-[60dvh] divide-y divide-border overflow-y-auto border-y border-border">
         {events.map((event) => {
           const amount = event.metadata?.amount;
           const isIncome = event.metadata?.transactionType === "income";

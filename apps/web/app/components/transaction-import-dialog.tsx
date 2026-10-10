@@ -289,7 +289,7 @@ export function TransactionImportDialog({
   );
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t.imports.title}</DialogTitle>
           <DialogDescription>{t.imports.ofxHelp}</DialogDescription>
@@ -298,7 +298,7 @@ export function TransactionImportDialog({
           <label className="flex flex-col gap-2 text-sm">
             <span>{t.imports.file}</span>
             <input
-              className="block w-full rounded-md text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-background file:px-4 file:py-2 file:font-semibold file:transition-colors hover:file:bg-secondary hover:file:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="block w-full min-w-0 rounded-md text-base file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-background file:px-4 file:py-2 file:font-semibold file:transition-colors hover:file:bg-secondary hover:file:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               type="file"
               accept=".ofx,.qfx,.csv"
               disabled={busy}
@@ -376,7 +376,7 @@ export function TransactionImportDialog({
                   <label className="flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      className="mt-1"
+                      className="mt-1 h-4 w-4 shrink-0 accent-primary"
                       checked={repairCurrency}
                       disabled={busy}
                       onChange={(e) => {
@@ -402,7 +402,7 @@ export function TransactionImportDialog({
               <label className="flex items-start gap-2">
                 <input
                   type="checkbox"
-                  className="mt-1"
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
                   disabled={busy}
                   checked={acceptCurrencyMismatch}
                   onChange={(e) => setAcceptCurrencyMismatch(e.target.checked)}
@@ -523,6 +523,7 @@ export function TransactionImportDialog({
                             ) : (
                               <input
                                 type="checkbox"
+                                className="h-4 w-4 shrink-0 accent-primary"
                                 disabled={busy}
                                 aria-label={`${t.imports.include} ${row.date} ${name}`}
                                 checked={!excluded.has(row.externalId)}
@@ -569,7 +570,7 @@ export function TransactionImportDialog({
                                       return next;
                                     });
                                   }}
-                                  className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-sm focus-visible:border-input"
+                                  className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-base focus-visible:border-input"
                                 />
                                 {nameSuggested && (
                                   <span className="shrink-0 text-xs text-muted-foreground">
@@ -582,7 +583,7 @@ export function TransactionImportDialog({
                             )}
                             {editable && (
                               <div className="mt-1 flex min-w-0 items-center gap-2">
-                                <div className="min-w-0 flex-1 [&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:py-0.5 [&_select]:pl-1 [&_select]:text-sm [&_select]:focus-visible:border-input">
+                                <div className="min-w-0 flex-1 [&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:py-0.5 [&_select]:pl-1 [&_select]:text-base [&_select]:focus-visible:border-input">
                                   <CategorySelect
                                     type={row.type}
                                     categories={pickerCategories}

@@ -45,12 +45,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* The theme script below rewrites content to match the in-app theme. */}
         <meta
+          suppressHydrationWarning
           name="theme-color"
           content="#ffffff"
           media="(prefers-color-scheme: light)"
         />
         <meta
+          suppressHydrationWarning
           name="theme-color"
           content="#161615"
           media="(prefers-color-scheme: dark)"
@@ -66,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           nonce={cspNonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem("amigo-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark");document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.content=d?"#161615":"#ffffff"})}catch(e){}})()`,
           }}
         />
         <LanguageContext.Provider value={language}>
@@ -159,8 +162,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
         <h1 className="type-display text-title-sm md:text-title">{message}</h1>
         <p className="mt-2 text-muted-foreground">{details}</p>
         <div className="mt-6">

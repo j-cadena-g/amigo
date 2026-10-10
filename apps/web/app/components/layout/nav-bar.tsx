@@ -88,7 +88,7 @@ export function NavBar() {
 
           <div className="ml-auto flex items-center">
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <DropdownMenuTrigger className="flex min-h-11 pointer-fine:min-h-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <span className="max-w-40 truncate">{displayName}</span>
                 <ChevronDown className="h-4 w-4" />
               </DropdownMenuTrigger>

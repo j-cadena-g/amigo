@@ -107,15 +107,15 @@ export default function RestoreAccount() {
 
   if (!checkedPending) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
+      <main className="min-h-dvh flex items-center justify-center bg-background">
         <p className="text-muted-foreground">{t.common.loading}</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
         <h1 className="type-display mt-6 text-title-sm">{t.onboarding.restoreTitle}</h1>
         <p className="mt-2">

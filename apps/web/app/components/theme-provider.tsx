@@ -30,9 +30,19 @@ function getStoredTheme(): Theme {
   return (localStorage.getItem(STORAGE_KEY) as Theme) || "system";
 }
 
+// Must match the theme-color meta tags in root.tsx.
+const THEME_COLORS = { light: "#ffffff", dark: "#161615" } as const;
+
 function applyTheme(resolved: "light" | "dark") {
   const root = document.documentElement;
   root.classList.toggle("dark", resolved === "dark");
+  // The meta tags follow the OS scheme; point both at the in-app theme so the
+  // installed PWA's status bar matches the page.
+  document
+    .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+    .forEach((meta) => {
+      meta.content = THEME_COLORS[resolved];
+    });
 }
 
 // Avoid hydration mismatch by deferring client-only rendering

@@ -658,7 +658,7 @@ export function AddRecurringDialog({
 
   return (
     <Dialog key={defaultCurrency} open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t.recurring.addTitle}</DialogTitle>
         </DialogHeader>
@@ -823,7 +823,7 @@ export function EditRecurringDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t.recurring.editTitle}</DialogTitle>
         </DialogHeader>

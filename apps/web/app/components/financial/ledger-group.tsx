@@ -64,7 +64,7 @@ export function RowIconButton({
       variant="ghost"
       size="icon"
       className={cn(
-        "h-11 w-11 shrink-0 text-muted-foreground sm:h-9 sm:w-9",
+        "h-11 w-11 shrink-0 text-muted-foreground pointer-fine:h-9 pointer-fine:w-9",
         tone === "destructive" ? "hover:text-destructive" : "hover:text-foreground",
         className
       )}

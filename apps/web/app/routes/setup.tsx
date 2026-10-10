@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from "react-router";
 import { CURRENCY_CODES } from "@amigo/db";
+import { NativeSelect } from "@/app/components/financial/form-controls";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Wordmark } from "@/app/components/wordmark";
@@ -21,9 +22,6 @@ import { pageTitle, useLanguage, useT } from "@/app/i18n";
 import { parseAcceptLanguage } from "@/app/lib/locale";
 import { useLocale } from "@/app/lib/use-locale";
 import { currencyName, defaultCurrencyForLocale } from "@/app/lib/currency";
-
-const SELECT_CLASS =
-  "mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base";
 
 export function loader({ context, request }: LoaderFunctionArgs) {
   const status = getSessionStatus(context);
@@ -125,8 +123,8 @@ export default function Setup() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
         <h1 className="type-display mt-6 text-title-sm">{t.nav.setUpHousehold}</h1>
 
@@ -208,37 +206,37 @@ export default function Setup() {
             <label htmlFor="currency" className="block text-sm font-semibold">
               {t.settings.household.homeCurrency}
             </label>
-            <select
+            <NativeSelect
               id="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className={SELECT_CLASS}
+              className="mt-1.5"
             >
               {CURRENCY_CODES.map((code) => (
                 <option key={code} value={code}>
                   {`${code} – ${currencyName(code, language)}`}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div>
             <label htmlFor="timezone" className="block text-sm font-semibold">
               {t.settings.household.timezone}
             </label>
-            <select
+            <NativeSelect
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
               aria-describedby="timezone-hint"
-              className={SELECT_CLASS}
+              className="mt-1.5"
             >
               {buildTimezoneOptions(timezone).map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <p id="timezone-hint" className="mt-1.5 text-sm text-muted-foreground">
               {t.settings.household.timezoneHint}
             </p>

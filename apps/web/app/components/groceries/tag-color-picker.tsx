@@ -13,7 +13,7 @@ interface TagColorPickerProps {
 export function TagColorPicker({ value, onChange, className }: TagColorPickerProps) {
   const t = useT();
   return (
-    <div className={cn("grid w-fit grid-cols-8 gap-2", className)}>
+    <div className={cn("grid w-fit grid-cols-8 gap-3", className)}>
       {COLOR_KEYS.map((color) => (
         <button
           key={color}

@@ -25,8 +25,8 @@ export function meta({ matches }: MetaArgs) {
 function JoinLayout({ children }: { children: React.ReactNode }) {
   const t = useT();
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
         <h1 className="type-display mt-6 text-title-sm">{t.nav.joinHousehold}</h1>
         {children}

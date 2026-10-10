@@ -86,11 +86,11 @@ export function WhereItWent({
                   style={{ width: `${max > 0 ? (row.amount / max) * 100 : 0}%` }}
                 />
               </span>
-              <span className="w-24 shrink-0 text-right font-mono font-medium">
+              <span className="min-w-24 shrink-0 whitespace-nowrap text-right font-mono font-medium">
                 {formatCents(row.amount, currency, locale)}
               </span>
               {monthlyComparison && (
-                <span className="hidden w-24 shrink-0 text-right font-mono font-medium text-muted-foreground sm:inline">
+                <span className="hidden min-w-24 shrink-0 whitespace-nowrap text-right font-mono font-medium text-muted-foreground sm:inline">
                   {formatCents(previous, currency, locale)}
                 </span>
               )}

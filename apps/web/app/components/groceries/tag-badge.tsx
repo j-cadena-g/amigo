@@ -24,12 +24,12 @@ export function TagBadge({ tag, className }: TagBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-xs font-semibold text-foreground",
+        "inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground",
         className
       )}
     >
       <TagDot color={tag.color} />
-      {tag.name}
+      <span className="min-w-0 truncate">{tag.name}</span>
     </span>
   );
 }

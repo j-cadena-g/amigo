@@ -31,7 +31,7 @@ export function loader({ context }: LoaderFunctionArgs) {
 function FullPageLoading() {
   const t = useT();
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background">
+    <main className="min-h-dvh flex items-center justify-center bg-background">
       <p className="text-muted-foreground">{t.common.loading}</p>
     </main>
   );
@@ -55,8 +55,8 @@ function SignedInContinue() {
   }, [revalidator]);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
         <Wordmark />
         <h1 className="type-display mt-6 text-title-sm">{t.nav.signedIn}</h1>
         <p className="mt-2 text-muted-foreground">{t.nav.takingYouHome}</p>
@@ -81,8 +81,8 @@ export default function Index() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-8 px-4 py-10">
+    <main className="min-h-dvh bg-background">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 px-4 py-10">
         <div>
           <h1>
             <Wordmark className="px-3 pb-1 pt-2 text-title-sm md:text-title" />

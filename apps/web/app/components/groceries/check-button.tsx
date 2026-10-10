@@ -11,7 +11,7 @@ export function CheckButton({ checked, className, ...props }: CheckButtonProps) 
     <button
       type="button"
       className={cn(
-        "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border-2 border-foreground before:absolute before:-inset-2.5 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border-2 border-foreground before:absolute before:-inset-3 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         checked && "bg-foreground text-background",
         className
       )}

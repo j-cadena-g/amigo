@@ -36,8 +36,8 @@ export function MonthHero({
   const locale = useLocale();
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="type-display text-title-sm md:text-title">{monthName}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="type-display min-w-0 text-title-sm md:text-title">{monthName}</h1>
         <Button asChild>
           <Link to="/financial?new=1">
             <Plus />

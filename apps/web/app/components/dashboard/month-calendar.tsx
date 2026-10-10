@@ -135,7 +135,7 @@ export function MonthCalendar({
       title={monthLabel}
       className={className}
       aside={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3 pointer-fine:gap-1">
           {month !== todayMonth && (
             <Button type="button" variant="outline" size="sm" onClick={() => goTo(todayMonth)}>
               {t.calendar.thisMonth}
@@ -145,7 +145,7 @@ export function MonthCalendar({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="relative h-8 w-8 before:absolute before:-inset-1.5 before:content-[''] pointer-fine:before:hidden"
             onClick={() => goTo(shiftMonth(month, -1))}
           >
             <ChevronLeft />
@@ -155,7 +155,7 @@ export function MonthCalendar({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="relative h-8 w-8 before:absolute before:-inset-1.5 before:content-[''] pointer-fine:before:hidden"
             onClick={() => goTo(shiftMonth(month, 1))}
           >
             <ChevronRight />

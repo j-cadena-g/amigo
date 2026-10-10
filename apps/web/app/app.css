@@ -108,6 +108,21 @@
     scroll-behavior: smooth;
   }
 
+  /* iOS Safari draws date and time inputs natively: they ignore our height and
+     keep an intrinsic min-width, so they spill out of narrow grid columns. */
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+
+  /* Without native appearance, iOS centers the value. */
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: start;
+  }
+
   html.dark {
     color-scheme: dark;
   }

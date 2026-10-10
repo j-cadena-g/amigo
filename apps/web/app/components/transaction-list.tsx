@@ -476,7 +476,6 @@ export function TransactionList({
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={() => void handleExportCsv()}
             >
               <Download />
@@ -485,7 +484,6 @@ export function TransactionList({
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={() => setImportOpen(true)}
             >
               <Upload />

@@ -140,7 +140,7 @@ export function TagInput({
             <button
               type="button"
               onClick={() => removeTag(tag.id)}
-              className="relative shrink-0 rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:text-foreground"
+              className="relative shrink-0 rounded-xs p-0.5 text-muted-foreground before:absolute before:-inset-2 before:content-[''] pointer-coarse:before:-inset-3 hover:text-foreground"
               aria-label={t.groceries.tags.removeNamed(tag.name)}
             >
               <X className="h-3 w-3 shrink-0" aria-hidden="true" />

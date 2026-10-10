@@ -521,22 +521,24 @@ export function TransactionImportDialog({
                             ) : row.duplicate && !row.possibleDuplicate ? (
                               <span>{t.imports.duplicate}</span>
                             ) : (
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 shrink-0 accent-primary"
-                                disabled={busy}
-                                aria-label={`${t.imports.include} ${row.date} ${name}`}
-                                checked={!excluded.has(row.externalId)}
-                                onChange={(e) =>
-                                  setExcluded((previous) => {
-                                    const next = new Set(previous);
-                                    if (e.target.checked)
-                                      next.delete(row.externalId);
-                                    else next.add(row.externalId);
-                                    return next;
-                                  })
-                                }
-                              />
+                              <label className="flex items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-11">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 shrink-0 accent-primary"
+                                  disabled={busy}
+                                  aria-label={`${t.imports.include} ${row.date} ${name}`}
+                                  checked={!excluded.has(row.externalId)}
+                                  onChange={(e) =>
+                                    setExcluded((previous) => {
+                                      const next = new Set(previous);
+                                      if (e.target.checked)
+                                        next.delete(row.externalId);
+                                      else next.add(row.externalId);
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </label>
                             )}
                           </td>
                           <td className="p-2 font-mono whitespace-nowrap">{row.date}</td>
@@ -570,7 +572,7 @@ export function TransactionImportDialog({
                                       return next;
                                     });
                                   }}
-                                  className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-base focus-visible:border-input"
+                                  className="h-8 w-full min-w-0 border-transparent bg-transparent px-1 py-0.5 text-base focus-visible:border-input pointer-coarse:h-11"
                                 />
                                 {nameSuggested && (
                                   <span className="shrink-0 text-xs text-muted-foreground">
@@ -583,7 +585,7 @@ export function TransactionImportDialog({
                             )}
                             {editable && (
                               <div className="mt-1 flex min-w-0 items-center gap-2">
-                                <div className="min-w-0 flex-1 [&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:py-0.5 [&_select]:pl-1 [&_select]:text-base [&_select]:focus-visible:border-input">
+                                <div className="min-w-0 flex-1 [&_select]:h-8 pointer-coarse:[&_select]:h-11 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:py-0.5 [&_select]:pl-1 [&_select]:text-base [&_select]:focus-visible:border-input">
                                   <CategorySelect
                                     type={row.type}
                                     categories={pickerCategories}

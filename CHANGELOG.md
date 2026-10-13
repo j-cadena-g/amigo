@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-13
+
+### Changed
+
+- Dependency and GitHub Actions updates (Clerk, Radix UI, drizzle-orm 0.45.4, lucide-react, Wrangler 4.149, Vite 8.3.4, `@cloudflare/vite-plugin` 1.63, `@cloudflare/vitest-pool-workers` 0.23, typescript-eslint, `actions/setup-node` 7.1.0) ([#194](https://github.com/j-cadena-g/amigo/pull/194), [#195](https://github.com/j-cadena-g/amigo/pull/195), [#196](https://github.com/j-cadena-g/amigo/pull/196))
+
+### Fixed
+
+- iPad and iPhone layout in the installed app: date and time fields stay inside their column, dialogs fit the screen and scroll inside instead of clipping, iOS no longer zooms in on the import preview fields, and the status bar follows the theme chosen in Settings. Buttons, checkboxes, and menu items are at least 44px on touch screens ([#193](https://github.com/j-cadena-g/amigo/pull/193))
+
 ## [0.6.2] - 2026-10-09
 
 ### Fixed

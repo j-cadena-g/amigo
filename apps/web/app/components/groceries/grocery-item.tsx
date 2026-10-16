@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import type { GroceryTag } from "@amigo/db";
 import { Trash2 } from "lucide-react";
+import type { GroceryCategory } from "@/app/lib/grocery-categories";
 import { cn } from "@/app/lib/utils";
 import type { GroceryItemWithTags } from "./types";
 import { CheckButton } from "./check-button";
@@ -17,6 +18,7 @@ interface GroceryItemProps {
   onDelete: (id: string) => void;
   onUpdateTags: (id: string, tagIds: string[]) => void;
   onEditName: (id: string, name: string) => void;
+  onSetCategory: (id: string, category: GroceryCategory | null) => void;
   onCreateTag: (name: string, color: string) => Promise<GroceryTag | undefined>;
   onDeleteTag: (tagId: string) => Promise<void>;
   onEditTag: (tagId: string, name: string, color: string) => Promise<void>;
@@ -30,6 +32,7 @@ function GroceryItemComponent({
   onDelete,
   onUpdateTags,
   onEditName,
+  onSetCategory,
   onCreateTag,
   onDeleteTag,
   onEditTag,
@@ -178,6 +181,11 @@ function GroceryItemComponent({
           allTags={allTags}
           selectedTagIds={selectedTagIds}
           onToggleTag={handleToggleTag}
+          aisle={{
+            category: item.category,
+            categorySource: item.categorySource,
+            onChange: (category) => onSetCategory(item.id, category),
+          }}
           onCreateTag={onCreateTag}
           onDeleteTag={onDeleteTag}
           onEditTag={onEditTag}

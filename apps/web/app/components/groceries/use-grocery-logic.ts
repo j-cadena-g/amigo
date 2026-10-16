@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
-import type { GroceryTag } from "@amigo/db";
+import type { GroceryCategorySource, GroceryTag } from "@amigo/db";
+import type { GroceryCategory } from "@/app/lib/grocery-categories";
 import type { GroceryItemWithTags, OptimisticAction } from "./types";
 import {
   applyOptimisticAction,
@@ -33,6 +34,7 @@ interface SerializedGroceryItem {
   transferredFromCreatedByUserId: string | null;
   itemName: string;
   category: string | null;
+  categorySource: GroceryCategorySource;
   isPurchased: boolean;
   purchasedAt: string | null;
   createdAt: string;
@@ -41,7 +43,7 @@ interface SerializedGroceryItem {
 }
 
 // Operations the offline sync queue (`/api/sync`) understands. Other actions
-// (renames, explicit purchase dates) require a live connection.
+// (renames, aisle pins, explicit purchase dates) require a live connection.
 function toQueuedMutation(action: OptimisticAction): QueuedMutation | null {
   switch (action.type) {
     case "add":
@@ -75,9 +77,17 @@ function toQueuedMutation(action: OptimisticAction): QueuedMutation | null {
         entityId: action.id,
         payload: { tagIds: action.tagIds },
       };
+    case "set_category":
+      // Aisle pins are online-only. runAction reverts them when the request
+      // cannot be sent.
+      return null;
     default:
       return null;
   }
+}
+
+function categorySourceFromServer(value: unknown): GroceryCategorySource {
+  return value === "user" ? "user" : "ai";
 }
 
 function buildItemFromServer(
@@ -92,6 +102,7 @@ function buildItemFromServer(
     transferredFromCreatedByUserId: raw.transferredFromCreatedByUserId,
     itemName: raw.itemName,
     category: raw.category,
+    categorySource: categorySourceFromServer(raw.categorySource),
     isPurchased: raw.isPurchased,
     purchasedAt: raw.purchasedAt ? new Date(raw.purchasedAt) : null,
     createdAt: new Date(raw.createdAt),
@@ -254,6 +265,17 @@ export function useGroceryLogic({
                   category: raw.category,
                 })
               );
+            } else if (action.type === "set_category") {
+              const raw = (await res.json()) as SerializedGroceryItem;
+              setBaseItems((prev) =>
+                applyOptimisticAction(prev, {
+                  ...action,
+                  server: {
+                    category: raw.category,
+                    categorySource: categorySourceFromServer(raw.categorySource),
+                  },
+                })
+              );
             } else {
               setBaseItems((prev) => applyOptimisticAction(prev, action));
             }
@@ -310,6 +332,7 @@ export function useGroceryLogic({
         createdByUserDisplayName: null,
         transferredFromCreatedByUserId: null,
         category: null,
+        categorySource: "ai",
         deletedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -424,6 +447,22 @@ export function useGroceryLogic({
     [runAction, t]
   );
 
+  const setCategory = useCallback(
+    (id: string, category: GroceryCategory | null) => {
+      runAction(
+        { type: "set_category", id, category },
+        t.groceries.actions.setAisle,
+        () =>
+          fetch(`/api/groceries/${id}/category`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category }),
+          })
+      );
+    },
+    [runAction, t]
+  );
+
   // --- Tag actions (low frequency; revalidate to refresh the shared list) ---
 
   const createTag = useCallback(
@@ -531,6 +570,7 @@ export function useGroceryLogic({
     deleteItem,
     updateTags,
     editName,
+    setCategory,
     createTag,
     deleteTag,
     editTag,

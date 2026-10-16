@@ -198,7 +198,47 @@ describe("mergeServerItemWithLocal", () => {
 
     expect(merged.id).toBe("server-1");
     expect(merged.tagIds).toEqual(["tag-a", "tag-b"]);
+    expect(merged.categorySource).toBe("ai");
     expect(merged._syncStatus).toBe("synced");
+  });
+
+  it("takes the server aisle and who chose it", () => {
+    const temp: OfflineGroceryItem = {
+      id: "temp-1",
+      householdId: "hh1",
+      createdByUserId: "u1",
+      createdByUserDisplayName: null,
+      itemName: "Milk",
+      category: null,
+      categorySource: "ai",
+      isPurchased: false,
+      purchasedAt: null,
+      createdAt: 1,
+      updatedAt: 1,
+      deletedAt: null,
+      tagIds: [],
+      _localVersion: 1,
+      _serverVersion: 0,
+      _syncStatus: "pending",
+    };
+
+    const merged = mergeServerItemWithLocal(
+      "server-1",
+      {
+        id: "server-1",
+        householdId: "hh1",
+        itemName: "Milk",
+        category: "Dairy & Eggs",
+        categorySource: "user",
+        createdAt: 2,
+        updatedAt: 2,
+      },
+      temp,
+      3
+    );
+
+    expect(merged.category).toBe("Dairy & Eggs");
+    expect(merged.categorySource).toBe("user");
   });
 });
 

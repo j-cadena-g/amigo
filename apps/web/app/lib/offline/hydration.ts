@@ -1,3 +1,4 @@
+import type { GroceryCategorySource } from "@amigo/db";
 import {
   getOfflineDB,
   type OfflineGroceryItem,
@@ -26,6 +27,7 @@ export interface GroceryItemWithTags {
   createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
+  categorySource?: GroceryCategorySource;
   isPurchased: boolean;
   purchasedAt: number | null;
   createdAt: number;
@@ -73,6 +75,7 @@ async function bulkInsertItems(items: GroceryItemWithTags[]): Promise<void> {
     createdByUserDisplayName: item.createdByUserDisplayName,
     itemName: item.itemName,
     category: item.category,
+    categorySource: item.categorySource ?? "ai",
     isPurchased: item.isPurchased,
     purchasedAt: item.purchasedAt,
     createdAt: item.createdAt,
@@ -110,6 +113,7 @@ function toServerGroceryItem(item: GroceryItemWithTags): ServerGroceryItem {
     createdByUserDisplayName: item.createdByUserDisplayName,
     itemName: item.itemName,
     category: item.category,
+    categorySource: item.categorySource ?? "ai",
     isPurchased: item.isPurchased,
     purchasedAt: item.purchasedAt,
     createdAt: item.createdAt,
@@ -133,6 +137,7 @@ async function incrementalSync(
         ...serverItem,
         createdByUserDisplayName: serverItem.createdByUserDisplayName ?? null,
         tagIds: serverItem.tags?.map((tag) => tag.id),
+        categorySource: serverItem.categorySource ?? "ai",
         _localVersion: 0,
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
@@ -144,6 +149,7 @@ async function incrementalSync(
       await db.groceryItems.update(serverItem.id, {
         ...serverItem,
         tagIds: serverItem.tags?.map((tag) => tag.id),
+        categorySource: serverItem.categorySource ?? "ai",
         _serverVersion: serverItem.updatedAt,
         _syncStatus: "synced",
       });
@@ -158,10 +164,12 @@ async function incrementalSync(
     });
 
     if (!hasConflict) {
-      // No queued mutation edits category, and a server-side rename (such as
-      // migration 0020) leaves updatedAt alone, so take the server's aisle.
+      // No queued mutation edits the aisle, and a server-side rename (such as
+      // migration 0020) leaves updatedAt alone, so take the server's aisle
+      // and who chose it.
       await db.groceryItems.update(serverItem.id, {
         category: serverItem.category,
+        categorySource: serverItem.categorySource ?? "ai",
         _serverVersion: serverItem.updatedAt,
       });
       continue;

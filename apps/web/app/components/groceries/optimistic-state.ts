@@ -75,6 +75,26 @@ export function applyOptimisticAction(
           : item
       );
 
+    case "set_category":
+      return items.map((item) => {
+        if (item.id !== action.id) return item;
+        if (action.server) {
+          return {
+            ...item,
+            category: action.server.category,
+            categorySource: action.server.categorySource,
+          };
+        }
+        if (action.category !== null) {
+          return {
+            ...item,
+            category: action.category,
+            categorySource: "user",
+          };
+        }
+        return { ...item, categorySource: "ai" };
+      });
+
     case "update_purchase_date":
       return items.map((item) =>
         item.id === action.id

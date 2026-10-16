@@ -1,0 +1,1 @@
+ALTER TABLE `grocery_items` ADD `category_source` text DEFAULT 'ai' NOT NULL;

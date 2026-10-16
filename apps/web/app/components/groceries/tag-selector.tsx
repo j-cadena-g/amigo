@@ -1,15 +1,24 @@
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect, useId, type ChangeEvent } from "react";
 import { Link } from "react-router";
-import type { GroceryTag } from "@amigo/db";
-import { Check, Pencil, Tag } from "lucide-react";
+import type { GroceryCategorySource, GroceryTag } from "@amigo/db";
+import { Check, ChevronDown, Pencil, Tag } from "lucide-react";
 import { useConfirm } from "@/app/components/confirm-provider";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import {
+  DEFAULT_GROCERY_CATEGORY,
+  GROCERY_CATEGORIES,
+  isGroceryCategory,
+  type GroceryCategory,
+} from "@/app/lib/grocery-categories";
 import { cn } from "@/app/lib/utils";
 import { tagColorKey, type TagColorKey } from "./constants";
 import { TagBadge } from "./tag-badge";
 import { TagColorPicker } from "./tag-color-picker";
 import { useT } from "@/app/i18n";
+
+/** Sentinel `<select>` value for "let Jev choose". */
+const AUTOMATIC_AISLE = "";
 
 interface TagSelectorProps {
   mode: "global" | "item";
@@ -23,6 +32,12 @@ interface TagSelectorProps {
   onFilterToggle?: (tagId: string) => void;
   /** Names the icon-only trigger in item mode. */
   itemName?: string;
+  /** Item mode only. Omitted in the list-wide filter popover. */
+  aisle?: {
+    category: string | null;
+    categorySource: GroceryCategorySource;
+    onChange: (category: GroceryCategory | null) => void;
+  };
 }
 
 export function TagSelector({
@@ -36,6 +51,7 @@ export function TagSelector({
   filterTagIds,
   onFilterToggle,
   itemName,
+  aisle,
 }: TagSelectorProps) {
   const t = useT();
   const confirm = useConfirm();
@@ -49,6 +65,7 @@ export function TagSelector({
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
+  const aisleSelectId = useId();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -130,6 +147,23 @@ export function TagSelector({
     setEditColor(tagColorKey(tag.color));
   }
 
+  const aisleCategory = aisle?.category;
+  const pinnedAisle =
+    aisle?.categorySource === "user"
+      ? isGroceryCategory(aisleCategory)
+        ? aisleCategory
+        : DEFAULT_GROCERY_CATEGORY
+      : null;
+  const shownAisle = isGroceryCategory(aisleCategory)
+    ? aisleCategory
+    : DEFAULT_GROCERY_CATEGORY;
+
+  function handleAisleChange(event: ChangeEvent<HTMLSelectElement>) {
+    if (!aisle) return;
+    const value = event.target.value;
+    aisle.onChange(isGroceryCategory(value) ? value : null);
+  }
+
   return (
     <div className="relative inline-block">
       {mode === "global" ? (
@@ -154,7 +188,11 @@ export function TagSelector({
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-controls={popoverId}
-          aria-label={itemName ? t.groceries.tags.tagsFor(itemName) : t.groceries.tags.tags}
+          aria-label={
+            itemName
+              ? t.groceries.tags.tagsAndAisleFor(itemName)
+              : t.groceries.tags.tagsAndAisle
+          }
           className="relative flex rounded-md p-1 text-muted-foreground before:absolute before:-inset-2 before:content-[''] hover:bg-secondary hover:text-foreground"
         >
           <Tag className="h-4 w-4" aria-hidden="true" />
@@ -213,6 +251,36 @@ export function TagSelector({
             </div>
           ) : (
             <>
+              {mode === "item" && aisle && (
+                <div className="mb-3 space-y-1.5">
+                  <label htmlFor={aisleSelectId} className="block text-sm font-semibold">
+                    {t.groceries.aisle}
+                  </label>
+                  <div className="relative min-w-0">
+                    <select
+                      id={aisleSelectId}
+                      value={pinnedAisle ?? AUTOMATIC_AISLE}
+                      onChange={handleAisleChange}
+                      className="flex h-10 w-full min-w-0 appearance-none rounded-md border border-input bg-background py-2 pl-3 pr-9 text-base transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <option value={AUTOMATIC_AISLE}>
+                        {pinnedAisle
+                          ? t.groceries.automaticAisle
+                          : t.groceries.automaticAisleWith(t.groceries.aisles[shownAisle])}
+                      </option>
+                      {GROCERY_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {t.groceries.aisles[category]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      aria-hidden
+                      className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                  </div>
+                </div>
+              )}
               <Input
                 type="text"
                 placeholder={t.groceries.tags.searchOrCreate}

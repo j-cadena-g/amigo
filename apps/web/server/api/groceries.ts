@@ -11,6 +11,7 @@ import {
   isNull,
   lt,
   scopeToHousehold,
+  sql,
   type DrizzleD1,
 } from "@amigo/db";
 import { getCloudflare } from "../../router-context";
@@ -29,6 +30,7 @@ import {
   ROUTE_RATE_LIMITS,
 } from "../middleware/rate-limit";
 import { getSplatPath, getSplatSegments, type ApiHandler } from "./route";
+import { GROCERY_CATEGORIES } from "@/app/lib/grocery-categories";
 import { getHomeCurrency } from "../lib/household-currency";
 import {
   categorizeGroceryItem,
@@ -54,6 +56,10 @@ const updatePurchaseDateSchema = z.object({
     (date) => date <= new Date(),
     "Purchase date cannot be in the future"
   ),
+});
+
+const updateCategorySchema = z.object({
+  category: z.enum(GROCERY_CATEGORIES).nullable(),
 });
 
 const toggleSchema = z.object({
@@ -149,7 +155,7 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     const itemId = crypto.randomUUID();
-    const { category } = await categorizeGroceryItem(
+    const decision = await categorizeGroceryItem(
       groceryCategoryAi(env.AI),
       validated.name.trim(),
       { supplied: validated.category, homeCurrency: () => getHomeCurrency(db, session!.householdId) }
@@ -173,7 +179,8 @@ export const handleGroceriesRequest: ApiHandler = async ({
             householdId: session!.householdId,
             createdByUserId: session!.userId,
             itemName: validated.name.trim(),
-            category,
+            category: decision.category,
+            categorySource: decision.source,
           })
           .returning()
           .get()
@@ -303,14 +310,22 @@ export const handleGroceriesRequest: ApiHandler = async ({
       throw new ActionError("Item not found", "NOT_FOUND");
     }
 
-    // If Jev can't decide, leave the aisle column alone so a rename that
-    // finished while this one was waiting is not overwritten. A confident
-    // choice is written even when it matches the aisle we read earlier.
-    const { category, decided } = await categorizeGroceryItem(
-      groceryCategoryAi(env.AI),
-      validated.name.trim(),
-      { fallback: existing.category, homeCurrency: () => getHomeCurrency(db, session!.householdId) }
-    );
+    // A pinned aisle is the member's. Don't ask Jev, and don't write category.
+    let category: string | null = null;
+    let decided = false;
+    if (existing.categorySource !== "user") {
+      // If Jev can't decide, leave the aisle column alone so a rename that
+      // finished while this one was waiting is not overwritten. A confident
+      // choice is written even when it matches the aisle we read earlier,
+      // unless the row was pinned while Jev was thinking.
+      const decision = await categorizeGroceryItem(
+        groceryCategoryAi(env.AI),
+        validated.name.trim(),
+        { fallback: existing.category, homeCurrency: () => getHomeCurrency(db, session!.householdId) }
+      );
+      category = decision.category;
+      decided = decision.decided;
+    }
 
     const updated = await withAudit(
       db,
@@ -328,7 +343,11 @@ export const handleGroceriesRequest: ApiHandler = async ({
           .update(groceryItems)
           .set({
             itemName: validated.name.trim(),
-            ...(decided ? { category } : {}),
+            ...(decided
+              ? {
+                  category: sql`CASE WHEN ${groceryItems.categorySource} = 'user' THEN ${groceryItems.category} ELSE ${category} END`,
+                }
+              : {}),
             updatedAt: new Date(),
           })
           .where(
@@ -460,6 +479,98 @@ export const handleGroceriesRequest: ApiHandler = async ({
     if (!updated) {
       throw new ActionError("Item not found", "NOT_FOUND");
     }
+
+    broadcastUpdate("update", id);
+
+    return Response.json(updated);
+  }
+
+  if (request.method === "PATCH" && id && action === "category") {
+    await enforceRateLimit(
+      env,
+      `${session!.userId}:groceries:category`,
+      ROUTE_RATE_LIMITS.groceries.category
+    );
+
+    const validated = updateCategorySchema.parse(await request.json());
+    const existing = await db.query.groceryItems.findFirst({
+      where: and(
+        eq(groceryItems.id, id),
+        scopeToHousehold(groceryItems.householdId, session!.householdId),
+        isNull(groceryItems.deletedAt)
+      ),
+    });
+
+    if (!existing) {
+      throw new ActionError("Item not found", "NOT_FOUND");
+    }
+
+    // A chosen aisle is a pin. null hands the item back to Jev.
+    const categorySource = validated.category === null ? "ai" : "user";
+    let category: string | null = validated.category;
+    let writeCategory = validated.category !== null;
+    if (validated.category === null) {
+      const decision = await categorizeGroceryItem(
+        groceryCategoryAi(env.AI),
+        existing.itemName,
+        {
+          fallback: existing.category,
+          homeCurrency: () => getHomeCurrency(db, session!.householdId),
+        }
+      );
+      writeCategory = decision.decided;
+      category = decision.category;
+    }
+
+    const scope = and(
+      eq(groceryItems.id, id),
+      scopeToHousehold(groceryItems.householdId, session!.householdId),
+      isNull(groceryItems.deletedAt)
+    );
+    // Clearing a pin waits on Jev, so only write if the item still has the
+    // name Jev saw and no one re-pinned it in the meantime.
+    const unchangedPin =
+      validated.category === null
+        ? and(
+            eq(groceryItems.itemName, existing.itemName),
+            eq(groceryItems.categorySource, existing.categorySource),
+            existing.category === null
+              ? isNull(groceryItems.category)
+              : eq(groceryItems.category, existing.category)
+          )
+        : undefined;
+
+    const updated = await db
+      .update(groceryItems)
+      .set({
+        ...(writeCategory ? { category } : {}),
+        categorySource,
+        updatedAt: new Date(),
+      })
+      .where(and(scope, unchangedPin))
+      .returning()
+      .get();
+
+    if (!updated) {
+      // A newer rename or pin wins; hand back the row as it is now.
+      const current = await db.query.groceryItems.findFirst({ where: scope });
+      if (!current) {
+        throw new ActionError("Item not found", "NOT_FOUND");
+      }
+      return Response.json(current);
+    }
+
+    await insertManyAuditLogs(db, [
+      {
+        householdId: session!.householdId,
+        tableName: "grocery_items",
+        recordId: id,
+        operation: "UPDATE",
+        oldValues: existing,
+        newValues: updated,
+        changedBy: session!.userId,
+      },
+    ]);
 
     broadcastUpdate("update", id);
 

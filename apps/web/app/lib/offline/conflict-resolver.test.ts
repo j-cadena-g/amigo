@@ -9,6 +9,7 @@ const local: OfflineGroceryItem = {
   createdByUserDisplayName: null,
   itemName: "leche",
   category: "Dairy",
+  categorySource: "ai",
   isPurchased: true,
   purchasedAt: 30,
   createdAt: 1,
@@ -27,6 +28,7 @@ const server: ServerGroceryItem = {
   createdByUserDisplayName: null,
   itemName: "leche",
   category: "Dairy & Eggs",
+  categorySource: "user",
   isPurchased: false,
   purchasedAt: null,
   createdAt: 1,
@@ -41,10 +43,41 @@ describe("mergeItems", () => {
 
     expect(merged).toMatchObject({
       category: "Dairy & Eggs",
+      categorySource: "user",
       isPurchased: true,
       tagIds: ["t1"],
       _serverVersion: 20,
       _syncStatus: "pending",
     });
+  });
+
+  it("takes the server aisle and source when merging, even if local is newer", () => {
+    const serverNewer = mergeItems(
+      { ...local, updatedAt: 10, category: "Dairy", categorySource: "ai" },
+      { ...server, updatedAt: 40, category: "Pantry", categorySource: "user" },
+      "merge"
+    );
+    expect(serverNewer.category).toBe("Pantry");
+    expect(serverNewer.categorySource).toBe("user");
+
+    // A member pinned the aisle on the server while this device was offline.
+    const localNewer = mergeItems(
+      { ...local, updatedAt: 50, category: "Dairy", categorySource: "ai" },
+      { ...server, updatedAt: 20, category: "Pantry", categorySource: "user" },
+      "merge"
+    );
+    expect(localNewer.category).toBe("Pantry");
+    expect(localNewer.categorySource).toBe("user");
+  });
+
+  it("takes the server aisle and source when the server wins", () => {
+    const merged = mergeItems(
+      { ...local, category: "Dairy", categorySource: "user" },
+      { ...server, category: "Pantry", categorySource: "ai" },
+      "server-wins"
+    );
+
+    expect(merged.category).toBe("Pantry");
+    expect(merged.categorySource).toBe("ai");
   });
 });

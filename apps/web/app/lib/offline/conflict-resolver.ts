@@ -1,3 +1,4 @@
+import type { GroceryCategorySource } from "@amigo/db";
 import type { OfflineGroceryItem } from "./db";
 
 export interface ServerGroceryItem {
@@ -7,6 +8,7 @@ export interface ServerGroceryItem {
   createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
+  categorySource?: GroceryCategorySource;
   isPurchased: boolean;
   purchasedAt: number | null; // timestamp_ms
   createdAt: number; // timestamp_ms
@@ -77,6 +79,7 @@ export function mergeItems(
       ...server,
       createdByUserDisplayName: server.createdByUserDisplayName ?? null,
       tagIds: server.tagIds ?? local.tagIds,
+      categorySource: server.categorySource,
       _localVersion: 0,
       _serverVersion: server.updatedAt,
       _syncStatus: "synced",
@@ -86,8 +89,9 @@ export function mergeItems(
   if (strategy === "local-wins") {
     return {
       ...local,
-      // Offline edits never change the aisle; the server assigns it.
+      // Offline edits never change the aisle or who chose it; the server assigns both.
       category: server.category,
+      categorySource: server.categorySource,
       _serverVersion: server.updatedAt,
       _syncStatus: "pending",
     };
@@ -103,7 +107,9 @@ export function mergeItems(
     createdByUserDisplayName:
       server.createdByUserDisplayName ?? local.createdByUserDisplayName,
     itemName: useServer ? server.itemName : local.itemName,
-    category: useServer ? server.category : local.category,
+    // Offline edits never change the aisle, so the server's pair always wins.
+    category: server.category,
+    categorySource: server.categorySource,
     isPurchased: useServer ? server.isPurchased : local.isPurchased,
     purchasedAt: useServer ? server.purchasedAt : local.purchasedAt,
     createdAt: local.createdAt,

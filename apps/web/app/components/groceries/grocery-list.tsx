@@ -55,6 +55,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
     deleteItem,
     updateTags,
     editName,
+    setCategory,
     createTag,
     deleteTag,
     editTag,
@@ -211,6 +212,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
                     onDelete={deleteItem}
                     onUpdateTags={updateTags}
                     onEditName={editName}
+                    onSetCategory={setCategory}
                     onCreateTag={handleCreateTag}
                     onDeleteTag={deleteTag}
                     onEditTag={editTag}

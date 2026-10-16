@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { focusDialogNotField } from "@/app/lib/pointer";
 import { cn } from "@/app/lib/utils";
 import { useT } from "@/app/i18n";
 
@@ -51,20 +52,24 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
+>(({ className, children, onOpenAutoFocus, ...props }, ref) => {
   const t = useT();
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         ref={ref}
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event);
+          focusDialogNotField(event);
+        }}
         style={{
           backgroundColor: "var(--color-card)",
           color: "var(--color-card-foreground)",
           borderColor: "var(--color-border)",
         }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-[51] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-lg animate-appear",
+          "fixed left-1/2 top-1/2 z-[51] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-lg animate-appear focus:outline-none",
           className
         )}
         {...props}

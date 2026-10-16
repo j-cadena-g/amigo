@@ -1,4 +1,5 @@
 import { and, auditLogs, eq, groceryItems, type DrizzleD1 } from "@amigo/db";
+import type { LoaderFunctionArgs } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRouterLoadContext } from "../../router-context";
 import type { AppSession, Env } from "../env";
@@ -8,6 +9,7 @@ import {
   handleGroceriesRequest,
   purgeOldPurchasedGroceryItems,
 } from "./groceries";
+import { handleApiRoute } from "./route";
 import { handleSyncRequest } from "./sync";
 
 // What the Workers AI binding returns for typesafe/jev.
@@ -100,7 +102,41 @@ describe("grocery categorization integration", () => {
     return response;
   }
 
-  async function seedItem(itemName: string, category: string) {
+  /** Goes through the route wrapper so Zod and ActionError become HTTP statuses. */
+  function callGroceriesRoute(env: Env, method: string, path: string, body: unknown) {
+    return handleApiRoute(
+      {
+        request: new Request(
+          `http://localhost/api/groceries${path ? `/${path}` : ""}`,
+          {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        ),
+        params: { "*": path },
+        context: createRouterLoadContext({
+          cloudflare: {
+            env,
+            ctx: { waitUntil() {} } as unknown as ExecutionContext,
+            caches: {} as CacheStorage,
+          },
+          app: {
+            cspNonce: "test-nonce",
+            sessionStatus: "authenticated",
+            session: session(),
+          },
+        }),
+      } as unknown as LoaderFunctionArgs,
+      { auth: "none", handler: handleGroceriesRequest }
+    );
+  }
+
+  async function seedItem(
+    itemName: string,
+    category: string,
+    categorySource?: "ai" | "user"
+  ) {
     const id = crypto.randomUUID();
     await db.insert(groceryItems).values({
       id,
@@ -108,6 +144,7 @@ describe("grocery categorization integration", () => {
       createdByUserId: ownerId,
       itemName,
       category,
+      ...(categorySource ? { categorySource } : {}),
     });
     return id;
   }
@@ -123,6 +160,7 @@ describe("grocery categorization integration", () => {
     await expect(response.json()).resolves.toMatchObject({
       itemName: "leche 2%",
       category: "Dairy & Eggs",
+      categorySource: "ai",
     });
     expect(run).toHaveBeenCalledWith(
       "typesafe/jev",
@@ -258,10 +296,296 @@ describe("grocery categorization integration", () => {
       results: [
         {
           success: true,
-          serverItem: { itemName: "aguacate avocado", category: "Fruits & Vegetables" },
+          serverItem: {
+            itemName: "aguacate avocado",
+            category: "Fruits & Vegetables",
+            categorySource: "ai",
+          },
         },
       ],
     });
+  });
+
+  it("stores a supplied aisle as the member's without asking Jev", async () => {
+    const run = vi.fn();
+
+    const response = await callGroceries(envWithAi(run), "POST", "", {
+      name: "leche",
+      category: "Dairy & Eggs",
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      itemName: "leche",
+      category: "Dairy & Eggs",
+      categorySource: "user",
+    });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("pins an aisle without asking Jev", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs");
+    const run = vi.fn();
+
+    const response = await callGroceries(envWithAi(run), "PATCH", `${id}/category`, {
+      category: "Pantry",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id,
+      category: "Pantry",
+      categorySource: "user",
+    });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("keeps a pinned aisle when the item is renamed", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs", "user");
+    const run = vi.fn().mockResolvedValue(jevResponse("Frozen"));
+
+    const response = await callGroceries(envWithAi(run), "PATCH", id, {
+      name: "leche 2%",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      itemName: "leche 2%",
+      category: "Dairy & Eggs",
+      categorySource: "user",
+    });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("keeps a pin that lands while Jev is choosing a new aisle", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs");
+    const { run, jev } = pendingJev();
+
+    const rename = callGroceries(envWithAi(run), "PATCH", id, {
+      name: "leche 2%",
+    });
+    await vi.waitFor(() => expect(run).toHaveBeenCalled());
+    await db
+      .update(groceryItems)
+      .set({ category: "Pantry", categorySource: "user" })
+      .where(eq(groceryItems.id, id));
+    jev.resolve(jevResponse("Frozen"));
+
+    expect((await rename).status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({
+      itemName: "leche 2%",
+      category: "Pantry",
+      categorySource: "user",
+    });
+  });
+
+  it("asks Jev again when a pin is cleared", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs", "user");
+    const run = vi.fn().mockResolvedValue(jevResponse("Pantry"));
+
+    const response = await callGroceries(envWithAi(run), "PATCH", `${id}/category`, {
+      category: null,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      category: "Pantry",
+      categorySource: "ai",
+    });
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a newer pin that lands while a pin is being cleared", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs", "user");
+    const { run, jev } = pendingJev();
+
+    const clear = callGroceries(envWithAi(run), "PATCH", `${id}/category`, {
+      category: null,
+    });
+    await vi.waitFor(() => expect(run).toHaveBeenCalled());
+    await db
+      .update(groceryItems)
+      .set({ category: "Pantry", categorySource: "user" })
+      .where(eq(groceryItems.id, id));
+    jev.resolve(jevResponse("Frozen"));
+
+    const response = await clear;
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      category: "Pantry",
+      categorySource: "user",
+    });
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({ category: "Pantry", categorySource: "user" });
+  });
+
+  it("does not save an aisle for a name that changed while a pin was being cleared", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs", "user");
+    const { run, jev } = pendingJev();
+
+    const clear = callGroceries(envWithAi(run), "PATCH", `${id}/category`, {
+      category: null,
+    });
+    await vi.waitFor(() => expect(run).toHaveBeenCalled());
+    await db
+      .update(groceryItems)
+      .set({ itemName: "helado" })
+      .where(eq(groceryItems.id, id));
+    jev.resolve(jevResponse("Pantry"));
+
+    expect((await clear).status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({
+      itemName: "helado",
+      category: "Dairy & Eggs",
+      categorySource: "user",
+    });
+  });
+
+  it("keeps the aisle but clears the pin when Jev fails", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs", "user");
+    const run = vi.fn().mockRejectedValue(new Error("upstream"));
+
+    const response = await callGroceries(envWithAi(run), "PATCH", `${id}/category`, {
+      category: null,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      category: "Dairy & Eggs",
+      categorySource: "ai",
+    });
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an unknown aisle", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs");
+    const run = vi.fn();
+
+    const response = await callGroceriesRoute(envWithAi(run), "PATCH", `${id}/category`, {
+      category: "Hardware",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Validation error",
+      code: "VALIDATION_ERROR",
+    });
+    expect(run).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({ category: "Dairy & Eggs", categorySource: "ai" });
+  });
+
+  it("returns 404 for another household's item", async () => {
+    const suffix = crypto.randomUUID();
+    const otherHouseholdId = `hh-groceries-other-${suffix}`;
+    const otherOwnerId = `user-groceries-other-${suffix}`;
+    await seedHouseholdWithOwner(db, {
+      householdId: otherHouseholdId,
+      ownerId: otherOwnerId,
+      ownerAuthId: `clerk_groceries_other_${suffix}`,
+    });
+    const id = crypto.randomUUID();
+    await db.insert(groceryItems).values({
+      id,
+      householdId: otherHouseholdId,
+      createdByUserId: otherOwnerId,
+      itemName: "leche",
+      category: "Dairy & Eggs",
+    });
+    const run = vi.fn();
+
+    const response = await callGroceriesRoute(envWithAi(run), "PATCH", `${id}/category`, {
+      category: "Pantry",
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "NOT_FOUND" });
+    expect(run).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row).toMatchObject({ category: "Dairy & Eggs" });
+  });
+
+  it("returns 404 for a soft-deleted item", async () => {
+    const id = await seedItem("leche", "Dairy & Eggs");
+    await db
+      .update(groceryItems)
+      .set({ deletedAt: new Date() })
+      .where(eq(groceryItems.id, id));
+    const run = vi.fn();
+
+    const response = await callGroceriesRoute(envWithAi(run), "PATCH", `${id}/category`, {
+      category: "Pantry",
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "NOT_FOUND" });
+    expect(run).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, id));
+    expect(row?.category).toBe("Dairy & Eggs");
+    expect(row?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("stores a supplied aisle as the member's for an offline sync add", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Frozen"));
+
+    const response = await handleSyncRequest({
+      env: envWithAi(run),
+      params: {},
+      request: new Request("http://localhost/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mutations: [
+            {
+              id: `mutation-${crypto.randomUUID()}`,
+              operation: "add",
+              entityType: "groceryItem",
+              entityId: `item-${crypto.randomUUID()}`,
+              payload: { name: "leche", category: "Dairy & Eggs" },
+            },
+          ],
+        }),
+      }),
+      sessionStatus: "authenticated",
+      session: session(),
+      loadContext: {} as never,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      processed: 1,
+      results: [
+        {
+          success: true,
+          serverItem: {
+            itemName: "leche",
+            category: "Dairy & Eggs",
+            categorySource: "user",
+          },
+        },
+      ],
+    });
+    expect(run).not.toHaveBeenCalled();
   });
 });
 

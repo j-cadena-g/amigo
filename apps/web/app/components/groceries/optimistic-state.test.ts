@@ -22,6 +22,7 @@ function createItem(
     createdByUserDisplayName: "Jaime",
     transferredFromCreatedByUserId: null,
     category: "General",
+    categorySource: "ai",
     deletedAt: null,
     createdAt: now,
     updatedAt: now,
@@ -99,6 +100,62 @@ describe("optimistic grocery mutations", () => {
 
     expect(committed[0]?.itemName).toBe("Manzanas");
     expect(committed[0]?.category).toBe("Fruits & Vegetables");
+  });
+
+  it("pins an aisle before the server answers", () => {
+    const baseItems = [
+      createItem({ id: "milk", itemName: "Milk", category: "General", categorySource: "ai" }),
+    ];
+
+    const committed = applyOptimisticAction(baseItems, {
+      type: "set_category",
+      id: "milk",
+      category: "Dairy & Eggs",
+    });
+
+    expect(committed[0]?.category).toBe("Dairy & Eggs");
+    expect(committed[0]?.categorySource).toBe("user");
+  });
+
+  it("marks an aisle automatic without changing it before the server answers", () => {
+    const baseItems = [
+      createItem({
+        id: "milk",
+        itemName: "Milk",
+        category: "Dairy & Eggs",
+        categorySource: "user",
+      }),
+    ];
+
+    const committed = applyOptimisticAction(baseItems, {
+      type: "set_category",
+      id: "milk",
+      category: null,
+    });
+
+    expect(committed[0]?.category).toBe("Dairy & Eggs");
+    expect(committed[0]?.categorySource).toBe("ai");
+  });
+
+  it("folds the server aisle and source after a category update", () => {
+    const baseItems = [
+      createItem({
+        id: "milk",
+        itemName: "Milk",
+        category: "Dairy & Eggs",
+        categorySource: "user",
+      }),
+    ];
+
+    const committed = applyOptimisticAction(baseItems, {
+      type: "set_category",
+      id: "milk",
+      category: null,
+      server: { category: "Pantry", categorySource: "ai" },
+    });
+
+    expect(committed[0]?.category).toBe("Pantry");
+    expect(committed[0]?.categorySource).toBe("ai");
   });
 
   it("commits a delete action by removing the item", () => {

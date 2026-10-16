@@ -1,3 +1,4 @@
+import type { GroceryCategorySource } from "@amigo/db";
 import {
   getOfflineDB,
   type OfflineGroceryItem,
@@ -295,6 +296,14 @@ export async function processSyncQueue(): Promise<{
   return { processed: totalProcessed, failed: totalFailed, discarded };
 }
 
+function categorySourceFromServer(
+  value: unknown,
+  fallback: GroceryCategorySource | undefined
+): GroceryCategorySource {
+  if (value === "ai" || value === "user") return value;
+  return fallback ?? "ai";
+}
+
 export function mergeServerItemWithLocal(
   serverId: string,
   serverItem: Record<string, unknown>,
@@ -327,6 +336,10 @@ export function mergeServerItemWithLocal(
       typeof serverItem.category === "string"
         ? serverItem.category
         : (fallback?.category ?? null),
+    categorySource: categorySourceFromServer(
+      serverItem.categorySource,
+      fallback?.categorySource
+    ),
     isPurchased: Boolean(
       serverItem.isPurchased ?? fallback?.isPurchased ?? false
     ),

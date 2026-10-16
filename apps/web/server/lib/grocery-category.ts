@@ -1,4 +1,4 @@
-import type { CurrencyCode } from "@amigo/db";
+import type { CurrencyCode, GroceryCategorySource } from "@amigo/db";
 import {
   DEFAULT_GROCERY_CATEGORY,
   GROCERY_CATEGORY_CRITERIA,
@@ -66,12 +66,18 @@ export interface GroceryCategoryDecision {
   category: string | null;
   /** False when `category` is the fallback because Jev did not choose an aisle. */
   decided: boolean;
+  /**
+   * "user" when an allowlisted `supplied` aisle was used.
+   * "ai" for Jev's choice and for the fallback.
+   */
+  source: GroceryCategorySource;
 }
 
 /**
- * Returns the supplied category when it is allowlisted, otherwise Jev's
- * confident choice. When Jev can't decide, `decided` is false and `category`
- * is `fallback` (General unless the caller passes something else).
+ * Returns the supplied category when it is allowlisted (`source` is "user"),
+ * otherwise Jev's confident choice (`source` is "ai"). When Jev can't decide,
+ * `decided` is false, `source` is "ai", and `category` is `fallback`
+ * (General unless the caller passes something else).
  */
 export async function categorizeGroceryItem(
   ai: GroceryCategoryAi | undefined,
@@ -89,11 +95,11 @@ export async function categorizeGroceryItem(
 ): Promise<GroceryCategoryDecision> {
   const explicit = supplied?.trim();
   if (explicit && isGroceryCategory(explicit)) {
-    return { category: explicit, decided: true };
+    return { category: explicit, decided: true, source: "user" };
   }
   if (!ai) {
     logJevFallback("grocery-category", "no_binding");
-    return { category: fallback, decided: false };
+    return { category: fallback, decided: false, source: "ai" };
   }
 
   // A failed or slow currency lookup only costs Jev the store's country, not the answer.
@@ -114,6 +120,6 @@ export async function categorizeGroceryItem(
     redact: [name],
     logChoice: true,
   });
-  if (!choice) return { category: fallback, decided: false };
-  return { category: choice.choice, decided: true };
+  if (!choice) return { category: fallback, decided: false, source: "ai" };
+  return { category: choice.choice, decided: true, source: "ai" };
 }

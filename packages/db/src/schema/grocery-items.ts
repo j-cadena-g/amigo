@@ -2,6 +2,10 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { households } from "./households";
 import { users } from "./users";
 
+/** Who chose an item's aisle: Jev ("ai") or a household member ("user"). */
+export const GROCERY_CATEGORY_SOURCES = ["ai", "user"] as const;
+export type GroceryCategorySource = (typeof GROCERY_CATEGORY_SOURCES)[number];
+
 export const groceryItems = sqliteTable(
   "grocery_items",
   {
@@ -22,6 +26,10 @@ export const groceryItems = sqliteTable(
     ).references(() => users.id, { onDelete: "set null" }),
     itemName: text("item_name").notNull(),
     category: text("category"),
+    // A "user" aisle is pinned: Jev never replaces it, even on rename.
+    categorySource: text("category_source", { enum: GROCERY_CATEGORY_SOURCES })
+      .notNull()
+      .default("ai"),
     isPurchased: integer("is_purchased", { mode: "boolean" })
       .notNull()
       .default(false),

@@ -243,7 +243,7 @@ async function processMutation(
       }
 
       const itemName = name.trim().slice(0, 255);
-      const { category: resolvedCategory } = await categorizeGroceryItem(
+      const decision = await categorizeGroceryItem(
         ai,
         itemName,
         {
@@ -258,7 +258,8 @@ async function processMutation(
           householdId: session.householdId,
           createdByUserId: session.userId,
           itemName,
-          category: resolvedCategory,
+          category: decision.category,
+          categorySource: decision.source,
         }),
         ...(validTags.length > 0
           ? [

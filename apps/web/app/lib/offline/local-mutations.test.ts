@@ -43,6 +43,7 @@ describe("applyQueuedMutationToItems", () => {
       id: "temp-1",
       itemName: "Eggs",
       tagIds: ["t1"],
+      categorySource: "ai",
       _syncStatus: "pending",
       deletedAt: null,
     });

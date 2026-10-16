@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import type { GroceryCategorySource } from "@amigo/db";
 
 export interface OfflineGroceryItem {
   id: string;
@@ -7,6 +8,11 @@ export interface OfflineGroceryItem {
   createdByUserDisplayName: string | null;
   itemName: string;
   category: string | null;
+  /**
+   * Who chose the aisle. Not indexed, so existing databases keep schema
+   * version 2; rows written before this field existed omit it (read as "ai").
+   */
+  categorySource?: GroceryCategorySource;
   isPurchased: boolean;
   purchasedAt: number | null; // timestamp_ms (D1 stores as integer)
   createdAt: number; // timestamp_ms

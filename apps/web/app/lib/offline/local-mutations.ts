@@ -31,6 +31,7 @@ export function buildOfflineItemForAdd(
     createdByUserDisplayName: null,
     itemName: name,
     category: null,
+    categorySource: "ai",
     isPurchased: false,
     purchasedAt: null,
     createdAt: t,

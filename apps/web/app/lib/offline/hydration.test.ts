@@ -174,6 +174,7 @@ describe("hydrateFromServer", () => {
     const pending = item({
       id: "g1",
       category: "Dairy",
+      categorySource: "ai",
       isPurchased: true,
       _serverVersion: 10,
       _syncStatus: "pending",
@@ -197,6 +198,7 @@ describe("hydrateFromServer", () => {
           createdByUserDisplayName: null,
           itemName: "Milk",
           category: "Dairy & Eggs",
+          categorySource: "user",
           isPurchased: false,
           purchasedAt: null,
           createdAt: ctx.now,
@@ -210,6 +212,7 @@ describe("hydrateFromServer", () => {
 
     expect(update).toHaveBeenCalledWith("g1", {
       category: "Dairy & Eggs",
+      categorySource: "user",
       _serverVersion: 10,
     });
   });

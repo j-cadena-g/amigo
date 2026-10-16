@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-16
+
+### Added
+
+- **Choose a grocery item's aisle.** The item's tags popover has an **Aisle** picker. Choosing an aisle pins it: Jev no longer moves that item, even when it is renamed. **Auto** hands the item back to Jev, which picks an aisle for its current name. Changing the aisle needs a connection, like renaming. Migration 0035 ([#198](https://github.com/j-cadena-g/amigo/pull/198))
+
 ## [0.6.3] - 2026-10-13
 
 ### Changed

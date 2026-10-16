@@ -23,12 +23,31 @@ Cloudflare-native household management app for shared budgeting, groceries, acco
 
 - Shared household dashboard and setup flow
 - Budget tracking with transactions, categories, budgets, and recurring entries
-- Grocery list management with tags, optimistic updates, and offline sync
+- Grocery list sorted into store aisles automatically (or pick the aisle yourself), with tags, optimistic updates, and offline sync
 - One accounts view for everything the household owns and owes (bank accounts, credit cards, loans, investments, property)
 - Household calendar on the dashboard
 - Household settings, member roles, invites, and account restore flows
 - Web push notifications for grocery changes and scheduled reminders for one-time or recurring income and expenses
 - Real-time updates through a household-scoped Durable Object WebSocket hub
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/dashboard.png" width="160" alt="Dashboard with October spending and a calendar of bills and paydays"></td>
+    <td align="center"><img src="docs/screenshots/groceries.png" width="160" alt="Grocery list grouped by store aisle, with store tags"></td>
+    <td align="center"><img src="docs/screenshots/aisle-picker.png" width="160" alt="Aisle picker open on a grocery item, set to Auto"></td>
+    <td align="center"><img src="docs/screenshots/money.png" width="160" alt="Transactions list with categories and accounts"></td>
+    <td align="center"><img src="docs/screenshots/accounts.png" width="160" alt="Accounts with net worth, assets, and liabilities"></td>
+  </tr>
+  <tr>
+    <td align="center">Dashboard</td>
+    <td align="center">Groceries</td>
+    <td align="center">Aisle picker</td>
+    <td align="center">Transactions</td>
+    <td align="center">Accounts</td>
+  </tr>
+</table>
+
+<sub>Screenshots: installed app on iPhone, sample data.</sub>
 
 ## Transaction imports
 

@@ -69,7 +69,7 @@ const DialogContent = React.forwardRef<
           borderColor: "var(--color-border)",
         }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-[51] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-lg animate-appear focus:outline-none",
+          "fixed left-1/2 top-1/2 z-[51] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-lg animate-appear focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           className
         )}
         {...props}

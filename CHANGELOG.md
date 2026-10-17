@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-17
+
+### Fixed
+
+- On phones, opening a grocery item's tags-and-aisle popover or a dialog such as **Edit account** no longer brings up the keyboard before you pick a field. Desktop still focuses the first field ([#200](https://github.com/j-cadena-g/amigo/pull/200))
+
 ## [0.6.4] - 2026-10-16
 
 ### Added

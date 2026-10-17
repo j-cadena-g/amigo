@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-17
+
+### Fixed
+
+- On phones, editing or adding a transaction no longer brings up the keyboard before you pick a field. Desktop still starts on the amount ([#202](https://github.com/j-cadena-g/amigo/pull/202))
+
 ## [0.6.5] - 2026-10-17
 
 ### Fixed

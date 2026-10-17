@@ -22,6 +22,7 @@ import { SectionLink } from "@/app/components/ledger";
 import { TypeToggle } from "@/app/components/type-toggle";
 import { AuditHistoryPanel } from "@/app/components/audit-history-panel";
 import { isPositiveAmount, parseAmount } from "@/app/lib/decimal-input";
+import { hasFinePointer } from "@/app/lib/pointer";
 import { useT } from "@/app/i18n";
 import {
   dayBeforeReminder,
@@ -126,6 +127,12 @@ function TransactionFields({
   const accountFieldId = useId();
   const { categories } = useFinancialCategories();
 
+  // Start on the amount only with a mouse or trackpad. On a phone, focusing it
+  // would raise the keyboard as soon as the form opens.
+  useEffect(() => {
+    if (hasFinePointer()) document.getElementById(amountId)?.focus();
+  }, [amountId]);
+
   const selectType = (type: "income" | "expense") =>
     onChange((prev) => {
       if (type === prev.type) return prev;
@@ -162,7 +169,6 @@ function TransactionFields({
           <AmountInput
             id={amountId}
             ref={amountRef}
-            autoFocus
             currency={form.currency}
             positive
             value={form.amount}

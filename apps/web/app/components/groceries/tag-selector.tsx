@@ -11,6 +11,7 @@ import {
   isGroceryCategory,
   type GroceryCategory,
 } from "@/app/lib/grocery-categories";
+import { hasFinePointer } from "@/app/lib/pointer";
 import { cn } from "@/app/lib/utils";
 import { tagColorKey, type TagColorKey } from "./constants";
 import { TagBadge } from "./tag-badge";
@@ -64,6 +65,7 @@ export function TagSelector({
   const [editColor, setEditColor] = useState<TagColorKey>("blue");
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const popoverId = useId();
   const aisleSelectId = useId();
 
@@ -95,6 +97,14 @@ export function TagSelector({
       };
     }
   }, [isOpen]);
+
+  // Focus the tag search only with a mouse or trackpad. On a phone it would raise
+  // the keyboard over the list before the user has chosen to type.
+  useEffect(() => {
+    if (isOpen && !editingTag && hasFinePointer()) {
+      searchInputRef.current?.focus();
+    }
+  }, [isOpen, editingTag]);
 
   const filteredTags = allTags.filter((tag) =>
     tag.name.toLowerCase().includes(search.toLowerCase())
@@ -282,6 +292,7 @@ export function TagSelector({
                 </div>
               )}
               <Input
+                ref={searchInputRef}
                 type="text"
                 placeholder={t.groceries.tags.searchOrCreate}
                 value={search}
@@ -290,7 +301,6 @@ export function TagSelector({
                   if (e.key === "Enter" && canCreate && !isCreating) handleCreate();
                 }}
                 aria-label={t.groceries.tags.searchOrCreate}
-                autoFocus
               />
 
               {canCreate && (

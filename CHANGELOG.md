@@ -4,9 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-10-18
+
+### Added
+
+- **Undo deleting a grocery item.** Deleting an item shows **Deleted Milk · Undo** for 7 seconds. The item is only removed once that ends, so other members never see a delete you undid. Leaving the page or switching apps sends the delete right away ([#208](https://github.com/j-cadena-g/amigo/pull/208))
+- After you add a grocery item, the status line says which aisle it went to, and its name is marked in yellow for a moment ([#208](https://github.com/j-cadena-g/amigo/pull/208))
+
 ### Removed
 
 - The old `debts` and `assets` tables. Credit cards, loans and assets have lived in accounts since 0.5.0; migration 0036 copies any row still left behind, then drops both tables. Edit history recorded before the move stays in the audit log until the 90-day cleanup removes it. Old `/debts` and `/assets` links still open **Accounts** ([#205](https://github.com/j-cadena-g/amigo/pull/205))
+
+### Fixed
+
+- On phones, tapping a grocery item's name to rename it brings up the keyboard. Before, the field opened without one and swallowed the next tap ([#206](https://github.com/j-cadena-g/amigo/pull/206))
+- **Add item** keeps the keyboard up, so you can type the next item right away ([#206](https://github.com/j-cadena-g/amigo/pull/206))
+- **Repeat every** and **Day of month** in a custom schedule open the number pad ([#206](https://github.com/j-cadena-g/amigo/pull/206))
+- Recurring names wrap instead of being cut off, so similar names like two paycheques can be told apart ([#206](https://github.com/j-cadena-g/amigo/pull/206))
+- On iPhone, the page behind a dialog no longer scrolls away when the keyboard opens. Closing the dialog leaves you where you were ([#207](https://github.com/j-cadena-g/amigo/pull/207))
 
 ## [0.6.6] - 2026-10-17
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { cn } from "@/app/lib/utils";
 import { buttonVariants } from "./button";
+import { PreservePageScroll } from "./preserve-page-scroll";
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
@@ -45,6 +46,7 @@ const AlertDialogContent = React.forwardRef<
       )}
       {...props}
     >
+      <PreservePageScroll />
       {children}
     </AlertDialogPrimitive.Content>
   </AlertDialogPortal>

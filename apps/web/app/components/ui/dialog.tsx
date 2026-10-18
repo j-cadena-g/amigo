@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { focusDialogNotField } from "@/app/lib/pointer";
 import { cn } from "@/app/lib/utils";
 import { useT } from "@/app/i18n";
+import { PreservePageScroll } from "./preserve-page-scroll";
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -76,6 +77,7 @@ const DialogContent = React.forwardRef<
       >
         {/* Scroll inside so the close button stays put on long dialogs. */}
         <div className="grid min-h-0 grid-cols-1 gap-4 overflow-y-auto overscroll-contain p-6">
+          <PreservePageScroll />
           {children}
         </div>
         <DialogPrimitive.Close className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none">

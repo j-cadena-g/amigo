@@ -9,6 +9,7 @@ import {
   createOptimisticMutation,
   type OptimisticMutation,
 } from "./optimistic-state";
+import { createPendingDeletes, UNDO_DELETE_MS } from "./pending-deletes";
 import { useHouseholdRealtime } from "@/app/components/realtime/household-realtime-provider";
 import { useToast } from "@/app/components/toast-provider";
 import type { QueuedMutation } from "@/app/lib/offline/sync-queue";
@@ -18,6 +19,15 @@ import {
   requestFailedMessage,
 } from "@/app/lib/api-error";
 import { useT } from "@/app/i18n";
+
+/** How long the "Added to <aisle>" note and the row highlight stay up. */
+const ADDED_FEEDBACK_MS = 3000;
+
+export interface AddedItem {
+  id: string;
+  name: string;
+  category: string | null;
+}
 
 interface UseGroceryLogicOptions {
   items: GroceryItemWithTags[];
@@ -139,10 +149,29 @@ export function useGroceryLogic({
   const [optimisticMutations, setOptimisticMutations] = useState<
     OptimisticMutation[]
   >([]);
-  const optimisticItems = useMemo(
-    () => applyOptimisticMutations(baseItems, optimisticMutations),
-    [baseItems, optimisticMutations]
+  // Deletes waiting out the undo window: hidden here, not sent yet. Kept apart
+  // from the overlay so they don't hold off realtime revalidation during the undo window.
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<ReadonlySet<string>>(
+    () => new Set()
   );
+  const optimisticItems = useMemo(() => {
+    const visible = applyOptimisticMutations(baseItems, optimisticMutations);
+    return pendingDeleteIds.size === 0
+      ? visible
+      : visible.filter((item) => !pendingDeleteIds.has(item.id));
+  }, [baseItems, optimisticMutations, pendingDeleteIds]);
+  const optimisticItemsRef = useRef(optimisticItems);
+  useEffect(() => {
+    optimisticItemsRef.current = optimisticItems;
+  }, [optimisticItems]);
+
+  // The item just added, once the server has put it in an aisle.
+  const [lastAdded, setLastAdded] = useState<AddedItem | null>(null);
+  useEffect(() => {
+    if (!lastAdded) return;
+    const timer = setTimeout(() => setLastAdded(null), ADDED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [lastAdded]);
 
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [datePickerItemId, setDatePickerItemId] = useState<string | null>(null);
@@ -257,6 +286,11 @@ export function useGroceryLogic({
               const raw = (await res.json()) as SerializedGroceryItem;
               const realItem = buildItemFromServer(action.item, raw);
               setBaseItems((prev) => [realItem, ...prev]);
+              setLastAdded({
+                id: realItem.id,
+                name: realItem.itemName,
+                category: realItem.category,
+              });
             } else if (action.type === "edit_name") {
               const raw = (await res.json()) as SerializedGroceryItem;
               setBaseItems((prev) =>
@@ -409,13 +443,59 @@ export function useGroceryLogic({
     [runAction, t]
   );
 
-  const deleteItem = useCallback(
+  // The real delete, once the undo window is over. keepalive so a delete
+  // flushed while the page is going away still reaches the server.
+  const commitDelete = useCallback(
     (id: string) => {
       runAction({ type: "delete", id }, t.groceries.actions.deleteItem, () =>
-        fetch(`/api/groceries/${id}`, { method: "DELETE" })
+        fetch(`/api/groceries/${id}`, { method: "DELETE", keepalive: true })
       );
     },
     [runAction, t]
+  );
+  const commitDeleteRef = useRef(commitDelete);
+  useEffect(() => {
+    commitDeleteRef.current = commitDelete;
+  }, [commitDelete]);
+
+  const [pendingDeletes] = useState(() =>
+    createPendingDeletes({
+      commit: (id) => commitDeleteRef.current(id),
+      onChange: setPendingDeleteIds,
+    })
+  );
+
+  // Don't leave deletes waiting when the list goes away: leaving the page,
+  // switching apps, or closing the tab sends them right away.
+  useEffect(() => {
+    const flush = () => pendingDeletes.flush();
+    const flushWhenHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", flushWhenHidden);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [pendingDeletes]);
+
+  const deleteItem = useCallback(
+    (id: string) => {
+      const item = optimisticItemsRef.current.find((candidate) => candidate.id === id);
+      if (!item) return;
+      pendingDeletes.schedule(id);
+      toast(t.groceries.deletedItem(item.itemName), {
+        duration: UNDO_DELETE_MS,
+        action: {
+          label: t.groceries.undo,
+          ariaLabel: t.groceries.undoDeleteNamed(item.itemName),
+          onClick: () => pendingDeletes.undo(id),
+        },
+      });
+    },
+    [pendingDeletes, toast, t]
   );
 
   const updateTags = useCallback(
@@ -559,6 +639,7 @@ export function useGroceryLogic({
     activeItems,
     purchasedItems,
     isPending,
+    lastAdded,
     filterTagIds,
     datePickerItem,
     datePickerItemId,

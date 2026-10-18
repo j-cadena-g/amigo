@@ -23,8 +23,6 @@ export type AuditTableName =
   | "transactions"
   | "budgets"
   | "financial_accounts"
-  | "assets"
-  | "debts"
   | "recurring_transactions";
 
 type AuditHistoryEntry = {

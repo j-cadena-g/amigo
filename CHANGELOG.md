@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- The old `debts` and `assets` tables. Credit cards, loans and assets have lived in accounts since 0.5.0; migration 0036 copies any row still left behind, then drops both tables. Edit history recorded before the move stays in the audit log until the 90-day cleanup removes it. Old `/debts` and `/assets` links still open **Accounts**
+
 ## [0.6.6] - 2026-10-17
 
 ### Fixed

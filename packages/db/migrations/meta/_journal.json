@@ -253,6 +253,13 @@
       "when": 1792175193501,
       "tag": "0035_grocery_category_source",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1792297106653,
+      "tag": "0036_drop_debts_and_assets",
+      "breakpoints": true
     }
   ]
 }

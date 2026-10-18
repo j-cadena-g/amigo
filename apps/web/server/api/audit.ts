@@ -1,9 +1,7 @@
 import {
   and,
-  assets,
   auditLogs,
   budgets,
-  debts,
   desc,
   eq,
   financialAccounts,
@@ -11,7 +9,6 @@ import {
   groceryItems,
   inArray,
   isNull,
-  or,
   recurringTransactions,
   scopeToHousehold,
   transactions,
@@ -43,10 +40,6 @@ interface AuditEntry {
 }
 
 export const auditTableSchema = z.enum(AUDIT_TABLES);
-
-function orOwnerOrShared(column: typeof assets.userId | typeof debts.userId, viewerUserId: string) {
-  return or(eq(column, viewerUserId), isNull(column));
-}
 
 async function assertCanViewAuditRecord(
   db: ReturnType<typeof getDb>,
@@ -95,26 +88,6 @@ async function assertCanViewAuditRecord(
           scopeToHousehold(financialAccounts.householdId, householdId),
           isNull(financialAccounts.deletedAt),
           visibleFinancialAccountsCondition(viewerUserId)
-        ),
-      });
-      break;
-    case "assets":
-      record = await db.query.assets.findFirst({
-        where: and(
-          eq(assets.id, recordId),
-          scopeToHousehold(assets.householdId, householdId),
-          isNull(assets.deletedAt),
-          orOwnerOrShared(assets.userId, viewerUserId)
-        ),
-      });
-      break;
-    case "debts":
-      record = await db.query.debts.findFirst({
-        where: and(
-          eq(debts.id, recordId),
-          scopeToHousehold(debts.householdId, householdId),
-          isNull(debts.deletedAt),
-          orOwnerOrShared(debts.userId, viewerUserId)
         ),
       });
       break;

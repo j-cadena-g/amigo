@@ -21,8 +21,6 @@ const RECORD_MONEY_AUDIT_FIELDS = new Set([
   "balance",
   "amount",
   "limitAmount",
-  "balanceInitial",
-  "balanceCurrent",
   "creditLimit",
   "availableCredit",
   "loanAmount",

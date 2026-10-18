@@ -45,7 +45,7 @@ export const settings = defineMessages({
       saveAction: "save household settings",
       confirmCurrencyTitle: "Change home currency?",
       confirmCurrencyBody:
-        "This updates household totals and conversion rates for accounts, debts, assets, transactions, and budgets. Native amounts in each record's own currency are not changed.",
+        "This updates household totals and conversion rates for accounts, transactions, and budgets. Native amounts in each record's own currency are not changed.",
       confirmCurrency: "Change currency",
     },
     account: {
@@ -104,7 +104,7 @@ export const settings = defineMessages({
       saveAction: "guardar la configuración del hogar",
       confirmCurrencyTitle: "¿Cambiar la moneda principal?",
       confirmCurrencyBody:
-        "Esto actualiza los totales del hogar y las tasas de cambio de cuentas, deudas, activos, movimientos y presupuestos. Los montos en la moneda original de cada registro no cambian.",
+        "Esto actualiza los totales del hogar y las tasas de cambio de cuentas, movimientos y presupuestos. Los montos en la moneda original de cada registro no cambian.",
       confirmCurrency: "Cambiar moneda",
     },
     account: {

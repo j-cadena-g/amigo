@@ -93,7 +93,8 @@ export function RecurringRuleRow({
 
       <div className={cn("min-w-0 flex-1", !rule.isActive && "text-muted-foreground")}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="truncate font-semibold">{title}</span>
+          {/* Wrap rather than truncate: on phones, similar names cut off at the same prefix. */}
+          <span className="min-w-0 break-words font-semibold">{title}</span>
           <span
             className={cn(
               "shrink-0 font-mono font-medium",

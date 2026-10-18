@@ -139,7 +139,12 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
             autoComplete="off"
             className="min-w-0 flex-1"
           />
-          <Button type="submit" disabled={!newItemName.trim()}>
+          {/* Keep focus in the field so the phone keyboard stays up for the next item. */}
+          <Button
+            type="submit"
+            disabled={!newItemName.trim()}
+            onMouseDown={(e) => e.preventDefault()}
+          >
             {t.groceries.addItem}
           </Button>
         </div>

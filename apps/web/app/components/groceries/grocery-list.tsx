@@ -11,7 +11,11 @@ import { EmptyState } from "@/app/components/empty-state";
 import { PushNotificationButton } from "@/app/components/push-notification-button";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { groupGroceriesByAisle } from "@/app/lib/grocery-categories";
+import {
+  DEFAULT_GROCERY_CATEGORY,
+  groupGroceriesByAisle,
+  isGroceryCategory,
+} from "@/app/lib/grocery-categories";
 import { useT } from "@/app/i18n";
 
 interface GroceryListProps {
@@ -44,6 +48,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
     activeItems,
     purchasedItems,
     isPending,
+    lastAdded,
     filterTagIds,
     datePickerItem,
     datePickerItemId,
@@ -179,8 +184,20 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
             {t.groceries.clearFilters}
           </Button>
         )}
-        <p role="status" className="ml-auto text-sm text-muted-foreground">
-          {isPending ? t.common.saving : ""}
+        {/* New items are sorted into their aisle, often off-screen: say where it went. */}
+        <p role="status" className="ml-auto text-right text-sm text-muted-foreground">
+          {isPending
+            ? t.common.saving
+            : lastAdded
+              ? t.groceries.addedTo(
+                  lastAdded.name,
+                  t.groceries.aisles[
+                    isGroceryCategory(lastAdded.category)
+                      ? lastAdded.category
+                      : DEFAULT_GROCERY_CATEGORY
+                  ]
+                )
+              : ""}
         </p>
       </div>
 
@@ -211,6 +228,7 @@ export function GroceryList({ items, allTags, userId, fromOffline }: GroceryList
                   <GroceryItem
                     key={item.id}
                     item={item}
+                    highlighted={lastAdded?.id === item.id}
                     allTags={mergedTags}
                     onToggle={toggleItem}
                     onToggleWithDate={toggleItemWithDate}

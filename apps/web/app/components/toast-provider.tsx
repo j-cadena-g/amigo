@@ -9,18 +9,28 @@ import {
 
 export type ToastVariant = "default" | "success" | "error";
 
+export interface ToastAction {
+  label: string;
+  /** Accessible name when the label alone is ambiguous, e.g. "Undo deleting Milk". */
+  ariaLabel?: string;
+  onClick: () => void;
+}
+
 export interface ToastOptions {
   variant?: ToastVariant;
   /** Auto-dismiss delay in ms. Defaults to 4000. */
   duration?: number;
+  /** A button next to the message. Clicking it runs the action and dismisses the toast. */
+  action?: ToastAction;
 }
 
 export type ToastFn = (message: string, options?: ToastOptions) => void;
 
-interface ToastItem {
+export interface ToastItem {
   id: string;
   message: string;
   variant: ToastVariant;
+  action?: ToastAction;
 }
 
 const ToastContext = createContext<ToastFn>(() => {});
@@ -56,7 +66,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const variant = options?.variant ?? "default";
       const duration = options?.duration ?? 4000;
 
-      setToasts((prev) => [...prev, { id, message, variant }]);
+      setToasts((prev) => [...prev, { id, message, variant, action: options?.action }]);
 
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -86,16 +96,45 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         role="status"
       >
         {toasts.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => dismiss(t.id)}
-            className={`pointer-events-auto max-w-sm animate-appear rounded-lg px-4 py-2.5 text-sm font-semibold shadow-lg ${VARIANT_STYLES[t.variant]}`}
-          >
-            {t.message}
-          </button>
+          <ToastView key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
         ))}
       </div>
     </ToastContext.Provider>
+  );
+}
+
+export function ToastView({
+  toast: t,
+  onDismiss,
+}: {
+  toast: ToastItem;
+  onDismiss: () => void;
+}) {
+  const shape = `pointer-events-auto max-w-sm animate-appear rounded-lg text-sm font-semibold shadow-lg ${VARIANT_STYLES[t.variant]}`;
+
+  if (!t.action) {
+    return (
+      <button type="button" onClick={onDismiss} className={`${shape} px-4 py-2.5`}>
+        {t.message}
+      </button>
+    );
+  }
+
+  const action = t.action;
+  return (
+    <div className={`${shape} flex items-center gap-1 py-1 pl-4 pr-1`}>
+      <span className="py-1.5">{t.message}</span>
+      <button
+        type="button"
+        onClick={() => {
+          action.onClick();
+          onDismiss();
+        }}
+        aria-label={action.ariaLabel}
+        className="min-h-11 rounded-md px-3 underline underline-offset-4 pointer-fine:min-h-0 pointer-fine:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+      >
+        {action.label}
+      </button>
+    </div>
   );
 }

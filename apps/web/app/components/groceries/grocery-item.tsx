@@ -13,6 +13,8 @@ import { useT } from "@/app/i18n";
 
 interface GroceryItemProps {
   item: GroceryItemWithTags;
+  /** Just added: mark the name so it's easy to spot in its aisle. */
+  highlighted?: boolean;
   allTags: GroceryTag[];
   onToggle: (id: string) => void;
   onToggleWithDate: (id: string) => void;
@@ -27,6 +29,7 @@ interface GroceryItemProps {
 
 function GroceryItemComponent({
   item,
+  highlighted = false,
   allTags,
   onToggle,
   onToggleWithDate,
@@ -161,7 +164,8 @@ function GroceryItemComponent({
             type="button"
             onClick={handleStartEdit}
             className={cn(
-              "relative block max-w-full truncate text-left text-base text-foreground",
+              "relative block max-w-full truncate rounded-sm text-left text-base text-foreground transition-colors duration-700 motion-reduce:transition-none",
+              highlighted && "bg-tag text-tag-foreground",
               "after:absolute after:inset-x-0 after:top-1/2 after:-mt-px after:h-0.5 after:origin-left after:bg-foreground after:transition-transform after:duration-150 after:ease-out after:content-['']",
               isCheckingOff ? "after:scale-x-100" : "after:scale-x-0"
             )}

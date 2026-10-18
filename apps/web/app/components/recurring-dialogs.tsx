@@ -403,6 +403,7 @@ function RecurringFields({
               <Input
                 id={intervalId}
                 type="number"
+                inputMode="numeric"
                 min="1"
                 value={form.customInterval}
                 onChange={(e) =>
@@ -424,6 +425,7 @@ function RecurringFields({
               <Input
                 id={dayOfMonthId}
                 type="number"
+                inputMode="numeric"
                 min="1"
                 max="31"
                 value={form.customDayOfMonth}

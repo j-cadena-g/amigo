@@ -1,4 +1,5 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
+import { flushSync } from "react-dom";
 import type { GroceryTag } from "@amigo/db";
 import { Trash2 } from "lucide-react";
 import type { GroceryCategory } from "@/app/lib/grocery-categories";
@@ -68,10 +69,14 @@ function GroceryItemComponent({
     onUpdateTags(item.id, newTagIds);
   }
 
+  // Render the field and focus it inside the tap. iOS only raises the
+  // keyboard for focus() during the user's gesture, not from a timeout.
   function handleStartEdit() {
-    setEditValue(item.itemName);
-    setIsEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    flushSync(() => {
+      setEditValue(item.itemName);
+      setIsEditing(true);
+    });
+    inputRef.current?.focus();
   }
 
   function handleSaveEdit() {

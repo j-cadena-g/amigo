@@ -57,7 +57,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.63.1",
+    "@cloudflare/vite-plugin": "^1.64.0",
     "@cloudflare/vitest-pool-workers": "^0.23.0",
     "@cloudflare/workers-types": "^5",
     "@eslint/js": "^10.0.1",
@@ -66,18 +66,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^10.12.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "^17.13.0",
     "typescript": "^6.0",
-    "typescript-eslint": "^8.71.1",
+    "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
     "workbox-core": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.149.0"
+    "wrangler": "^4.151.1"
   }
 }

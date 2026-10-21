@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-10-20
+
+### Changed
+
+- Dependency updates (Clerk, Radix UI, React 19.3.1, zod 4.6.7, lucide-react, Wrangler 4.151, `@cloudflare/vite-plugin` 1.64, Vitest 4.1.12, turbo, typescript-eslint) ([#210](https://github.com/j-cadena-g/amigo/pull/210), [#211](https://github.com/j-cadena-g/amigo/pull/211))
+
 ## [0.6.7] - 2026-10-18
 
 ### Added

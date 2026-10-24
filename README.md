@@ -229,7 +229,7 @@ You do **not** need a Cloudflare account, Workers Builds, Cursor Cloud Agent sec
 
 ### Prerequisites
 
-- pnpm 11.3.0 (run `corepack enable` to use the version pinned in `package.json`)
+- pnpm 12.15.0 (run `corepack enable` to use the version pinned in `package.json`)
 - Node.js on `PATH` for local helper scripts
 - Wrangler comes with the repo (`pnpm exec wrangler`); a global install is optional
 - A **personal** [Clerk](https://clerk.com/) development application (`pk_test_` / `sk_test_`)

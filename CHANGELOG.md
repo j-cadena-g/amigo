@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-10-29
+
+### Fixed
+
+- A new grocery item that Jev couldn't place right away no longer stays stuck in **General**. Jev takes a second, longer look after the item is added and moves it to its aisle on every device, unless the item was renamed, pinned or moved in the meantime ([#217](https://github.com/j-cadena-g/amigo/pull/217))
+- Packaged cold cuts like bologna, salami and sliced ham are filed under **Deli** ([#217](https://github.com/j-cadena-g/amigo/pull/217))
+
 ## [0.6.9] - 2026-10-28
 
 ### Changed

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-10-28
+
+### Changed
+
+- Dependency updates (React Router 8.5, Clerk, Wrangler 4.152, `@cloudflare/vite-plugin` 1.65, Vite 8.3.5, ESLint 10.13, typescript-eslint, turbo, lucide-react), pnpm 12 and CI on Node 24 ([#213](https://github.com/j-cadena-g/amigo/pull/213), [#214](https://github.com/j-cadena-g/amigo/pull/214), [#215](https://github.com/j-cadena-g/amigo/pull/215))
+
 ## [0.6.8] - 2026-10-20
 
 ### Changed

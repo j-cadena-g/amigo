@@ -36,6 +36,7 @@ import {
   categorizeGroceryItem,
   groceryCategoryAi,
 } from "../lib/grocery-category";
+import { retryGroceryAisle } from "../lib/grocery-aisle-retry";
 
 const addItemSchema = z.object({
   name: z.string().min(1).max(255),
@@ -203,6 +204,18 @@ export const handleGroceriesRequest: ApiHandler = async ({
     }
 
     broadcastUpdate("create", item.id);
+
+    if (!decision.decided) {
+      runAfterResponse(
+        retryGroceryAisle(env, {
+          householdId: session!.householdId,
+          userId: session!.userId,
+          itemId: item.id,
+          itemName: item.itemName,
+          homeCurrency: () => getHomeCurrency(db, session!.householdId),
+        })
+      );
+    }
 
     runAfterResponse(
       queueGroceryPush(env, session!.householdId, {

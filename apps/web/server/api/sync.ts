@@ -20,10 +20,12 @@ import type { ApiHandler } from "./route";
 import { getHomeCurrency } from "../lib/household-currency";
 import { localizeResultErrors } from "../lib/localize-error";
 import { GROCERY_SYNC_MUTATION_RETENTION_MS } from "../../app/lib/offline/sync-retention";
+import { getCloudflare } from "../../router-context";
 import {
   categorizeGroceryItem,
   groceryCategoryAi,
 } from "../lib/grocery-category";
+import { retryGroceryAisle } from "../lib/grocery-aisle-retry";
 
 const MAX_BATCH_SIZE = 10;
 const GROCERY_SYNC_MUTATION_CLEANUP_BATCH_SIZE = 500;
@@ -79,6 +81,25 @@ export const handleSyncRequest: ApiHandler = async ({
       throw error;
     }));
 
+  // Adds Jev couldn't place get a second try after the response is sent.
+  const ctx = getCloudflare(loadContext)?.ctx;
+  const retryAisle = (itemId: string, itemName: string) => {
+    const settled = retryGroceryAisle(env, {
+      householdId: session!.householdId,
+      userId: session!.userId,
+      itemId,
+      itemName,
+      homeCurrency,
+    }).catch((err) => {
+      console.warn("sync: aisle retry failed", err instanceof Error ? err.message : err);
+    });
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(settled);
+    } else {
+      void settled;
+    }
+  };
+
   for (const mutation of validated.mutations) {
     try {
       const serverItem = await processMutation(
@@ -86,7 +107,8 @@ export const handleSyncRequest: ApiHandler = async ({
         session!,
         mutation,
         groceryCategoryAi(env.AI),
-        homeCurrency
+        homeCurrency,
+        retryAisle
       );
       results.push({
         id: mutation.id,
@@ -203,7 +225,8 @@ async function processMutation(
   session: { userId: string; householdId: string },
   mutation: z.infer<typeof syncMutationSchema>,
   ai: ReturnType<typeof groceryCategoryAi>,
-  homeCurrency: () => Promise<CurrencyCode>
+  homeCurrency: () => Promise<CurrencyCode>,
+  retryAisle: (itemId: string, itemName: string) => void
 ): Promise<Record<string, unknown> | null> {
   switch (mutation.operation) {
     case "add": {
@@ -302,6 +325,8 @@ async function processMutation(
         },
         async () => created
       );
+
+      if (!decision.decided) retryAisle(newItemId, itemName);
 
       return created;
     }

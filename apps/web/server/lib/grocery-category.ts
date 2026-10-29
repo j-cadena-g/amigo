@@ -14,6 +14,8 @@ import {
 
 export const GROCERY_CATEGORY_MODEL = JEV_MODEL;
 export const GROCERY_CATEGORY_TIMEOUT_MS = 2500;
+/** The retry after an add runs once the response is sent, so it can wait longer. */
+export const GROCERY_CATEGORY_RETRY_TIMEOUT_MS = 10_000;
 export const GROCERY_CATEGORY_MIN_CONFIDENCE = 0.5;
 /** How long categorization waits for the household's currency before using the default store. */
 const HOME_CURRENCY_WAIT_MS = 500;
@@ -86,11 +88,13 @@ export async function categorizeGroceryItem(
     supplied,
     fallback = DEFAULT_GROCERY_CATEGORY,
     homeCurrency,
+    timeoutMs = GROCERY_CATEGORY_TIMEOUT_MS,
   }: {
     supplied?: string | null;
     fallback?: string | null;
     /** The household's currency, or a lookup run only if Jev is asked. */
     homeCurrency?: CurrencyCode | null | (() => Promise<CurrencyCode | null>);
+    timeoutMs?: number;
   } = {}
 ): Promise<GroceryCategoryDecision> {
   const explicit = supplied?.trim();
@@ -116,7 +120,7 @@ export async function categorizeGroceryItem(
     instructions,
     criteria: { ...GROCERY_CATEGORY_CRITERIA },
     minConfidence: GROCERY_CATEGORY_MIN_CONFIDENCE,
-    timeoutMs: GROCERY_CATEGORY_TIMEOUT_MS,
+    timeoutMs,
     redact: [name],
     logChoice: true,
   });

@@ -33,7 +33,7 @@ export const GROCERY_CATEGORY_CRITERIA: Record<GroceryCategory, string> = {
   Bakery:
     "Bread, buns, bagels, tortillas, and baked goods such as croissants, muffins, and cakes. Includes pan, bolillo, pan dulce, tortillas, pan tajado, pan de bono, almojábanas, buñuelos, arepas.",
   Deli:
-    "Deli counter meats and cheeses, rotisserie chicken, and ready-to-eat meals, salads, and sushi. Includes jamón rebanado, pollo rostizado, comida preparada, jamón tajado, salchichón, mortadela.",
+    "Deli counter meats and cheeses, packaged cold cuts and lunch meats, rotisserie chicken, and ready-to-eat meals, salads, and sushi. Includes bologna, salami, pepperoni, sliced ham, sliced turkey, pastrami, prosciutto, jamón rebanado, pollo rostizado, comida preparada, jamón tajado, salchichón, mortadela.",
   Meat: "Fresh beef, chicken, pork, turkey, ground meat, bacon, and sausages. Includes carne, pollo, res, cerdo, chorizo, tocino, carne molida, costilla, sobrebarriga, longaniza.",
   "Fish & Seafood":
     "Fresh fish and shellfish. Includes pescado, camarón, salmón, tilapia.",

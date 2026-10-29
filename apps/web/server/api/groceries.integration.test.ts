@@ -169,6 +169,92 @@ describe("grocery categorization integration", () => {
     );
   });
 
+  it("asks Jev again after the response when it can't place a new item", async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce(jevResponse("Deli", 0.3))
+      .mockResolvedValueOnce(jevResponse("Deli"));
+
+    const response = await callGroceries(envWithAi(run), "POST", "", {
+      name: "bologna",
+    });
+
+    expect(response.status).toBe(201);
+    const item = (await response.json()) as { id: string };
+    expect(item).toMatchObject({ category: "General", categorySource: "ai" });
+    expect(run).toHaveBeenCalledTimes(2);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, item.id));
+    expect(row).toMatchObject({ category: "Deli", categorySource: "ai" });
+    const [audit] = await db
+      .select()
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.recordId, item.id),
+          eq(auditLogs.operation, "UPDATE")
+        )
+      );
+    expect(audit).toMatchObject({ changedBy: ownerId });
+    expect(JSON.stringify(audit?.newValues)).toContain("Deli");
+  });
+
+  it("does not ask Jev again when it placed a new item", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Deli"));
+
+    await callGroceries(envWithAi(run), "POST", "", { name: "bologna" });
+
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("leaves a new item in General when Jev is still unsure on the retry", async () => {
+    const run = vi.fn().mockResolvedValue(jevResponse("Deli", 0.3));
+
+    const response = await callGroceries(envWithAi(run), "POST", "", {
+      name: "bologna",
+    });
+
+    const item = (await response.json()) as { id: string };
+    expect(run).toHaveBeenCalledTimes(2);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, item.id));
+    expect(row).toMatchObject({ category: "General" });
+  });
+
+  it("does not move a new item renamed while Jev retries", async () => {
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("upstream"))
+      .mockImplementationOnce(async () => {
+        await db
+          .update(groceryItems)
+          .set({ itemName: "jabón" })
+          .where(
+            and(
+              eq(groceryItems.householdId, householdId),
+              eq(groceryItems.itemName, "bologna")
+            )
+          );
+        return jevResponse("Deli");
+      });
+
+    const response = await callGroceries(envWithAi(run), "POST", "", {
+      name: "bologna",
+    });
+
+    const item = (await response.json()) as { id: string };
+    expect(run).toHaveBeenCalledTimes(2);
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, item.id));
+    expect(row).toMatchObject({ itemName: "jabón", category: "General" });
+  });
+
   it("moves a renamed item to Jev's new aisle", async () => {
     const id = await seedItem("pan", "Bakery");
     const run = vi.fn().mockResolvedValue(jevResponse("Frozen"));
@@ -304,6 +390,63 @@ describe("grocery categorization integration", () => {
         },
       ],
     });
+  });
+
+  it("asks Jev again after the response for an offline sync add it can't place", async () => {
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("upstream"))
+      .mockResolvedValueOnce(jevResponse("Deli"));
+    const deferred: Promise<unknown>[] = [];
+    const env = envWithAi(run);
+
+    const response = await handleSyncRequest({
+      env,
+      params: {},
+      request: new Request("http://localhost/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mutations: [
+            {
+              id: `mutation-${crypto.randomUUID()}`,
+              operation: "add",
+              entityType: "groceryItem",
+              entityId: `item-${crypto.randomUUID()}`,
+              payload: { name: "bologna" },
+            },
+          ],
+        }),
+      }),
+      sessionStatus: "authenticated",
+      session: session(),
+      loadContext: createRouterLoadContext({
+        cloudflare: {
+          env,
+          ctx: {
+            waitUntil: (task: Promise<unknown>) => deferred.push(task),
+          } as unknown as ExecutionContext,
+          caches: {} as CacheStorage,
+        },
+        app: {
+          cspNonce: "test-nonce",
+          sessionStatus: "authenticated",
+          session: session(),
+        },
+      }),
+    });
+    await Promise.all(deferred);
+
+    const body = (await response.json()) as {
+      results: { serverItem: { id: string; category: string } }[];
+    };
+    const serverItem = body.results[0]?.serverItem;
+    expect(serverItem?.category).toBe("General");
+    const [row] = await db
+      .select()
+      .from(groceryItems)
+      .where(eq(groceryItems.id, serverItem?.id ?? ""));
+    expect(row).toMatchObject({ category: "Deli", categorySource: "ai" });
   });
 
   it("stores a supplied aisle as the member's without asking Jev", async () => {
